@@ -1,0 +1,109 @@
+<TITLE>VAXTAP -- H2vaxinst-Defining-the-logical-names </TITLE>
+<P>
+<H2><A NAME=H2vaxinst-Defining-the-logical-names.html>Defining the logical names</A></H2>
+<P>
+The installation procedure generates a file SETUPSTARTUP.COM, which
+should be tailored to suit your system and then run at boot time.
+<P>
+The following logical name definitions are required in the LNM$SYSTEM
+table.
+<P>
+<DL>
+<DT><TT>SETUPEXE</TT></DT><DD>Points to the directory where the .EXE
+files are kept
+<DT><TT>SETUPLOGS</TT></DT><DD>Points to the directory for log files from
+cleanup jobs
+<DT><TT>SETUPENABLED</TT></DT><DD>Defined as INTERACTIVE, if interactive
+tape mounting is to be allowed
+<DT><TT>SETUPGENERIC</TT></DT><DD>List of users for whom the check on
+generic device name against the TMS is not performed.
+<DT><TT>SETUPMAXDEV</TT></DT><DD>Maximum number of devices of a given
+type that can be allocated per user per node. If not defined, the default
+is 999.
+<DT><TT>SETUPNOTAPES</TT></DT><DD>Can be used to define a list of users
+that are not allowed to use the VAXTAP commands
+<DT><TT>SETUPQUEUES</TT></DT><DD>Points to a list of batch queue names in
+which SETUP commands may be issued (or * for no restriction)
+<DT><TT>STAGETAPES</TT></DT><DD>Defined as YES if tape staging is
+enabled.
+<DT><TT>DISK$STAGE</TT></DT><DD>Points to the disk (or volume set, stripe
+set or search list) to be used for tape staging.
+</DL>
+<P>
+In addition, a logical name must exist for each generic device type. The
+logical name is SETUPgeneric-deviceS, thus, for a generic device of type
+8MM, the corresponding logical name is SETUP8MMS. The generic device type
+is selected using the /GENERIC qualifier of the various VAXTAP commands.
+<P>
+<PRE>
+                         <B>SETUPSTARTUP.COM</B>
+                                  </PRE>
+<P>
+<PRE>
+$ !---------------------------------------------------------------------------*
+$ !
+$ !      Startup command file for SETUP/STAGE/LABELDUMP
+$ !      Modify logical name definitions as required for your node.
+$ !---------------------------------------------------------------------------*
+$ !
+$ !
+$ !*** Following lines are CERN specific ***
+$ !      Create lnm table for SETUP information ...
+$ !      This is used at CERN in conjunction with the TMS
+$        create/name_table/parent=lnm$system_table/prot=w:wred lnm$setup
+$ !
+$ !      Issue TMS flush command
+$ !
+$        machine = f$trnlnm("SYS$NODE") - "::"
+$        command = "TMS FLUSH ALL SYSTEM ''machine'"
+$        'command'
+$ !*** End of CERN specific code ***
+$ !
+$ !      Define directory for .EXE files
+$        define/system setup_exe cern_root:[exe]
+$ !
+$ !      Define symbols for commands
+$ !
+$        einit    :==$setup_exe:einit
+$        labeldump:==$setup_exe:labeldump
+$        setup    :==$setup_exe:setup
+$        stage    :==$setup_exe:stage
+$        wrtape   :==$setup_exe:wrtape
+$        tapecopy :==@setup_exe:tapecopy ! Tapecopy is a command file
+$        xtape    :==$setup_exe:xtape
+$ !
+$ !      Allow usage of tapes interactively
+$ !
+$        define/system setup_enabled "INTERACTIVE"
+$ !
+$ !      Disallow specific users from using tapes (useful to stop troublemakers)
+$ !
+$ !      define/system setup_notapes "DECNET,CERNET"
+$ !
+$ !      Allow tapes in these batch queues
+$ !
+$ !      define/system setup_queues "SYS$TAPES"
+$ !      define/system setup_queues "SYS$BATCH,SYS$TAPES"
+$ !      define/system setup_queues "*" ! all queues
+$ !
+$ !      Set up lists of available device types
+$ !
+$        define/system setup_tk50s "VSDD18$MKA700:"
+$        define/system setup_8200s "UXDDB1$MUB0:"
+$        define/system setup_exabytes setup_8200s ! Can also have aliases...
+$ !
+$ !      Allow tape staging
+$ !
+$        define/system stage_tapes "YES"
+$ !      Must also ensure that DISK$STAGE exists...
+$ !
+$ !     Define directory for log files (CLEAN_STAGE.COM called from
+$ !     STAGECLN)
+$       if f$trnlnm("SYS$LOG") .eqs. ""
+$          then
+$             define/system setup_logs sys$manager
+$          else
+$             define/system setup_logs sys$log
+$          endif
+</PRE>
+<P>

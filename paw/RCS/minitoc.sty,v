@@ -1,0 +1,284 @@
+head     1.1;
+branch   ;
+access   ;
+symbols  ;
+locks    goossens:1.1; strict;
+comment  @@;
+
+
+1.1
+date     94.06.09.09.59.04;  author goossens;  state Exp;
+branches ;
+next     ;
+
+
+desc
+@initial entry
+@
+
+
+
+1.1
+log
+@Initial revision
+@
+text
+@% minitoc.sty
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Jean-Pierre Drucbert
+% ONERA/CERT/GPI
+% Office National d'\'Etudes et de Recherches A\'eroSpatiales
+% Centre d'\'Etudes et de Recherches de Toulouse
+% Groupe de Prestations Informatiques
+% Complexe Scientifique de Rangueil
+% 2, Avenue \'Edouard Belin
+% BP 4025
+% F-31055 TOULOUSE CEDEX
+% FRANCE
+%
+% Phone +33-61-55-70-59
+% Fax +33-61-55-71-72
+% Telex 521 596 F
+%
+% Email: drucbert@@reseau.onecert.fr
+%
+% Please send me any (constructive) suggestions and comments.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% minitoc.sty --- redefines the \chapter command to display a
+%  mini-table-of-contents at the beginning of every chapter.
+%  Oct-90       Original version, by Nigel Ward.
+%  Nov-91       Revised to reuse \chapter, \section, \subsection commands
+%               transparently, generate toc-file-name automatically,
+%               assorted other cleanup.  Dan Jurafsky
+%  Jun/Jul-93  New design, to avoid allocating a newwrite for each chapter (!)
+%               Added \chapterend to terminate the scope of a minitoc.
+%               (IF YOU FORGOT PUTTING \chapterend at the end of EACH chapter,
+%               an entry for the next chapter will appear in each minitoc.)
+%               (Thanks to Yufan Hu).
+%               Replaced ``minipage'' environnement by a ``verse''
+%               environnement, to allow a minitoc split across pages. All the
+%               layout of the minitoc is in the \minitableofcontents command,
+%               so if someboby wants to redefine that layout, he has just to
+%               rewrite it (and only it).
+%
+%               You can inhibit the minitoc for the next chapter by preceding
+%               it with \minitocno. (\minitocyes is useless for the user: it is
+%               implicit AFTER the \chapter* pseudo-chapters).
+%
+%               Problems: you MUST have \chapterend to terminate each chapter
+%               with a minitoc. How about avoiding this constraint?
+%
+%               The depth of the minitoc is user-adjustable with the counter
+%               `minitocdepth' (as `tocdepth' for the table of contents).
+%               At least three passes (3!!!) of LaTeX are necessary to get
+%               correct minitoc's (the first pass creates the .mtcX files, the
+%               second uses them (but they may contain wrong page numbers) and
+%               recreates them, the third should be ok).
+%
+%               Works with \chapter[xxx]{yyy} and floating bodies.
+%               Works with two columns (but the minitoc is in composed in one
+%               column; how to make it to spread over the two column?)
+%               Some mods added to work with xr.sty (external references).
+%               xr.sty version 5 is much more tolerant.
+%   05Jul93     Version 2
+%               Added compatibility with hangcaption.sty (the option
+%               hangcaption (if present) must be given BEFORE minitoc option.)
+%               BEWARE to options modifying \@@caption
+%               Version 3 not released (buggy)
+%   09Jul93     Version 4
+%               Added \if@@realch to avoid contentslines from pseudo-chapters
+%               to go into the toc!
+%               The option file minitocoff.sty allows to use a latex document
+%               with minitoc commands and to make them transparent: just
+%               replace the minitoc option by minitocoff.
+%   13Jul93     Version 5
+%               Added a selection mechanism to not write spurious things in
+%               the minitoc's.
+%   15Jul93     Version 6
+%               Fixed problems about chapters in the toc,
+%               removed obsolete \caption stuff (filters are better)
+%               added compatibility with toch.sty
+%               (toch.sty makes a table of chapters. if used,
+%               must be loaded BEFORE minitoc.sty)
+%   22Jul93     Version 7 (MAJOR DIFFERENCES)
+%               Completely rewritten, using tricks from xr.sty
+%               (the version 5, by David Carlisle). The info
+%               for minitocs is directely stolen from the .toc
+%               file.
+%               \chapterend and \minitocno are suppressed
+%               \minitoc, \dominitoc and \faketableofcontents added
+%   29Jul93     Version 8
+%               Spacing adjustements.
+%               Jean-Pierre Drucbert
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\typeout{*** minitoc style option, version 8 ***}
+\newwrite\tf@@mtc  % a file descriptor to write minitocs
+\newtoks\mtc@@toks
+\newcounter{mtc}  % counter of minitocs
+\setcounter{mtc}{0}
+\def\mtc@@string{\relax}
+\def\themtc{\arabic{mtc}}
+\newcounter{minitocdepth} % analog to tocdepth, but for minitocs
+\setcounter{minitocdepth}{2}
+\def\mtc@@rule{\kern-3\p@@
+  \hrule width \columnwidth \kern 2.6\p@@} % the \hrule is .4pt high
+
+\newlength\mtcindent % indentation (left/rigth) of minitocs
+\mtcindent=24pt      % defaut value
+\def\mtcfont{\small\rm}    % font for the minitoc
+%\def\mtc@@narrower{%   copied from \narrower in plain.tex
+%     \advance\leftskip\mtcindent \advance\rightskip\mtcindent}
+                        % \@@BBR discourages page breaks
+\def\@@BBR{\unpenalty\nopagebreak[4]}
+
+
+\def\mtc@@verse{\let\\=\@@centercr
+  \list{}{\itemsep\z@@ \itemindent 0pt\listparindent \itemindent
+          \leftmargin\mtcindent
+          \rightmargin\leftmargin}\item[]}
+\let\endmtc@@verse\endlist
+
+\newcommand{\minitoc}{% this command must be used after \chapter
+                      % if you need a minitoc (no automatic minitoc)
+        \relax{% we begin a local group here
+        \widowpenalty=10000
+        \clubpenalty=10000
+        \parskip=0pt
+        \noindent\reset@@font\mtcfont%
+%       \mtc@@narrower
+        \parindent=0pt%
+        \nopagebreak[4]%
+        \vspace*{-1.14\baselineskip}\nopagebreak[4]%
+        \mtc@@rule\nopagebreak[4]\vspace*{-1.4286\baselineskip}%
+        \nopagebreak[4]\null~\vrule width 0pt
+        height -\baselineskip\\\@@BBR
+        \leftmargin\mtcindent
+        \rightmargin\mtcindent
+        \itemindent=0pt \labelwidth=0pt
+        \labelsep=0pt \listparindent=0pt
+        \begin{mtc@@verse}\c@@tocdepth=\c@@minitocdepth
+        ~\\\@@BBR % this blanc line is necessary to avoid
+                 % a wild negative indentation
+\begingroup
+  \makeatletter
+  \def\@@tocfile{mtc\thechapter}
+  \@@input{\jobname.\@@tocfile}\if@@filesw
+  \fi
+  \global\@@nobreakfalse \endgroup
+        \end{mtc@@verse}%
+        \nopagebreak[4]\vspace*{-1.\baselineskip}%
+        \nopagebreak[4]\null~\nopagebreak[4]\\\@@BBR
+        \mtc@@rule\null~\\}% %## the \\ is essential
+        \par\pagebreak[1]\vspace{1.5\baselineskip}} % some space below minitoc
+
+% tricky code to deal with \chapter*
+\let\mtc@@schapter\@@schapter
+\def\@@schapter{\addtocontents{toc}{\string\chapterend}\mtc@@schapter}
+\def\@@schapter{\addtocontents{toc}{\string\chapterbegin}\mtc@@schapter}
+\let\chapterend\relax
+\let\chapterbegin\relax
+
+% this command extract info from the .toc file
+% and create the .mtcN files
+\def\@@dominitoc#1{{%
+  \makeatletter
+  \MTC@@next#1.toc\relax\\}}
+
+\def\dominitoc{\@@dominitoc{\jobname}\immediate\closeout\tf@@mtc}
+
+
+\def\MTC@@next#1\relax#2\\{%
+  \edef\MTC@@list{#2}%
+  \MTC@@loop{#1}}
+\def\MTC@@toc{%
+  \ifx\MTC@@list\@@empty\else\expandafter\MTC@@explist\fi}
+
+\def\MTC@@contentsline#1#2#3{%
+\expandafter%
+ \ifx\csname #1\endcsname\chapter\relax
+ \stepcounter{mtc} % the mtc counter simulates the chapter counter
+ \typeout{Writing\space\jobname.mtc\themtc}
+ \def\mtcname{\jobname.mtc\themtc}
+ \immediate\closeout\tf@@mtc % close the current .mtcN file
+ \immediate\openout\tf@@mtc=\mtcname % open the next .mtcN file
+ \fi
+\expandafter% % extract and write info for sections, etc.
+ \ifx\csname #1\endcsname\section\relax
+   \mtc@@toks{\noexpand ~#2}
+   \edef\@@tempa{\immediate\write\tf@@mtc {%
+   \string\mtc@@string%
+   \string\contentsline{#1}{\noexpand\the\mtc@@toks}{#3}}}\@@tempa
+ \fi
+\expandafter%
+ \ifx\csname #1\endcsname\subsection\relax
+     \mtc@@toks{\noexpand ~#2}
+     \edef\@@tempa{\immediate\write\tf@@mtc {%
+     \string\mtc@@string%
+     \string\contentsline{#1}{\noexpand\the\mtc@@toks}{#3}}}\@@tempa
+ \fi
+\expandafter%
+ \ifx\csname #1\endcsname\subsubsection\relax
+     \mtc@@toks{\noexpand ~#2}
+     \edef\@@tempa{\immediate\write\tf@@mtc {%
+     \string\mtc@@string%
+     \string\contentsline{#1}{\noexpand\the\mtc@@toks}{#3}}}\@@tempa
+ \fi
+\expandafter%
+ \ifx\csname #1\endcsname\paragraph\relax
+     \mtc@@toks{\noexpand ~#2}
+     \edef\@@tempa{\immediate\write\tf@@mtc {%
+     \string\mtc@@string%
+     \string\contentsline{#1}{\noexpand\the\mtc@@toks}{#3}}}\@@tempa
+ \fi
+\expandafter%
+ \ifx\csname #1\endcsname\subparagraph\relax
+     \mtc@@toks{\noexpand ~#2}
+     \edef\@@tempa{\immediate\write\tf@@mtc {%
+     \string\mtc@@string%
+     \string\contentsline{#1}{\noexpand\the\mtc@@toks}{#3}}}\@@tempa
+ \fi
+}
+
+\def\MTC@@explist{\expandafter\MTC@@next\MTC@@list\\}
+\def\MTC@@loop#1{\openin\@@inputcheck#1\relax
+  \ifeof\@@inputcheck
+    \typeout{^^JNo file #1^^JMINITOCS NOT PREPARED.^^J}%
+    \expandafter\MTC@@toc
+  \else
+    \typeout{PREPARING MINITOCS FROM #1}%
+    \expandafter\MTC@@read\fi}
+\def\MTC@@read{%
+  \read\@@inputcheck to\MTC@@line
+  \expandafter\MTC@@test\MTC@@line....\MTC@@}
+\long\def\MTC@@test#1#2#3#4#5\MTC@@{%
+  \ifx#1\contentsline
+    \let\mtc@@string\string
+    \MTC@@contentsline{#2}{#3}{#4}%
+    \let\mtc@@string\relax
+  \else\ifx#1\@@input
+     \edef\MTC@@list{\MTC@@list#2\relax}%
+  \else\ifx#1\chapterend % \chapter* closes the .mtcN file
+     \immediate\closeout\tf@@mtc
+     \immediate\openout\tf@@mtc=\jobname.bmt % and opens a scratch file
+  \else\ifx#1\chapterbegin
+     \addtocounter{mtc}{-1} % \chapter* has done a parasite increment
+     \fi
+     \fi
+  \fi\fi
+  \ifeof\@@inputcheck\expandafter\MTC@@toc
+  \else\expandafter\MTC@@read\fi}
+
+% if you don't want a table of contents, but want minitocs,
+% you need to creat the .toc file, without inputing it
+% into your document. This command is a stripped off version
+% of \tableofcontents
+\def\faketableofcontents{\fake@@starttoc{toc}}
+\def\fake@@starttoc#1{\begingroup
+  \makeatletter
+  \if@@filesw \expandafter\newwrite\csname tf@@#1\endcsname
+             \immediate\openout \csname tf@@#1\endcsname \jobname.#1\relax
+  \fi \global\@@nobreakfalse \endgroup}
+\endinput
+%%
+@

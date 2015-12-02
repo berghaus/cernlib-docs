@@ -1,0 +1,159 @@
+head     1.1;
+access   ;
+symbols  ;
+locks    goossens:1.1; strict;
+comment  @@;
+
+
+1.1
+date     94.04.25.09.23.32;  author goossens;  state Exp;
+branches ;
+next     ;
+
+
+desc
+@Initial Entry
+@
+
+
+
+1.1
+log
+@Initial revision
+@
+text
+@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%  GEANT manual in LaTeX form                              %
+%                                                                 %
+%  Michel Goossens (for translation into LaTeX)                   %
+%  Version 1.00                                                   %
+%  Last Mod. Jan 24 1991  1300   MG + IB                          %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\Origin{W.Mitaroff}
+\Submitted{21.02.85}               \Revised{19.12.93}
+\Version{Geant 3.16}               \Routid{HITS510}
+
+\Makehead{Digitisation for drift chambers}
+
+\Shubr{GCDRIF}{(RADD,ZMIN,ZMAX,DETREP,HITREP,IOUT*)}
+\begin{DLtt}{MMMMMMMM}
+\item[RADD] ({\tt REAL}) radius of cylindrical chamber in cm;
+\item[ZMIN] ({\tt REAL}) $z$ of lower end of cylindrical chamber;
+\item[ZMAX] ({\tt REAL}) $z$ of upper end of cylindrical chamber;
+\item[DETREP] ({\tt REAL}) array of 8 with detector description:
+\begin{DLtt}{MMMM}
+\item[1] number of wires;
+\item[2] wire spacing in $\phi$ (radians);
+\item[3] cosine of wire angle with respect to the $z$ axis;
+\item[4] sine of wire angle  with respect to the $z$ axis 
+(signed like $d\phi/dz$);
+\item[5] $d\phi/dz$ along wire;
+\item[6] $\phi$ of point with $z=0$ on wire 1;
+\item[7] drift velocity (cm nsec$^{-1}$);
+\item[8] if $>0$ user routine \Rind{GUDTIM}
+will be called to calculate drift time;
+\end{DLtt}
+\item[HITREP] ({\tt REAL}) array of 4 describing the track:
+\begin{DLtt}{MMMM}
+\item[1] $\phi$ coordinate of intersection;
+\item[2] $z$ coordinate of intersection;
+\item[3] $d\phi/dr$;
+\item[4] $dz/dr$;
+\end{DLtt}
+\item[IOUT] ({\tt INTEGER}) array of 4 with digitisation information:
+\begin{DLtt}{MMMM}
+\item[1] wire number (1...{\tt NWI} with increasing phi), -1 if {\tt DETREP}
+parameters are inconsistent;
+\item[2] drift time in nsec, $>0$ if $\phi(hit)>\phi(wire)$;
+\item[3] digitised current division information
+(relative position of charge along wire, per mille);
+\item[4] amount of charge deposited onto wire.
+\end{DLtt}
+\end{DLtt}
+Digitisation routine for a cylindrical drift chamber.
+ 
+\begin{figure}[hbt]
+     \centering
+%    \epsfig{file=eps/hits510-1.eps,width=14cm}
+\begin{verbatim}
+                        Charge                     
+         .              |                        .
+         |              .                        |
+         =========================================  SENSE WIRE
+     ...................................................> Z (cm)
+         Z              Z                        Z 
+          l                                       u
+     ...............................................> ICD (0<ICD<1000)
+         0              ICD                      1000
+               ICD                (1000-ICD)
+\end{verbatim}
+     \caption{Coordinate system along the wire}
+     \label{fg:hits510-1}
+\end{figure}
+
+Knowing the position $Z$ of the deposit of charge we can calculate
+\[
+\mbox{\tt ICD} = L \frac{Z-Z_l}{Z_u -Z_l} 
+\]
+where $L=1000$ in the
+program. This is the information stored into {\tt IOUT(3)}.
+
+\Shubr{GCDERR}{(ICD*,ERP,ERS)}
+\begin{DLtt}{MMMMMMMM}
+\item[ICD] ({\tt INTEGER}) digitised current division information 
+($\leq\mbox{\tt ICD}\leq1000$), overwritten on output with the
+modified value taking into account the errors;
+\item[ERP] ({\tt REAL}) variance of Gaussian pedestal errors 
+on the measured
+pulse heights relative to the sum of the pulse heights;
+\item[ERS] ({\tt REAL}) variance of Gaussian slope 
+errors on the measured
+pulse heights relative to the each pulse heights.
+\end{DLtt}
+Routine to calculate the error on the current division
+information as obtained by \Rind{GCDRIF}.
+Here we assume that {\tt ICD} has been determined by measuring the pulse heights 
+$I_1, I_2$ at the two ends of the wire with the formula:
+\[
+\mbox{\tt ICD} = L \; \frac{I_2}{I_+} 
+\mbox{\hspace{1cm}with\hspace{1cm}}  I_+ = I_1+I_2 
+\]
+Its error is determined by:
+\[
+\delta \mbox{\tt ICD} = - \frac{\mbox{\tt ICD}}{I_+} \delta I_1 + 
+\frac{L-\mbox{\tt ICD}}{I_+}  \delta I_2
+\mbox{\hspace{5mm}and\hspace{5mm}}
+\delta I_1 = \delta_1 + \epsilon_1 \; I_1  \mbox{\hspace{3mm};\hspace{3mm}}
+\delta I_2 = \delta_2 + \epsilon_2 \; I_2 
+\]
+ 
+ 
+$\delta_1$ and $\delta_2 $ are of dimension {\tt [I]} and represent the 
+{\it pedestal} errors. $\epsilon_1$ and $\epsilon_2$ are the {\it slope} errors.
+Errors are independent (no correlations), with a Gaussian distribution with 
+average 0 and {\tt ERP} as relative variance for pedestals $\delta_i/I_+$ 
+and {\tt ERS} as variance for slopes $\epsilon_i$.  This gives the final result
+ 
+\[
+\delta \mbox{\tt ICD}   = \underbrace{-\frac{\delta_1}{I_+}\mbox{\tt ICD} +
+                 \frac{\delta_2}{I_+}(L-\mbox{\tt ICD})}_{\mbox{\it pedestals}}
+               +
+ \underbrace{(\epsilon_2-\epsilon_1)
+\frac{\mbox{\tt ICD}(L-\mbox{\tt ICD})}{L}}_{\mbox{\it slope}}
+\]
+
+\Rind{GCDERR} sets the {\tt ICD} obtained from \Rind{GCDRIF} to
+$\mbox{\tt ICD}=\mbox{\tt ICD}+\delta \mbox{\tt ICD}$ with 
+$ 0 \leq \mbox{\tt ICD}\leq L$.
+
+\Sfunc{GUDTIM}{VALUE = GUDTIM(DETREP,HITREP,IW1,DIS)}
+The arguments have the same meaning than for \Rind{GCDRIF} apart from:
+\begin{DLtt}{MMMMMMMM}
+\item[IW1] ({\tt INTEGER}) wire number which will generate a signal;
+\item[DIS] ({\tt REAL}) distance from the track to the wire;
+\end{DLtt}
+This function has to be written by the user to return the drift time
+in nanoseconds.
+@

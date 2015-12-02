@@ -1,0 +1,111 @@
+\Version {PKCHAR}                      \Routid{M427}
+\Keywords{UNPACK PACK CONTINUOUS BYTE STRING}
+\Author{J. Zoll}                       \Library{KERNLIB}
+\Submitter{}                           \Submitted{01.06.1973}
+\Language{Fortran or Assembler}        \Revised{16.09.1991}
+\Cernhead {Pack/Unpack Continuous Byte-strings}
+{\tt PKCHAR} allows packing of integers into
+{\it continuous byte-strings} on zoned memory across word boundaries.
+The term {\it continuous byte-string} is used here to designate
+$n$-bit bytes, stored from left to right,
+as opposed to the objects handled by {\tt PKBYT} (M422),
+which are stored right to left within each word.
+The inverse unpacking is performed by {\tt UPKCH}.
+Leading and trailing bits of each zone can be ignored.
+\Structure
+{\tt SUBROUTINE} subprograms\\
+User Entry Names: \Rdef{PKCHAR}, \Rdef{UPKCH}\\
+External References: \Rind{JBYT}{M421}, \Rind {SBYT}{M421}, \Rind{CBYT}{M421}\\
+{\tt COMMON} Block Names and Lengths: {\tt /SLATE/ NWU,DUMMY(39)}
+\Usage
+\begin{verbatim}
+    CALL PKCHAR(INT,MPK,N,IPAR)
+    CALL UPKCH (MPK,INT,N,IPAR)
+\end{verbatim}
+{\tt PKCHAR} packs the {\tt N}--word vector {\tt INT} of integers into
+the continuous byte-string supported by the vector {\tt MPK} according
+to the packing specifications given in {\tt IPAR}.
+\par
+{\tt UPKCH} is the exact inverse of {\tt PKCHAR}.
+\par
+The packing parameters are given in the 5-element vector {\tt IPAR}:
+\begin{DLtt}{1234567890}
+\item [IPAR(1)] Number of bits per byte, must be $\geq 1$.
+\item [IPAR(2)] Number of bytes to be used in each
+zone (starting with the left-most); \\
+if $\mathtt{IPAR(2)=0}$, the maximum
+possible number is used.
+\item [IPAR(3)] Number of bits per zone. If
+$\mathtt{IPAR(3)=0}$, a zone equals 1 word.
+\item [IPAR(4)] Number of leading bits of each zone
+to be ignored.
+\item [IPAR(5)] Each new word handled by {\tt PKCHAR} is preloaded with
+{\tt IPAR(5)}.
+\end{DLtt}
+{\tt MPK} is seen as a continuous string of bits,
+starting with the most significant bit of {\tt MPK(1)},
+ignoring word boundaries.
+This string is divided into a number of consecutive and contiguous zones,
+each of {\tt IPAR(3)} bits;
+the first zone starts with the most significant bit of {\tt MPK(1)}.
+Each zone contains {\tt IPAR(4)} leading bits,
+a number of bytes (each of {\tt IPAR(1)} bits), and trailing bits, if any.
+\par
+On return from either routine, {\tt NWU} in {\tt COMMON} block
+{\tt /SLATE/} indicates the number of words in {\tt MPK} actually used.
+{\tt PKCHAR} sets to {\tt IPAR(5)} each word of {\tt MPK} before
+filling it, but it does not clear any trailing unused words which
+logically belong to the last zone.
+\newpage
+\Examples
+\begin{enumerate}
+\item To convert, on the CDC 7600, 6-bit Hollerith text to 7-bit
+{\tt ASCII}--code, to be held in 36-bit words on the PDP10,
+with 5 characters per word.
+\begin{verbatim}
+    DATA IPACK6 /6,0,0,0,0/
+    DATA IPACK7 /7,0,36,0,0/
+    CALL UPKCH(HOLL,INT,N,IPACK6)
+\end{verbatim}
+unpacks the Hollerith string {\tt HOLL} into {\tt INT}, where
+{\tt INT(I)} is a small integer giving the display-code value of the
+{\tt I}-th character. After conversion to {\tt ASCII}, one may pack:
+\begin{verbatim}
+    CALL PKCHAR(INT,MPK,N,IPACK7)
+\end{verbatim}
+giving the vector {\tt MPK} ready to be written out.
+If for some reason one required the first and the last (5th)
+character in each 36-bit PDP10 word to be zero, one could use:
+\begin{verbatim}
+    DATA IPACK7 /7,3,36,7,0/
+\end{verbatim}
+\item To unpack 8-character bytes read with the CDC 7600 from
+9-track tapes:
+\begin{verbatim}
+    DATA IPACK /8,0,120,0,0/
+    CALL UPKCH(A,INT,N,IPACK)
+\end{verbatim}
+\item To unpack on the CRAY 32-bit integers,
+read one each into one 64-bit machine word,
+into 16-bit integers, one each in one machine word,
+right-justified with zero-fill:
+\begin{verbatim}
+    DATA IPACK /16,2,0,32,0/
+    CALL UPKCH(I32,I16,N,IPACK)
+\end{verbatim}
+The same operation on the Apollo, which has 32-bit words,
+could be done with
+\begin{verbatim}
+    DATA IPACK /16,0,0,0,0/
+\end{verbatim}
+\item The Fortran implementaion of {\tt BLOW} (M426) executes:
+\begin{verbatim}
+    IPACK(1) = NBITS
+    IPACK(2) = 0
+    IPACK(3) = NBYTES*NBITS + 127
+    IPACK(4) = 0
+    IPACK(5) = 0
+    CALL UPKCH(SOURCE,TARGET,NBYTES,IPACK)
+\end{verbatim}
+\end{enumerate}
+$\bullet$

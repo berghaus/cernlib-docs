@@ -1,0 +1,89 @@
+% 20 may 1992  mg
+\Version{ABUSER}                          \Routid{Z036}
+\Keywords{ABUSER FORTRAN IBM REENT}
+\Author{R. Matthews, A. Cass}           \Library{KERNLIB, IBM only}
+\Submitter{}                              \Submitted{01.02.1983 }
+\Language{Assembler}                      \Revised{19.07.1988}
+\Cernhead {Intercept a Fortran Abend on IBM}
+{\tt ABUSER} enables a user-supplied subroutine to receive control when
+the user's program abends. A call to {\tt ABUSER} identifies the
+user-supplied subroutine which is to receive control. The
+identified subroutine will be called if the user's program
+abends and can perform pre-termination processing such as
+printing summaries or plotting histograms.
+\Structure
+{\tt SUBROUTINE} subprogram \\
+User Entry Names: \Rdef{ABUSER}
+\Usage
+\begin{verbatim}
+    CALL ABUSER(NAME)
+\end{verbatim}
+\begin{DLtt}{12345678}
+\item [NAME] Name of a user-supplied {\tt SUBROUTINE} subprogram
+declared {\tt EXTERNAL} in the calling program.
+\end{DLtt}
+This subprogram
+receives control via a call of the form
+\begin{verbatim}
+    CALL NAME(KODES,KODEU)
+\end{verbatim}
+\begin{DLtt}{123456}
+\item[KODES] A 4-byte integer containing, if available, the system
+completion code as hexadecimal number (use {\tt Z} format for printing).
+\item[KODEU] A 4-byte integer containing, if available, the user
+completion code as integer number (use {\tt I} format for printing).
+\end{DLtt}
+\Restrict
+This subprogram is compiler and system dependent.
+\par
+MVS:
+\par
+The Fortran 4 version relies on modifications to the IBM
+H-extended compiler  library and is therefore not portable. The
+Fortran 77 version uses a standard interface into the {\tt FACOM}
+compiler library.
+\par
+CMS:
+\par
+The subprogram is compiler independent but {\tt KODES} and {\tt KODEU}
+are not available and so are set to zero. Note that the routine uses
+storage in the CMS nucleus -- the {\tt NUSERFWD} field and also 8-bytes
+at {\tt NCCOPYR} -- which must not be overwritten. (No other CERN Library
+routine uses these locations.)
+\Notes
+{\tt ABUSER} can be called at any time during normal processing,
+(i.e. before an abend occurs), to re-specify the name of the
+user-supplied subroutine. Alternatively, the effect of previous calls
+can be cancelled by {\tt CALL ABUSER(0)}. A call to {\tt ABUSER}
+after an abend will have no effect.
+\par
+A secondary abend which occurs while the user is processing the primary
+abend will cause program termination.
+\newpage
+Under MVS the user-supplied subroutine will not receive control for the
+following completion codes:\\
+\begin{DLtt}{123456}
+\item[122] -- job cancelled with dump
+\item[222] -- job cancelled
+\item[322] -- cpu time exceeded
+\item[522] -- wait time limit exceeded
+\end{DLtt}
+\Examples
+In the following example, {\tt ABUSER} is called to identify a subroutine
+called {\tt FATAL} as the subroutine which is to receive control when the
+user's program abends. If an abend occurs, subroutine {\tt FATAL} will
+be called and will print the completion codes and then call {\tt HISTDO}
+to plot histograms.
+\begin{verbatim}
+    EXTERNAL FATAL
+    ...
+    CALL ABUSER(FATAL)
+    ...
+    END
+    SUBROUTINE FATAL(KODES,KODEU)
+    WRITE(6,'(1X,''PROGRAM ABENDING WITH CODES '',Z3,I5)') KODES,KODEU
+    CALL HISTDO
+    RETURN
+    END
+\end{verbatim}
+$\bullet$

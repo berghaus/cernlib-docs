@@ -1,0 +1,594 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%   ZEBRA RZ - Reference Manual -- LaTeX Source                   %
+%                                                                 %
+%   Appendices - System dependencies                              %
+%              - Technical details                                %
+%                                                                 %
+%   Original: Michel Goossens (from SGML source)                  %
+%   Additions: Jamie Shiers                                       %
+%                                                                 %
+%   Last Mod.:  3 June 1993 18:00 mg                              %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\Filename{H1rzappen-system-specific-details}
+\chapter{System specific details}
+
+\Filename{H2rzappen-VMCMS}
+\section{VM/CMS systems}
+\index{VM/CMS}
+
+On VM/CMS systems, RZ files should always have mode 6, i.e. ``update
+in place''. In addition, if a file is to be written by one user
+and simultaneously read by another, the {\tt'F'} option of \Rind{RZMAKE} is 
+recommended. If this is not used, users reading the file will
+not see consistant information if the file is extended, unless
+the file is first closed and they reaccess the appropriate disk.
+\par
+The \Rind{RZOPEN} routine should always be used to open an RZ file
+on VM/CMS systems, to ensure that more than the VS Fortran default
+of 50 records can be read and written.
+
+\Filename{H2rzappen-VAXVMS}
+\section{VAX/VMS systems}
+\index{VAX/VMS}
+
+Shared access (in the VAX Fortran sense of \Lit{OPEN(LUN,SHARED,..)})
+can give rise to excessive RMS lock traffic in VAXcluster systems.
+If shared read access with concurrent write is required, you
+might wish to consider the use of a read-only copy of the
+RZ file, updated at regular intervals from the ``master'' file,
+to avoid such problems.
+
+\subsection{NFS access}
+\index{NFS}
+
+Files residing on non-VMS systems that are accessed via NFS~\cite{bib-NFS}
+should be processed using C I/O (option {\tt'C'} in \Rind{RZOPEN}).
+This is because such files are seen as \Lit{STREAM\_LF} to VAX Fortran
+and cannot be read with Fortran direct access.
+
+Note that files created on most Unix systems are automatically
+in exchange mode, as exchange mode corresponds to native on
+such systems (IEEE floating point format). When reading these
+files, the option 'X' must be given on both the \Rind{RZOPEN}
+and \Rind{RZFILE} calls, as the file itself is not 'marked'
+as exchange mode.
+
+\newpage
+\Filename{H2rzappen-MVS}
+\section{MVS systems}
+\index{MVS}
+
+To enable shared access to an RZ (or any Fortran direct access) file
+on systems running MVS, the file should be created as a VSAM
+file using the following procedure.
+
+\begin{XMPt}{Creating an RZ file on MVS systems}
+         //CRVSAM    JOB  ,CLASS=E,TIME=(0,01),NOTIFY=F99ABC
+         /*JOBPARM LINES=2
+         //A EXEC PGM=IDCAMS,REGION=512K
+         //SYSPRINT DD SYSOUT=*
+         //SYSIN DD *
+          DELETE                  /* delete old file, if exists */ -
+          (F99ABC.KEYEDACC.FILE) -
+          PRG    CLUSTER
+ 
+          DEFINE CLUSTER          /* create new keyed access file */ -
+          (NAME(F99ABC.KEYEDACC.FILE) -
+          VOLUMES(STR012) -
+          INDEXED -
+          RECORDS(10 10)          /* primary secondary_space (in records) */ -
+          KEYS(20 20)             /* length and offset (in bytes) */ -
+           SHAREOPTIONS(4 3)       /* multi read + multi write */ -
+          SPEED -
+          SPANNED -
+          REUSE -
+          RECORDSIZE(23400 23400))      /* average maximum (in bytes) */ -
+          DATA -
+          (NAME(F99ABC.KEYEDACC.FILE.DATA)) -
+          INDEX -
+          (NAME(F99ABC.KEYEDACC.FILE.INDEX))
+\end{XMPt}
+
+\Filename{H2rzappen-automatic-determination-record-length}
+\section{Automatic record length determination}
+
+The routine \Rind{RZOPEN} can automatically determine the 
+record length of existing RZ files. This is triggered
+by specifying a value of zero for the parameter \Rarg{LRECL}
+on input. The record length is determined as follows:
+
+\begin{UL}
+\item IBM systems (Fortran I/O only). 
+      The file is first opened for sequential
+      access and a Fortran unformatted read is issued,
+      using the IBM extension NUM=nbytes, e.g.
+\begin{XMP}
+            READ(UNIT=LUNIT,NUM=LRECL) ITEST
+\end{XMP}
+      The file is then closed and reopened for direct-access
+      I/O.
+\item VAX/VMS and Apollo systems (SR9) (Fortran I/O only). 
+      The file is first
+      opened for sequential access and a Fortran inquire
+      statment is issued, e.g.
+\begin{XMP}
+            INQUIRE(UNIT=LUNIT,RECL=LRECL)
+\end{XMP}
+      The file is then closed and reopened for direct-access
+      I/O.
+\item All other systems plus VAX/VMS systems using C I/O.
+      The record length is determined from the data in the file
+      itself. For this reason, the RZ package must know if the
+      file is in native or exchange format.
+      For this reason, the option \Lit{'X'} is recommended
+      when processing exchange format files.
+\end{UL}
+
+\Filename{H1rzappen-RZ-technical-details}
+\chapter{Technical details of the ZEBRA RZ system}
+
+\Filename{H2rzappen-RZ-IO}
+\section{RZ I/O}
+
+The RZ package uses Fortran I/O, unless the option 'C' is specified
+on the calls to \Rind{RZOPEN}, \Rind{RZMAKE} and \Rind{RZFILE}.
+If C I/O is used, the C file pointer is {\bf returned} by the
+routine \Rind{RZOPEN}. Thus the LUN parameter must not be a constant.
+
+On most machines, the file pointer returned by the C library
+is a small positive integer. To avoid possible conflicts with
+Fortran logical units, the RZ package adds 1000 to such
+pointers. This is handled internally by the RZ package and has
+no impact on the user.
+
+\Filename{H2rzappen-RZ-link-area}
+\section{RZ link area}
+
+A permanent reference link area, \Lit{RZCL}, is automatically created upon the first
+call to \Rind{RZFILE} or \Rind{RZMAKE}. This link area is defined
+in the patchy sequence \Lit{P=QCDE,D=QCDE,Z=RCL}.
+This link area contains the following definitions:
+\begin{DLtt}{123456}
+\item[LTOP]Address of control bank for current RZ file
+\item[LRZ0]Address of bank for memory files
+\item[LCDIR]Address of directory structure for current working directory
+\item[LRIN]Last record read 
+\item[LROUT]Last record written
+\item[LFREE]Pointer to list of free records
+\item[LUSED]Pointer to list of used records
+\item[LPURG]Pointer to list of purged records
+\item[LTEMP]
+\item[LCORD]Pointer to list of ordered cycles
+\item[LFROM]Pointer to copied directory
+\end{DLtt}
+\Lit{LQRS} (system link 7) points to a linear chain containing
+the control banks for all RZ files currently open.
+A bank for a specific Fortran logical unit or C file pointer 
+can be located using the following code.
+(The numeric bank identifier is set to the Fortran logical
+unit or C file pointer). 
+\newpage
+\begin{XMPt}{Locating the RZ control bank by logical unit}
+*
+*     Any RZ files open?
+*
+      IF(LQRS.EQ.0)GO TO 99
+*
+*     Yes, loop over linear chain looking for the bank
+*     for logical unit LUN
+*
+      LRZ=LQRS
+  10  IF(LRZ.EQ.0)GO TO 99
+      IF(IQ(KQSP+LRZ-5).NE.LUN)THEN
+         LRZ=LQ(KQSP+LRZ)
+         GO TO 10
+      ENDIF
+*
+*     LRZ now points to the control bank for LUN
+*     LRECL is equal to # of data words of bank
+*
+      LRECL = IQ(KQSP+LRZ-1)
+*
+...
+  99  CONTINUE
+\end{XMPt}
+\newpage
+
+\Filename{H2rzappen-RZ-control-bank}
+\section{Structure of the RZ control bank}
+
+The variable \Lit{LTOP} points to the control bank
+for the current RZ file, e.g. the one corresponding
+to the current working directory. 
+%\begin{XMPt}{Structure of LTOP bank}
+%       - STATUS word description
+%           - bit 1 =1  if no authorisation to modify directory
+%           - bit 2 =1  if directory has been modified
+%           - bit 3 =1  if file locked by 'RZFILE'
+%           - bit 4 =1  if ORGANIZATION='RELATIVE' on VAX
+%           - bit 5 =1  if C file access routine used
+%           - bit 11-17 LOG level (default taken from MZ)
+% 
+%         LOGLV = JBYT(IQ(KQSP+LRZ),11,7)-10
+% 
+%       - LTOP description
+% 
+%         *********************************************************
+%         * -10*       *  Free reference link                     *
+%         * -9 *       *  Free                                    *
+%         * -8 * LCORD *  Pointer to ordered cycles (RZCOPY)      *
+%         * -7 * LRIN  *  Pointer to input buffer                 *
+%         * -6 * LROUT *  Pointer to output buffer                *
+%         * -5 * LPURG *  Pointer to list of purged records       *
+%         * -4 * LFROM *  Pointer to copied directory             *
+%         * -3 * LUSED *  pointer to list of used records         *
+%         * -2 * LFREE *  Pointer to list of free records         *
+%         * -1 * LSDIR *  Pointer to first subdirectory           *
+%  LTOP==>*IIII*       *  Status word                             *
+%         * +1 *       *  directory structure (see below)         *
+%         * .. *       *                                          *
+%         *LREC*       *                                          *
+%         *********************************************************
+%\end{XMPt}
+%\newpage
+
+The first data word of this control bank can be accessed by
+\Lit{IQ(KQSP+LTOP+1)}, where 
+\Lit{KQSP} is the offset of the primary store from \Lit{LOCF(LQ(0))}.
+
+The record numbers for each subdirectory of a given
+directory are in a separate structure. The subdirectory
+structure of the top directory is reached by \Lit{IQ(KQSP+LTOP+KLS)}.
+
+For the top directory, \Lit{IQ(KQSP+LTOP+KLB)}
+points to a file descriptor structure,
+
+\begin{XMPt}{RZ Directory structure (DZDOC format)}
+\label{xmp:rztop}
+ Bank IDH  RZ       RZ system top bank                                          
+ Bank IDN           Numeric bank identifier
+                    Fortran Unit
+                    If CACCESS set: 1000 + file pointer
+                    If HACCESS set: address of user routine
+ Author             R.Brun                                                      
+ Store     0                                                                    
+ Division  SYSTEM                                                               
+ NL              10                                                             
+ NS               9                                                             
+ ND        variable                                                             
+ Next      RZ0                                                                  
+ Up        NONE                                                                 
+ IO-Charac          I                                                           
+              ---------- Description of the links  ----------
+ 1         LSDIR    Pointer to first subdirectory                               
+ 2         LFREE    Pointer to list of free records                             
+ 3         LUSED    pointer to list of used records                             
+ 4         LFROM    Pointer to copied directory                                 
+ 5         LPURG    Pointer to list of purged records                           
+ 6         LROUT    Pointer to output buffer                                    
+ 7         LRIN     Pointer to input buffer                                     
+ 8         LCORD    Pointer to ordered cycles (RZCOPY)                          
+ 9         LSNUSED  Free                                                        
+              ---------- Description of the Reference links  ----------
+ 1         LRNUSED  Free reference link *                                       
+              ---------- Description of the status bits ----------
+ 1         NOAUTH   no authorisation to modify directory                        
+ 2         MODIFIED directory has been modified                                 
+ 3         LOCKED   file locked by 'RZFILE'                                     
+ 4         ORGREL   ORGANIZATION='RELATIVE' on VAX                              
+ 5         CACCESS  C file access routine used                                  
+ 6         HACCESS  Hook to user's I/O routine
+ 7-13      USERLUN  User unit number
+ 14                 Reserved for future use
+ 15-17     LOGLEVEL LOG-level+3  (default taken from MZ)                     
+              ---------- Description of the data words   ----------
+ 1         Z:IDNAME Directory name (up to 16 characters)                        
+ 2         Z:IDNAME "                                                           
+ 3         Z:IDNAME "                                                           
+ 4         Z:IDNAME "                                                           
+ 5         RECPT1   Record number of the mother directory,                      
+ 6         RECPT2   or C file pointer (words 5 and 6)                           
+ 7         B:IWPW1  Write password (1st part)                                   
+ 8         B:IWPW2  (2nd part)                                                  
+ 9         NCHDRW   No. of char. DIR(1:5),WPW(6:10), and bit 12 eX mode         
+ 10        D:IDATEC Creation date/time                                          
+ 11        D:IDATEM Last mod date/time                                          
+ 12        NQUOTA   Maximum number of records QUOTA                             
+ 13        N:NRUSED Number of used records                                      
+ 14        NWUSED   Number of words used MOD 1000000                            
+ 15        NMEGA    Number of megawords used                                    
+ 16        RESERVED Reserved                                                    
+ 17        IRIN     Record number currently in LRIN                             
+ 18        IROUT    Record number currently in LROUT                            
+ 19        IRLOUT   Number of the last record written                           
+ 20        IP1      Pointer to first free word in IRLOUT                        
+ 21        ICONT    Record number continuation                                  
+ 22        NFREE    Number of words free in F                                   
+ 23        N:NSD    Number of subdirectories                                    
+ 24        P:LD     Pointer to directory records                                
+ 25        P:LB     Pointer to file descriptor (only for TOP)                   
+ 26        P:LS     Pointer to first subdirectory S                             
+ 27        P:LK     Pointer to first KEY K                                      
+ 28        P:LF     Pointer to free space F                                     
+ 29        LC       Pointer to last cycle C                                     
+ 30        LE       Pointer to end of directory                                 
+ 31        N:NKEYS  Number of keys in that directory                            
+ 32        N:NWKEY  Number of elements in one key                               
+ --REP level=1  N:NWKEY + 9 / 10                                                
+     1       B:KDES   KEYS descriptor (3 bits per el. ,10 keys per word)        
+ --REP level=1 -- End --                                                        
+ --REP level=1  N:NWKEY                                                         
+     1       Z:TAG1   First part of CHTAG(1) 4 characters                       
+     2       Z:TAG2   Second part                                               
+ --REP level=1 -- End --                                                        
+ 1         L:LD     Directory records structure                                 
+ 1         N:NRD    Number of records to describe this dir.                     
+ --REP level=1  N:NRD                                                           
+     1       IREC(I)  Record number I of directory                              
+ --REP level=1 -- End --                                                        
+ 1         L:LB     file descriptor (only for TOP)                              
+ 1         N:NWREC  Number of words for bitmap descriptor                       
+ 2         LREC     Physical record length (in words)                           
+ 3         D:IDATE  Creation date of the file                                   
+ --REP level=1  N:NWREC                                                         
+     1       B:BITMAP 1 bit per record on the file                              
+ --REP level=1 -- End --                                                        
+ 1         L:LS     Subdirectory structure                                      
+ --REP level=1  N:NSD                                                           
+     1       Z:NAM1   Name of subdirectory                                      
+     2       Z:NAM2   "                                                         
+     3       Z:NAM3   "                                                         
+     4       Z:NAM4   "                                                         
+     5       NCHSD    Number of characters in subdirectory name                 
+     6       IRECSD   Record number of this subdirectory                        
+     7       D:IDTIME Date and Time of creation of subdirectory                 
+ --REP level=1 -- End --                                                        
+ 1         L:LK     KEYS structure                                              
+ --REP level=1  N:NKEYS ! I=1,NKEYS                                             
+     1       P:LCYC   Pointer to highest cycle in C for key I                   
+   --REP level=2  N:NWKEYS! K=1,NWKEYS                                          
+         1     KEYS(I,K Element K of key I                                      
+   --REP level=2 -- End --                                                      
+ --REP level=1 -- End --                                                        
+ 1         L:LF     Start of free space                                         
+ --REP level=1  NFREE                                                           
+     1       EMPTY    Free space                                                
+ --REP level=1 -- End --                                                        
+ 1         L:LCYC   Cycles structure                                            
+ 1         PTOCYCLE                                                             
+ 1         P:BI0015 LCYC Pointer to prev cycle of KEY (0 if no)                 
+ 1         P:BI1631 SECREC Second record (if there) (bits 17 to 32)             
+ 2         D:CREATD Creation date/time relative to 1986 (bits 9 TO 32)          
+ 2         BITVAL04 RZKEEP (bit 5)                                              
+ 2         BITVAL03 Append mode (bit 4)                                         
+ 2         BITS0002 Vector format (if RZVOUT) (bits 1 to 3)                     
+ 3         PTODATA  Pointer to the data                                         
+ 3         BITS1631 Record number where data str. starts (bits 17 to 32)        
+ 3         BITS0015 Offset in record (bits 1 to 16)                             
+ 4         CYWORD4                                                              
+ 4         BITS0019 Number of words in data structure (bits 1 to 20)            
+ 4         BITS2031 Cycle number (bits 21 to 32)                                
+\end{XMPt}
+
+%         *******************************************************************
+%         * WORD  *   TAG   *                 CONTENT                       *
+%         *******************************************************************
+%         *  1-4  * IDNAME  *      Directory name  (up to 16 characters)    *
+% KUP     *   5   *         *      Record number of the mother directory,   *
+%         *   6   *         *      or C file pointer (words 5 and 6)        *
+% KPW1    *   7   *  IWPW1  *      Write password (1st part)                *
+%         *   8   *  IWPW2  *                     (2nd part)                *
+%         *   9   * NCHDRW  *      No. of char. DIR(1:5),WPW(6:10), and     *
+%         *       *         *      bit 12 eXchange mode                     *
+% KDATEC  *  10   *  IDATEC *      Creation date/time                       *
+% KDATEM  *  11   *  IDATEM *      Last mod date/time                       *
+% KQUOTA  *  12   * NQUOTA  *      Maximum number of records QUOTA          *
+% KRUSED  *  13   * NRUSED  *      Number of used records                   *
+% KWUSED  *  14   * NWUSED  *      Number of words used MOD 1000000         *
+% KMEGA   *  15   * NMEGA   *      Number of megawords used                 *
+%         *  16   *         *               Reserved                        *
+% KIRIN   *  17   *   IRIN  *      Record number currently in LRIN          *
+% KIROUT  *  18   *   IROUT *      Record number currently in LROUT         *
+% KRLOUT  *  19   *   IRLOUT*      Number of the last record written        *
+% KIP1    *  20   *   IP1   *      Pointer to first free word in IRLOUT     *
+%         *  21   *   ICONT *      Record number continuation               *
+% KNFREE  *  22   *   NFREE *      Number of words free in F                *
+% KNSD    *  23   *   NSD   *      Number of subdirectories                 *
+% KLD     *  24   *   LD    *      Pointer to directory records             *
+% KLB     *  25   *   LB    *      Pointer to file descriptor (only for TOP)*
+% KLS     *  26   *   LS    *      Pointer to first subdirectory S          *
+% KLK     *  27   *   LK    *      Pointer to first KEY   K                 *
+% KLF     *  28   *   LF    *      Pointer to free space  F                 *
+% KLC     *  29   *   LC    *      Pointer to last cycle  C                 *
+% KLE     *  30   *   LE    *      Pointer to end of directory              *
+% KNKEYS  *  31   *   NKEYS *      Number of keys in that directory         *
+% KNWKEY  *  32   *   NWKEY *      Number of elements in one key            *
+% KKDES   *  33   *   KDES  *      KEYS descriptor (3 bits per element)     *
+%         *       *   ...   *      10 keys per word                         *
+% KTAGS   *  34   *   TAG11 *      First part of CHTAG(1) 4 characters      *
+%         *  35   *   TAG12 *      Second part                              *
+%         *  ..   *         *      ....                                     *
+%         *       *   TAGN1 *      First part of CHTAG(NWKEY)               *
+%         *       *   TAGN2 *      Second part                              *
+%  LD->   *  +0   *   NRD   *      Number of records to describe this dir.  *
+%         *  +1   *   IREC  *      Record number 1 of directory             *
+%         *  +2   *         *                    2                          *
+%         *  ..   *         *                    ..                         *
+%         *  +NRD *         *                   NRD                         *
+%         *******************************************************************
+
+
+\subsection*{Subdirectory descriptor structure}
+The subdirectories below a given directory are described
+by the part labelled \Lit{LS} in the description of the top bank.
+%\begin{XMPt}{Subdirectory structure}
+%         *******************************************************************
+%         * WORD  *   TAG   *                 CONTENT                       *
+%         *******************************************************************
+%  LS->   *   1   *  NAM1   *    Name of 1st subdirectory                   *
+%         *   2   *  NAM2   *    "                                          *
+%         *   3   *  NAM3   *    "                                          *
+%         *   4   *  NAM4   *    "                                          *
+%         *   5   *  NCHSD  *    Number of characters in subdirectory name  *
+%         *   6   *  IRECSD *    Record number of this subdirectory         *
+%         *   7   *  IDTIME *    Date and Time of creation of subdirectory  *
+%         *   8   *  NAM1   *    Name of 2nd subdirectory                   *
+%         *   9   *  NAM2   *    "                                          *
+%         *  10   *  NAM3   *    "                                          *
+%         *  11   *  NAM4   *    "                                          *
+%         *  12   *  NCHSD  *    Number of characters in subdirectory name  *
+%         *  13   *  IRECSD *    Record number of this subdirectory         *
+%         *  14   *  IDTIME *    Date and Time of creation of subdirectory  *
+%         *   .   *         *               ..                              *
+%         *       *         *    etc...                                     *
+%         *******************************************************************
+%\end{XMPt}
+To loop over all subdirectories at a given level, the following code
+could be used.
+\begin{XMPt}{Looping over all subdirectories at a given level}
+*
+*     Loop over all subdirectories at this level
+*
+         DO 5 JJ=1,IQ(KQSP+LCDIR+KNSD)
+            LS=IQ(KQSP+LCDIR+KLS)
+            IH=LS+7*(JJ-1)
+            CALL ZITOH(IQ(KQSP+LCDIR+IH),IHDIR,4)
+            CALL UHTOC(IHDIR,4,CHDIR,16)
+*
+*     CHDIR now contains the name of subdirectory JJ in
+*     CHARACTER format
+*
+...
+   5        CONTINUE
+\end{XMPt}
+\subsection*{KEYS structure}
+
+For a given directory, the keys structure is given
+by the part labelled \Lit{LK} in the description of the top bank.
+%\begin{XMPt}{KEYS structure}
+%\small
+%         *******************************************************************
+%         * WORD  *   TAG   *                 CONTENT                       *
+%         *******************************************************************
+%  LK->   *   1   *  LCYC   *    Pointer to highest cycle in C for key 1    *
+%         *   2   *  KEYS(1)*    First element of key 1                     *
+%         *   3   *  KEYS(2)*    Second element of key 1 (if any)           *
+%         *   .   *         *    ...........                                *
+%         *NWKEY+1*  KEYS() *    NWKEYth element of key 1                   *
+%         *   .   *  LCYC   *    Pointer to highest cycle in C for key 2    *
+%         *   .   *         *    First element of key 2                     *
+%         *   .   *         *    Second element of key 2 (if any)           *
+%         *   .   *         *    ...........                                *
+%         *   .   *         *    NWKEYth element of key 2                   *
+%         *   .   *         *    ...........                                *
+%         *   .   *  LCYC   *    Pointer to highest cycle in C for key NKEYS*
+%         *   .   *         *    First element of key NKEYS                 *
+%         *   .   *         *    Second element of key NKEYS (if any)       *
+%         *   .   *         *    ...........                                *
+%         *   .   *         *    NWKEYth element of key NKEYS               *
+%         *******************************************************************
+%
+%C refers to the cycles structure, described below.
+%\end{XMPt}
+The following Fortran code could be used to process the keys 
+in a given subdirectory.
+\begin{XMPt}{Processing the RZ keys}
+      NWK        = IQ(KQSP+LCDIR+KNWKEY)
+      NKEYS      = IQ(KQSP+LCDIR+KNKEYS)
+      LK         = IQ(KQSP+LCDIR+KLK)
+      DO 50 I=1,NKEYS
+*           Number of this key vector
+         K=LK+(NWK+1)*(I-1)
+         DO 40 J=1,NWK
+            IKDES=(J-1)/10
+            IKBIT1=3*J-30*IKDES-2
+            IF(JBYT(IQ(KQSP+LCDIR+KKDES+IKDES),IKBIT1,3).LT.3)THEN
+               KEYS(J)=IQ(KQSP+LCDIR+K+J)
+            ELSE
+               CALL ZITOH(IQ(KQSP+LCDIR+K+J),KEYS(J),1)
+            ENDIF
+  40     CONTINUE
+*         Here we have KEY vector # I in KEYS()
+      ...
+  50  CONTINUE
+\end{XMPt}
+\subsection*{CYCLES structure}
+
+The cycles structure is given by the part 
+labelled \Lit{LCYC} in the description of the top bank.
+%\begin{XMPt}{Cycles structure}
+%     For each cycle
+%
+%      WORD 1   - Pointer to previous cycle of KEY (bits 1 to 16)(0 if no)
+%               - Second record (if there)  (bits 17 to 32)
+%
+%      WORD 2   - Creation date relative to 1986   (bits 9 TO 32)
+%               - Creation time. 1minute precision
+%               - RZKEEP                           (bit 5)
+%               - Append mode                      (bit 4)
+%               - Vector format (if RZVOUT)        (bits 1 to 3)
+%
+%      WORD 3   - Record number where data str. starts (bits 17 to 32)
+%               - Offset in record (bits 1 to 16)
+%
+%      WORD 4   - Number of words in data structure (bits 1 to 20)
+%               - Cycle number  (bits 21 to 32)
+%
+%           The pointer LCYC in structure K points to WORD 1
+%
+%
+%K refers to the cycles structure, described above.
+%\end{XMPt}
+
+\subsection*{File descriptor structure}
+
+The file descriptor can be found in the
+part labelled \Lit{LB} in the description of the top bank.
+%\begin{XMPt}{File descriptor structure}
+%         *******************************************************************
+%         * WORD  *   TAG   *                 CONTENT                       *
+%         *******************************************************************
+%  LB->   *   1   *  NWREC  *    Number of words for bitmap descriptor      *
+%         *   2   *  LREC   *    Physical record length (in words)          *
+%         *   3   *  IDATE  *    Creation date of the file                  *
+%         *   4   *         *             BITMAP                            *
+%         *   5   *         *       1 bit per record on the file            *
+%         *   .   *         *               ..                              *
+%         *       *         *    etc...                                     *
+%         *******************************************************************
+%\end{XMPt}
+%\newpage
+
+\subsection*{Lock record}
+
+The record lock information is encoded in the 
+part labelled \Lit{LC} in the description of the top bank.
+%\begin{XMPt}{Lock structure}
+%         *******************************************************************
+%         * WORD  *   TAG   *                 CONTENT                       *
+%         *******************************************************************
+%         *   1   *  NLOCK  *    Number of locks                            *
+%         *   2   *  IFREE  *    Pointer to first free word in record       *
+%         *   3   *  FLAG   *    LOCK flag                                  *
+%         *   4   *  NWLOCK *    Number of words for 1st lock               *
+%         *   5   *  LOCK1  *    First part of the lock ID                  *
+%         *   6   *  LOCK2  *    Second part of the lock ID                 *
+%         *   7   *  DATE/T *    Date and time of the lock                  *
+%         *   8   *  IRECD  *    Record number of the locked directory      *
+%         *   9   *  ND     *    Number of couples (first,last)             *
+%         *  10   *  IR1    *    1st record locked                          *
+%         *  11   *  IRL    *    last record locked                         *
+%         *  12   *  IR1    *    "                                          *
+%         *  13   *  IRL    *    "                                          *
+%         *  14   *  ..     *                                               *
+% NWLOCK+4*       *  NWLOCK *    Number of words for second lock            *
+%         *   .   *         *               ..                              *
+%         *       *         *    etc...                                     *
+% IFREE   *   .   *    0    *    First free word (content=0)                *
+%         *   .   *         *               ..                              *
+%         *******************************************************************
+%\end{XMPt}
+%

@@ -1,0 +1,155 @@
+head     1.1;
+access   ;
+symbols  ;
+locks    goossens:1.1; strict;
+comment  @@;
+
+
+1.1
+date     94.04.25.09.23.56;  author goossens;  state Exp;
+branches ;
+next     ;
+
+
+desc
+@Initial Entry
+@
+
+
+
+1.1
+log
+@Initial revision
+@
+text
+@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%  GEANT manual in LaTeX form                              %
+%                                                                 %
+%  Michel Goossens (for translation into LaTeX)                   %
+%  Version 1.00                                                   %
+%  Last Mod. Jan 24 1991  1300   MG + IB                          %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\Origin{R.Brun}
+\Submitted{01.06.83}       \Revised{14.12.93}
+\Version{Geant 3.16}       \Routid{TRAK300}
+\Makehead{Storing secondary tracks in the stack}
+
+\Shubr{GSKING}{(IT)}
+\begin{DLtt}{MMMMMMMM}
+\item[IT] ({\tt INTEGER}) number of the track to be stored for subsequent
+tracking, if {\tt IT=0} all secondary tracks generated in the current
+step are stored for tracking.
+\end{DLtt}
+
+During transport, particles can generate new particles, called 
+secondary. In {\tt GEANT} these particles are stored in the common
+\FCind{/GCKING/} (see {\tt [BASE030]} for an explanation of the
+variables in this common). The number of particles generated in
+the current step is {\tt NGKINE} (common \FCind{/GCKING/}). If no
+user action is taken, the variable {\tt NGKINE} is reset to 0 at the
+beginning of the subsequent step and these particles are not transported.
+
+To be transported by {\tt GEANT}, these particles need to be stored
+in the data structure {\tt JSTAK} (see {\tt [TRACK399]}) which
+normally is a
+LIFO stack: the last particle generated is the first one to be
+tracked when the current one stops. The order of tracking can be changed 
+by the user, plase see {\tt [TRAK310]} for more information on this
+subject. 
+
+The routine \Rind{GSKING} moves particles from the \FCind{/GCKING/} common
+to the {\tt JSTAK} structure, where {\tt GEANT} looks for particles to 
+transport.
+
+When a particle is fetched from the {\tt JSTAK} data structure, its place
+is freed for a new one, so the information on the initial kinematics of
+this track is lost. It may be useful in some occasion to record the initial
+kinematic of a track and save it till the end of the event. This is accomplished
+by storing the particle information both in the {\tt JSTAK} data structure
+and in the {\tt JVERTX/JKINE} one, which is permanent throughout the life
+of the event. As already said in {\tt [KINE100]}, this should not be done
+by the user calling directly the \Rind{GSVERT}/\Rind{GSKINE} routines
+during tracking, but rather controlling the action of \Rind{GSKING} via
+the array {\tt IFLGK} in common \FCind{/GCKING/}. If the particle number
+{\tt IG} generated in the current step ({\tt 1} $\leq$ {\tt IG} $\leq$ 
+{\tt NGKINE}) is being moved to the {\tt JSTAK} {\it stack}, either
+singularly or together with all the other particles generated in the
+current step (setting the argument of \Rind{GSKING} to 0), the action
+performed depends on {\tt IFLGK(IG)}:
+
+\begin{DLtt}{MMMMMMMMMMMM}
+\item[IFLGK(IG)$<$0] the particle is ignored;
+\item[~~~~~~~~~$=$0] the particle is stored on the temporary stack {\tt JSTAK}
+to be transported;
+\item[~~~~~~~~~$=$1] the particle is stored on the temporary stack {\tt JSTAK}
+to be transported {\it and} in the {\tt JKINE} data structure attaching it to
+a vertex created in the current position (array {\tt VECT(I), I}=1,3 in the
+\FCind{/GCTRAK/} common);
+\item[~~~~~~~~~$>$1] the particle is stored on the temporary stack {\tt JSTAK}
+to be transported {\it and} in the {\tt JKINE} data structure attaching it to
+vertex number {\tt IFLGK(IG)}, which must exist.
+\end{DLtt}
+
+If {\tt IFLGK(IG)}$>$0, after the call to \Rind{GSKING}, {\tt IFLGK(IG)} is
+set to the newly created track number in {\tt JKINE}. The number of the
+vertex used is returned in {\tt IFLGK(NGKINE+1)}. This feature allows the
+user to identify the created vertex and tracks via the routines 
+\Rind{GSVERU} and \Rind{GSKINU} (see {\tt [KINE100]}).
+
+\section*{Example}
+
+In case of a hadronic interaction, discard the neutrinos, store the protons
+in the permanent data structure {\tt JVERTX/JKINE}, and store all the
+other particles produced in the temporary stack.
+
+Add to the protons in the {\tt JKINE} bank the {\tt JVOLUM}
+and copy number of the 
+volume and the number of the tracking medium where they have been produced
+by an interaction.
+
+\begin{verbatim}
+      SUBROUTINE GUSTEP
++SEQ,GCKING,GCVOLU,GCTMED.
+      CHARACTER*4 CHCASE
+      DIMENSION UBUF(3)
+      .
+      .
+      .
+      CALL UHTOC(KCASE,4,CHCASE,4)
+      IF(CHCASE.EQ.'HADR') THEN
+         DO 10 IG=1, NGKINE
+            IPART = GKIN(5,IG)
+            IF(IPART.EQ.4) THEN
+*---                Discard neutrinos
+               IFLGK(IG)=-1
+            ELSEIF(IPART.EQ.14) THEN
+*---                Save protons in JKINE and transport them
+               IFLGK(IG)=1
+            ELSE
+*---                Simply transport the rest
+               IFLGK(IG)=0
+            ENDIF
+  10     CONTINUE
+      ENDIF
+*---                Perform action on all the particles
+      CALL GSKING(0)
+*---               Add information to the JKINE bank
+      DO 20 IG=1,NGKINE
+         IPART = GKIN(5,IG)
+         IF(IPART.EQ.14) THEN
+*---               This is a proton
+*---               Get the track number
+            IT = IFLGK(IG)
+            NUBUF = 3
+            UBUF(1) = LVOLUM(NLEVEL)
+            UBUF(2) = NUMBER(NLEVEL)
+            UBUF(3) = NUMED
+            IADR = 0
+*---               Store the information
+            CALL GSKINU(IT,NUBUF,UBUF,IADR)
+         ENDIF
+  20  CONTINUE
+\end{verbatim}
+@

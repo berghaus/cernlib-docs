@@ -1,0 +1,253 @@
+head	1.2;
+access;
+symbols;
+locks;
+
+
+1.2
+date	95.05.12.17.28.34;	author goossens;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	94.04.02.16.46.41;	author goossens;	state Exp;
+branches;
+next	;
+
+
+desc
+@Initial entry
+@
+
+
+1.2
+log
+@latest version with new amsmath
+@
+text
+@%  12 may 1995  ksk
+\Version {TL}                                \Routid{E230}
+\Keywords{FIT FITTING LINEAR LEAST-SQUARE CONSTRAINED UNCONSTRAINED}
+\Author{W. Hart, W. Matt}                    \Library{KERNLIB}
+\Submitter{}                                 \Submitted{01.01.1975}
+\Language{Fortran}                           \Revised{04.02.1986}
+\Cernhead {Constrained and Unconstrained Linear Least Squares Fitting}
+The {\tt TL} package finds the least squares solution to a set of
+unweighted linear equations, possibly subject to a set of equality
+constraints. The solution is found by Householder triangularisation
+(see Ref. 1 for details) with parameter elimination if constraints are
+present. This write-up ends with a few words on generalised least
+squares fitting (unequal weighting) which is a simple application of
+the {\tt TL} package.
+\par
+All matrices are assumed to be stored {\bf row-wise and without gaps},
+{\bf contrary} to the Fortran convention, i.e., if the
+Fortran statement {\tt DIMENSION  A(NJ,NI)} reserves
+memory for the matrix {\bf A} the element $A_{ij}$ is found in word
+{\tt A(J,I)}.
+\Structure
+{\tt SUBROUTINE} subprograms\\
+User Entry  Names: \Rdef{TLSC}, \Rdef{TLS}, \Rdef{TLERR}, \Rdef{TLRES}\\
+Internal Entry Names: {\tt TLSMSQ}, {\tt TLSWOP}, {\tt TLUK}, {\tt
+TLSTEP}, {\tt TLPIV}
+\Usage
+ {\bf General Description}\\[2mm]
+Consider the set of $M$ linear equations
+$$ \sum^N_{j=1} A_{ij}x_j = b_i
+\mbox{\hspace{1cm}} (i=1,2,\ldots,M \ \mbox{with} \ N\leq M)$$
+to be solved such that the Euclidian norm
+$\mathbf{||Ax - b||_2} = S^2$ is minimised. Instead of determining
+{\bf x} from the Normal Equation $\mathbf{x = (A'A)^{-1} A'b}$
+it is found by applying successive Householder transformations
+({\bf Q}) which reduce {\bf A} to upper triangular
+form without changing the norm of the columns of {\bf A} or the vector
+{\bf b}. This is beneficial from the point of view of stability and
+flexibility of application. Writing
+$$\mathbf{QA = R = \binoms{R_1}{O}}
+\begin{array}{@@{ \ \} \ }l} N \ \mbox{rows} \\ M-N \ \mbox{rows}
+\end{array}
+\mbox{\quad and \quad} \mathbf{Qb = y = \binoms{y_1}{y_2}}
+\begin{array}{@@{ \ \} \ }l} N \ \mbox{rows} \\ M-N \ \mbox{rows}
+\end{array} $$
+we have that $\mathbf{||Rx - y||_2 = ||Ax - b||_2}$
+and the vector {\bf x} is obtained by backward substitution in
+$\mathbf{R_1x = y_1}$. As a byproduct, the sum of squares of
+residuals is directly calculated as $S^2 = \mathbf{||y_2||_2}$.
+\par
+Now consider {\bf A} and {\bf b} to be composed of $M_1$ constraints
+to be satisfied exactly, followed by $M-M_1$ equations to be minimised.
+Writing
+$$\mathbf{A = \binoms{A_1}{A_2}}
+\begin{array}{@@{ \ \} \ }l} M_1 \ \mbox{rows} \\ M-M_1 \ \mbox{rows}
+\end{array}
+\mbox{\quad , \quad}  \mathbf{b = \binoms{b_1}{b_2}}
+\begin{array}{@@{ \ \} \ }l} M_1 \ \mbox{rows} \\ M-M_1 \ \mbox{rows}
+\end{array} $$
+then $\mathbf{||A_2x-b_2||_2} = S^2$  has to be minimized
+subject to $\mathbf{A_1x-b_1} = 0$.
+\newpage
+This problem is solved by eliminating $M_1$ parameters and then
+evaluating the reduced set of parameters (see Ref. 2 for details).
+\par
+An attractive feature of the unitary Householder transformations
+is that when each parameter is eliminated ("solved for")
+column pivoting allows the selection of that parameter which gives the
+maximum reduction in the current value of $S^2$.
+Thus it is possible to terminate the calculation whenever $S^2$ or its
+current reduction become acceptably small. This can be exploited when
+iterating. If there is more than one RHS vector, then {\bf x} and {\bf b}
+become $N \times L$ and $M \times L$ matrices with the pivoting strategy
+applied to the first column of {\bf b}.
+\par
+The triangular form of $\mathbf{R_1}$ allows the error matrix, {\bf E},
+of the fitted parameters to be derived directly from $\mathbf{R_1}$
+itself without inverting. The equation is
+$$\mathbf{E=R_1^{-1}(R_1^{-1})'}.$$
+Moreover, the vector of fitted residuals is most easily computed by
+applying the inverse Householder transformation to $\mathbf{y_2}$, i.e.
+$$\mathbf{Ax-b=Q^{-1} \binoms{O}{y_2}}.$$
+Note that these residuals do {\it not have to be calculated} to find
+the fitted $S^2$ which is output from the fitting routines.
+\par
+In all routines described below, the dimensionality of the problem
+is transmitted via the common block
+\begin{verbatim}
+    COMMON /TLSDIM/ M1,M,N,L,IER
+\end{verbatim}
+The parameter {\tt IER} returns the number of parameters solved for,
+or else {\tt -1001} if either $\mathtt{M1>N}$,
+$\mathtt{N>M}$ or {\bf A} has rank less than {\tt N}. \\[3mm]
+{\bf Constrained Least Squares Fitting}
+\begin{verbatim}
+    CALL TLSC(A,B,AUX,IPIV,EPS,X)
+\end{verbatim}
+\begin{DLtt}{123456}
+\item[A] ({\tt REAL}) The combined constraint / derivative matrix of
+dimension $\mathtt{M \times N}$, the upper {\tt M1} rows being the
+constraints.
+\item[B] ({\tt REAL}) The combined constraint / measurement matrix of
+dimension $\mathtt{M \times L}$, the upper {\tt M1} rows being the
+constraints.
+\item[X] ({\tt REAL}) The matrix of dimension $\mathtt{N \times L}$
+returning the {\tt L} least squares solutions.
+\item[AUX] ({\tt REAL}) Working array of length
+$\mathtt{N+\max(N,L)}$. On output {\tt AUX(J),(J=1,L)}
+contain the minimised sum of squares.
+\item[IPIV] ({\tt INTEGER}) Working array of length {\tt N} which holds
+the exchange information (column pivoting is employed if necessary).
+\item[EPS] ({\tt REAL}) Parameter specifying a pivoting criterium.
+There is no exchange of columns $I$ and $1$ unless
+$\mathtt{EPS*PIVOT(I) > PIVOT(1)}$. Typically ${\tt EPS \simeq 0.1}$.
+\end{DLtt}
+Subroutines called: {\tt TLSMSQ}, {\tt TLSWOP}, {\tt TLUK},
+{\tt TLSTEP}.\\[3mm]
+When constraint equations are present, the full pivoting
+strategy cannot be adopted and so all parameters are solved for,
+i.e., {\tt IER} returns the value {\tt N} or {\tt -1001}. Under these
+circumstances {\tt EPS} is used to reduce the amount of pivoting to
+those cases where it is felt to be absolutely necessary. \\[3mm]
+\newpage
+{\bf Unconstrained Least Squares Fitting}
+\begin{verbatim}
+    CALL TLS(A,B,AUX,IPIV,EPS,X)
+\end{verbatim}
+\begin{DLtt}{123456}
+\item[A] ({\tt REAL}) $\mathtt{M \times N}$ derivative matrix.
+\item[B] ({\tt REAL}) $\mathtt{M \times L}$ matrix of measurements.
+\item[X] ({\tt REAL}) $\mathtt{N \times L}$ parameter solution matrix.
+\item[AUX] ({\tt REAL}) Working array as for {\tt TLSC}.
+\item[IPIV] ({\tt INTEGER}) Working array as for {\tt TLSC}.
+\item[EPS] ({\tt REAL}) Input parameter used for prematurely
+terminating the calculation: \\
+$\mathtt{> 0:}$ Termination when r.m.s. residual $\mathtt{<|EPS|}$,\\
+$\mathtt{< 0:}$ Termination when the reduction in the residual
+$\mathtt{<|EPS|}$, \\
+$\mathtt{= 0:}$ Unconditionally solve for all $X_j.$
+\end{DLtt}
+Subroutines called: {\tt TLSMSQ}, {\tt TLSWOP}, {\tt TLUK},
+{\tt TLSTEP}, {\tt TLPIV}.\\[3mm]
+As previously indicated, full pivoting is possible
+without constraints, hence the allowance for premature exit.\\[3mm]
+{\bf  Fitted Error Matrix}
+\begin{verbatim}
+    CALL TLERR(A,E,AUX,IPIV)
+\end{verbatim}
+The parameter and subroutine arguments defined previously in
+{\tt COMMON /TLSDIM/} require the output values from a call to
+{\tt TLS} or {\tt TLSC}. {\tt E} is an $N \times N$ matrix
+which, upon return, will contain the unnormalised covariance matrix of
+the fitted parameters, $\mathbf{(A'A)^{-1}}$. {\tt A} may be overwritten
+by {\tt E} and the routine may be called independently from
+{\tt TLS/TLSC} by  setting {\tt IER} to zero. \\[3mm]
+Subroutines called: {\tt TLUK}, {\tt TLSTEP}.\\[3mm]
+{\bf Fitted Residuals}
+\begin{verbatim}
+    CALL TLRES(A,B,AUX)
+\end{verbatim}
+All the arguments and common variables require the output
+values from a call to {\tt TLS} or {\tt TLSC}. Upon return,
+{\tt B} will give the matrix of residuals, i.e., for each set of
+least squares equations the column vector $\mathbf{Ax-b}$.\\[3mm]
+Subroutine called: {\tt TLSTEP}.
+\Notes
+\begin{enumerate}
+\item The pivoting and exit criteria of {\tt TLS} are calculated using
+the first vector of measurements; therefore it is wise to have
+$\mathtt{EPS=0}$ if $\mathtt{L>1}$.
+\item {\tt TLERR} and/or {\tt TLRES} may be called in any order after
+{\tt TLS} or {\tt TLSC}.
+\item {\tt TLS} or {\tt TLSC} may be used for solving simultaneous linear
+equations by setting $\mathtt{M=N}$ or $\mathtt{M1=N}$.
+\item Useful examples in the application of these routines can
+be found in the {\tt HYDRA} Geometry / Kinematics processors.
+\end{enumerate}
+\newpage
+{\bf Generalized Least Squares Fitting} \\[3mm]
+The problem is to minimise $\mathbf{(Ax-b)'G(Ax-b)}$ where {\bf G}, the
+weight matrix, is the inverse of the error matrix of the
+measurement vector {\bf b}. Once again Householder
+triangularisation offers an attractive alternative to the Normal
+Equation solution $\mathbf{x=(A'GA)^{-1} A'Gb}$.
+The first step is to perform the Choleski decomposition of {\bf G},
+which is positive semi-definite (see {\tt TR} (F112)), such that
+$\mathbf{G=U'U}$, {\bf U} being upper triangular. The
+problem is then reduced to minimising $\mathbf{||A^1x-b^1||_2}$,
+where $\mathbf{A^1=UA}$ and $\mathbf{b^1=Ub}$,
+which is just the unweighted case previously described. This has the
+feature that if {\bf A} has already been triangularised then the product
+{\bf UA} remains triangular and only back substitution is necessary to
+find the weighted least squares solution.
+\Refer
+\begin{enumerate}
+\item G. Golub, Numerical methods for solving linear least squares
+problems, Numer. Math. {\bf 7} (1965)  206--216.
+\item {\AA}. Bj\"orck and G. Golub, Iterative refinement of linear least
+square solutions by Householder transformation, BIT {\bf 7} (1967)
+322--337.
+\end{enumerate}
+$\bullet$
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d1 1
+d39 1
+a39 1
+$$\mathbf{QA = R = \left[{R_1 \atop O} \right]}
+d42 1
+a42 1
+\mbox{\quad and \quad} \mathbf{Qb = y = \left[ {y_1 \atop y_2} \right]}
+d53 1
+a53 1
+$$\mathbf{A = \left[{A_1 \atop A_2}\right]}
+d56 1
+a56 1
+\mbox{\quad , \quad}  \mathbf{b = \left[{b_1 \atop b_2}\right]}
+d81 1
+a81 1
+$$\mathbf{Ax-b=Q^{-1} \left[{O \atop y_2}\right]}.$$
+@

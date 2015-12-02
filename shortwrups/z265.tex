@@ -1,0 +1,325 @@
+%02 apr 94 ksk
+\Version{CINTF}                         \Routid{Z265}
+\Keywords{INTERFACE C FORTRAN LIBRARY}
+\Author{see below}                      \Library{KERNLIB}
+\Submitter{}                            \Submitted{19.09.1991}
+\Language{Fortran + C}                  \Revised{01.04.1994}
+\Cernhead {Immediate Interface Routines to the C Library}
+{\bf Authors:} F. Carminati, M. Marquina, A. Rademakers,
+J. Shiers, J. Zoll. \\[3mm]
+The routines of this package are Fortran callable routines
+which in turn call their corresponding C Library routines,
+after having taken care of the Fortran way of passing parameters.
+\par
+The names of the interface routines are exactly the names
+of the C functions with the letter F added;
+the parameters are in one-to-one correspondence with the C functions;
+thus {\tt "man <name>"} gives the exact details also for the
+interface routine.
+\par
+Most Fortran systems on Unix machines are clever,
+they protect the Fortran user against name-clashes with the C library,
+for example a {\tt "CALL RENAME (...)"} compiles as a reference to
+\verb'"rename_"' (or to {\tt "RENAME"} on the Cray).
+\par
+If this is not strictly true, and/or if moreover the Fortran Run-time
+library does itself contain an interface routine {\tt "rename"} then
+there might be trouble because it is not obvious which {\tt "rename"}
+will be linked to the interface routine {\tt RENAMEF}.
+The IBM 6000 machine has succeeded in creating this problem,
+it has both {\tt "rename"} and \verb'"rename_"' on the
+Fortran Run-time library.
+In this case one has to give an explicite {\tt -lc}
+on the link statement to ensure that the C library is
+searched before the Fortran library (but after the Kernlib library).
+\Structure
+{\tt SUBROUTINE} and {\tt FUNCTION} subprograms \\
+User Entry Names:
+\begin{htmlonly}
+\begin{tabular}{llllllll}
+\end{htmlonly}
+\begin{latexonly}
+\begin{tabular}[t]{l*{7}{@{\hspace{4pt}}l}}
+\end{latexonly}
+\Rdef{ACCESSF},& \Rdef{CHDIRF}, & \Rdef{CTIMEF}, & \Rdef{EXITF},  &
+\Rdef{GETENVF},& \Rdef{GETGIDF},& \Rdef{GETPIDF},& \Rdef{GETUIDF},\\
+\Rdef{GETWDF}, & \Rdef{GMTIMEF},& \Rdef{KILLF},  & \Rdef{LSTATF}, &
+\Rdef{PERRORF},& \Rdef{READLNF},& \Rdef{RENAMEF},& \Rdef{SETENVF},\\
+\Rdef{SLEEPF}, & \Rdef{STATF},  & \Rdef{SYSTEMF},& \Rdef{UNLINKF}
+\end{tabular} \\
+{\tt COMMON} Block Names and Lengths: {\tt /SLATE/ ISLATE(40)}
+\Usage
+The types of all variables and functions follow from the Fortran
+default typing convention (unless typed explicitly),
+except that variables starting with the letters {\tt CH} are
+of type {\tt CHARACTER}.
+ 
+The symbol {\tt *} designates an output parameter.
+ 
+For convenience, routines which return a {\tt CHARACTER} string
+also return the occupied useful length of this string
+in {\tt ISLATE(1)} of {\tt /SLATE/}. \\[2mm]
+\newpage
+{\bf 'access' --- determine accessibility of file}
+\begin{verbatim}
+    LOGICAL ACCESSF
+    truth = ACCESSF(CHNAME,MODE)
+ 
+      CHNAME  the path-name of the file
+        MODE  a bit pattern specifying the type of access:
+ 
+              bit 1 (1): execution permission
+                  2 (2): write permission
+                  3 (4): read permission
+               all zero: existence
+\end{verbatim}
+ 
+{\bf 'chdir' --- set current working directory}
+\begin{verbatim}
+    INTEGER CHDIRF
+    ISTAT = CHDIRF(CHNAME)
+ 
+      CHNAME  the path-name of the new working directory
+       ISTAT  function value returns zero if successful.
+\end{verbatim}
+ 
+{\bf 'ctime' --- convert encoded time to ASCII}
+\begin{verbatim}
+    CHARACTER CHTIME*24
+    CALL CTIMEF(ITIME, CHTIME)
+ 
+       ITIME  encoded time (as returned by STATF)
+     CHTIME*  decoded time string of length 24
+\end{verbatim}
+ 
+{\bf 'exit' --- terminate the process with a status code}
+\begin{verbatim}
+    CALL EXITF(IRC)
+\end{verbatim}
+stops setting return status {\tt IRC}. This should not be used
+for normal run termination. On the IBM VM this had to be implemented
+with a computed {\tt GOTO}, hence if $\mathtt{IRC>20}$
+a {\tt STOP 255} is executed.
+\par
+On the Unix machines {\tt IRC} will appear in the shell variable
+"status"
+which is reset after execution of each command, thus for more complicated
+logic the value of status has to be saved like (in the C shell):
+\begin{verbatim}
+      set rc = $status
+      if   (rc != 0)  then
+        if (rc == 1)  then
+          echo '  not quite happy, but continue'
+         else
+          echo '  stop for trouble'
+          exit
+         endif
+       endif
+\end{verbatim}
+ 
+\newpage
+{\bf 'getenv' --- get the text of an environment variable}
+\begin{verbatim}
+    CHARACTER CHTEXT*(big enough)
+    CALL GETENVF(CHNAME, CHTEXT)
+ 
+      CHNAME  the name of the environment variable,
+     CHTEXT*  returns its value, with blank-fill
+              ISLATE(1) occupied length, =0 if not found
+\end{verbatim}
+ 
+{\bf 'getgid' --- get group identification}
+\begin{verbatim}
+    CALL GETGIDF(IDG)
+ 
+      IDG  returns the real group ID of the current process.
+\end{verbatim}
+ 
+{\bf 'getpid' --- get process identification}
+\begin{verbatim}
+    CALL GETPIDF(IDP)
+ 
+      IDP  returns the process ID of the current process.
+\end{verbatim}
+ 
+{\bf 'getuid' - get user identification}
+\begin{verbatim}
+    CALL GETUIDF(IDU)
+ 
+      IDU  returns the real user ID of the current process.
+\end{verbatim}
+ 
+{\bf 'getwd' --- get the path-name of the working directory}
+\begin{verbatim}
+    CHARACTER CHTEXT*(big enough)
+    CALL GETWDF(CHTEXT)
+ 
+     CHTEXT*  returns the path-name, with blank-fill
+              ISLATE(1) occupied length, =0 if not found
+\end{verbatim}
+ 
+{\bf 'gmtime' --- blow encoded time to time elements for
+Greenwich Mean Time}
+\begin{verbatim}
+    INTEGER ITMELS(9)
+    CALL GMTIMEF(ITIME, ITMELS)
+ 
+       ITIME  encoded time (as returned by STATF)
+     ITMELS*  decoded time elements:
+              (1) sec, (2) min, (3) hour, (4) day, (5) month, (6) year,
+              (7) weekday, (8) yearday, (9) isdst
+\end{verbatim}
+ 
+{\bf 'kill' --- send a signal to a process}
+\begin{verbatim}
+    ISTAT = KILLF(IPID,ISIG)
+ 
+        IPID  process ID
+        ISIG  signal number
+       ISTAT  function value returns zero if successful.
+\end{verbatim}
+ 
+\newpage
+{\bf 'perror' --- print message for the most recent C Library error}
+\begin{verbatim}
+    CALL PERRORF(CHTEXT)
+ 
+      CHTEXT  the text to be printed before the error message
+\end{verbatim}
+ 
+{\bf 'readlink' --- read value of a symbolic link}
+\begin{verbatim}
+    INTEGER   READLNF
+    CHARACTER VAL*(big enough)
+ 
+    NCH = READLNF(CHNAME,VAL)
+ 
+          CHNAME  path-name of the link
+      VAL(1:NCH)  returns the value of the link
+             NCH  useful length returned,
+                  = -1 if trouble, PERRORF may be called.
+\end{verbatim}
+ 
+{\bf 'rename' --- rename a file}
+\begin{verbatim}
+    INTEGER RENAMEF
+    ISTAT = RENAMEF(CHFROM,CHTO)
+ 
+      CHFROM  old file name
+        CHTO  new file name
+       ISTAT  function value returns zero if successful.
+\end{verbatim}
+ 
+{\bf 'setenv' - set environment variable}
+\begin{verbatim}
+    INTEGER SETENVF
+ 
+    ISTAT = SETENVF(CHNAME,CHVAL)
+ 
+       CHNAME  name of the environment variable
+        CHVAL  its value to be set
+        ISTAT  function value returns zero if succesful.
+\end{verbatim}
+On machines where the {\tt setenv} function of system BSD is not
+available, {\tt putenv} is used instead on a string constructed from
+{\tt CHNAME} and {\tt CHVAL} in allocated memory, hence one should
+avoid re-defining the same variable very many times. \\
+ 
+{\bf 'sleep' --- suspend execution}
+\begin{verbatim}
+    CALL SLEEPF(NSECS)
+ 
+       NSECS  number of seconds to wait
+\end{verbatim}
+ 
+\newpage
+{\bf 'stat' --- get file status}
+\begin{verbatim}
+    INTEGER INFO(12)
+    INTEGER STATF
+ 
+    ISTAT = STATF(CHNAME, INFO)
+ 
+      CHNAME  path-name of the file
+       INFO*  information returned
+       ISTAT  function value returns zero if successful.
+\end{verbatim}
+This routine returns the properties of a given file
+in a 12-word integer vector:
+\begin{verbatim}
+   INFO(1) =  dev       device inode resides on
+   INFO(2) =  ino       this inode's number
+   INFO(3) =  mode      protection
+   INFO(4) =  nlink     number or hard links to the file
+   INFO(5) =  uid       user-id of owner
+   INFO(6) =  gid       group-id of owner
+   INFO(7) =  size      total size of file
+   INFO(8) =  atime     file last access time
+   INFO(9) =  mtime     file last modify time
+   INFO(10) = ctime     file last status change time
+   INFO(11) = blksize   optimal blocksize for file system i/o ops
+   INFO(12) = blocks    actual number of blocks allocated
+\end{verbatim}
+On machines where {\tt 'blksize'} and {\tt 'blocks'} are not available
+(like Silicon Graphics) the words \\
+{\tt INFO(11/12)} will always be zero. \\
+ 
+{\bf 'lstat' --- get file status}
+ 
+{\tt LSTATF} is like {\tt STATF} except in the case where the named file
+is a symbolic link, in which case {\tt LSTATF} returns information
+about the link, while {\tt STATF} returns information about
+the file the link references.
+ 
+For convenience {\tt LSTATF} stores into {\tt /SLATE/} some
+information about the nature of {\tt CHNAME}:
+\begin{verbatim}
+      ISLATE(1) = 0  if CHNAME is a regular file
+      ISLATE(2) = 0  if CHNAME is a symbolic link
+      ISLATE(3) = 0  if CHNAME is a directory
+\end{verbatim}
+ 
+{\bf 'system' --- issue a shell command}
+\begin{verbatim}
+    INTEGER SYSTEMF
+    ISTAT = SYSTEMF(CHTEXT)
+ 
+      CHTEXT  the command to be executed
+       ISTAT  returns the exit status of the shell
+\end{verbatim}
+\newpage
+{\bf 'unlink' --- remove directory entry}
+\begin{verbatim}
+    INTEGER UNLINKF
+    ISTAT = UNLINKF(CHNAME)
+ 
+      CHNAME  the path-name of the file to be unlinked
+       ISTAT  function value returns zero if successful.
+\end{verbatim}
+Normally this deletes file {\tt CHNAME}. If {\tt CHNAME} is a soft link,
+the link is deleted, but not the file pointed to.
+\Notes
+The routine {\tt SIGNALF}, which belongs to this family,
+will be described separately in the next paper \\[1mm]
+ 
+These routines have also been implemented on some machines
+which are not running Unix.
+The present state is as follows:
+ 
+{\bf VAX} system {\tt VMS} has :
+\begin{verbatim}
+    CHDIRF, EXITF, GETENVF, GETWDF, RENAMEF, SLEEPF, SYSTEMF
+\end{verbatim}
+Presently {\tt GETENVF} looks in the symbol table,
+except if the name of the environment variable is {\tt "HOME"}
+for which it will return the value of the logical name
+\verb'SYS$LOGIN'.
+ 
+Some other routines are available through the C run-time library.
+ 
+{\bf IBM 3090} system {\tt VM/CMS} has :
+\begin{verbatim}
+CHDIRF, CTIMEF, EXITF, GETENVF, GETPIDF, GETWDF, GMTIMEF,
+KILLF, PERRORF, RENAMEF, SLEEPF, STATF, SYSTEMF
+\end{verbatim}
+$\bullet$

@@ -1,0 +1,337 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%  GEANT manual in LaTeX form                                     %
+%                                                                 %
+%  Michel Goossens (for translation into LaTeX)                   %
+%  Version 1.00                                                   %
+%  Last Mod. Jan 24 1991  1300   MG + IB                          %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\Documentation{R.Brun, S.Ravndal}  
+\Submitted{01.10.84}    \Revised{10.03.94}
+\Version{Geant 3.21}\Routid{BASE100}
+\Makehead{Examples of GEANT application}
+This section contains a skeleton of a standard user program {\tt GEXAMP}
+to use the
+{\tt GEANT} system. More detailed examples can be found in the
+standard examples {\tt GEXAM1 - 6}. The recommended user routines
+are indicated in bold characters and will be explained more in detail
+in the following.
+
+\begin{multicols}{2}
+\footnotesize
+\begin{XMP}
+      PROGRAM GEXAMP
+      PARAMETER (NGBANK=50000, NHBOOK=5000)
+      COMMON/GCBANK/Q(NGBANK)
+      COMMON/PAWC  /H(NHBOOK)
+C--> {\sl Initialises {\tt HBOOK} and {\tt GEANT} memory}
+      CALL GZEBRA( NGBANK)
+      CALL HLIMIT(-NHBOOK)
+C--> {\sl Open graphics system}
+      CALL HPLINT(0)
+      CALL IGMETA(8,0)
+C--> {\sl {\tt GEANT} initialisation}
+      CALL {\bf UGINIT}
+C--> {\sl Start events processing}
+      CALL GRUN
+C--> {\sl End of Run}
+      CALL {\bf UGLAST}
+      END
+*-----------------------------------------------
+      SUBROUTINE {\bf UGINIT}
+C--> {\sl Initialise {\tt GEANT}}
+      CALL GINIT
+C--> {\sl Read data records}
+      OPEN(4,FILE='gcards.dat',STATUS='UNKNOWN')
+      CALL GFFGO
+C--> {\sl Initialise data structure}
+      CALL GZINIT
+C--> {\sl Initialise graphics}
+      CALL GDINIT
+      IF(NRGET.GT.0) THEN
+C--> {\sl Read data structures from file}
+         CALL GRFILE(1,'mygeom.dat','I')
+      ELSE
+C--> {\sl Particle table initialisation}
+         CALL GPART
+C--> {\sl Geometry and materials description}
+         CALL UGEOM
+      ENDIF
+C--> {\sl Energy loss and cross-sections tables}
+      CALL GPHYSI
+      IF(NRSAVE .GT. 0) THEN
+C--> {\sl Save permanent data structures} 
+         CALL GRFILE(2,'mysave.dat','NO')
+      ENDIF
+C--> {\sl Print banks}
+      CALL GPRINT('MATE',0)
+      CALL GPRINT('TMED',0)
+      CALL GPRINT('VOLU',0)
+C--> {\sl Book histograms} 
+      END
+*-----------------------------------------------
+      SUBROUTINE {\bf UGEOM}
+C--> {\sl Defines material, tracking media }
+C--> {\sl and geometry.}
+C--> {\sl Close geometry banks.}
+      CALL GGCLOS
+      END
+*-----------------------------------------------
+      SUBROUTINE {\bf GUKINE}
+C--> {\sl Generates kinematics}
+C--> {\sl Data card {\tt KINE} itype x y z px py pz}
++SEQ, GCFLAG.
++SEQ, GCKINE.
+      CALL GSVERT(PKINE,0,0,0,0,NVERT)
+      CALL GSKINE(PKINE(4),IKINE,NVERT,0,0,NT)
+C--> {\sl Print kinematic}
+      IF (IDEBUG.NE.0) THEN
+         CALL GPRINT('VERT',0)
+         CALL GPRINT('KINE',0)
+      END IF
+      END
+*-----------------------------------------------
+      SUBROUTINE {\bf GUSTEP}
+C--> {\sl Called at the end of each tracking }
+C--> {\sl step.}
++SEQ, GCKINE.
+C--> {\sl Debug event}
+      CALL GDEBUG
+C--> {\sl Store the created particles} 
+      IF (NGKINE.GT.0) CALL GSKING (0)
+      END
+*-----------------------------------------------
+      SUBROUTINE {\bf UGLAST}
+C--> {\sl Termination routine} 
+C--> {\sl Print histograms and statistics}
+      CALL GLAST
+C--> {\sl Close {\tt HIGZ/GKS} file}
+      CALL IGEND
+      END
+\end{XMP}
+\end{multicols}
+
+\section{Notes}
+\begin{itemize}
+\item Whenever possible {\tt GEANT} makes use of the {\tt ZEBRA} store
+for large data structures. This allows it to adapt the size of the program
+data portion
+to the size of the problem. The total amount of space required depends
+on the application. {\tt GEANT} can run with as little as 50,000 words
+or less, but for large detectors it is not uncommon to 
+declare stores of several million words. The call to \Rind{GZEBRA}
+initialises the common \FCind{/GCBANK/} to receive the {\tt GEANT}
+data structures. This call is necessary before any other routine of
+the {\tt GEANT} system is called.
+\item The call to \Rind{HLIMIT} initialises the {\tt ZEBRA} system
+to use the \FCind{/PAWC/} common block for the {\tt HBOOK} histogram
+package. The size of the common depends on the number and size of the
+plot requested. The {\tt ZEBRA} system must be initialised only once,
+and the negative argument to \Rind{HLIMIT} prevents a second
+initialisation of the system.
+The \Rind{HLIMIT} call has to be placed {\bf after} the call
+to \Rind{GZEBRA} and the argument has to be the dimension of the 
+\FCind{/PAWC/} common block with a negative sign in front. 
+\item
+The main program is intended for {\it batch} applications,
+while to run the simulation interactively, the interactive main program
+called \Rind{GXINT} should be linked in front of the user code.
+\item The program shown will require the graphic libraries in the
+link sequence. Often, for batch production or for
+small tests, graphics is not needed, and not loading the graphics
+code makes the program smaller. To avoid loading graphic routines
+the calls to \Rind{IGINIT}, \Rind{IGMETA}, \Rind{IGEND}, \Rind{GDINIT}
+and \Rind{GDEBUG} should be removed. 
+
+If, on the other hand, the user is interested in including the routine
+\Rind{GDEBUG} and in excluding graphics at the same time, then the
+following routine should be included in the code:
+\begin{verbatim}
+      SUBROUTINE GDCXYZ
+      ENTRY IGSA
+      ENTRY GDTRAK
+      END
+\end{verbatim}
+
+which will avoid every reference to the graphics routines from \Rind{GDEBUG}.
+
+\item The user code to define the {\it tracking media} and the geometry
+of the setup should be inside the routine \Rind{UGEOM}. The pre-initialised
+data structured can be read from disk, but it is recommended to call 
+\Rind{GPHYSI} in any case, to initialise the cross-section tables. An 
+example of a full material, geometry and detector design is given below
+and has been extracted from the example {\tt GEXAM3}. Here only major
+calls are shown, the redundant parts can be found in the source code
+of \Rind{UGEOM} in {\tt GEXAM3}. 
+
+The example shows the basic concept in 
+{\tt GEANT}. First material parameters are defining the properities of
+a detector material calling the subroutine \Rind{GSMATE}. 
+Here in addition to the 16 predefined materials, the material definition of
+Calcium is examplary shown. More information towards the predefined materials
+and further use of material definition routines can be found in the 
+section {\tt CONS001 - CONS101}.
+Then tracking parameters are associated to the materials, defining
+a so called tracking medium. Each {\tt GEANT}  volume must be 
+associated to an existing tracking medium. Here in the example the
+tracking medium {\tt 'TARGET'} is defined to exist of Calcium.
+ 
+In the example shown below several
+detector volumes are defined using the subroutine \Rind{GSVOLU}.
+The defined volume have associated parameters of name, shape,
+tracking medium and shape parameters.
+In this example the volume {\tt 'TGT '} consists of the 
+previously defined tracking medium {\tt 'TARGET'}.The 
+volumes (and if necessary identical copies of them)
+are then positioned according to the detector geometry. The 
+volumes are positioned on the same level, or inside each other. By
+setting the parameter {\tt ONLY} or  {\tt MANY} in the call of \Rind{GSPOS} 
+the user has the opportunity to tell either {\tt GEANT} the logical
+volume structure and to apply boolean operations (cutting, joining and
+intersection) between two positioned volumes. More information about
+the concept in defining volumes and positioning can be retrieved from
+the section {\tt GEOM}. 
+
+Finally the user is required to classify into sets all
+sensitive detectors (defined as those volume defined as
+detector via \Rind{GSDET} and other related routines, for which 
+he wants to store hits in the hit data structure {\tt JHITS}.
+\begin{multicols}{2}
+\footnotesize
+\begin{XMP}
+      SUBROUTINE {\bf UGEOM}
++SEQ,GCLIST
++SEQ,GCONSP
+      COMMON/DLSFLD/ISWFLD,FLDVAL
+C--> {\sl Defining material parameters}
+C--> {\sl Defining geometry parameters}
+C--> {\sl Defining positioning parameters}
+C--> {\sl Data statements, left out here, to}
+C--> {\sl Define materials and mixtures}
+      CALL GSMATE(17,'CALCIUM$',
+     + 40.08,20.,1.55,10.4,23.2,0,0)
+C--> {\sl .......}
+C--> {\sl further material an mixture definitions}
+C--> {\sl .......}
+C--> {\sl Defining tracking media}
+      CALL GSTMED( 2,'TARGET    $',
+     + 17,0,0,0.,10.,.2,.1,.001,.5,0,0)
+C--> {\sl .......}
+C--> {\sl defining further media}
+C--> {\sl .......}
+C--> {\sl Define the reference frame}
+      CALL GSVOLU
+     +     ('CAVE','BOX ',1,CAVPAR,3,ICAVE)
+C--> {\sl The targe box is shifted by 100 cm}
+C--> {\sl in the cave.}
+      CALL GSVOLU
+     +     ('TGT ','BOX ',2,TGTPAR,3,ITGT )
+      CALL GSVOLU
+     +     ('TBIN','TRD1',3,TBIPAR,4,ITBIN)
+      CALL GSVOLU
+     +     ('TBOU','TRD1',4,TBOPAR,4,ITBOU)
+      CALL GSVOLU
+     +     ('ARM ','TRD1',1,ARMPAR,4,IARM)
+      CALL GSVOLU
+     +     ('FDIN','BOX ',9,FDIPAR,3,IFDIN)
+      CALL GSVOLU
+     +     ('FDOU','BOX ',4,FDOPAR,3,IFDOU)
+C--> {\sl Define drift wire planes}
+      CALL GSVOLU
+     +     ('FSP ','BOX ',13,FDIPAR,3,IFSP)
+C--> {\sl .......}
+C--> {\sl further geometry definitions}
+C--> {\sl .......}
+C--> {\sl Positioning the daughter volumes in}
+C--> {\sl their mother volume.}
+      CALL GSPOS
+     + ('TGT ',1,'TBIN', 0., 0.,-5.08,0,'ONLY')
+      CALL GSPOS
+     + ('TGT ',2,'TBIN', 0., 0.,-2.54,0,'ONLY')
+      CALL GSPOS
+     + ('TGT ',3,'TBIN', 0., 0., 0.  ,0,'ONLY')
+      CALL GSPOS
+     + ('TGT ',4,'TBIN', 0., 0., 2.54,0,'ONLY')
+      CALL GSPOS
+     + ('TGT ',5,'TBIN', 0., 0., 5.08,0,'ONLY')
+      CALL GSPOS
+     + ('TBIN',1,'TBOU', 0., 0.,   0.,0,'ONLY')
+      CALL GSPOS
+     + ('TBOU',1,'CAVE', 0., 0.,  ZTG,0,'ONLY')
+      CALL GSPOS
+     + ('ARM ',1,'CAVE',XLARM,0.,ZLARM,1,'ONLY')
+      CALL GSPOS
+     + ('ARM ',2,'CAVE',XRARM,0.,ZRARM,2,'ONLY')
+      CALL GSPOS
+     + ('FDOU',1,'ARM ',0.,0., DFDO  ,0,'ONLY')
+      CALL GSPOS
+     + ('FDIN',1,'FDOU',0.,0., 0.    ,0,'ONLY')
+      CALL GSPOS
+     + ('FSP ',1,'FDIN',0.,0.,-2.9975,0,'ONLY')
+C--> {\sl .......}
+C--> {\sl positioning of further volumes}
+C--> {\sl .......}
+C--> {\sl Print the stored definitions}
+      CALL GLOOK('VOLU',LPRIN,NPRIN,ILOOK)
+      IF(ILOOK.NE.0) CALL GPVOLU(0)
+      CALL GLOOK('ROTM',LPRIN,NPRIN,ILOOK)
+      IF(ILOOK.NE.0) CALL GPROTM(0)
+      CALL GLOOK('TMED',LPRIN,NPRIN,ILOOK)
+      IF(ILOOK.NE.0) CALL GPTMED(0)
+      CALL GLOOK('MATE',LPRIN,NPRIN,ILOOK)
+      IF(ILOOK.NE.0) CALL GPMATE(0)
+      CALL GLOOK('PART',LPRIN,NPRIN,ILOOK)
+      IF(ILOOK.NE.0) CALL GPPART(0)
+C--> {\sl Clean up volume banks and perform}
+C--> {\sl optimization}
+      CALL GGCLOS
+C--> {\sl Define sensitive detector parts}
+      CALL GSDET
+     &('DRFT','FSP ',2,NAFD ,NBITSV,1,100,
+     &100,IDRFT,IFD )
+C--> {\sl Define hit parameters}
+      CALL GSDETH('DRFT','FSP ',9,NAMESH,
+     &NBITSH,ORIG,FACT)
+      RETURN
+      END
+\end{XMP}
+\end{multicols}
+
+
+
+
+
+\item It is convenient to store the input data records (see {\tt [BASE040]})
+in an auxiliary file ({\tt gcards.dat} in the example). This allows to
+have a standard input file and to overwrite selected input data records
+as needed.
+If, for instance, the standard {\tt gcards.dat} file contains the record
+{\tt TRIG 1000} and a short test run is requested this can be obtained
+with the following input:
+\begin{verbatim}
+READ 4
+TRIG 10
+STOP
+\end{verbatim}
+the first line instructs {\tt FFREAD} to open and process the file
+connected with logical unit 4, and the second line (re-)defines the
+number of events to be processed. The {\tt STOP} command ends the 
+{\tt FFREAD} processing of the input.
+\item 
+In the above
+example the common blocks have not been expanded in the code. The notation
+used is the one of the {\tt PATCHY}/{\tt CMZ}~\cite{bib-PATCHY,bib-CMZ}
+code management systems. These products, among other things, can
+run as pre-processors, replacing the {\tt +SEQ,...}
+instructions with the corresponding code fragments. Users are strongly
+recommended to use these systems to include {\tt GEANT} common blocks
+in their code. 
+
+Long experience in supporting {\tt GEANT} users has shown that, as the
+user program grows, typing errors in the insertion of the common blocks
+{\it by hand} become very common, but difficult to find. The investment
+needed to learn a code management system at the user level is usually 
+negligible compared with the time and energy needed in hunting a
+problem introduced by a mistyped common.
+\end{itemize}

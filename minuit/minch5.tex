@@ -1,0 +1,456 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%   MINUIT User Guide -- LaTeX Source                             %
+%                                                                 %
+%   Chapter 5                                                     %
+%                                                                 %
+%   The following external EPS files are referenced:              %
+%                                                                 %
+%   Editor: Michel Goossens / CN-AS                               %
+%   Last Mod.: 17 Mar. 1992 10.20 mg                              %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ 
+\chapter{How to get the right answer from Minuit.}
+
+The goal of Minuit --- to be able to minimize and analyze parameter
+errors for all possible user functions with any number of variable
+parameters --- is of course impossible to realise, even in principle,
+in a finite amount of time. In practice, some assumptions must be made
+about the behaviour of the function in order to avoid evaluating it
+at all possible points.
+In this chapter we give some hints on how the user can help Minuit
+to make the right assumptions.
+
+\section{Which Minimizer to Use.}
+
+One of the historically interesting advantages of Minuit is that it
+was probably the first minimization program to offer the user a choice
+of several minimization algorithms.
+This could be taken as a reflection of the fact that none of the
+algorithms known at that time were good enough to be universal, so
+users were encouraged to find the one that worked best for them.
+Since then, algorithms have improved considerably, but Minuit still
+offers several, mostly so that old users will not feel cheated, but also to
+help the occasional user who does manage to defeat the best algorithms.
+Minuit currently offers five commands which can be used to find a
+smaller function value, in addition to a few others,
+like \Cind[MINOs]{MINOS} and \Cind[IMProve]{IMPROVE},
+which will retain a smaller function value if they stumble on one
+unexpectedly (or, in the case of \Cind[IMProve]{IMPROVE}, hopefully).
+The commands which can be used to minimize are:
+
+\subsection{MIGRAD}
+
+This is the best minimizer for nearly all functions. It is a
+variable-metric method with inexact line search, a stable
+metric updating scheme, and checks for positive-definiteness.
+It will run faster if you \Cind[SET STRategy]{SET STRATEGY 0}
+and will be more reliable if you \Cind[SET STRategy]{SET STRATEGY 2}
+(although the latter option may not help much).
+Its main weakness is that it depends heavily on knowledge of the
+first derivatives, and fails miserably if they are very inaccurate.
+If first derivatives are a problem, they can be
+calculated analytically inside \Rind{FCN} (see elsewhere in this writeup) or
+if this is not feasible, the user can try to improve the accuracy of
+Minuit's numerical approximation by adjusting values using the
+\Cind[SET EPSmachine]{SET EPS} and/or \Cind[SET STRategy]{SET STRATEGY} commands
+(see Floating Point Precision and \Cind[SET STRategy]{SET STRATEGY}).
+
+\subsection{MINIMIZE}
+
+This is equivalent to \Cind[MIGrad]{MIGRAD}, 
+except that if \Cind[MIGrad]{MIGRAD} fails,
+it reverts to \Cind[SIMplex]{SIMPLEX} and then calls 
+\Cind[MIGrad]{MIGRAD} again.
+This is what the old \Cind[MIGrad]{MIGRAD} command used to do, 
+but it was removed from
+the \Cind[MIGrad]{MIGRAD} command so that users would have a choice, 
+and because it is
+seldom of any use to call \Cind[SIMplex]{SIMPLEX} when 
+\Cind[MIGrad]{MIGRAD} has failed (there are of course exceptions).
+
+\subsection{SCAN}
+
+This is not intended to minimize, and just scans the function, one
+parameter at a time.
+It does however retain the best value after each scan,
+so it does some sort of highly primitive minimization.
+
+\subsection{SEEK}
+
+We have retained this Monte Carlo search mainly for sentimental
+reasons, even though the limited experience with it is
+less than spectacular.
+\index{metropilis algorithm}
+\index{Monte Carlo}
+The method now incorporates a Metropolis algorithm which always
+moves the search region to be centred at a new minimum,
+and has probability 
+$ e ^{(-F/F_{\mathrm{min}})}$
+of moving the search region to a higher point with function value $F$.
+This gives it the theoretical ability to jump
+through function barriers like a multidimensional
+quantum mechanical tunneler in search of isolated minima, but it is
+widely believed by at least half of the authors of Minuit that this
+is unlikely to work in practice (counterexamples are welcome)
+since it seems to depend critically on choosing
+the right average step size for the random jumps,
+and if you knew that, you wouldn't need Minuit.
+
+\subsection{SIMPLEX}
+
+\index{minimization!multidimensional}
+\index{multidimensional minimization}
+This genuine multidimensional minimization routine is usually much
+slower than \Cind[MIGrad]{MIGRAD}, but it does not use first derivatives,
+so it should not be so sensitive to the precision of the \Rind{FCN}
+calculations, and is even rather robust with respect to
+gross fluctuations in the function value.
+However, it gives no reliable information about parameter errors,
+no information whatsoever about parameter correlations,
+and worst of all cannot be expected to converge accurately
+to the minimum in a finite time.
+Its estimate of \texttt{EDM} is largely fantasy, so it would not even
+know if it did converge.
+
+\section{Floating point Precision}
+
+Minuit figures out at execution time the precision with which it was
+compiled, and assumes that \Rind{FCN} provides about the same precision.
+That means not just the length of the numbers used and returned
+by \Rind{FCN}, but the actual mathematical accuracy of the calculations.
+The section on Floating point Precision in Chapter One describes
+what to do if this is not the case.
+
+\section{Parameter Limits}
+
+Putting limits (absolute bounds) on the allowed values for
+a given parameter, causes Minuit to make a non-linear
+transformation of its own internal parameter values to obtain the
+(external) parameter values passed to \Rind{FCN}.
+To understand the adverse effects of limits, see ``The Transformation
+for Parameters with Limits'' in Chapter 1.
+Basically, the use of limits should be avoided unless needed to
+keep the parameter inside a desired range.
+ 
+If parameter limits are needed, in spite of the effects described
+in Chapter One, then the user should be aware of the following
+techniques to alleviate problems caused by limits:
+
+\subsection{Getting the Right Minimum with Limits.}
+
+If \Cind[MIGrad]{MIGRAD} converges normally to a point where no parameter is
+near one of its limits, then the existence of limits has
+probably not prevented Minuit from finding the right minimum.
+On the other hand, if one or more parameters is near its limit
+at the minimum, this may be because the true minimum is indeed
+at a limit, or it may be because the minimizer has become 
+``blocked'' at a limit.  
+This may normally happen only if the parameter
+is so close to a limit (internal value at an odd multiple
+of $\pm \frac{\Tstm \pi}{\Tstm 2}$ that Minuit prints a warning to this effect
+when it prints the parameter values.
+
+The minimizer can become blocked at a limit, because at a limit
+the derivative seen by the minimizer 
+$\partial F / \partial P_{\mathrm{int}}$
+is zero no matter what the real derivative
+$\partial F / \partial P_{\mathrm{ext}}$ is.
+
+\[
+\frac{\partial F}{\partial P_{\mathrm{int}}}                =
+\frac{\partial F}{\partial P_{\mathrm{ext}}}
+\frac{\partial P_{\mathrm{ext}}}{\partial P_{\mathrm{int}}} =
+\frac{\partial F}{\partial P_{\mathrm{ext}}}                = 0
+\]
+
+For a stepping method (like \Cind[SIMplex]{SIMPLEX}) 
+this seldom poses any problem,
+but a method based on derivatives (\Cind[MIGrad]{MIGRAD}) may become blocked
+at such a value.
+If this happens, it may be necessary to move the value of the
+parameter in question a significant distance from the
+limit (with \Cind[SET PARameter]{SET PARam}) and restart the minimization, perhaps
+with that parameter fixed temporarily.
+We are investigating ways to induce Minuit to extricate itself from
+such situations automatically, but it is not so obvious as it seems,
+and for the moment must sometimes be done by hand.
+
+\subsection{Getting the right parameter errors with limits.}
+\label{sec:right-errors}
+
+In the best case, where the minimum is far from any limits,
+Minuit will correctly transform the error matrix, and the
+parameter errors it reports should be accurate and very
+close to those you would have got without limits.
+In other cases (which should be more common, since
+otherwise you wouldn't need limits), the very meaning of
+parameter errors becomes problematic.  Mathematically, since
+the limit is an absolute constraint on the parameter, a parameter
+at its limit has no error, at least in one direction.
+The error matrix, which can assign only symmetric errors, then
+becomes essentially meaningless.
+On the other hand, the \Cind[MINOs]{MINOS} analysis is still meaningful,
+at least in principle, as long as \Cind[MIGrad]{MIGRAD} (which is called
+internally by \Cind[MINOs]{MINOS}) does not get blocked at a limit.
+Unfortunately, the user has no control over this aspect of
+the \Cind[MINOs]{MINOS} calculation, although it is possible to get enough
+printout from the \Cind[MINOs]{MINOS} command to be able to determine whether
+the results are reliable or not.
+
+\section{Fixing and Releasing Parameters}
+
+When Minuit needs to be guided to the ``right'' minimum,
+often the best way to do this is with the \Cind{FIX} 
+and \Cind[RELease]{RELEASE} commands.
+That is, suppose you have a problem with ten free parameters,
+and when you minimize with respect to all at once, Minuit goes to
+an unphysical solution characterized by an unphysical or unwanted
+value of parameter number four.
+One way to avoid this is to \Cind{FIX} parameter four at a ``good'' value
+(not necessarily the best, since you presumably don't know that yet),
+and minimize with respect to the others. 
+Then \Cind[RELease]{RELEASE 4} and minimize again. 
+If the problem admits a ``good'' physical solution, you will
+normally find it this way.  
+If it doesn't work,
+you may see what is wrong by the following sequence
+(where \texttt{xxx} is the expected physical value for parameter four):
+\begin{alltt}\footnotesize
+SET PARAM 4 xxx
+FIX 4
+MIGRAD
+RELEASE 4
+SCAN 4
+\end{alltt}
+where the \Cind[SCAn]{SCAN} command gives you a picture of \Rind{FCN} as a 
+function of parameter four alone,
+the others being fixed at their current best values.
+If you suspect the difficulty is due to parameter five,
+then add the command
+\begin{alltt}\footnotesize
+CONTOUR  4  5
+\end{alltt}
+to see a two-dimensional picture.
+
+\section{Interpretation of Parameter Errors}
+
+There are two kinds of problems that can arise:
+The {\bf reliability} of Minuit's error estimates, and their
+{\bf statistical interpretation}, assuming they are accurate.
+
+\subsection{Statistical Interpretation.}
+
+For discussuion of basic concepts, such as the meaning of the elements
+of the error matrix, parabolic versus \Cind[MINOs]{MINOS} errors,
+the appropriate value for \texttt{UP} 
+(see \Cind[SET ERRordef]{SET ERRdef}), and setting of exact
+confidence levels, see (in order of increasing complexity and completeness):
+
+\begin{UL}            
+\item {\em ``Interpretation of the Errors on Parameters'',}
+      see Part 3 of this write-up.
+\item {\em ``Determining the Statistical Significance of Experimental
+      Results''}\cite{bib-MIN81}.
+\item {\em ``Statistical Methods in Experimental Physics''}\cite{bib-EADIE}.
+\end{UL}
+
+\subsection{The Reliability of Minuit Error Estimates.}
+
+Minuit always carries around its own current estimates of the
+parameter errors, which it will print out on request, no matter how
+accurate they are at any given point in the execution.
+For example, at initialization, these estimates are just the starting
+step sizes as specified by the user.  
+After a \Cind[MIGrad]{MIGRAD} or \Cind[HESse]{HESSE} step,
+the errors are usually quite accurate, unless there has been a problem.
+Minuit, when it prints out error values,
+also gives some indication of how reliable it thinks they are.
+For example, those marked \texttt{'CURRENT GUESS ERROR'} are only working values
+not to be believed, and \texttt{'APPROXIMATE ERROR'} means that they have been
+calculated but there is reason to believe that they may not be accurate.
+If no mitigating adjective is given, then at least Minuit believes
+the errors are accurate, although there is always a small chance
+that Minuit has been fooled.
+Some visible signs that Minuit may have been fooled are:
+
+\begin{UL}
+\item Warning messages produced during the minimization or error analysis.
+\item Failure to find new minimum.
+\item Value of \texttt{EDM} too big. For a ``normal'' minimization, 
+      after \Cind[MIGrad]{MIGRAD}, the value of \texttt{EDM} is usually more 
+      than three orders of magnitude smaller than \texttt{UP} 
+      (the \Cind{SET ERRordef}), unless a looser tolerance has been specified.
+\item Correlation coefficients exactly equal to zero, unless some parameters
+      are known to be uncorrelated with the others.
+\item Correlation coefficients very close to one (greater than 0.99).
+      This indicates both an exceptionally difficult problem, and one
+      which has been badly parametrized so that individual errors are not
+      very meaningful because they are so highly correlated.
+\item Parameter at limit. This condition, signalled by a Minuit warning
+      message, may make both the function minimum and parameter errors
+      unreliable. See section \ref{sec:right-errors},
+      {\em Getting the right parameter errors with limits.}
+\end{UL}
+
+The best way to be absolutely sure of the errors, is to use
+``independent'' calculations and compare them, or compare the calculated
+errors with a picture of the function if possible.
+For example, if there is only one free parameter, the command \Cind[SCAn]{SCAN}
+allows the user to verify approximately the function curvature.
+Similarly, if there are only two free parameters, use \Cind[CONtour]{CONTOUR}.
+To verify a full error matrix, compare the results of \Cind[MIGrad]{MIGRAD}
+with those (calculated afterward) by \Cind[HESse]{HESSE}, 
+which uses a different method.
+And of course the most reliable and most expensive technique,
+which must be used if asymmetric errors are required, is \Cind[MINOs]{MINOS}.
+
+\section{Convergence in MIGRAD, and Positive-definiteness.}
+
+\Cind[MIGrad]{MIGRAD} uses its current estimate of the covariance matrix of the
+function to determine the current search direction, since this is
+the optimal strategy for quadratic functions and ``physical'' functions
+should be quadratic in the neighbourhood of the minimum at least.
+The search directions determined by \Cind[MIGrad]{MIGRAD} are guaranteed to be
+downhill only if the covariance matrix is positive-definite,
+so in case this is not true, it makes a positive-definite
+approximation by adding an appropriate constant along the diagonal
+as determined by the eigenvalues of the matrix.
+Theoretically, the covariance matrix for a ``physical'' function must be
+positive-definite at the minimum, although it may not be so
+for all points far away from the minimum, even for a well-determined
+physical problem. 
+Therefore, if \Cind[MIGrad]{MIGRAD} reports that it has found a
+non-positive-definite covariance matrix, this may be
+a sign of one or more of the following:
+
+\begin{UL}
+\item {\bf A non-physical region.}
+      On its way to the minimum, \Cind[MIGrad]{MIGRAD}
+      may have traversed a region which has
+      unphysical behaviour, which is of course not a serious problem as long
+      as it recovers and leaves such a region.
+\item {\bf An underdetermined problem.}
+      If the matrix is not positive-definite even at the minimum,
+      this may mean that the solution is not well-defined, for example
+      that there are more unknowns than there are data points, or that the
+      parametrization of the fit contains a linear dependence.
+      If this is the case, then Minuit (or any other program) cannot solve
+      your problem uniquely, and the error matrix will necessarily be
+      largely meaningless, so the user must remove the underdeterminedness
+      by reformulating the parametrization. Minuit cannot do this itself,
+      but it can provide some hints (contours, global correlation coefficients,
+      eigenvalues) which can help the clever user to find out what is wrong.
+\item {\bf Numerical inaccuracies.}
+      It is possible that the apparent lack of positive-definiteness
+      is in fact only due to excessive roundoff errors in numerical
+      calculations, either in \Rind{FCN} or in Minuit.
+      This is unlikely in general, but becomes more likely if the number of
+      free parameters is very large, or if the parameters are badly scaled
+      (not all of the same order of magnitude), and correlations are
+      also large.
+      In any  case, whether the non-positive-definiteness is
+      real or only numerical is largely irrelevant, since in both cases the
+      error matrix will be unreliable and the minimum suspicious.
+\end{UL}
+
+\section{Additional Trouble-shooting}
+
+When Minuit just doesn't work, some of the more common causes are:
+
+\begin{UL}
+\item {\bf Precision mismatch.}
+      Make sure your \Rind{FCN} has been compiled with the same precision as the
+      version of Minuit you are using.
+      When using \texttt{DOUBLE PRECISION}, it is safest to use the \texttt{IMPLICIT}
+      declaration to make sure that everything is \texttt{DOUBLE PRECISION}, not
+      just the arguments of \Rind{FCN} but also the internal variables.
+      Note that depending on the computer system used, floating-point
+      constants may be passed as single precision in subroutine arguments,
+      even if there is an \texttt{IMPLICIT DOUBLE PRECISION} statement
+      (which is strictly speaking correct since the \texttt{IMPLICIT} statement
+      refers only to variables, not constants).
+      Therefore, if constants are used as arguments in subroutine calls,
+      they must be explicitly of the right precision (for example, on Apollo,
+      even 0. is not equal to \texttt{0.D0}).
+       
+      If the problem is only one of precision, and not of word length mismatch,
+      an appropriate \Cind[SET EPSmachine]{SET EPS} command may fix it.
+\item {\bf Trivial bugs in \Rind{FCN}.}
+      The possibilities for Fortran bugs are numerous. Probably the most
+      common among physicists inexperienced in Fortran is the confusion
+      between \texttt{REAL} and \texttt{INTEGER} types, 
+      which you can sometimes get away with, but not always.
+      [For example, if \texttt{A} and \texttt{B} are \texttt{REAL} variables, 
+      the Fortran statement \texttt{A = 2*B}   is not good programming, 
+      but happens to do what the user
+      probably intended, whereas the statement   \texttt{A = B + 2/3}   almost
+      certainly will not do what the user intended.]
+      Minuit can spot some trivial bugs itself, and issues
+      a warning when it detects an unusual \Rind{FCN} behaviour.  Such a warning
+      should be taken seriously.
+       
+      Minuit also offers some tools (especially \Cind[SCAn]{SCAN}) 
+      which can help the user to find trivial bugs.
+\item {\bf Overwriting in a user routine.}
+      Overwriting most often occurs when setting the values of a local
+      array or an array in \texttt{COMMON}, and elements outside the
+      dimensions of the array are addressed.
+      Most computer systems do not detect this error unless you attempt to
+      write into a protected area of memory, and of course Minuit is also
+      helpless, especially if Minuit itself is being overwritten.
+      The symptoms of user overwriting may be almost anything,
+      including unusual behaviour of Minuit itself.
+      The effects depend critically on where instructions and data are
+      loaded in memory, so they may change completely if the same
+      program is recompiled with different compiler options or reloaded
+      in a different sequence, even though the compiler and loader
+      are not at fault.
+\item {\bf Changing the values of input arguments.}
+      In subroutine \Rind{FCN}, for example, the arguments \texttt{NPAR} and \texttt{IFLAG},
+      as well as the values of the parameters themselves, are only
+      input to \Rind{FCN} and their values should not be changed inside \Rind{FCN}.
+      Minuit is now protected against this in principle, since
+      the user only gets a copy of the value, not the actual address
+      of the internal Minuit variable, but still this is a symptom of
+      misunderstanding by the user.
+       
+      If you really want to change the number of variable parameters,
+      this must be done with commands like \Cind{FIX} and \Cind[RELease]{RELEASE}, 
+      by redefining parameters using command \Cind[PARameters]{PARAMETER}
+      or \Cind[CLEar]{CLEAR}.
+       
+      Similarly, if a parameter takes on an unwanted value, it will do no good
+      to change its value inside \Rind{FCN}: In the best case, 
+      Minuit won't see your
+      improved value, and in the worst case, it will produce unpredictable
+      results. To set a parameter to a certain value, use the command
+      \Cind[SET PARameter]{SET PARam}, and to keep it within certain bounds, use the command
+      \Cind{SET LIMits}.  If the parameter must obey more complicated constraints,
+      you must find a trick such as adding a penalty value to \Rind{FCN} outside
+      of the physical region, to force it back to where you want it.
+\item {\bf An ill-posed problem.}
+      For questions of parameter dependence, see the discussion above
+      on postive-definiteness.
+      Other mathematical problems which can arise are:
+      {\bf excessive numerical roundoff} ---
+      be especially careful of exponential and factorial functions
+      which get big very quickly and lose accuracy;
+      {\bf starting too far from the solution} ---
+      the function may have unphysical local minima, especially
+      at infinity in some variables;
+      {\bf incorrect normalization} ---
+      in likelihood functions, the probability distributions must
+      be normalized or at least have an integral which is independent
+      of the values of the variable parameters.
+\item {\bf A bug in Minuit.}
+      This is extremely unlikely, but it did happen once. If a bug is suspected, and
+      all other possible causes can be eliminated, please try to save a copy of the
+      input and output files, listing of \Rind{FCN}, and other information that may be
+      relevant, and send them to \texttt{Fred.James@cern.ch}.
+\end{UL}
+
+
+
+

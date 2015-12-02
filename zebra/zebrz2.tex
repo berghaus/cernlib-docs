@@ -1,0 +1,1600 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%   ZEBRA RZ - Reference Manual -- LaTeX Source                   %
+%                                                                 %
+%   Reference section with a description of all RZ routines       %
+%                                                                 %
+%   Original: Michel Goossens (from SGML source)                  %
+%   Additions: Jamie Shiers                                       %
+%                                                                 %
+%   Last Mod.: 27 June 1994 10:50 jds                             %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\Filename{H1rzuser-routine-description}
+\chapter{Description of user callable RZ routines}
+
+\Filename{H2rzuser-open-direct-access-file}
+\section{Open a direct access file}
+\Shubr{RZOPEN}{(*LUN*,CHDIR*,CHNAME,CHOPT,*LRECL*,ISTAT*)}
+
+\begin{DLtt}{123456}
+\item[LUN]Logical unit number associated with the RZ file.
+The \Rind{RZOPEN} routine issues a FORTRAN OPEN statement for the
+specified logical unit, unless option C is specified.
+Option {\tt C} selects C I/O using the KERNLIB {\tt CFIO} routines.
+\index{KERNLIB}
+\index{CFIO routines}
+If this option is selected, {\tt LUN} returns the file pointer
+from the C library I/O routines.
+\item[CHDIR]Character variable in which the top directory
+name is returned (option {\tt W}). The name has the form
+``{\tt LUNn}'', e.g. ``{\tt LUN1}'' or ``{\tt LUN99}'',
+if FORTRAN I/O is used, or 
+``{\tt LUN1003}'' or ``{\tt LUN11021}'' in the case of C I/O.
+\item[CHNAME]Character variable specifying the name of the 
+file to be opened.
+\item[CHOPT]Character variable specifying the options required.
+\begin{DLtt}{123}
+\item[' ']  default, open file in readonly mode
+\item['L']  create file with relative organization (VAX only)
+\item['N']  open a new file
+\item['S']  open file in shared readonly mode
+\item['U']  open file in update mode
+\item['SU'] open file in shared update mode
+\item['1']  open file read/write assume single user
+\item['W']  return in {\tt CHDIR} directory name include
+\item['Y']  suppress {\tt LRECL} consistency check
+\item['C']  Use C I/O instead of FORTRAN I/O
+\item['X']  Exchange mode file
+\item['P']  Preserve case of file name (Unix systems)
+\end{DLtt}
+\item[LRECL] Integer variable specifying the record length
+of the file in machine words.
+If a value of zero (0) is specified, the \Rind{RZOPEN} routine 
+will attempt to obtain the correct record length from
+the file itself. A value of zero must not be specified for new files.
+\item[ISTAT] Integer variable in which the status code
+is returned. 
+\end{DLtt}
+
+The \Rind{RZOPEN} routine opens a new or existing RZ file
+on the specified logical unit. A call to \Rind{RZFILE}, for
+existing files, or \Rind{RZMAKE}, for new files, must follow
+a successful call to \Rind{RZOPEN}.
+
+\subsubsection*{RZOPEN status information returned in {\tt IQUEST}}
+\begin{DLtt}{1234567890}
+\item[IQUEST(7)] Number of entries in the top directory.
+\item[IQUEST(8)] Number of words per key.
+\item[IQUEST(10)] Record length (machine words, 32-bit words for exchange mode).
+\item[IQUEST(11)] C-file pointer (from \Rind{CFOPEN}).
+\item[IQUEST(12)] Exchange mode flag (set if \Ropt{X} is specified or is an existing
+                 file is in exchange mode).
+\item[IQUEST(13)] RZ file format version number.
+\begin{DLtt}{12}
+\item[0]Original (default) format - 4 words are used for the cycle block
+for each entry. 16 bit pointers for record numbers and word offsets within
+records are used, with corresponding limitations on the size of an RZ file
+and of individual directories within that file.
+\item[1]'New' format - option N in RZMAKE. 7 words are used for the
+cycle block for each entry. 32 bit pointers are now used, removing
+the previous limitations. In addition, the cycle block now contains
+the value of KEY(1) for the corresponding entry, providing an internal
+consistency check.
+\end{DLtt}
+\end{DLtt}
+
+\subsubsection*{Operating system dependent features}
+
+
+On Unix systems, filenames are translated to lowercase
+unless the \Ropt{P} option is specified. 
+Lowercase filenames
+are recommended to avoid problems with mixed or uppercase
+filenames which might occur, for example with NFS servers.
+\index{Unix}\index{NFS}
+
+When accessing RZ files over DECnet, care should be taken
+to ensure that the RMS network block count is sufficient
+to process the remote file. The block count is specified
+in 512 byte blocks.
+\index{DECnet}\index{VMS}\index{RMS}
+
+\begin{XMPt}{Accessing a file with record length 4096 words over DECnet}
+
+$ SET RMS/NETWORK_BLOCK_COUNT=32
+
+\end{XMPt}
+
+On MVS systems, the prefix for the current userid
+will be automatically prepended to the filename
+unless the filename begins with a dot (``.'').
+For instance, assuming \Lit{R01jds} is the current userid prefix,
+\Rind{RZOPEN} opens file \Lit{R01JDS.RZTEST.DATA} for both of the following 
+file specifications:
+\begin{XMP}
+      CHFILE = 'RZTEST.DATA'
+      CHFILE = '.R01JDS.RZTEST.DATA'
+\end{XMP}
+\index{MVS}
+
+\subsubsection*{AFS and NFS specific considerations}
+
+C input/output is particularly interesting when accessing Unix
+files from a VAX/VMS system via NFS. Such files cannot
+be read by FORTRAN, but can be processed successfully
+using C. If the file resides on a Unix system, such
+as an Apollo, Sun etc. the option 'X' should also be
+specified to indicate that the file is in exchange format
+by default. Files created on Cray Unicos systems are not,
+by default, in exchange format.
+\index{C!input/output}
+
+\Filename{H2rzuser-create-rzfile}
+\section{Create a new RZ file}
+\index{initialization}
+\Shubr{RZMAKE}{(LUN,CHDIR,NWKEY,CHFORM,CHTAG,NREC,CHOPT)}
+
+\begin{DLtt}{1234567}
+\item[LUN]Logical unit number associated with the RZ file.
+A FORTRAN {\tt OPEN} statement or call to the
+routine \Rind{RZOPEN} must precede the call to \Rind{RZMAKE}.\\
+Starting address of the memory area which will contain the
+RZ information ({\tt'M'} option)
+\item[CHDIR]Character variable specifying the name of the top directory to be
+associated with unit {\tt LUN} (up to 16 characters).
+\item[NWKEY] Number of words associated to a key {\bf (maximum 100)}
+\item[CHFORM] Character variable describing each element of the key vector
+\begin{DLtt}{12}
+\item['B']Bit string but not zero
+\item['H']Hollerith (4 characters)
+\item['A']Same as {\tt'H'} except for \Rind{RZLDIR}
+\item['I']Integer (nonzero)
+\end{DLtt}
+\item[CHTAG]Character array defined as {\tt CHARACTER*8 CHTAG(NWKEY)}.\\
+Each element of the array allows the description of the corresponding
+element in the key vector with a tag of up to 8 characters.
+\item[NREC]Number of physical records for the primary allocation
+\item[CHOPT]Character variable specifying the selected options.
+\begin{DLtt}{123456}
+\item[{\rm medium}]
+\begin{DLtt}{12}
+\item[' ']Disk (default)
+\item['M']Memory - The user must allocate at least {\tt NREC*LUN} words
+of memory starting at address {\tt LUN} if this option is used
+(see below).
+\end{DLtt}
+\item[{\rm mode}]
+\begin{DLtt}{12}
+\item[' ']Native mode (default)
+\item['X']Exchange mode (32 bit machines only)
+\end{DLtt}
+\item[{\rm format}]
+\begin{DLtt}{12}
+\item[' ']'Old' format (default)
+\item['O']As above
+\item['N']'New' format
+\item['4']Synonym for 'O'
+\item['7']Synonym for 'N'
+\end{DLtt}
+\item[{\rm other}]
+\begin{DLtt}{12}
+\item['F']Format {\tt NREC} records, unless option {\tt'M'}.
+\item['C']Use C I/O
+\end{DLtt}
+\end{DLtt}
+\end{DLtt}
+
+Subroutine \Rind{RZMAKE} creates a new RZ file on the specified
+logical unit. Should the file already exist, the routine
+\Rind{RZFILE} should be used.
+On return from \Rind{RZMAKE}, {\tt IQUEST(1)}
+\index{QUEST@{\tt QUEST}!IQUEST@{\tt IQUEST}}
+will be set to 0
+if the routine was successful. A non-zero value for
+{\tt IQUEST(1)} indicates an error.
+
+\subsubsection*{RZMAKE return codes}
+\index{QUEST@{\tt QUEST}!IQUEST@{\tt IQUEST}}
+\begin{DLtt}{1234567}
+\item[IQUEST(1)]Error status
+\begin{DLtt}{1}
+\item[0]Normal completion
+\item[1]Invalid number of words per keys (NWKEY)
+\item[2]Invalid number of records
+\item[3]Invalid combination of options specified
+\item[4]Invalid logical unit (LUN)
+\item[5]Invalid record length (LRECP)
+\item[6]Logical unit already in use
+\end{DLtt}
+\end{DLtt}
+
+The following example opens and creates a new RZ file,
+whose top directory contains
+three words per key, the first one being an integer (the year) and the
+two others being Hollerith (the month and the day).
+A total of 5000 records of length 4096 bytes are requested.
+\enlargethispage{\baselineskip}
+\begin{XMPt}{Example of using the routine RZMAKE}
+      CHARACTER*16 CHDIR
+      CHARACTER    CHTAG(3)*8
+      DATA CHTAG/'Year','Month','Day'/
+      LRECL = 1024
+      CALL RZOPEN(LUN,CHDIR,'RZTEST.DAT','N',LRECL,ISTAT)
+      IF(ISTAT.NE.0) GOTO 999
+      CALL RZMAKE(LUN,'Top_Dir',3,'IHH',CHTAG,5000,' ')
+ 
+  999 PRINT *,'Return code from RZOPEN = ',ISTAT
+\end{XMPt}
+
+\finalnewpage
+
+Option {\tt'F'} is particularly important for RZ files on
+\index{VM/CMS}
+VM/CMS systems, when shared access is required. Further
+details are given in Appendix A.
+
+{\bf N.B. when using option C, the call to RZMAKE must 
+immediately follow a call to RZOPEN. This permits the
+record length of the file to be passed from RZOPEN to RZMAKE,
+where it is stored in an RZ control bank for future use}.
+
+Option {\tt'M'} creates an RZ file in memory. The
+variable {\tt LUN} contains the record length.
+The address of this variable is used as the starting
+address for the memory file, as shown in the following example.
+\begin{XMPt}{Example of creating a memory file}
+      COMMON/MEMRZ/IBUFF(163840)
+*
+*     Set record length of memory file to 1024 words
+*     Starting address is LOCF(IBUF(1))
+*     Number of 'records' is 160 (length of IBUFF/lrecl)
+*
+      IBUF(1) = 1024
+      CALL RZMAKE(IBUF(1),'MEMRZ',3,'IHH',CHTAG,160,'M')
+\end{XMPt}
+
+\Filename{H2rzuser-access-rzfile}
+\section{Access an existing RZ file}
+
+\index{access}
+\Shubr{RZFILE}{(LUN,CHDIR,CHOPT)}
+
+\begin{DLtt}{123456}
+\item[LUN]Logical unit number associated with the RZ file.
+A call to the routine \Rind{RZOPEN} or 
+a FORTRAN {\tt OPEN} statement must precede the call to \Rind{RZFILE}.
+\item[CHDIR]Character variable specifying the name of the top directory to be
+associated with unit {\tt LUN}.
+\item[CHOPT]Character variable specifying the selected options.
+\begin{DLtt}{1234567}
+\item[medium]
+\begin{DLtt}{12}
+\item[' ']Disk (default)
+\end{DLtt}
+\item[mode]
+\begin{DLtt}{12}
+\item[' ']Read mode (default)
+\item['S']Shared mode
+\item['U']Update mode
+\item['1']Update mode and only one user (no LOCKs necessary)
+\item['L']List current LOCK identifiers
+\item['D']Reset "locking" word of the file (after program crash !)
+\item['C']Use C I/O
+\item['X']Exchange format file
+\end{DLtt}
+\end{DLtt}
+\end{DLtt}
+\index{filemode!shared}
+\index{filemode!update}
+\par 
+Subroutine \Rind{RZFILE} accesses an existing RZ file on the specified
+logical unit. Should the file not yet exist, the routine
+\Rind{RZMAKE} should be used.
+\par
+On return from \Rind{RZFILE}, {\tt IQUEST(1)}
+\index{QUEST@{\tt QUEST}!IQUEST@{\tt IQUEST}}
+will be set to 0 if the routine was successful. 
+A non-zero value for {\tt IQUEST(1)}
+indicates an error.
+
+{\bf N.B. when using option C, the call to RZFILE must 
+immediately follow a call to RZOPEN. This permits the
+record length of the file to be passed from RZOPEN to RZFILE,
+where it is stored in an RZ control bank for future use}.
+
+\Shubr{RZHOOK}{(LUN,CHDIR,TARGET,LRECL,CHOPT)}
+
+\begin{DLtt}{123456}
+\item[LUN]Logical unit number associated with the RZ file.
+The RZ file must already be open before calling \Rind{RZHOOK}
+\item[CHDIR]Character variable specifying the name of the top directory to be
+associated with unit \Lit{LUN}.
+\item[TARGET]Integer variable containing the address of the user
+routine that is to be called to perform the I/O.
+This routine must be declared \Lit{EXTERNAL} in the routine
+that calls \Rind{RZHOOK}.
+\item[LRECL]Integer variable containing the record length of the
+\Rind{RZFILE} in words.
+\item[CHOPT]Character variable specifying the selected options, as for
+\Rind{RZFILE}.
+\end{DLtt}
+
+Subroutine \Rind{RZHOOK} accesses an existing RZ file which must
+already be connected and ready for I/O. \Rind{RZHOOK} calls
+the routine \Rind{RZFILE} which reads records from the RZ file.
+
+The specifications for the user I/O routine are the same as for
+\Rind{FZHOOK}.
+
+\begin{XMPt}{An example of a user coded I/O routine}
+      SUBROUTINE FMXZIO(IBUF,IOWAY)
+      DIMENSION IBUF(8192)
++CDE,ZMACH.
++CDE,QUEST.
++CDE,FATBUG.
+      CHARACTER*6  CHWAY
+
+      IRC  = 0
+      IF(IDEBFA.GE.3) PRINT *,'FMXZIO. IQUEST(1-6) = ',
+     +   (IQUEST(J),J=1,6)
+      LUN  = IQUEST(1)
+      NREC = IQUEST(4)
+      IF(IOWAY.EQ.0) THEN
+         CALL XZREAD(LUN,IBUF,NREC,IQUEST(2)*IQCHAW,NGOT,' ',IRC)
+      ELSEIF(IOWAY.EQ.1) THEN
+         CALL XZRITE(LUN,IBUF,NREC,IQUEST(2)*IQCHAW,' ',IRC)
+      ELSE
+         WRITE(CHWAY,'(I6)') IOWAY
+         CALL ZFATAM('Invalid value for IOWAY in FMXZIO - '//CHWAY)
+      ENDIF
+
+      IQUEST(1) = IRC
+
+      END
+\end{XMPt}
+
+\Filename{H2rzuser-set-logging-level}
+\section{Set the logging level}
+
+\Shubr{RZLOGL}{(LUN,LOGLEV)}
+\index{logging level}
+\index{logging level}
+
+\begin{DLtt}{123456}
+\item[LUN]Logical unit number for which the logging level has to be set
+\item[LOGLEV]Logging level
+\begin{DLtt}{12}
+\item[-3]Suppress all messages
+\item[-2]Error messages only
+\item[-1]Terse logging
+\item[ 0]Normal logging: \Rind{RZFILE}, \Rind{RZMAKE}, \Rind{RZEND}, \Rind{RZCLOS}
+\item[ 1]Log to watch rare events
+\item[ 2]Log to monitor calls
+\item[ 3]Short dumps to debug user-written output routines
+\item[ 4]Full dumps to debug user-written output routines
+\end{DLtt}
+\end{DLtt}
+
+The logging level
+(i.e. the verboseness of the messages of the ZEBRA system) can be
+controlled for a given RZ unit number by a call to \Rind{RZLOGL}.
+
+Each declaration of an RZ file via \Rind{RZMAKE} or \Rind{RZFILE}
+associates a default logging level of 0 to the file.
+At any point in a program the logging level can be reset to a new
+value by calling \Rind{RZLOGL} with the appropriate parameters.
+
+\Filename{H2rzuser-close-direct-access-file}
+\section{Close a direct access file}
+
+\index{file!close}
+\Shubr{RZCLOS}{(CHDIR,CHOPT)}
+
+\begin{DLtt}{123456}
+\item[CHDIR]Character variable specifying the name of the top directory of the
+file to be closed.
+\item[CHOPT]Character variable specifying the options required.
+\begin{DLtt}{12}
+\item[' ']  default, close file specified by the variable {\tt CHDIR}
+\item['A']  close all files - {\tt CHDIR} not used
+\end{DLtt}
+\end{DLtt}
+
+This routine terminates RZ access to the file referenced
+by the specified top directory {\tt CHDIR}, and issues a FORTRAN
+or C close for the associated file. For this reason,
+it should be used in preference to the routine \Rind{RZEND}.
+
+\Shubr{RZEND}{(CHDIR)}
+\index{file!deaccess}
+
+\begin{DLtt}{123456}
+\item[CHDIR]Character variable specifying the name of the top directory of the
+file to be closed.
+\end{DLtt}
+
+A direct access file, identified by a top directory name,
+is closed by a call to \Rind{RZEND}.
+The directories present in memory,
+when they have been changed,
+are copied to the file and then deleted from memory, else
+the directories in memory are simply deleted.
+Note that a FORTRAN close statment must be provided by the
+user for the associated file.
+
+\Filename{H2rzuser-save-modified-directories}
+\section{Save modified directories}
+\index{save modified directories}
+\Shubr{RZSAVE}{ }
+
+All directories which have been modified in memory
+and the current output buffer are written to the output file by a call
+to \Rind{RZSAVE}. This routine is called
+automatically by the system when using \Rind{RZCDIR}, 
+\Rind{RZCLOS}, \Rind{RZEND} or \Rind{RZFREE}.
+In an interactive environment it may save to call \Rind{RZSAVE} from
+time to time.
+
+\Filename{H2rzuser-operations-on-directories}
+\section{Operations on RZ directories}
+\subsection{Define the naming directory}
+\index{naming!directory}
+\Shubr{RZNDIR}{(*CHPATH*,CHOPT)}
+\Idesc
+\begin{DLtt}{1234567}
+\item[*CHPATH*]Character variable specifying the complete pathname of the
+naming directory ({\tt'S'} option)
+\item[CHOPT]Character variable specifying the option
+\begin{DLtt}{12}
+\item[' ']Set the naming directory to the path specified in
+{\tt CHPATH} (default)
+\item['P']Print the naming directory
+\item['R']Read the naming directory pathname into {\tt CHPATH}
+\end{DLtt}
+\end{DLtt}
+\Odesc
+\begin{DLtt}{1234567}
+\item[*CHPATH*]Character variable containing the complete pathname of the
+naming directory ({\tt'R'} option).
+\end{DLtt}
+\par 
+When one is working with many different directories, and has to
+refer frequently the same directory, then the latter can be defined
+as the {\bf naming directory}, designated by the symbol
+'\verb!~!'
+in pathnames.
+A typical example would be an application where subdirectories have
+to be created in user routines in which the complete pathname of the
+naming directory is unknown.
+To set the naming directory a call to \Rind{RZNDIR} must be made.
+\subsubsection*{RZNDIR return codes}
+\begin{DLtt}{12}
+\item[0]Normal completion
+\item[1]{\tt'S'} (default) option and the pathname {\tt CHPATH} is invalid
+\end{DLtt}
+\subsection{Define the current working directory}
+\index{current!working directory}
+\index{CWD}
+\Shubr{RZCDIR}{(*CHPATH*,CHOPT)}
+\Idesc
+\begin{DLtt}{1234567}
+\item[*CHPATH*]Character variable specifying the pathname of the {\tt CWD}
+(default).\\
+{\tt CHPATH = ' '} means the {\tt CWD} (useful with the {\tt'U'} option)\\
+Unless several RZ files are open at the same time, the path name can
+be specified either as a path starting with the character {\tt'/'}, in
+which case an absolute pathname is intended for the given top directory.
+When several RZ files are open, an absolute pathname must start with a
+double slash {\tt'//'} and the top directory.
+When the pathname does not start with a {\tt'/'}, the pathname is prefixed
+with the path of the {\tt CWD}.
+\item[CHOPT]Character variable specifying the option
+\begin{DLtt}{12}
+\item[' ']Set the {\tt CWD} (default)
+\item['P']Print the {\tt CWD}
+\item['R']Read the {\tt CWD} pathname into {\tt CHPATH}
+\item['U']The same as the default but the time stamp in the
+directory in memory is checked against the one on the file and if
+needed the directory in memory is brought up to date.
+This option should be used when the user expects that directories can be
+changed concurrently by another user and he wants to use the latest
+version.
+\item['K']Keep the Current Directory in memory. By default, space occupied
+by the Current Directory may be released in case there is not enough
+space to accomodate the new directory.
+\end{DLtt}
+\end{DLtt}
+\Odesc
+\begin{DLtt}{1234567}
+\item[*CHPATH*]Character variable containing the complete pathname of the
+{\tt CWD} ({\tt'R'} option)
+\end{DLtt}
+\par 
+The {\tt CWD} is set to the top directory after a call to \Rind{RZMAKE}.
+The {\tt CWD} can be changed, displayed or obtained by a call to \Rind{RZCDIR}.
+\par 
+All operations of RZ routines manipulating keys
+(i.e. \Rind{RZIN}, \Rind{RZOUT}, \Rind{RZRDIR}, \Rind{RZKEYS},
+\Rind{RZPURG}, \Rind{RZDELK}, \Rind{RZDELT}, \Rind{RZQUOT},
+\Rind{RZPASS}) refer to objects in
+the ``Current Working Directory'' or {\tt CWD} for short.
+
+\subsubsection*{RZCDIR return codes}
+
+\index{QUEST@{\tt QUEST}!IQUEST@{\tt IQUEST}}
+\begin{DLtt}{123456789}
+\item[IQUEST(1)]Error status
+\begin{DLtt}{1}
+\item[0]Normal completion
+\item[1]The pathname {\tt CHPATH} is invalid (default option)
+\end{DLtt}
+\item[IQUEST(7)]{\tt NKEYS}, number of keys in the directory
+\item[IQUEST(8)]{\tt NWKEY}, number of words in a key
+\item[IQUEST(9)]Number of directories below {\tt CWD}.
+\item[IQUEST(10)]{\tt NQUOTA}, the record quota for the {\tt CWD} tree.
+\end{DLtt}
+
+\subsubsection*{Examples:}
+
+It is not necessary to specify {\tt //Top\_dir} in a pathname
+unless several RZ files are open simultaneously.
+If only one RZ file is declared, the following two calls
+are equivalent:
+
+\begin{verbatim}
+      CALL RZCDIR('//top_dir/dira/dirb/dirc',' ')
+and
+      CALL RZCDIR('/dira/dirb/dirc',' ')
+\end{verbatim}
+
+If the {\tt CWD} was already set to {\tt /dira/dirb}
+one can further abbreviate
+the calling sequence to
+
+\begin{verbatim}
+      CALL RZCDIR('dirc',' ')
+\end{verbatim}
+
+To go one level up in the directory tree one can use '$\backslash$', e.g.
+if the {\tt CWD} is {\tt /dira/dirb/dirc}
+then the two following calls are equivalent:
+
+\begin{verbatim}
+      CALL RZCDIR('\',' ')
+and
+      CALL RZCDIR('/dira/dirb',' ')
+\end{verbatim}
+
+To set the {\tt CWD} to the Naming directory one uses:
+
+\begin{verbatim}
+      CALL RZCDIR('~',' ')
+\end{verbatim}
+
+\subsection{Creation of a directory}
+\index{directory!creation}
+\Shubr{RZMDIR}{(CHDIR,NWKEY,CHFORM,CHTAG)}
+
+\begin{DLtt}{1234567}
+\item[CHDIR]Character variable with a maximum of 16 characters (for the given
+level), specifying the name of the directory to be
+created. All characters, but \verb!/, \ ,* ,~ or ?!
+are allowed in a directory name.
+\item[NWKEY]Number of words associated to a key {\bf (maximum 100)}
+\item[CHFORM]Character variable describing each element of the key vector
+(a blank is equivalent to {\tt'I'}).
+\begin{DLtt}{12}
+\item['B'] Bit string but not zero
+\item['H'] Hollerith (4 characters)
+\item['A'] same as {\tt'H'} (see \Rind{RZLDIR})
+\item['I'] Integer (nonzero)
+\end{DLtt}
+\item[CHTAG] Character array defined as {\tt CHARACTER*8 CHTAG(NWKEY)}.\\
+Each element of the array allows the description of the corresponding
+element in the key vector with a tag of up to 8 characters.
+\end{DLtt}
+
+A directory below the current ``working directory'' (see \Rind{RZCDIR})
+can be created by a call to \Rind{RZMDIR}.
+
+\subsubsection*{Example 1: Creating the geometry file of a LEP experiment}
+
+To create a geometry file for the OPAL detector
+the data base for the experiment has as top directory called
+{\tt //OPAL}.
+A directory called {\tt Geometry} is created, which will contain
+the names of the 12 main detectors of OPAL.
+
+\begin{verbatim}
+      CHARACTER TAGS(2)*8
+      INTEGER   KEY(2)
+ 
+      CALL RZMDIR('Geometry',1,'H','Detector')
+      CALL RZCDIR('Geometry',' ')
+      TAGS(1)='Volume'
+      TAGS(2)='Number'
+      CALL RZMDIR('CDET',2,'HI',TAGS)
+      CALL RZMDIR('ECAL',2,'HI',TAGS)
+      CALL RZMDIR('HCAL',2,'HI',TAGS)
+      CALL RZMDIR('FDET',2,'HI',TAGS)
+      CALL RZMDIR('MUON',2,'HI',TAGS)
+              .......
+\end{verbatim}
+
+As we now want to introduce information into the {\tt CDET } directory,
+we put our working directory equal to the latter by a call to \Rind{RZCDIR}:
+
+\begin{verbatim}
+      CALL RZCDIR('CDET',' ')
+\end{verbatim}
+
+which is equivalent to
+
+\begin{verbatim}
+      CALL RZCDIR('//OPAL/Geometry/CDET'),' ')
+\end{verbatim}
+
+\subsubsection*{Example 2: Using the geometry file of a LEP experiment}
+
+Logical records can then be entered corresponding to the parameters
+of each of the 24 sectors of the Jet chamber of the Central detector,
+of the vertex detector and of the Z chambers
+(routine \Rind{RZOUT} is described below).
+
+\begin{verbatim}
+C--     Write the information for the 24 Jet chamber sectors
+      CALL UCTOH('SECT',KEY,4,4)
+      DO 10 ISECT=1,24
+          KEY(2)=ISECT
+          CALL RZOUT(IXSTOR,LQ(LCDET-ISECT),KEY,ICYCLE,' ')
+   10 CONTINUE
+C--     Write the information for the vertex chamber
+      CALL UCTOH('VERT',KEY,4,4)
+      KEY(2)=1
+      CALL RZOUT(IXSTOR,LVERT,KEY,ICYCLE,' ')
+C--     Write the information for the Z chambers
+      CALL UCTOH('ZCHA',KEY,4,4)
+      CALL RZOUT(IXSTOR,LZCHA,KEY,ICYCLE,' ')
+\end{verbatim}
+
+Update records for the geometry of each detector can be foreseen, e.g.
+by creating a directory {\tt'Updates'} below {\tt'CDET'}
+
+\begin{verbatim}
+      CALL RZMDIR('Updates',1,'I','RUN')
+\end{verbatim}
+
+The Logical records in the {\tt'Updates'} directory will contain the
+detector's identification as well as update parameters. {\tt KEY(1)} could be
+the {\tt RUN} number from which the given corrections should be applied.
+The procedure to build the geometry data structure could be the following:
+
+\begin{UL}
+\item Read the standard parameters in directory {\tt'CDET'}
+\item Set the {\tt CWD} to 'Updates' and check if there are corrections
+to be applied for that run,etc.
+\end{UL}
+
+\subsection{Get the key definitions for the current working directory}
+
+\index{CWD!key definition}
+\Shubr{RZKEYD}{(NWKEY*,CHFORM*,CHTAG*)}
+\Odesc
+\begin{DLtt}{1234567}
+\item[NWKEY*]Number of words associated to a key in the {\tt CWD}
+\item[CHFORM*]Character variable describing each element of the key vector
+(see \Rind{RZMDIR})
+\item[CHTAG*]Character array defined as {\tt CHARACTER*8 CHTAG(NWKEY)}.\\
+Each element of the array describes the corresponding
+element in the key vector.
+\end{DLtt}
+
+Information about the key definitions, as declared by \Rind{RZMDIR},
+for the {\tt CWD} can be obtained be a call to \Rind{RZKEYD}.
+
+
+\subsection{Lock and unlock a directory}
+\index{filemode!shared}
+\index{filemode!update}
+\Shubr{RZLOCK}{(CHLOCK)}
+\begin{DLtt}{1234567}
+\item[CHLOCK]Character variable (up to 8 characters) identifying the owner
+of the lock (e.g.
+specifying the name of the user, his computer identifier,...).
+This parameter is used to avoid two users, who have both the
+write password for a directory, trying to change it at the same time.
+{\tt CHLOCK} is also useful in the case of a system crash while a directory
+was locked.
+\end{DLtt}
+
+When an RZ random access file is declared mode {\tt'SU'} (shared/update)
+with \Rind{RZFILE} , then care must be taken to propagate the changes made
+to the file to other processes, which are accessing the file
+concurrently. Therefore, whenever the
+directory structure or the data part of the {\tt CWD} has to be changed by
+calling one of the following routines:
+\Rind{RZMDIR}, \Rind{RZCOPY}, \Rind{RZDELT}, \Rind{RZDELK},
+\Rind{RZFRFZ}, \Rind{RZOUT}, \Rind{RZPURG}, \Rind{RZQUOT}, \Rind{RZRENK},
+\index{directory!locking}
+\index{directory!unlocking}
+then, before using the first time any of these routines,
+the {\tt CWD} must be locked by a calling routine \Rind{RZLOCK}.
+To use this routine the write
+password must have been specified if one has been defined.
+Once a directory is locked, all
+subdirectories become unavailable for locking. Hence when the top
+directory is locked, the complete file is locked.
+
+Note that two or more branches of a directory can be modified
+concurrently
+by different users (each one making a call to \Rind{RZLOCK}), as long as
+for any given directory to be locked there is no higher level
+directory already in a locked state.
+
+\Shubr{RZFREE}{(CHLOCK)}
+\begin{DLtt}{1234567}
+\item[CHLOCK]Character variable identifying the owner of the lock.
+\end{DLtt}
+
+Once all modifications to a directory are performed, it must
+be unlocked by a call to \Rind{RZFREE}. This routine outputs the updated
+directories and provides them with a time stamp, so that other users
+can determine whether they want to update the copy of the directories
+they are working with.
+
+\subsection{Set the space quota for the current working directory}
+\index{directory!quota}
+\Shubr{RZQUOT}{(NQUOTA)}
+\Idesc
+\begin{DLtt}{1234567}
+\item[NQUOTA]The maximum number of records which can be used by the {\tt CWD}
+and its subdirectories\\
+By default {\tt NQUOTA} is equal to the minimum of the total number of
+records allowed for the complete file (parameter {\tt NREC}
+in \Rind{RZMAKE}) and the quota of the parent directory.
+\end{DLtt}
+
+Routine \Rind{RZQUOT} allows the user to define a
+space quota for the {\tt CWD} and all its subdirectories.
+
+
+\subsection{Scan RZ directory structure}
+\index{scan directories}
+\Shubr{RZSCAN}{(CHPATH,UROUT)}
+\begin{DLtt}{123456}
+\item[CHPATH]Character variable specifying the directory pathname
+from which the scan should start.
+\item[UROUT]Variable containing the address of the user
+routine to be called by \Rind{RZSCAN} for each directory.
+This variable must be declared EXTERNAL in the routine
+which calls \Rind{RZSCAN}.
+\end{DLtt}
+
+Subroutine \Rind{RZSCAN} scans a directory structure from the specified
+starting directory. For each subdirectory found, the user provided
+routine \Rind{UROUT} is called as shown below.
+\begin{XMPt}{Example of using the routine RZSCAN}
+      EXTERNAL UROUT
+
+      CALL RZSCAN('//CERN/DELPHI',UROUT)
+
+      END
+
+      SUBROUTINE UROUT(CHPATH)
+      CHARACTER*(*)    CHPATH
+      PRINT *,CHPATH(1:LENOCC(CHPATH))
+      END
+
+\end{XMPt}
+
+\subsection{List the contents of a directory}
+\index{list directory}
+\Shubr{RZLDIR}{(CHPATH,CHOPT)}
+
+\begin{DLtt}{123456}
+\item[CHPATH]Character variable specifying the directory pathname.
+\begin{DLtt}{123}
+\item[' ']List information for the {\tt CWD} (default).
+\item['T']List also subdirectory tree from specified directory.
+\item['//']List all the RZ files.
+\end{DLtt}
+\item[CHOPT]Character variable specifying the options
+\begin{DLtt}{123}
+\item['A']List all keys created with option {\tt'A'} by \Rind{RZOUT}
+or \Rind{RZVOUT}.
+\item[' ']By default such keys are not listed.
+\end{DLtt}
+\end{DLtt}
+
+The keys and the subdirectory names belonging to a given pathname can
+be listed by a call to \Rind{RZLDIR}.
+
+If the keys have been defined by \Rind{RZMAKE} or \Rind{RZMDIR}
+with format {\tt'H'},
+they are listed each with 4 characters. If keys have been defined
+with format {\tt'A'}, they are listed without separators.
+
+
+\subsection{Retrieve the contents of a directory}
+\index{directory!retrieve}
+\Shubr{RZRDIR}{(MAXDIR,CHDIR*,NDIR*)}
+\Idesc
+\begin{DLtt}{123456}
+\item[MAXDIR]Length of the character array {\tt CHDIR}
+\end{DLtt}
+\Odesc
+\begin{DLtt}{123456}
+\item[CHDIR*]Character array which will contain the directory names attached to
+the {\tt CWD}. If the length of the directory name is greater then the length
+of one element of {\tt CHDIR} (as obtained by the {\tt LEN} function), only
+as many characters as will fit in the array element are returned, and
+an error code will be set in {\tt IQUEST(1)}.
+\item[NDIR*]Actual number of subdirectories attached to the {\tt CWD}\\
+If this number is greater than {\tt MAXDIR}, only the first
+{\tt MAXDIR} directory names will be returned in {\tt CHDIR}
+(see {\tt IQUEST(11)})
+\index{QUEST@{\tt QUEST}!IQUEST@{\tt IQUEST}}
+\end{DLtt}
+
+The list of {\tt NDIR} directories attached to the {\tt CWD} is 
+retrieved and stored into the character array {\tt CHDIR}.
+
+\subsubsection*{RZRDIR return codes}
+\index{QUEST@{\tt QUEST}!IQUEST@{\tt IQUEST}}
+\begin{DLtt}{1234567}
+\item[IQUEST(1)]Error status
+\begin{DLtt}{1}
+\item[0]Normal completion
+\item[1]More entries present in the directory than returned in {\tt CHDIR}
+(see {\tt NDIR} and {\tt IQUEST(11)}).
+\end{DLtt}
+\item[IQUEST(11)]Actual number of subdirectories
+\end{DLtt}
+
+\subsection{Set the password of the current working directory}
+\Shubr{RZPASS}{(CHPASS,CHOPT)}
+\index{current!password}
+
+\begin{DLtt}{1234567}
+\item[CHPASS]Character string specifying the password.
+\item[CHOPT]Character string specifying the options desired:
+\begin{DLtt}{12}
+\item[' ']Specify a password (default),
+\item['S']Set or change a password (to change a password a previous call to
+\Rind{RZPASS} specifying the old password must have been made).
+\end{DLtt}
+\end{DLtt}
+
+Each directory of an RZ file can have its own write password.
+When an RZ file is first initialized with \Rind{RZMAKE} there is
+no write password set.
+Routine \Rind{RZPASS} can be used to specify
+or change the password of the {\tt CWD}.
+\index{CWD}
+\par By default, when a directory is created (\Rind{RZMDIR}), the write
+password is set equal to the one of the parent directory.
+If a password is set, a call to \Rind{RZPASS} is necessary to be able
+to write a new key, create a new directory or delete a key or directory.
+The password specified using \Rind{RZPASS} is
+checked against the one encrypted in the RZ directory referenced.
+
+{\bf Examples:}\quad
+\begin{tabular}[t]{>{\tt}l@{\qquad}l}
+CALL RZPASS('password',' ')   & specifies a write password \\[2mm]
+CALL RZPASS('New\_password,'S')& changes or sets a password
+\end{tabular}
+
+
+\Filename{H2rzuser-write-bank-or-data-structure}
+\section{Write a bank or data structure}
+\Shubr{RZOUT}{(IXDIV,LSUP,KEY,*ICYCLE*,CHOPT)}
+\index{output!data-structure}
+\Idesc
+\begin{DLtt}{1234567}
+  \item[IXDIV]Index of the division(s)\\
+    May be zero if the \Ropt{D} option is not selected\\
+    May be a compound index
+    (see the description of the routine \Rind{MZIXCO} in the MZ reference
+    manual).
+    if the \Ropt{D} option is selected
+  \item[LSUP]Supporting address
+    of the data structure (may be zero if the \Ropt{D} option is selected)
+  \item[KEY]Keyword vector of length \Rarg{NWKEY} as specified by \Rind{RZMDIR}.
+  \item[ICYCLE]Cycle number (\Ropt{A} option only)
+  \item[CHOPT]Character variable specifying the selected options.
+  \begin{DLtt}{123}
+    \item[{\rm data structure}] \mbox{ } 
+    \begin{DLtt}{12}
+      \item[' ']The data structure supported by the bank at
+        {\tt LSUP} is written out (the next link is not followed)
+        \index{link!next}%
+      \item['D']Complete division(s)\\
+        default: Dropped banks are squeezed out\\
+        \phantom{default: }(slower but maybe more economic than \Ropt{DI})
+      \item['DI']Immediate dump of divisions with dropped banks included
+      \item['L']Write the data structure supported by the linear structure
+        at \Lit{LSUP} (the next link is followed)
+      \index{link!next}%
+      \item['S']Single bank at \Rarg{LSUP}
+      \item['Q']Search for existing object with same key vector suppressed.
+      User is responsible for ensuring uniqueness of key vector. In case
+      multiple objects with the same key vector exist, only the first is 
+      accessible. 
+    \end{DLtt}
+    \item[{\rm mode}] \mbox{ }
+    \begin{DLtt}{12}
+      \item[' ']Keep banks available after output (default)
+      \item['A']Key will not be visible by \Rind{RZLDIR}
+      \item['N']No links, i.e. linkless handling
+      \item['R']Replace existing object of identical size and keys
+      \item['W']Drop data structure or wipe division(s) after output
+    \end{DLtt}
+  \end{DLtt}
+\end{DLtt}
+\Odesc
+\begin{DLtt}{1234567}
+  \item[ICYCLE]Cycle number associated to the key entered\\
+    \Lit{ICYCLE=1} if \Rarg{KEY}
+    was not already present in the directory,
+    and one larger than the previous cycle associated to the key otherwise.
+\end{DLtt}
+
+To write a bank, data structure or a complete division to an RZ file and enter the
+associated key
+into the current working directory, a call to \Rind{RZOUT} should be made.
+If the key is not yet present in the directory, a cycle number of
+one is returned, while in any other case the cycle number is the old
+one present on the file increased by one.
+
+
+\subsection*{RZOUT warning messages}
+
+In the original design of RZ, 16 bits were used to store the
+record numbers where data structures were stored. Also, pointers
+within individual directories were similarly stored in 16 bits.
+This limits the number of records in an RZ file and 
+the size of directories to 64K. 
+
+Should an attempt be made to store a data structure that
+would increase the size of a directory beyond this limit,
+RZOUT will automatically delete previous cycles, if any,
+for the given key vector and issue a warning message.
+
+See the description of \Rind{RZMAKE} for details concerning
+the revised RZ format, which uses 32 bits for this information
+and thus circumvents the problem.
+
+\subsection*{RZOUT return codes}
+\index{QUEST@{\tt QUEST}!IQUEST@{\tt IQUEST}}
+\begin{DLtt}{123456789}
+\item[IQUEST(1)]Error status
+\begin{DLtt}{1}
+\item[0]Normal completion
+\item[1]The directory quota is exhausted, no more space
+-- nothing has been written
+\end{DLtt}
+\item[IQUEST(2)]Number of physical records written
+\item[IQUEST(3)]Record number of the first record written
+\item[IQUEST(4)]Offset of the information inside the first record
+\item[IQUEST(5)]Record number of the continuation record
+\item[IQUEST(6)]Cycle number of the data structure written
+\item[IQUEST(7)]Number of keys in the directory
+\item[IQUEST(8)]{\tt NWKEY}, the number of words per key
+\item[IQUEST(9)]Number of records still available in the current subdirectory
+\item[ ]
+\item[IQUEST(11)]{\tt NWBK}, number of words of bank material
+\end{DLtt}
+
+\Filename{H2rzuser-output-array}
+\section{Output an array}
+\Shubr{RZVOUT}{(VECT,NOUT,KEY,*ICYCLE*,CHOPT)}
+\index{output!array}
+
+\Idesc
+\begin{DLtt}{1234567}
+\item[VECT]Array to be output onto the RZ file\\
+{\tt VECT} should be dimensioned at least to {\tt NOUT}
+\item[NOUT]number of words of array {\tt VECT} to be output
+\item[KEY]Keyword vector of length {\tt NWKEY} as specified by \Rind{RZMDIR}.
+\item[ICYCLE]Cycle number ({\tt'A'} option only)
+\item[CHOPT]Character variable specifying the selected options.
+\begin{DLtt}{1234567}
+\item[format]
+\begin{DLtt}{12}
+\item[' ']The array contains floating point data (default)
+\item['A']Key will not be visible by \Rind{RZLDIR}
+\item['B']The array contains bitted data
+\item['H']The array contains Hollerith data
+\item['I']The array contains integer data
+\item['R']Replace existing object of identical size and keys
+\item['S']Search for existing object with same key vector suppressed.
+User is responsible for ensuring uniqueness of key vector. In case
+multiple objects with the same key vector exist, only the first is 
+accessible. 
+\end{DLtt}
+\end{DLtt}
+\end{DLtt}
+\Odesc
+\begin{DLtt}{1234567}
+\item[ICYCLE]Cycle number associated to the key entered\\
+{\tt ICYCLE=1} if {\tt KEY} was not already present in the directory,
+and one larger than the previous cycle associated to the key otherwise.
+\end{DLtt}
+\par 
+The contents of a FORTRAN array can be written
+into an RZ file and associated with a key in the {\tt CWD}
+by a call to \Rind{RZVOUT}.
+The convention for the cycle number is the same as for \Rind{RZOUT}.
+
+\Filename{H2rzuser-read-bank-or-data-structure}
+\section{Read a bank or data structure}
+\Shubr{RZIN}{(IXDIV,*LSUP*,JBIAS,KEY,ICYCLE,CHOPT)}
+\index{input!data-structure}
+
+\Idesc
+\begin{DLtt}{1234567}
+\item[IXDIV]Index of the division to receive the data structure\\
+{\tt IXDIV = 0} means division 2 of the primary store
+\item[*LSUP*]
+\item[JBIAS]{\tt JBIAS < 1:} {\tt LSUP} is the supporting bank
+and {\tt JBIAS} is the link bias specifying where the data structure 
+has to be introduced into this bank, i.e. the data structure will 
+be connected to {\tt LQ(LSUP+JBIAS)}.\\
+{\tt JBIAS = 1:}
+{\tt LSUP} is the supporting link, i.e. the data structure
+is connected to {\tt LSUP} (top level data structure)\\
+{\tt JBIAS = 2:} Stand alone data structure, no connection.
+\item[KEY]Keyword vector of the information to be read (default)\\
+sequential number of the key vector in the directory if 'S' option
+\item[ICYCLE]Cycle number of the key to be read\\
+{\tt ICYCLE > 0} highest cycle number means read the highest cycle\\
+{\tt ICYCLE = 0} means read the lowest cycle
+\item[CHOPT]Character variable specifying the options selected.
+\begin{DLtt}{123}
+\item[{\rm data structure}] \mbox{ }
+\begin{DLtt}{123}
+\item[' ']Default - Same as 'D' below
+\item['C']Provide information about the cycle numbers associated 
+with {\tt KEY}.\\
+The total number of cycles and the cycle number identifiers
+of the 19 highest cycles are returned in {\tt IQUEST(50)} and
+{\tt IQUEST(51..89)} respectively. \\
+The data struture associated with {\tt KEY} will not be read
+in unless the option {\tt D} is also specified.
+\item['D']Read the data structure with the {\tt (KEY,ICYCLE)} pair specified.
+\item['N']Read the neighbouring
+\footnote{
+Directory entries are stored in ``historical'' order so that it
+makes sense to talk of neighbouring records.
+This can be used, e.g. to update records of calibration
+constants or to scan files with events, where the keys correspond to
+event or run numbers.}
+keys (i.e. those preceding and following {\tt KEY}).\\
+The first 9 elements of the key-vectors of the previous and next key are available
+respectively as {\tt IQUEST(31..39)} and {\tt IQUEST(41..49)}, see below.
+\item['R']Read data into existing bank at {\tt LSUP, JBIAS}. Note that the bank
+must have the same size as the one stored in the file.
+\item['S']KEY(1) contains the sequential number of the key vector
+in the current directory (No search required).
+\end{DLtt}
+\end{DLtt}
+\end{DLtt}
+\Odesc
+\begin{DLtt}{1234567}
+\item[*LSUP*]For {\tt JBIAS = 1} or {\tt 2, LSUP} contains
+the entry address to the data structure\\
+In any case {\tt IQUEST(11)} returns the entry address
+\end{DLtt}
+
+When one wants to read a bank, data structure or division from
+a direct access file into memory one calls \Rind{RZIN} or \Rind{RZINPA}.
+The information identified by a given {\tt KEY} and cycle in the {\tt CWD} are
+input. If the cycle specified is not present on the file, the information
+associated with the highest cycle of the given key will be used.
+
+
+\Shubr{RZINPA}{(CHPATH,IXDIV,*LSUP*,JBIAS,KEY,ICYCLE*,CHOPT)}
+\index{input!data-structure}
+
+\begin{DLtt}{123456}
+\item[CHPATH] Character variable specifying the name of the
+directory containing the objects to be retrieved.
+\item[others] Remaining arguments as for \Rind{RZIN}.
+\end{DLtt}
+
+When one wants to read information from a key associated to a directory
+which is not the {\tt CWD}, then a call to \Rind{RZINPA} should be made.
+This routine has a supplementary character type argument {\tt CHPATH}, which
+specifies the pathname
+of the directory where the information has to read.
+
+\subsection*{RZIN and RZINPA return codes}
+\Rind{RZIN} and \Rind{RZINPA} return the status, 
+either normal or error completion,
+in the {\tt QUEST} vector as follows:
+\index{QUEST@{\tt QUEST}!IQUEST@{\tt IQUEST}}
+\par {\bf Normal read status returns are:}
+\begin{DLtt}{123456789}
+\item[IQUEST(1)]Operation status code
+\begin{DLtt}{1}
+\item[1]key/cycle pair not present in the {\tt CWD}
+\item[0]normal completion
+\end{DLtt}
+\item[IQUEST(2)]number of physical records read
+\item[IQUEST(3)]Record number of the first record read
+\item[IQUEST(4)]Offset of the start of the information in the first record.
+\item[IQUEST(5)]Record number of the continuation record (0 if not {\tt'A'} option).
+\item[IQUEST(6)]{\tt ICYCLE:} cycle number of information returned.
+\item[IQUEST(7)]Number of keys in the directory
+\item[IQUEST(8)]{\tt NWKEY}, the number of words per key\\[3mm]
+\item[IQUEST(11)]{\tt LSUP}, the entry address into the data structure\\
+zero means: empty data structure
+\item[IQUEST(12)]{\tt NWBK}, the number of words occupied
+by the data structure in memory                \\
+zero means: empty data structure
+\item[IQUEST(14)]Time stamp of the information(compressed).
+In order to get
+the unpacked date and time (integers), one can use the RZ internal
+routine \Rind{RZDATE} as follows
+\label{RZDATE}
+\begin{verbatim}
+   CALL RZDATE(IQUEST(14),IDATE,ITIME,1)
+\end{verbatim}
+\item[IQUEST(20)]Key serial number in the directory
+\item[IQUEST(21..20+NWKEY)\ ]{\tt KEY(1)...KEY(NWKEY)} if {\tt'S'} option given\\[3mm]
+\item[IQUEST(30)]{\tt NWKEY} or zero if no previous key is present ({\tt'N'} option)
+\item[IQUEST(31..39)\ ]The first 9 elements of the key vector for the element preceding {\tt KEY}
+(if {\tt IQUEST(30) > 0}) \\
+Only {\tt IQUEST(31..30+MIN(NWKEY,9))} are significant\\[3mm]
+\item[IQUEST(40)]{\tt NWKEY} or zero if no following key is present ({\tt'N'} option)
+\item[IQUEST(41..49)\ ]The first 9 elements of the key vector
+for the element following {\tt KEY} (if {\tt IQUEST(40) > 0}) \\
+Only {\tt IQUEST(41..40+MIN(NWKEY,9))} are significant \\[3mm]
+\item[IQUEST(50)]Number of cycles present for {\tt KEY}
+({\tt'C'} option)
+\item[IQUEST(51..69)\ ]The cycle number identifiers associated with {\tt KEY}\\
+If {\tt IQUEST(50) $\leq$ 19} then only {\tt IQUEST(51..50+IQUEST(50)})
+are meaningful\\
+If {\tt IQUEST(50) $>$ 19} then {\tt IQUEST(51..69)} contain the 19
+highest cycles for {\tt KEY}
+\item[IQUEST(71..89)\ ]The time stamp
+information corresponding to each of the
+initialized cycle numbers in {\tt IQUEST(51..69)}
+\end{DLtt}
+\par If the pair {\tt (KEY,ICYCLE)} is not present in the
+{\tt CWD (IQUEST(1)=1)}
+and the {\tt'N'} option is given, then {\tt IQUEST(30...)} and {\tt IQUEST(40...)}
+will contain, respectively, the ``lowest'' and ``highest'' key vectors present.
+
+\Filename{H2rzuser-input-array}
+\section{Input an array from an RZ file}
+\Shubr{RZVIN}{(VECT*,NDIM,*NWORDS*,KEY,ICYCLE,CHOPT)}
+\index{input!array}
+
+\Idesc
+\begin{DLtt}{1234567}
+\item[NDIM]Number of words available in array {\tt VECT} (e.g. declared
+dimension)
+\item[NWORDS]Actual length of the vector. If the length of the vector
+is greater than NDIM, then the vector is truncated. If option O
+is specified, then NWORDS will contain, on input, the offset of the 
+first word of the vector that should be returned.
+\item[KEY]Keyword vector of the information to be read
+\item[ICYCLE]Cycle number of the key to be read\\
+{\tt ICYCLE > 0} highest cycle number means read the highest cycle\\
+{\tt ICYCLE = 0} means read the lowest cycle
+\item[CHOPT]Character variable specifying the options selected(see \Rind{RZIN}).
+\begin{DLtt}{123}
+\item['O']Read vector starting from offset specified by argument NWORDS.
+\end{DLtt}
+\end{DLtt}
+\Odesc
+\begin{DLtt}{1234567}
+\item[VECT*]FORTRAN array to contain the information input\\
+The array {\tt VECT} should be at least dimensioned to {\tt NDIM} words
+\item[NFILE*]Actual length of the array on the file
+\end{DLtt}
+
+The information associated with a (key,cycle) pair on an RZ file can
+be read into an array by a call to \Rind{RZVIN}.
+The same conventions used by \Rind{RZIN} for {\tt KEY} and 
+{\tt CYCLE} in the {\tt CWD} are used.
+
+\subsection*{RZVIN return codes}
+
+\Rind{RZVIN} returns the read status, either normal or error completion,
+in {\tt QUEST} in a way similar to \Rind{RZIN}.
+\index{QUEST@{\tt QUEST}!IQUEST@{\tt IQUEST}}
+
+\Filename{H2rzuser-operations-on-keys-and-cycles}
+\section{Operations on keys and cycles}
+
+\subsection{Purge old cycles}
+\index{VAX/VMS}
+\index{key!purge}
+
+\Shubr{RZPURG}{(NKEEP)}
+
+\begin{DLtt}{1234567}
+\item[NKEEP]Number of cycles which must be kept for the given key\\
+If {\tt NKEEP < 1} then {\tt NKEEP} is taken to be 1 and only the
+highest cycle is kept
+\end{DLtt}
+
+This command can be compared with 
+the {\tt PURGE} command on the VAX/VMS system.
+All but the last {\tt NKEEP} cycles of all
+key are deleted from the {\tt CWD} by a call to \Rind{RZPURG}.
+
+\subsubsection*{RZPURG return codes}
+\index{QUEST@{\tt QUEST}!IQUEST@{\tt IQUEST}}
+\begin{DLtt}{123456789}
+\item[IQUEST(9)]Number of records still available in the current subdirectory
+\par
+\item[IQUEST(11)]Maximum number of cycles purged
+\item[IQUEST(12)]Number of words freed
+\item[IQUEST(13)]Number of records freed
+\end{DLtt}
+
+
+\subsection{Delete a subtree from the current working directory}
+\Shubr{RZDELT}{(CHDIR)}
+
+\begin{DLtt}{1234567}
+\item[CHDIR]Character variable specifying the directory name of the subtree of
+the CWD.
+\end{DLtt}
+
+A subtree of the {\tt CWD} can be deleted by a call to \Rind{RZDELT}
+
+\subsubsection*{RZDELT return codes}
+\index{QUEST@{\tt QUEST}!IQUEST@{\tt IQUEST}}
+
+\begin{DLtt}{12345678}
+\item[IQUEST(1)]Error status
+\begin{DLtt}{12}
+\item[0]Normal completion
+\item[1]Invalid directory subtree name
+\end{DLtt}
+\end{DLtt}
+\index{directory!delete subtree}
+
+\subsection{Delete a key from the current working directory}
+\Shubr{RZDELK}{(KEY,ICYCLE,CHOPT)}
+\begin{DLtt}{1234567}
+\item[KEY]Key array of dimension {\tt NWKEY} (see \Rind{RZMDIR})
+\item[ICYCLE]Cycle number of the key to be deleted
+\begin{DLtt}{12345678}
+\item[>0] highest cycle number means delete the highest cycle
+\item[=0] means delete the lowest cycle
+\item[=-1,-2,...] means delete the highest cycle {\tt -1, -2,...}
+\end{DLtt}
+\item[CHOPT]Character variable specifying the options selected.
+\begin{DLtt}{123}
+\item[' ']Delete the explicitly specified cycle {\tt ICYCLE} only (default).\\
+If cycle {\tt ICYCLE} does not exist, no action is taken.
+\item['C']Delete {\bf all} cycles corresponding to key ({\tt ICYCLE} not used)
+\item['K']Delete all keys in the {\tt CWD} ({\tt ICYCLE} and {\tt KEY} not used)
+\item['S']Delete all cycles smaller than cycle {\tt ICYCLE} for the given
+key-vector
+\end{DLtt}
+\end{DLtt}
+
+When a key-cycle pair has to be deleted from the
+{\tt CWD} a call to \Rind{RZDELK} must be made
+\index{key!deletion}
+
+\subsubsection*{RZDELK return codes}
+\index{QUEST@{\tt QUEST}!IQUEST@{\tt IQUEST}}
+\begin{DLtt}{123456789}
+\item[IQUEST(1)]Operation status code
+\begin{DLtt}{1}
+\item[1]No entry for key/cycle pair specified
+\item[0]normal completion
+\end{DLtt}
+\item[IQUEST(11)]Maximum number of cycles deleted
+\item[IQUEST(12)]Number of words freed
+\item[IQUEST(13)]Number of records freed
+\end{DLtt}
+{\bf Examples:}\quad
+\begin{tabular}[t]{>{\tt}l@{\qquad}p{.5\textwidth}}
+CALL RZDELK(KEY,2,' ')      & 
+deletes the information associated with key {\tt KEY} 
+and cycle number 2 in the {\tt CWD}.                      \\[2mm]
+CALL RZDELK(KEY,4,'S')      & 
+deletes all information associated with key {\tt KEY}
+and a cycle number smaller than 4 in the {\tt CWD}.       \\[2mm]
+CALL RZDELK(0,0,'K')        &
+deletes all cycles of all keys in the {\tt CWD}.
+\end{tabular}
+
+
+\subsection{Rename a key in the current working directory}
+\Shubr{RZRENK}{(KEYOLD,KEYNEW)}
+
+\begin{DLtt}{1234567}
+\item[KEYOLD]Key array of dimension {\tt NWKEY} containing the old key vector
+\item[KEYNEW]Key array of dimension {\tt NWKEY} containing the new key vector
+\end{DLtt}
+
+A key in the {\tt CWD} can be renamed by a call to \Rind{RZRENK}
+
+\subsubsection*{Return codes}
+\index{QUEST@{\tt QUEST}!IQUEST@{\tt IQUEST}}
+
+\begin{DLtt}{123456789}
+\item[IQUEST(1)]Operation status code
+\begin{DLtt}{1}
+\item[1]No entry for {\tt KEYOLD} in the {\tt CWD}
+\item[0]normal completion
+\end{DLtt}
+\end{DLtt}
+\index{key!rename}
+
+\subsection{Retrieve the keys associated to the current working directory}
+\Shubr{RZKEYS}{(MAXDIM,MAXKEY,KEYS*,NKEYS*)}
+
+\Idesc
+\begin{DLtt}{1234567}
+\item[MAXDIM]The actual first dimension of output array {\tt KEYS}.
+It should in principle be at least equal to the number of key elements
+{\tt NWKEY} as declared to \Rind{RZMDIR}.
+\item[MAXKEY]The actual second dimension of output array {\tt KEYS}.
+\end{DLtt}
+\Odesc
+\begin{DLtt}{1234567}
+\item[KEYS*]A 2-dimensional array dimensioned {\tt KEYS(MAXDIM,MAXKEY)}.
+It will contain the key vectors associated with the {\tt CWD}.
+Its first index runs over the key elements for a given key, while
+its second index runs over the different keys.
+\item[NKEYS*]Number of keys returned in array {\tt KEYS}.
+\end{DLtt}
+
+Subroutine \Rind{RZKEYS} returns the list of keys created in the
+{\tt CWD}. The keys are returned in historical order.
+\subsubsection*{Return codes}
+\index{QUEST@{\tt QUEST}!IQUEST@{\tt IQUEST}}
+\begin{DLtt}{123456789}
+\item[IQUEST(1)]Error status
+\begin{DLtt}{1}
+\item[0]Normal completion
+\item[1]The keys have a length {\tt NWKEY > MAXKEY}
+or more entries present in the directory than returned in {\tt KEYS}
+(see {\tt IQUEST(11)}).
+\end{DLtt}
+\par
+\item[IQUEST(11)]Actual number of keys in the {\tt CWD}.
+\item[IQUEST(12)]{\tt NWKEY}, number of words characterizing a key vector
+element for the {\tt CWD} (as defined on Page~\pageref{RZMDIR} for \Rind{RZMDIR}).
+\end{DLtt}
+\index{key!retrieve}
+
+\subsubsection*{Examples}
+
+For the lead glass blocks file in the example in
+section 1, we could write:
+\begin{verbatim}
+      INTEGER KEYS(5000)
+ 
+      CALL RZKEYS(1,5000,KEYS,NKEYS)
+\end{verbatim}
+For the events to be scanned we could have:
+\begin{verbatim}
+      INTEGER KEYS(2,500)                      ! Up to 500 keys vectors
+ 
+      CALL RZKEYS(2,500,KEYS,NKEYS)
+\end{verbatim}
+
+\Filename{H2rzuser-copy-data-structure-from-directory-to-cwd}
+\section{Copy a data structure from one directory to the \texttt{CWD}}
+\index{copy directory}
+\Shubr{RZCOPY}{(CHPATH,KEYIN,ICYCIN,KEYOUT,CHOPT)}
+
+\begin{DLtt}{1234567}
+\item[CHPATH]The pathname of the directory tree which has to be copied
+to the {\tt CWD}
+\item[KEYIN]Key-vector of the object to be copied from {\tt CHPATH}.
+\item[ICYCIN]Cycle number of the key to be copied
+\item[KEYOUT]Key array of the object in the {\tt CWD} after the copy
+\item[CHOPT]Character variable specifying the options selected.
+\begin{DLtt}{12}
+\item[' ']Copy the object from {\tt (KEYIN,ICYCIN)} from
+{\tt CHPATH} to the {\tt CWD} (default).\\
+If {\tt KEYOUT} already exists, a new cycle is created.
+\item['C']Copy all cycles for the specified key ({\tt ICYCIN} not used)
+\item['K']Copy all keys in the {\tt CWD} ({\tt ICYCIN} and {\tt KEYIN} not used)
+Given together with the 'C' option it copies all cycles of all keys.
+\item['T']Not yet implemented. Copy the complete tree {\tt CHPATH}.
+By default only the highest cycles are copied.
+Given together with the 'C option all cycles are copied.
+\end{DLtt}
+\end{DLtt}
+
+Note that the input and output keys {\tt KEYIN} and {\tt KEYOUT} may be
+identical. In this case, if {\tt KEYOUT} already exists in the {\tt CWD}, a new
+cycle (or several) is created.
+
+A directory tree identified by its
+pathname {\tt CHPATH} can be copied
+to the {\tt CWD} with the help of subroutine \Rind{RZCOPY}.
+Routine \Rind{RZCOPY} can also be used to merge two RZ files.
+
+\subsubsection*{Return codes}
+\index{QUEST@{\tt QUEST}!IQUEST@{\tt IQUEST}}
+\begin{DLtt}{12345679}
+\item[IQUEST(1)]Error status
+\begin{DLtt}{1}
+\item[1]Invalid pathname
+\item[0]Normal completion
+\end{DLtt}
+\end{DLtt}
+
+
+\Filename{H2rzuser-copy-information-directory-sequential-file}
+\section{Copy information from a directory from/to a sequential file}
+\Shubr{RZTOFZ}{(LUNFZ,CHOPT)}
+
+\begin{DLtt}{1234567}
+\item[LUNFZ]Logical unit number of the FZ sequential access file
+\item[CHOPT]Character variable specifying the options selected.
+\begin{DLtt}{12}
+\item[' ']Write the highest cycle of the keys in the {\tt CWD}
+to the FZ file (default).
+\item['C']Write all cycles of the keys in the {\tt CWD} to the FZ file
+\end{DLtt}
+\end{DLtt}
+
+In order to provide
+easy transportability of data between different computer
+systems information stored in an RZ directory tree can
+be written to or read from a sequential file.
+All keys in the tree associated with the {\tt CWD} can be copied
+to an FZ sequental file by using \Rind{RZTOFZ}.
+The sequential file must be opened with \Rind{FZFILE} prior to
+the call to \Rind{RZTOFZ} and thus the transport mode (native or exchange)
+is determined by the mode declared to \Rind{FZFILE}.
+\index{FZ!mode exchange}
+\index{FZ!mode native}
+The data structures are read into the system division of the
+primary store before their transfer to the output file.
+\index{random!to sequential}
+\index{FZ!random!to sequential}
+\index{random!from sequential}
+\index{FZ!random!from sequential}
+
+\Shubr{RZFRFZ}{(LUNFZ,CHOPT)}
+\begin{DLtt}{123456}
+\item[LUNFZ]Logical unit number of the FZ sequential access file
+\item[CHOPT]Character variable specifying the options selected.
+\begin{DLtt}{12}
+\item[' ']Read all cycles of the keys present on the FZ file into the
+{\tt CWD} (default).
+\item['H']Read the highest cycle of the keys present on the FZ file into
+the {\tt CWD}.
+\end{DLtt}
+\end{DLtt}
+
+A directory tree can be read
+from an FZ sequential file
+into the {\tt CWD} using the routine \Rind{RZFRFZ}.
+If a sub-directory with the same name as the one read in is already
+present in the {\tt CWD}, then a new cycle is created for the introduced keys.
+The sequential file must be opened with \Rind{FZFILE}
+prior to the call to \Rind{RZFRFZ}
+and hence the transport format (native or exchange)
+is determined by the mode declared to \Rind{FZFILE}.
+
+\Filename{H2rzuser-retrieve-statistics-about-directory}
+\section{Retrieve statistics about a given RZ directory}
+
+\Shubr{RZSTAT}{(CHPATH,NLEVELS,CHOPT)}
+
+\begin{DLtt}{1234567}
+\item[CHPATH]The pathname of the directory about which information
+has to be provided.
+\item[NLEVELS]Number of levels below {\tt CHPATH} about which space information
+has to be accumulated.
+\item[CHOPT]Character variable specifying the options desired
+\begin{DLtt}{12}
+\item[' ']Print the statistics (default)
+\item['Q']Return the statistics in the user communication vector {\tt IQUEST}\\
+\end{DLtt}
+\end{DLtt}
+
+Routine \Rind{RZSTAT} provides information about the usage statistics
+of an RZ direct access file associated with a given directory,
+as specified by its pathname.
+The routine can be used in two ways,
+namely to print the global statistics at the end of a run, or
+to retrieve, at any given moment, useful data about the space usage
+(e.g. to verify whether there is
+still enough space left to add another record).
+
+If option {\tt'Q'} is specified, print out is supressed. In all cases, 
+the {\tt IQUEST} vector contains on return:
+\begin{DLtt}{123456789}
+\item[IQUEST(11)] number of records used
+\item[IQUEST(12)] number of words   used
+\item[IQUEST(13)] quota for the current directory
+\item[IQUEST(14)] quota for this file   
+\end{DLtt}
+\index{QUEST@{\tt QUEST}!IQUEST@{\tt IQUEST}}
+\index{statistics}
+\newpage
+\section{Internal RZ routines}
+
+This section does not contain an exhaustive list of
+all RZ internal routines, but concentrates on those
+that produce error messages.
+
+As these routines should not be called by the user,
+the calling sequences are not described - simply
+the error codes.
+
+\Shubr{RZIODO}{(LUNRZ,RECNO,RECL,BUFFER,IN-OUT)}
+
+\subsubsection*{Return codes}
+\index{QUEST@{\tt QUEST}!IQUEST@{\tt IQUEST}}
+\begin{DLtt}{12345679}
+\item[IQUEST(1)]Error status
+\begin{DLtt}{1}
+\item[101]Read error
+\item[102]Write error
+\end{DLtt}
+\end{DLtt}
+
+
+\Filename{H2rzuser-RZ-calling-sequences}
+\section{Overview of RZ calling Sequences}
+\begin{Tabhere}
+\caption{The RZ calling sequences}
+\label{TRZCALL}
+\begin{center}
+\begin{tabular}{|>{\tt}l@{\quad}r|}
+\hline
+\multicolumn{1}{|c}{\bf Calling sequence} & \multicolumn{1}{r|}{\bf page}   \\
+\hline
+CALL RZCDIR (*CHPATH*,CHOPT)                             & \pageref{RZCDIR} \\
+CALL RZCLOS (CHDIR,CHOPT)                                & \pageref{RZCLOS} \\
+CALL RZCOPY (CHPATH,KEYIN,ICYCIN,KEYOUT,CHOPT)           & \pageref{RZCOPY} \\
+CALL RZDELK (KEY,ICYCLE,CHOPT)                           & \pageref{RZDELK} \\
+CALL RZDELT (CHDIR)                                      & \pageref{RZDELT} \\
+CALL RZEND (CHDIR)                                       & \pageref{RZEND}  \\
+CALL RZFILE (LUN,CHDIR,CHOPT)                            & \pageref{RZFILE} \\
+CALL RZFREE (CHLOCK)                                     & \pageref{RZFREE} \\
+CALL RZFRFZ (LUNFZ,CHOPT)                                & \pageref{RZFRFZ} \\
+CALL RZHOOK (LUN,CHDIR,TARGET,LRECL,CHOPT)               & \pageref{RZHOOK} \\
+CALL RZIN (IXDIV,*LSUP*,JBIAS,KEY,ICYCLE,CHOPT)          & \pageref{RZIN}   \\
+CALL RZINPA (CHPATH,IXDIV,*LSUP*,JBIAS,KEY,ICYCLE*,CHOPT)& \pageref{RZINPA} \\
+CALL RZKEYD (NWKEY*,CHFORM*,CHTAG*)                      & \pageref{RZKEYD} \\
+CALL RZKEYS (MAXDIM,MAXKEY,KEYS*,NKEYS*)                 & \pageref{RZKEYS} \\
+CALL RZLDIR (CHPATH,CHOPT)                               & \pageref{RZLDIR} \\
+CALL RZLOCK (CHLOCK)                                     & \pageref{RZLOCK} \\
+CALL RZLOGL (LUN,LOGLEV)                                 & \pageref{RZLOGL} \\
+CALL RZMAKE (LUN,CHDIR,NWKEY,CHFORM,CHTAG,NREC,CHOPT)    & \pageref{RZMAKE} \\
+CALL RZMDIR (CHDIR,NWKEY,CHFORM,CHTAG)                   & \pageref{RZMDIR} \\
+CALL RZNDIR (*CHPATH*,CHOPT)                             & \pageref{RZNDIR} \\
+CALL RZOPEN (*LUN*,CHDIR*,CHNAME,CHOPT,*LRECL*,ISTAT*)   & \pageref{RZOPEN} \\
+CALL RZOUT (IXDIV,LSUP,KEY,*ICYCLE*,CHOPT)               & \pageref{RZOUT}  \\
+CALL RZPASS (CHPASS,CHOPT)                               & \pageref{RZPASS} \\
+CALL RZPURG (NKEEP)                                      & \pageref{RZPURG} \\
+CALL RZQUOT (NQUOTA)                                     & \pageref{RZQUOT} \\
+CALL RZRDIR (MAXDIR,CHDIR*,NDIR*)                        & \pageref{RZRDIR} \\
+CALL RZRENK (KEYOLD,KEYNEW)                              & \pageref{RZRENK} \\
+CALL RZSAVE                                              & \pageref{RZSAVE} \\
+CALL RZSCAN (CHPATH,UROUT)                               & \pageref{RZSCAN} \\
+CALL RZSTAT (CHPATH,NLEVELS,CHOPT)                       & \pageref{RZSTAT} \\
+CALL RZTOFZ (LUNFZ,CHOPT)                                & \pageref{RZTOFZ} \\
+CALL RZVIN (VECT*,NDIM,NFILE*,KEY,ICYCLE,CHOPT)          & \pageref{RZVIN}  \\
+CALL RZVOUT (VECT,NOUT,KEY,*ICYCLE*,CHOPT)               & \pageref{RZVOUT} \\
+\hline
+\end{tabular}
+\end{center}
+\end{Tabhere}
+
+% Local Variables: 
+% mode: latex
+% TeX-master: "zebramain"
+% End: 

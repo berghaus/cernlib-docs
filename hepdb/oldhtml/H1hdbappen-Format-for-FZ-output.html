@@ -1,0 +1,359 @@
+<TITLE>HEPDB -- H1hdbappen-Format-for-FZ-output </TITLE>
+<P>
+<H1><A NAME=H1hdbappen-Format-for-FZ-output.html>Format for FZ output</A></H1>
+<P>
+HEPDB can create a journal file and can also update a data base from the
+corresponding journal file. The journal file format is defined as an FZ
+record consisting of a header and the data part. The format is general
+enough and can also be used for the communication betwen the server and a
+process which wants to update the data base.
+<P>
+The data part of the FZ record is relevant only for data to be entered. It
+is exactly the same data structure as input to <TT>DBENTR</TT>. For
+efficiency reason, HEPDB for its own journal file stores the data
+structure as input to the <A NAME=RZOUT392> RZOUT</A> call. This difference can be easily
+recognised from the value of <TT>KEY(1)</TT>, which is zero for outside
+source and nonzero for HEPDB's own journal file.
+<P>
+The header part has very similar structure for the eight actions foreseen
+so far, e.g., entering data, creating new directories, deleting data
+objects, deleting a directory tree, renaming the keys, entering names of
+data elements or help information for a directory, entering alias name to
+a directory, deleting a few partitions in a partitioned directory.
+However, they differ in details and the eight different types of FZ
+headers are listed below.
+<P>
+<PRE>
+   Header for entering data :
+ +----------+----------+------+----------------------------------------+
+ |Word Count| Mnemonic | Type |         Content                        |
+ +----------+----------+------+----------------------------------------+
+ |        1 |   IACT   |   I  | Action code (=1)                       |
+ |        2 |  NWKEY   |   I  | Number of key elements                 |
+ |        3 |  NWDOP   |   I  | Number of words used to store CHOPT    |
+ |        4 |   NDOP   |   I  | Number of words used to to store the   |
+ |          |          |      | path name                              |
+ |        5 |  IPREC   |   I  | Precision chosen for packing           |
+ |          |          |      | (see DBENTR)                           |
+ |        6 |  KEY(1)  |   I  | Key element 1                          |
+ |       .. |   ...    |  ..  |   ........                             |
+ |  NWKEY+5 |KEY(NWKEY)|  ..  | Key element NWKEY                      |
+ |  NWKEY+6 |  CHOPT   |   H  | Character option                       |
+ |       .. |     ..   |   H  |                                        |
+ |  NWKEY+6 |  PATHN   |   H  | Path name                              |
+ |   +NWDOP |          |      |                                        |
+ |       .. |     ..   |   H  |                                        |
+ +----------+----------+------+----------------------------------------+
+   Header for creating directories :
+ +----------+----------+------+----------------------------------------+
+ |Word Count| Mnemonic | Type |         Content                        |
+ +----------+----------+------+----------------------------------------+
+ |        1 |   IACT   |   I  | Action code (=2)                       |
+ |        2 |  NWKEY   |   I  | Number of key elements                 |
+ |        3 |  NWDOP   |   I  | Number of words used to store CHOPT    |
+ |        4 |   NDOP   |   I  | Number of words used to to store the   |
+ |          |          |      | path name                              |
+ |        5 |   MXKP   |   I  | Maximum number of objects inside one   |
+ |          |          |      | partition (see DBMDIP)                 |
+ |        6 |  INSTM   |   I  | Insertion time packed up to minutes    |
+ |          |          |      | (see DBPKTM)                           |
+ |        7 |  NRECD   |   I  | Unused at this moment                  |
+ |        8 |  CHOPT   |   H  | Character option (e.g., 'P' for a      |
+ |       .. |   ...    |  ..  | partitioned directory)                 |
+ |   NDOP+8 |  CHFOR   |   H  | Description of key element type. This  |
+ |       .. |     ..   |  ..  | information is stored in NCFO = (NWKEY |
+ |       .. |     ..   |  ..  | +3)/4 words                            |
+ |   NDOP+8 |  CHTAG   |   H  | Tags for each key element. This info.  |
+ |    +NCFO |     ..   |  ..  | is stored in NTAG = 2*NWKEY words.     |
+ |NDOP+NCFO |  PATHN   |   H  | Path name                              |
+ |  +NTAG+8 |          |      |                                        |
+ |       .. |     ..   |   H  |                                        |
+ +----------+----------+------+----------------------------------------+
+   Header for deleting objects :
+ +----------+----------+------+----------------------------------------+
+ |Word Count| Mnemonic | Type |         Content                        |
+ +----------+----------+------+----------------------------------------+
+ |        1 |   IACT   |   I  | Action code (=3)                       |
+ |        2 |  NWKEY   |   I  | Number of key elements                 |
+ |        3 |  NWDOP   |   I  | Number of words used to store CHOPT    |
+ |        4 |   NDOP   |   I  | Number of words used to to store the   |
+ |          |          |      | path name                              |
+ |        5 |  NPARS   |   I  | Number of pairs of validity range (set |
+ |          |          |      | for CDPURK) or -1 for CDPURG           |
+ |        6 |  INSTM   |   I  | Deletion time packed up to minutes     |
+ |          |          |      | (see DBPKTM)                           |
+ |        7 |  ISEL(1) |   I  | The objects to be selected using the   |
+ |       .. |    ...   |      | validity criteria in CDPURK            |
+ |  NPARS+6 |  ISEL(n) |   I  |                                        |
+ |  NPARS+7 |  KEY(1)  |   I  | Key element 1 for CDURK                |
+ |          |   ...    |  ..  |      .........                         |
+ |    NENDK |  KEY(n)  |  ..  | Key element NWKEY for CDPURK           |
+ |        7 |  KYDAT   |   I  | To be used for CDPURG                  |
+ |        8 |  KYTIM   |   I  | To be used for CDPURG                  |
+ |       .. |   ...    |  ..  |                                        |
+ |    NENDK |          |      | NWKEYth word following KYDAT for CDPURG|
+ |  NENDK+1 |  CHOPT   |   H  | Character option                       |
+ |       .. |   ...    |  ..  |                                        |
+ |  NENDK+1 |  PATHN   |   H  | Path name                              |
+ |   +NWDOP |          |      |                                        |
+ |       .. |     ..   |   H  |                                        |
+ +----------+----------+------+----------------------------------------+
+   Header for deleting directories :
+ +----------+----------+------+----------------------------------------+
+ |Word Count| Mnemonic | Type |         Content                        |
+ +----------+----------+------+----------------------------------------+
+ |        1 |   IACT   |   I  | Action code (=4)                       |
+ |        2 |    ---   |   I  | Unused (set to 0)                      |
+ |        3 |  NWDOP   |   I  | Number of words used to store CHOPT    |
+ |        4 |   NDOP   |   I  | Number of words used to to store the   |
+ |          |          |      | path name                              |
+ |        5 |    ---   |   I  | Unused (set to 0)                      |
+ |        6 |  INSTM   |   I  | Deletion time packed up to minutes     |
+ |          |          |      | (see DBPKTM)                           |
+ |        7 |  CHOPT   |   H  | Character option                       |
+ |  NWDOP+7 |  PATHN   |   H  | Path name                              |
+ |       .. |     ..   |   H  |                                        |
+ +----------+----------+------+----------------------------------------+
+   Header for renaming keys :
+ +----------+----------+------+----------------------------------------+
+ |Word Count| Mnemonic | Type |         Content                        |
+ +----------+----------+------+----------------------------------------+
+ |        1 |   IACT   |   I  | Action code (=5)                       |
+ |        2 |  NWKEY   |   I  | Number of key elements                 |
+ |        3 |  NWDOP   |   I  | Number of words for CHOPT (= 0)        |
+ |        4 |   NDOP   |   I  | Number of words used to to store the   |
+ |          |          |      | path name                              |
+ |        5 |  Unused  |   I  | Set to zero                            |
+ |        6 |  KYO(1)  |   I  | Old key element 1                      |
+ |       .. |   ...    |  ..  |   ........                             |
+ |  NWKEY+5 |KYO(NWKEY)|  ..  | Old key element NWKEY                  |
+ |  NWKEY+6 |  KYN(1)  |   I  | New key element 1                      |
+ |       .. |     ..   |  ..  |   ........                             |
+ |2*NWKEY+5 |KYO(NWKEY)|  ..  | New key element NWKEY                  |
+ |2*NWKEY+6 |  PATHN   |   H  | Path name                              |
+ |       .. |     ..   |   H  |                                        |
+ +----------+----------+------+----------------------------------------+
+   Header for entering/deleting names or help information :
+ +----------+----------+------+----------------------------------------+
+ |Word Count| Mnemonic | Type |         Content                        |
+ +----------+----------+------+----------------------------------------+
+ |        1 |   IACT   |   I  | Action code (=6)                       |
+ |        2 |  NWKEY   |   I  | Number of key elements                 |
+ |        3 |  NWDOP   |   I  | Number of words used to store CHOPT    |
+ |        4 |   NDOP   |   I  | Number of words used to to store the   |
+ |          |          |      | path name (DICTIONARY or HELP)         |
+ |        5 |  IFLAG   |   I  | Flag (1 for help information; 2 for    |
+ |          |          |      | names of the data elements)            |
+ |        6 |  KEY(1)  |   I  | Key element 1 ( = Identifier of path)  |
+ |       .. |   ...    |  ..  |   ........                             |
+ |  NWKEY+5 |KEY(NWKEY)|  ..  | Key element NWKEY                      |
+ |  NWKEY+6 |  CHOPT   |   H  | Character option                       |
+ |       .. |   ...    |  ..  |   ........                             |
+ |   NWKEY+ |          |      |                                        |
+ |  NWDOP+6 |  PATHN   |   H  | Path name (DICTIONARY or HELP)         |
+ |       .. |     ..   |   H  |                                        |
+ +----------+----------+------+----------------------------------------+
+   Header for entering the alias name :
+ +----------+----------+------+----------------------------------------+
+ |Word Count| Mnemonic | Type |         Content                        |
+ +----------+----------+------+----------------------------------------+
+ |        1 |   IACT   |   I  | Action code (=7)                       |
+ |        2 |    ---   |   I  | Unused (set to 0)                      |
+ |        3 |  NWDOP   |   I  | Number of words used to store CHOPT(=0)|
+ |        4 |   NDOP   |   I  | Number of words used to to store the   |
+ |          |          |      | path name of the dictitionary          |
+ |        5 |  IFLAG   |   I  | Flag (0 means temporary; 1 permanent)  |
+ |        6 |   NWDP   |   I  | Number of words used to store the      |
+ |          |          |      | path name                              |
+ |        7 |  PATHD   |   H  | Path name of the dictionary            |
+ |       .. |     ..   |   H  |                                        |
+ |   NDOP+7 |  ALIAS   |   H  | Alias name                             |
+ |       .. |     ..   |   H  |                                        |
+ |   NDOP+9 |  PATHN   |   H  | Path name of the directory             |
+ |       .. |     ..   |   H  |                                        |
+ +----------+----------+------+----------------------------------------+
+   Header for deleting a few partitions in a partitioned directory :
+ +----------+----------+------+----------------------------------------+
+ |Word Count| Mnemonic | Type |         Content                        |
+ +----------+----------+------+----------------------------------------+
+ |        1 |   IACT   |   I  | Action code (=8)                       |
+ |        2 |    ---   |   I  | Unused (set to 0)                      |
+ |        3 |  NWDOP   |   I  | Number of words used to store CHOPT    |
+ |        4 |   NDOP   |   I  | Number of words used to to store the   |
+ |          |          |      | path name                              |
+ |        5 |  INSTM   |   I  | Deletion time packed up to minutes     |
+ |          |          |      | (see CDPKTM)                           |
+ |        6 |  NKEEP   |   I  | Number of partitions to be kept        |
+ |        7 |  CHOPT   |   H  | Character option                       |
+ |  NWDOP+7 |  PATHN   |   H  | Path name of the directory             |
+ |       .. |     ..   |   H  |                                        |
+ +----------+----------+------+----------------------------------------+
+</PRE>
+<P>
+The bank structure created in memory by HEPDB is show below.
+<P>
+<PRE>
+            (3)   +-------\
+        +---------|  FZDB  >   List of directories to be updated
+        |         +-------/
+        |
+  +--------\      +--------\
+  |  UPDB   >-----|  UPDB   >  Support for all top directories opened
+  +--------/      +--------/
+    |   |
+    |   |   (2)   +--------\
+    |   +---------|  DICT   >  Dictionary information
+    |             +--------/
+    |
+    |       (1)   +--------\
+    +-------------|  NODB   >  Node bank for the top directory
+                  +--------/
+                   |..|..||
+                      |
+                      |
+                  +--------\
+                  |  NODB   >
+                  +--------/
+                   |....|||
+                        |      Node bank of subdirectory for which data
+                  +--------\   +--------\   +--------\   is retrieved
+                  |  NODB   >--|  KYDB   >--|  KYDB   >
+                  +--------/   +--------/   +--------/   Key banks
+                                   | (1)        | (1)
+                               +--------+   +--------+
+                               |  DATA  |   |  DATA  |
+                               +--------+   +--------+
+</PRE>
+<P>
+<PRE>
+                         <B>Bank description</B>
+                                  </PRE>
+<P>
+<PRE>
+========================================================================
+|Bank:  UPDB                                            Top level bank |
+|NL_/NS_ =  2/2                                          IO_ = '8I -H' |
+|NW_     =  12                                                         |
++----------------------------------------------------------------------+
+|LINKS:                                                                |
+|link   type   bank                                        offset      |
+|----   ----   ----                                        ------      |
+| -3     Ref   FZDB                                        KLFZDB ( 3) |
+| -2     Str   DICT                                        KLDICT ( 2) |
+| -1     Str   NODB                                                    |
+|  0     nxt   UPDB of the next data base file                         |
++----------------------------------------------------------------------+
+|DATA WORDS:                                                           |
+|word  type  contents                                      offset      |
+|----  ----  --------                                      ------      |
+|   1    I   Logical unit number of RZ file                MUPLUN ( 1) |
+|   2    I   Flag if database to be updated (0 if not)     MUPFLG ( 2) |
+|   3    I   Logical unit number of standard journal file  MUPJFL ( 3) |
+|   4    I   Logical unit number of special backup file    MUPBAK ( 4) |
+|   5    I   Identifier of the top directrory              MUPDIC ( 5) |
+|   6    I   Number of characters in the top directory     MUPNCH ( 6) |
+|            name                                                      |
+|   7    I   Shared/server flag (IOPS*10 + IOPP)           MUPSRV ( 7) |
+|            (IOPS = 1 if S option in DBINIT;                          |
+|             IOPP = 1 if P option in DBINIT)                          |
+|   8    I   Maximum insertion time for subsequent         MUPKY7 ( 8) |
+|            object retrieval                                          |
+|9-12    H   Name of the top directory                     MUPNAM ( 9) |
++----------------------------------------------------------------------+
+========================================================================
+|Bank:  DICT                                           Dictionary bank |
+|NL_/NS_ =  0/0                                     IO_ = '1I /3I 22H' |
+|NW_     =  1 + 25*n                                                   |
++----------------------------------------------------------------------+
+|DATA WORDS:                                                           |
+|word  type  contents                                      offset      |
+|----  ----  --------                                      ------      |
+|   1    I   Number of nodes in the dictionary             MDCNTM ( 1) |
+|      For each node (Node number n)                                   |
+|IOFF+      (= (n-1)*NWITDB + 1)  (NWITDB = 25)                        |
+|   1    I   Unique identifier of the node                 MDCITM ( 1) |
+|   2    I   Number of characters for describing the path  MDCNCH ( 2) |
+|            to the node                                               |
+|   3    I   Last update to the node (not avaialable yet)  MDCLUP ( 3) |
+| 4-5    H   Alias name                                    MDCALI ( 4) |
+|6-25    H   Name of the path to the node (excluding the   MDCNAM ( 6) |
+|            top directory part)                                       |
++----------------------------------------------------------------------+
+========================================================================
+|Bank:  NODB                                                 Node bank |
+|NL_/NS_ =  NS_/(number of down nodes)               IO_ = '4I 16B -H' |
+|NW_     =  20 + words needed for path name                            |
++----------------------------------------------------------------------+
+|LINKS:                                                                |
+|link   type   bank                                        offset      |
+|----   ----   ----                                        ------      |
+| -n     Str   NODB (next level node)                                  |
+|  0     nxt   KYDB of the first key bank to the node      KLDYDB ( 0) |
++----------------------------------------------------------------------+
+|DATA WORDS:                                                           |
+|word  type  contents                                      offset      |
+|----  ----  --------                                      ------      |
+|   1    I   Number of key elements for this node          MNDNWK ( 1) |
+|   2    I   Total number of data words in the Key bank    MNDNWD ( 2) |
+|   3    I   Number of characters describing the path to   MNDNCH ( 3) |
+|            the node                                                  |
+|   4    I   Unique identifier of this node                MNDDIC ( 4) |
+|5-20    B   IO descriptor of the Key bank                 MNDIOF ( 5) |
+|21-..   H   Name of the path to the node                  MNDNAM (21) |
++----------------------------------------------------------------------+
+========================================================================
+|Bank:  KYDB                                                  Key bank |
+|NL_/NS_ =  3/1                                          IO_ = Dynamic |
+|NW_     =  NWKEY + NWFXM(=6)                                          |
++----------------------------------------------------------------------+
+|LINKS:                                                                |
+|link   type   bank                                        offset      |
+|----   ----   ----                                        ------      |
+| -2     Ref   UPDB (Top level bank)                       KLUPDB ( 3) |
+| -2     Ref   NODB (parent node bank)                     KLNODB ( 2) |
+| -1     Str   Data bank                                   KLDADB ( 1) |
+|  0     nxt   KYDB of the next key bank                               |
++----------------------------------------------------------------------+
+|DATA WORDS:                                                           |
+|word  type  contents                                      offset      |
+|----  ----  --------                                      ------      |
+|   1    I   Serial number of the object                               |
+|   2    I   Refernce to the master object (for update)                |
+|   3    I   Start validity time (upto seconds)                        |
+|   4    I   End   validity time (upto seconds)                        |
+|   5    I   Source identifier                                         |
+|   6    I   Flag for storing the object (internal to HEPDB)           |
+|             Bit JRZUDB (=1) : Full RZ option                         |
+|                 JIGNDB (=2) : Ignore the object                      |
+|                 JPRTDB (=3) : Directory is partitioned               |
+|                 JASFDB (=4) : Specially encoded ASCII                |
+|   7    I   Insertion time (upto minutes)                             |
+|8-NWKEY     User keys                                                 |
+|NWKEY+1 I   Logical end validity time (upto seconds)                  |
+|NWKYDB+                                                               |
+|  -4    I   Number of physical reads to disk for this key MKYRID (-4) |
+|  -3    I   Number of calls to DBUSE in the same event    MKYCEV (-3) |
+|  -2    I   Number of calls to DBUSE in the entire run    MKYCRU (-2) |
+|  -1    I   Precision used for storing the object         MKYPRE (-1) |
+|   0    I   Free flag (set by DBFREE call)                MKYFRI ( 0) |
++----------------------------------------------------------------------+
+========================================================================
+|Bank:  FZDB                         List of directories to be updated |
+|NL_/NS_ =  0/0                                             IO_ = '-H' |
+|NW_     =  4 + 20*n                                                   |
++----------------------------------------------------------------------+
+|LINKS:                                                                |
+|link   type   bank                                        offset      |
+|----   ----   ----                                        ------      |
+|  0     nxt   FZDB of the next data base file                         |
++----------------------------------------------------------------------+
+|DATA WORDS:                                                           |
+|word  type  contents                                      offset      |
+|----  ----  --------                                      ------      |
+| 1-4    H   Top directory name                            MFZTOP ( 1) |
+|      For each directory (number n)                                   |
+|IOFF+      (= (n-1)*(MXLWDB+1) + MFZDIR)  (MXLWDB = 20; MFZDIR = 5)   |
+|  1     I   Number of characters in the path                          |
+|2-21    H   Complete pathname of the directory or the root            |
++----------------------------------------------------------------------+
+</PRE>

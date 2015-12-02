@@ -1,0 +1,1970 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%   FATMEN User Guide and Reference manual                        %
+%                                                                 %
+%   Fatmen Part 4: Installaion Guide                              %
+%                                                                 %
+%   This document needs the following external EPS files:         %
+%   none                                                          %
+%                                                                 %
+%   Editor: Michel Goossens / CN-AS                               %
+%   Last Mod.:  7 June 1993 13:20 mg                              %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\Filename{H1Fatmeninstallation-general-hints}
+\chapter{General hints}
+\Filename{H2Fatmeninstallation-pam-file-availability}
+\section{Availability of PAM files, libraries and FATMEN shell}
+\par
+The FATMEN package is installed as part of the CERN program library.
+If you have a version of the CERN program library corresponding
+to CERN Computer Newsletter 197 or later, you should have FATMEN
+on your system.
+\index{Library}
+\index{PAM}
+\index{server}
+\par
+\index{EXEC}
+\index{FM}
+\index{shell}
+\par
+The standard installation (CNL 201 and after) creates the FATMEN
+callable interface (part of PACKLIB), the FATMEN shell and the
+FATMEN server.
+\Filename{H2Fatmeninstallation-Using-ZEBRA-HBOOK-with-FATMEN}
+\section{Using ZEBRA, HBOOK etc. with FATMEN}
+\subsection{The size of the users' store}
+\par
+\index{ZEBRA}
+The FATMEN package creates a division of type 'P' (package)
+in the store that the user declares in the call to
+FMINIT.(See on Page~\pageref{FMINIT}) This division
+is declared with NW=10000 and NWMAX=100000. (See the ZEBRA users'
+guide\cite{bib-ZEBRA} for details of the routine MZDIV).
+Thus, the users store should be sufficiently large to accomodate
+this division.
+\subsection{Using HBOOK and FATMEN}
+\index{HBOOK}
+\par
+If the user also wishes to use HBOOK, ZEBRA should be initialised
+first followed by a call to HLIMIT with a negative argument. This will
+indicate to HBOOK that ZEBRA has already been initialised.
+\par
+Note that the FATMEN FORTRAN routines do not save and restore the
+current directory within an RZ file. 
+\subsection{Calling MZWIPE}
+\index{MZWIPE}
+\par
+It is normally safe to call MZWIPE to clean divisions in the store
+which contains the FATMEN division with the following exception:
+\begin{UL}
+\item
+Do not use MZWIPE to delete all package divisions
+({\tt IXWIPE=IXSTOR+23}). This will delete all banks created with
+FMLIFT (see Page~\pageref{FMLIFT}) and not saved using
+FMPUT (see Page~\pageref{FMPUT}).
+\end{UL}
+\Filename{H2Fatmeninstallatio-Using-FATMEN-without-TMS}
+\section{Using FATMEN without a Tape Management System}
+\par
+\index{TMS}
+\index{VMTAPE}
+The only Tape Management Systems currently supported by FATMEN
+are the HEPVM TMS, and VMTAPE. These are selected by the PATCHY statements
+\begin{XMP}
++USE,TMS.
+
+and
+
++USE,VMTAPE.
+
+respectively.
+\end{XMP}
+\par
+\index{TMS}
+The Tape Management System is responsible for maintaining information
+on tape volumes, such as availability, label type etc. When installed
+without the TMS flag, FATMEN takes the default values for each
+media type as defined at installation time, or by a call to the
+routine FMEDIA (or the MEDIA command in the shell).
+\par
+To see the current defaults, type the command MEDIA in the shell.
+\par
+As well as tailoring the default values for each media type,
+a user exit, FMUTMS, can be provided to override the default
+values for a given volume. See the description of the FMUTMS 
+routine in the user interface section of this manual for more details.
+\Filename{H1Fatmeninstallation-installing-fatmen}
+\chapter{Installing FATMEN}
+\par
+As described above, the installation of the FATMEN software as part
+of the standard CERN program library installation. FATMEN relies
+heavily on the program library, and so this is a pre-requisite
+for its usage.
+\par
+The standard program library installation procedure
+will generate the FATMEN FORTRAN interface (in PACKLIB),
+and three modules. These are the shell (FM), the server (FATSRV)
+and a program to create a new, empty RZ file for use with
+FATMEN (MKFATNEW).
+\index{mkfatnew}
+\index{FATNEW}
+\index{Creating a new catalogue}
+
+{\tt mkfatnew} is just a simple script that calls the {\tt FATNEW}
+program. For example, on VAX/VMS systems the following maybe used.
+\begin{XMPt}{Example MKFATNEW command file}
+$! fatsys:==CERN ! For example
+$! fatgrp:==LHC  ! For example
+$
+$  type/nopage sys$input
+
+Please give the name of the FATMEN system. This name forms
+the top-level of the FATMEN catalogue, e.g. //CERN
+
+$eod
+$  inquire/nopunc ans "FATSYS? "
+$  if ans.eqs."" then ans = "CERN"
+$  fatsys==ans - "//"
+$  type/nopage sys$input
+
+Please give the name of the FATMEN group.
+
+$eod
+$  inquire/nopunc ans "FATGRP? "
+$  if ans.eqs."" then exit
+$  fatgrp==ans - "FM"
+$  write sys$output ""
+$  inquire/nopunc fatdir "Directory where FATMEN catalogue should reside? "
+$  olddir = f$environment("DEFAULT")
+$  set default 'fatdir'
+$  create/directory [.todo]
+$  create/directory [.tovm]          ! Only at CERN !!!
+$  create/directory [.done]
+$  set file/protection=w:rw todo.dir
+$  fatman="FM''fatgrp'"
+$  set file/acl=(id='fatman',access=read+write,options=default) todo.dir
+$  set file/protection=w:rw tovm.dir ! Only at CERN !!!
+$  set file/protection=w:rw done.dir
+$  run cern:[pro.exe]fatnew
+$  set default 'olddir'
+\end{XMPt}
+\Filename{H2Fatmeninstallation-Installing-FATMEN-on-new-machine}
+\section{Installing FATMEN on a new machine}
+\par
+The first step is the installation of the CERN program libraries.
+Once this has been achieved, FATMEN should be configured as below.
+\subsection{Access to data}
+\par
+Access to data through FATMEN is currently supported on:
+\begin{OL}
+\item
+VM/CMS systems running the HEPVM software, in particular SETUP and STAGE.
+\item
+VM/CMS systems without the HEPVM software are supported
+provided that the CERN REXX local function package as well as the
+GIME and DROP execs are installed. 
+\index{Local function}
+\index{REXX local function package}
+\index{DROP}
+\index{GIME}
+\index{RXLOCFN}
+\index{REXX}
+\index{HEPVM}
+\item 
+\index{VMBATCH}
+\index{VMTAPE}
+VM/CMS systems running VMBATCH and/or VMTAPE, provided that the
+REXX local function package as well as the
+GIME and DROP execs are installed. 
+\item
+\index{VAXTAP}
+VAX/VMS systems. The CERN Program Library Package VAXTAP is required
+for access to tapes.
+\item
+\index{SHIFT}
+Unix systems. Tape support is currently only possible on the CERN Cray
+system, the CERN SHIFT project and the
+L3 Apollo network at CERN.
+\par
+CERN is developing generalised Unix tape software (staging and tape
+mounting) which will be used to provide tape support on all other
+Unix systems. This software is based upon the existing Cray and
+SHIFT syntax and so the FATMEN interface is already written.
+\item
+MVS systems. Only FORTRAN I/O is supported in the current version.
+The IBM FORTRAN routine FILEINF is used whereever possible,
+together with the CERN Program Library Package FTPACK, written
+by R. Matthews.
+\end{OL}
+\par
+On all other systems some modifications to the code are required for
+data access. These modifications are restricted to the routines
+FMOPEN, FMCLOS and FMCOPY.
+\subsection{Using the FATMEN catalogue}
+\par
+The FATMEN catalogue is simply a FORTRAN direct access file, processed
+using the CERN ZEBRA package. Users access the file in read-only mode,
+with updates being sent to and applied by a server (one per experiment).
+Updates are sent as ZEBRA FZ files (exchange mode, ASCII mapping).
+\subsection{Configuring FATMEN}
+\subsubsection{VM/CMS systems}
+\par
+Machines that do not run the HEPVM software may use FATMEN
+provided that they install the GIME and DROP execs, and
+the REXX local function package. To install the REXX local
+function package, simply copy the files RXLOCFN SEGMENT and
+RXLOCFN MODULE to your local machine. They will be
+automatically loaded when needed. Some functions
+in this package will return a null-string or zero unless
+certain HEPVM CP modifications are installed. However, all of the
+functions required for FATMEN will work without any problem.
+\par
+If you require any of the above software and do not have
+access to CERNVM (or any other machine running the HEPVM
+software), simply sent a mail message to JAMIE@CERNVM. 
+\par
+Upon initialisation the FATMEN software issues an 'EXEC GIME FMgroup',
+e.g. 'EXEC GIME FML3'. Thus, if the FATMEN catalogue for L3 is NOT
+kept on the 191 disk of FML3, an appropriate
+\index{names file}
+\index{GIME}
+entry in the GIMEUSER, GIMEGRP or GIMESYS NAMES file is required.
+An additional entry is also required in the normal NAMES file
+so that the updates can be correctly sent to the appropriate service
+machine.
+\par
+Systems running VMBATCH should activate the necessary code by
+putting
+\begin{XMP}
++USE,VMBATCH.
+\end{XMP}
+into the installation cradle for FATMEN. 
+(Different code is required to obtain the username, jobname
+and account field in a VMBATCH job to that used in HEPVM batch).
+\par
+Systems running VMTAPE should activate the necessary code by putting
+\begin{XMP}
++USE,VMTAPE.
+\end{XMP}
+This will provide access to tape files.
+If user tapes are catalogued in the VMTAPE catalogue (TMC),
+select also
+\begin{XMP}
++USE,VMTMC.
+\end{XMP}
+\par
+Systems running both VMTAPE and VMBATCH may simply add
+\begin{XMP}
++USE,VMCENTER.
+\end{XMP}
+\subsubsection{VAX/VMS systems}
+\par
+Upon initialisation, the client looks for a file in the directory
+specified by the symbol FMgroup, e.g. FML3.
+If the FATMEN catalogue is kept in
+DISK\$FAT:\lsb FATMEN.L3\rsb, 
+one should type
+\begin{XMP}
+FML3:==DISK$FAT:\lsb FATMEN.L3\rsb
+\end{XMP}
+This directory must contain the subdirectories
+\lsb .TODO\rsb , \lsb .DONE\rsb . The \lsb .TODO \rsb directory
+must be writeable by all members of the L3 collaboration (in this example).
+\par
+If the catalogue is on a disk that has disk quotas enabled, then an ACL
+must be established on the directory \lsb .TODO\rsb as in the example
+below. In this example, the top level directory is \lsb FMCDF \rsb  
+belonging to user FMCDF. The identifier CDF\_EXPERIMENT is held by
+all members of the CDF experiment and is an identifier with the
+RESOURCE attribute. Setting up the directory in this manner allows
+all CDF users to send updates to the FATMEN server for their experiment
+and avoids the need for entries in the quota file for every CDF user
+for the disk in question. 
+Only entries for FMCDF and CDF\_EXPERIMENT are required.
+\par
+If disk quotas are not enabled on the volume in question, then 
+allowing group write access to the \lsb .TODO \rsb    
+directory is sufficient.
+\begin{XMP}
+(IDENTIFIER=FMCDF,ACCESS=READ+WRITE+EXECUTE+DELETE+CONTROL)
+(IDENTIFIER=CDF_EXPERIMENT,ACCESS=READ+WRITE+EXECUTE)
+(IDENTIFIER=FMCDF,OPTIONS=DEFAULT,ACCESS=READ+WRITE+EXECUTE+DELETE+CONTROL)
+(IDENTIFIER=CDF_EXPERIMENT,OPTIONS=DEFAULT,ACCESS=READ+WRITE+EXECUTE)
+\end{XMP}
+\par
+The configuration for the server is performed by the
+sample command file shown below.
+\par
+For the server only, a variable FATSYS must be
+set to the appropriate name, should the catalogue name not be //CERN
+\begin{XMP}
+$!
+$! Example FATSERV.COM
+$!
+$ dd = f$cvtime(,,"WEEKDAY")
+$ tt = f$time()
+$ hh = f$trnlnm("SYS$NODE")
+$ write sys$output ""
+$ write sys$output "FATSERV starting at ''dd' ''tt' on ''hh'"
+$ write sys$output ""
+$ !
+$ ! Set FATMEN system
+$ !
+$ FATSYS:==CERN
+$ !
+$ ! Set FATMEN group
+$ !
+$ FATGRP:==FMCNDIV
+$ !
+$ ! Set FATMEN wakeup interval in seconds
+$ !
+$ ! Define FMCNDIV if not defined in system login
+$ !
+$ FMCNDIV:==DISK\$CERN:\lsb FMCNDIV\rsb
+$ FMWAKEUP:==30
+$ !
+$ ! Set FATMEN log level
+$ !
+$ FMLOGL:==3
+$ write sys$output -
+"FATMEN group set to ''FATGRP', wakeup interval is ''FMWAKEUP' seconds"
+$ run cern:\lsb pro.exe\rsb fatsrv
+\end{XMP}
+\index{remote staging}
+\index{multi-file staging}
+\index{VAXTAP}
+
+See the \Rind{VAXTAP}~\cite{bib-VAXTAP} long writeup for details on configuring
+the VAX tape handling software, in particular for remote and
+multi-file staging.
+\subsubsection{Unix systems}
+\par
+Upon initialisation, the client looks for a file in the directory
+specified by the variable FMexperiment, e.g. FML3. Thus,
+if the FATMEN catalogue is kept in /users/fatmen/l3, the variable
+FML3 should be set to this path:
+\begin{XMP}
+FML3=/users/fatmen/l3; export FML3
+\end{XMP}
+This directory must contain the subdirectories
+todo and done. The todo directory
+must be writeable by all members of the L3 collaboration (in this example).
+\par
+For the server only, a variable FATSYS must be
+set to the appropriate name, should the catalogue name not be //CERN
+\begin{XMP}
+FATSYS=DESY;export FATSYS
+\end{XMP}
+\par
+The configuration for the server is performed by the
+sample script shown below.
+\begin{XMP}
+#!/bin/sh
+#
+# Example FATSERV script.
+#
+t="date"
+h="hostname"
+echo
+echo FATSERV starting at $t on $h
+echo
+FATGRP=FML3   ;export FATGRP
+FATSYS=CERN   ;export FATSYS
+FMWAKEUP=10;   export FMWAKEUP
+FML3=/fatmen/fml3; export FML3
+echo FATMEN group set to $FATGRP , wakeup interval is $FMWAKEUP seconds
+echo
+/cern/pro/bin/fatsrv
+\end{XMP}
+\Filename{H1Fatmeninstallation-remote-access-to-fatmen-catalogue}
+\chapter{Remote access to the FATMEN catalogue}
+\index{remote catalogues}
+\index{catalogue access}
+\par
+Remote access to the FATMEN catalogue is currently supported
+over DECnet (between VAX/VMS systems only) NFS, AFS and CSPACK.
+CSPACK access has not yet been tested on VM/CMS or MVS systems.
+\Filename{H2Fatmeninstallation-DECnet-access-to-FATMEN-catalogues}
+\section{DECnet access to FATMEN catalogues}
+\par
+\index{DECnet}
+To access a remote catalogue over DECnet, simply include
+the node specification in the symbol definition. e.g.
+\begin{XMP}
+FMCDF:==FNALF::USR$ROOT37:[FMCDF]
+\end{XMP}
+\Filename{H2Fatmeninstallation-NFS-access-to-FATMEN-catalogues}
+\section{NFS access to FATMEN catalogues}
+\par
+\index{NFS}
+To access a remote catalogue over NFS, simply define
+the required environmental variable as in the example
+below.
+\begin{XMP}
+FMOPAL=/fatmen/fmopal; export FMOPAL
+
+df /fatmen
+Filesystem    Total KB    free %used   iused %iused Mounted on
+fatcat:/fatmen  409600  138704   66%   -       -    /fatmen
+
+\end{XMP}
+
+\Filename{H2Fatmeninstallation-AFS access-to-FATMEN-catalogues}
+\section{AFS access to FATMEN catalogues}
+\index{AFS}
+To access a remote catalogue over AFS, one simply
+has to define the appropriate environment variable
+to point to the directory where the catalogue resides,
+e.g.
+
+\begin{XMP}
+export FML3=/afs/cern.ch/fatmen/fml3
+\end{XMP}
+
+\Filename{H2Fatmeninstallation-CSPACK-access-to-FATMEN-catalogues}
+\section{CSPACK access to FATMEN catalogues}
+\index{CSPACK}
+
+If FATMEN has been installed with the {\tt CSPACK}
+option enabled (\Lit{+USE,CSPACK} in the PATCHY step of
+the library build), then remote catalogues may also
+be accessed and updated using {\tt CSPACK}. The
+standard {\tt ZSERV} must be installed on the remote
+system on which the catalogue resides, as described in
+the {\tt CSPACK}~\cite{bib-CSPACK} manual. One then defines
+the symbol (VAX/VMS) or environmental variable (UNIX)
+that points to the directory where the catalogue resides
+with the syntax {\tt node:path}.
+
+Thus, to enable {\tt CSPACK} access to the {\tt L3}
+catalogue residing on the node {\tt fatcat}, the
+appropriate {\tt C shell} definition would be
+
+\begin{XMP}
+setenv FML3 fatcat:/fatmen/fml3
+\end{XMP}
+
+\Filename{H2Fatmeninstallation-FATCAT-dedicated-FATMEN-server-at-CERN}
+\section{FATCAT - the dedicated FATMEN server at CERN}
+\index{fatcat}
+
+At CERN, the FATMEN catalogues are stored on the node FATCAT.
+This is currently an RS6000 which is only used for FATMEN catalogue
+management. The recommended way of accessing a FATMEN catalogue at
+CERN is the following:
+\begin{OL}
+\item
+NFS mount the \Lit{/fatmen} file system
+\item
+Define environmental variables to point to the directory of interest
+\end{OL}
+
+An example of how this may be done is shown below.
+
+\begin{XMPt}{NFS mounting the /fatmen file system on a Unix platform}
+
+mount fatcat:/fatmen /fatmen
+
+\end{XMPt}
+
+\begin{XMPt}{NFS mounting the /fatmen file system on a VMS platform}
+
+$NFSMOUNT fatcat:"/fatmen" fatmen
+
+\end{XMPt}
+
+\begin{XMPt}{Defining the environmental variables on a Unix system}
+#/bin/ksh
+for i in /fatmen/fm*
+   do
+     typeset -u fatgrp
+     fatpath=$i
+     fatgrp=`basename $i`
+     echo Setting $fatgrp to $fatpath ...
+     eval $fatgrp=$fatpath;export $fatgrp
+   done
+\end{XMPt}
+
+\begin{XMPt}{Defining the environmental variables on a VAX/VMS system}
+$ loop:
+$ fatman = f$search("FATMEN:[000000]FM*.DIR")
+$ if fatman .eqs. "" then exit
+$ fatman = f$parse(fatman,,,"NAME")
+$ fatdir = "FATMEN:[''fatman']"
+$ write sys$output "Setting ''fatman' to ''fatdir'..."
+$ 'fatman' :== 'fatdir'
+$ goto loop
+\end{XMPt}
+
+\Filename{H1Fatmeninstallation-distributing-catalogue-upfates}
+\chapter{Distribution of catalogue updates}
+\index{catalogue}
+\index{updates}
+\index{servers}
+\index{distribution of updates}
+\index{remote catalogues}
+\index{DECnet}
+\index{bitnet}
+\index{TCPIP}
+\par
+It is unfortunately at least unrealisitic and more likely impossible
+to access a single catalogue world-wide and so one typically
+has multiple copies of the catalogue. These catalogues
+are automatically keep up to date by the FATMEN servers.
+The updates may be sent over Bitnet, DECnet or TCP/IP.
+However, the servers must be configured so that they
+know to which nodes updates should be sent. In addition,
+it may be desirable to maintain subsets of the catalogue
+at remote sites. For example, information on raw data
+may remain at the laboratory where the data is taken
+whereas all DST information is sent to all collaborating
+institutes. 
+\par
+\index{NAMEFIND}
+\index{NAMEFD}
+\index{names file}
+The configuration file that is used has the same format
+on all systems. This format is that of a VM/CMS names file.
+On non-VM systems, these files are processed using the
+FORTRAN callable routine, NAMEFD, available in the CERN
+program library KERNLIB.
+\Filename{H2Fatmeninstallation-Configuring-servers-on-VM-systems}
+\section{Configuring servers on VM systems}
+\par
+This is performed by adding entries to the NAMES file
+of the servers in question. For each remote server
+one can define up to 16 generic name patterns, each
+of which may include wild-cards. For more details
+see the example below. Updates may be sent to
+remote IBM machines, VAXes connected via Interlink
+and Unix machines using the CSPACK software. 
+\par
+Note that the default for VM systems is to send
+the updates using the SENDFILE exec. This can be
+overridden for individual entries either by sending
+the updates to a gateway machine, as described later,
+or by specifying an alternate exec, as for the entry
+FMVAX.
+\begin{XMP}
+:nick.FATSERVERS
+               :list FMSACLAY FATCAT FMIN2P3 FMRAL FMVAX
+
+:nick.FMVAX
+               :userid.fmsmc
+               :node.vxcrna
+               :DIR1.//cern/smc/dst/*
+               :exec.fat2vax
+
+:nick.FMSACLAY
+               :userid.fmsmc
+               :node.frsac12
+               :DIR1.//cern/smc/dst/*
+ 
+:nick.FMIN2P3
+               :userid.fmsmc
+               :node.frcpn11
+               :DIR1.//cern/smc/dst/*
+ 
+:nick.FMRAL
+               :userid.fmsmc
+               :node.ukacrl
+               :DIR1.//cern/smc/dst/*
+ 
+:nick.FATCAT
+               :userid.fmfatcat
+               :node.cernvm
+               :DIR1.//cern/smc/dst/*
+ 
+\end{XMP}
+\par
+In the preceeding example, all updates referring to generic
+names beginning //CERN/SMC are sent to the server defined
+by the name FATCAT, whereas only updates referring to
+names beginning //CERN/SMC/DST are sent to the
+servers at SACLAY, IN2P3 and RAL.
+Note the the FMFATCAT account is in fact a gateway
+into the Unix-world (using the program in PATCH FATCAT
+in the FATMEN PAM file and that FMVAX is an account of
+a VAX linked to the IBM via Interlink, but this is completely
+transparent to the server.
+\par
+On systems other than CERNVM, updates that are to be sent to
+non-VM systems should pass via a gateway service machine.
+\begin{XMP}
+:nick.FATDESY  :userid.R01H1
+               :node.dhhdesy3
+               :DIR1.//cern/h1/*
+               :protocol.mvsjob
+               :gateway.fmgate at cernvm
+
+:nick.FATVAX   :userid.fmh1
+               :node.vxdesy
+               :dir1.//cern/h1/*
+               :protocol.tcpip
+               :gateway.fmgate at cernvm
+               :receive.yes
+\end{XMP}
+\par
+In the above example, updates destined for FATDESY and FATVAX
+are not send directly, but pass via an intermediate service machine.
+wakes up at predefined intervals and transfers any files to the specified
+remote nodes. In the case of the entry FATVAX, files are also
+retrieved from the remote system.
+\subsection{Transferring updates to VAX/VMS systems via Interlink}
+\par
+This method should only be used at CERN. For other systems,
+a gateway service machine should be used. See the description
+below for setting up a gateway service machine.
+\par
+Files sent from IBM VM/CMS systems via the Interlink VM-DECnet
+gateway will arrive in the default directory for the FAL DECnet
+object, typically
+\begin{XMP}
+SYS\$SPECIFIC:\lsb FAL\$SERVER \rsb
+\end{XMP}
+\par
+By default, the files will be named FATMEN.RDRFILE. At CERN
+a small modification has been made to the Interlink software
+so that the files arrive as VAXUSER.FILENAME\_FILETYPE,
+thus files sent to FMOPAL would be called
+\begin{XMP}
+FMOPAL.FATMEN_RDRFILE
+\end{XMP}
+\par
+These files can be copied to the correct directory using the
+command file FATRL.COM, included in the PATCH DCL of the FATMEN
+pamfile.
+\Filename{H2Fatmeninstallation-Configuring-servers-on-VMS-MVS-and-Unix-systems}
+\section{Configuring servers on VMS, MVS and Unix systems}
+\par
+The names file configuration is exactly the same on VMS, MVS and
+Unix systems as on VM nodes. The processing of the names file
+is performed by a FORTRAN program, FATSEND,  which uses the CERN program
+library routine NAMEFD and the updates are transferred
+using the CSPACK routines. 
+\par
+For each remote server, a subdirectory should be created.
+(If the subdirectories are note created, they will be
+created as required by the server).
+In the case of the example names file shown below, we
+would have the subdirectories \lsb .TOD0SG01 \rsb,
+\lsb .TOD0SF01 \rsb and so on (VAX/VMS systems). 
+The FATMEN server copies all updates into each of these
+subdirectories and the program FATSEND copies the updates
+to the specified remote nodes, using either TCP/IP or DECnet,
+and deletes those files that are successfully copied.
+DECnet transfers are only possible between VAX/VMS systems.
+\par
+On MVS systems, the protocol BITNET is also valid for transmission
+of updates to remote VM systems. This is done using the TSO
+transmit command.
+\par
+An example names file is shown below.
+\begin{XMP}
+:nick.FATSERVERS
+               :list FMSGI FMVAX 
+
+:nick.FMSGI    :userid.fmd0
+               :node.d0sg01
+               :protocl.tcpip
+               :dir1//fnal/d0/*
+               :receive.yes 
+               :queue:USR$ROOT37:[FMD0.TODO]
+
+:nick.FMVAX    :userid.fmd0
+               :node.d0sf01
+               :protocl.tcpip
+               :dir1//fnal/d0/*
+\end{XMP}
+
+In this example, servers connecting the the machine \Lit{D0SG01}
+will transmit updates in both directions, rather than the
+default, which is to send updates only.
+This option is useful for the transmission of updates
+to a machine that does not accept incoming connections,
+as is the case with VAX systems running the UCX TCP/IP software,
+the Cray at CERN and MVS systems.
+
+If the tag \Lit{:queue} is specified, the updates are placed in
+the specified directory. If not, they are placed in the subdirectory
+\Lit{todo} of the account that is used to performed the transfer.
+
+If a subdirectory TOVM exists, the FATMEN server will attempt to send
+all updates via Interlink to CERNVM. This option is only intended for
+use at CERN.
+\Filename{H2Fatmeninstallation-Using-gateway-service-machine-on-VM-systems}
+\section{Using a gateway service machine on VM systems}
+\par
+To send updates from a VM node into a non-VM system,
+use the :gateway tag to define a gateway service machine.
+The VM service machine will send all updates to this
+gateway machine, which in turn will transmit them by
+the specified protocol at regular intervals using the
+program FATSEND.
+\par
+Valid protocols are TCPIP, BITNET and MVSJOB.
+TCPIP, which is the default, results in the files
+being transferred using the CSPACK routines, as
+described above. One should normally also set the
+:receive.yes option so that updates are also retrieved
+from these remote systems.
+\par
+Specfiying BITNET together with a gateway machine permits
+updates to be sent to remote nodes at specified
+intervals, rather than immediately.
+\par
+Although it is possible to use SENDFILE to send files to
+MVS nodes, these files are generally unreadable and
+hence the preferred method is to specify the protocol
+MVSJOB. This will result in an IEBGENER job being submitted
+to the remote node, which will copy the updates to a temporary
+file in the input queue of the specified server.
+The usual restrictions on remote job submission apply.
+\Filename{H1Fatmeninstallation-fatsend-program}
+\chapter{The Program FATSEND}
+\par
+This program is generated using the command MAKEPACK FATSEND.
+Alternatively, one may use a job such as the following:
+\begin{XMP}
+
+VAX/VMS systems
+
+$if p1 .nes. "" then goto 'p1
+$ y:
+$ypatchy cern:[pro.pam]ZEBRA.pam fatsend.for :go 
++use,qcde.
++use,vaxvms,*fatsend.
++exe.
++pam,11,r=qcde.
++pam,12,t=c,a. fatmen.cards
++quit
+$ f:
+$for fatsend
+$ l:
+$link fatsend,'lib$,sys$input/opt
+sys$library:vaxcrtl/shareable
+sys$system:sys.stb
+multinet_socket_library/share
+$ exit
+
+Unix systems (Use f77 instead of xlf on non-AIX machines)
+
+ypatchy /cern/pro/pam/ZEBRA.pam fatsend.f :go <<!
++use,qcde.
++use,ibmrt,*fatsend.
++exe.
++pam,11,r=qcde.
++pam,12,t=c,a. fatmen.cards
++quit
+!
+xlf -c -q extname -q charlen=32000 fatsend.f 
+xlf fatsend.o -L/cern/new/lib -lpacklib -lc -o fatsend
+
+\end{XMP}
+\par
+The program can be tailored by setting the variables FMLOGL and FMWAKEUP, e.g.
+\begin{XMP}
+
+$fmlogl:==3
+$fmwakeup:==3600 ! Once an hour
+
+\end{XMP}
+\par
+On Unix systems, the tailoring is done using environmental variables.
+The following example is for the C shell.
+\begin{XMP}
+
+setenv fmlogl 3
+setenv fmwakeup 3600 
+
+\end{XMP}
+On VM/CMS systems, the SETENV command should be used, as in
+\begin{XMP}
+SETENV FMWAKEUP 3600
+\end{XMP}
+\par
+On MVS systems no equivalent to environmental variables exists.
+Therefore names files entries are used, as shown below.
+\begin{XMP}
+:nick.fatsrv  :wakeup.60   :logl.0
+
+:nick.fatsend :wakeup.3600 :logl.3
+
+:nick.FMSGI
+               :mvsid.r01d0
+               :userid.fmd0
+               :node.d0sg01
+               :protocl.tcpip
+               :dir1//fnal/d0/*
+\end{XMP}
+\Filename{H1Fatmeninstallation-installing-vaxtap}
+\chapter{Installing VAXTAP for tape access on VAX/VMS systems}
+\index{VAXTAP}
+\par
+FATMEN interfaces to the CERN Program Library package VAXTAP
+to provide tape support on VAX/VMS systems. The long writeup
+should also be consulted.~\cite{bib-VAXTAP}
+\par
+The package is installed by running a command file that can
+be generated by the following PATCHY run:
+\begin{XMP}
+$YPATCHY CERN:[PRO.PAM]VAXTAP.PAM INSTALL.COM :GO
++USE,INSTALL,T=EXE.
++PAM.
++QUIT
+\end{XMP}
+\par
+Once this command file has been extracted, installation of the package
+proceeds by typing 
+\begin{XMP}
+@INSTALL
+\end{XMP}
+and answering the questions. If VAXTAP is to be installed on a system
+without access to the HEPVM Tape Management System, as is likely
+to be the case when installing it outside CERN, answer NO to the first
+question. Answering A or ALL to the second question will cause
+the installation to complete without any further dialogue.
+\par
+When the command file completes, the file SETUP\_STARTUP.COM should
+be edited and tailored.
+\begin{XMP}
+$ !---------------------------------------------------------------------------*
+$ !
+$ !      Startup command file for SETUP/STAGE/LABELDUMP
+$ !      Modify logical name definitions as required for your node.
+$ !---------------------------------------------------------------------------*
+$ !
+$ !
+$ !
+$ !     Create lnm table for SETUP information ...
+$       create/name_table/parent=lnm$system_table/prot=w:wred lnm$setup
+$ !
+$ !      Define directory for .EXE files
+$      define/system setup_exe cern_root:[exe]
+$ !
+$ !      Allow usage of tapes interactively
+$ !
+$      define/system setup_enabled "INTERACTIVE"
+$ !
+$ !      Disallow specific users from using tapes (useful to stop troublemakers)
+$ !
+$ !      define/system setup_notapes "DECNET,CERNET"
+$ !
+$ !      Allow tapes in these batch queues
+$ !
+$!      define/system setup_queues "SYS$TAPES"
+$!      define/system setup_queues "SYS$BATCH,SYS$TAPES"
+$!      define/system setup_queues "*" ! all queues
+$ !
+$ !      Set up lists of available device types
+$ !
+$      define/system setup_tk50s "VSDD18$MKA700:"
+$      define/system setup_8200s "UXDDB1$MUB0:"
+$      define/system setup_exabytes setup_8200s ! Can also have aliases...
+$ !
+$ !      Allow tape staging
+$ !
+$      define/system stage_tapes "YES"
+$ !      Must also ensure that DISK$STAGE exists...
+\end{XMP}
+\par
+See also the description of the FMEDIA routine and the MEDIA shell
+command for information on configuring generic device names in
+FATMEN. The generic device names used by VAXTAP must match those
+used by FATMEN. Thus, if the generic device type for a given
+medium is set to DAT, the logical name SETUP\_DATS must point
+to a list of valid device names.
+\par
+See also the installation instructions in PATCH DOC of the VAXTAP
+pam file.
+\Filename{H1Fatmeninstallation-VM-service-machines}
+\chapter{The VM FATMEN service machines}
+\par
+These machines should normally be running
+in disconnected mode and autologged
+at system startup time. These machines run a FORTRAN program which
+calls an EXEC to issue WAKEUP upon the arrival of new RDR files.
+These are then read in, processed, then WAKEUP is called again.
+\Filename{H2Fatmeninstallation-Setting-up-new-service-machine}
+\section{Setting up a new service machine}
+\par
+The service machine should have the name FM{\bf throng}, e.g
+\index{throng}
+{\bf throng}
+\Rind{FMALEPH}, \Rind{FMCHARM2}, \Rind{FMCPLEAR}, \Rind{FMDELPHI}, etc.
+\footnote{The FATMEN servers may have any names, provided
+that suitable NAMES file entries are established.}
+The account created requires a 191 disk of sufficient size
+to maintain the expected file catalogue information. Some 800 bytes
+are required per file catalogue entry, thus for a catalogue containing
+15000 files, about 20 cylinders are required. A 193 disk is required for
+maintaining journal information.
+This disk should be at least 5 cylinders.
+\begin{table}[h]
+\caption{Mini-disks required for FATMEN service machines}
+\begin{center}\begin{tabular}{|l|p{.8\linewidth}|}
+\hline
+191    & Disk for FATMEN RZ file, log file and \Lit{PROFILE EXEC}.
+         The profile exec contains only one line - \Lit{'EXEC FATPROF'}
+         20 cylinders is normally sufficient for an initial allocation for this
+         disk.  \\
+192    & Link to the disk containing the server code and EXECs.
+         At CERN, these are kept on the 191 disk of userid FATMEN.\\
+193    &  Disk for keeping journal files. About 5 cylinders are normally
+         required. These files are created automatically by the server
+          following each update and are named \Lit{FATyyjjj FZhhmmss}, 
+         e.g. \Lit{FAT90001 FZ120000} for a file created at 
+         12:00:00 on January 1st, 1990.\\
+\hline
+\end{tabular} \end{center}\end{table}
+\par
+On CERNVM, the FATMEN service machines are monitored and controlled
+by the FATONE machine. Any new service machines must be registered
+by running the FATMEN exec on the 191 disk of this machine, as shown
+below.
+\begin{XMPt}{Modifying the list of FATMEN servers}
+defaults list fatmen       /* list current list of FATMEN servers */
+FMALEPH FMCNDIVR FMDELPHI FMCHARM2 FML3 FMOPAL FMCPLEAR CPDELPHI
+defaults set fatmen fmep03 /* add new FATMEN server */
+fatmen (edit               /* edit list of FATMEN servers */
+\end{XMPt}
+\Filename{H2Fatmeninstallation-Generating-FATMEN-EXECs}
+\section{Generating the FATMEN EXECs}
+\par
+The EXECs used by FATMEN can be generated using the following PATCHY
+cradle:
+\begin{XMP}
++EXE.
++ASM, 21,R=!./*BEGIN ! EXEC */
++USE,REXX.
++PAM,11.
++QUIT.
+\end{XMP}
+\par
+The resultant file should be processed using the \Lit{SPLITFIL} exec
+as shown below:
+\begin{XMP}
+\Ucom{splitfil fatrexx rexx}
+-----> Split FATREXX REXX A1 into pieces
+Generate FM EXEC A
+Generate FATSERV EXEC A
+Generate FAT2CERN EXEC A
+Generate FAT4WARD EXEC A
+Generate FATJOURN EXEC A
+Generate FATUSE EXEC A
+Generate FATLOG EXEC A
+Generate PURGE EXEC A
+\end{XMP}
+
+These EXECs should reside on the FATMEN 191 disk.
+\Filename{H2Fatmeninstallation-Monitoring-FATMEN-servers}
+\section{Monitoring the FATMEN servers}
+
+{\bf Privileged users} may send the FATMEN servers
+management commands to monitor their progress, check that they are active
+etc. Examples of use are:
+\begin{XMP}
+Jamie@Cernvm;
+\Ucom{TELL FMDDDIVR QSPOOL}
+12:44:53  * MSG FROM FMDDDIVR: I HAVE 0 FILES IN MY RDR
+Jamie@Cernvm;
+\Ucom{TELL FMDDDIVR HELLO}
+12:44:58  * MSG FROM FMDDDIVR: HELLO AND HOW ARE YOU TODAY?
+Jamie@Cernvm;
+* See how much disk space CHARM2 service machine has used
+\Ucom{TELL FMCHARM2 QDISK A}
+12:45:19 * MSG FROM FMCHARM2: LABEL  VDEV M STAT CYL TYPE BLKSIZE FILES  BLKS USED-(%) BLKS LEFT BLK TOTAL
+12:45:19 * MSG FROM FMCHARM2: CHARM2 191  A R/W   20 3380    4096     6       35-01         2961      3000
+\end{XMP}
+\begin{table}[h]
+\caption{List of commands currently supported by the FATMEN service machine}
+\begin{center} \begin{tabular} {|>{\tt}l|p{.8\linewidth}|}
+\hline
+HELLO    & Check whether server is active.
+         If the server does not respond immediately, it means that it
+         is either down, or processing an update. As multiple updates
+         can be grouped together, it can happen that the server does not
+         respond for a considerable period of time to a \Lit{HELLO} message. \\
+HELP     & Displays this list of commands. \\
+STOP     & Stop the server, but does not log it off. \\
+QDISK    & Issue a \Lit{QUERY DISK} command and send the output back
+         to the originator of the message. \\
+QSPOOL   & Return the number of RDR files that the service
+         machine currently has in its reader. \\
+DROP     & Cause the server to call the \Lit{DROP}
+         exec to drop the specified link. \\
+GIME     & Cause an \Lit{EXEC GIME} to be issued.\\
+CLOSE    & Close the console log and spool it to the owner of
+         the service machine. \\
+NEWLOG   & Cause the server to open a new log file. \\
+PURGE    & Purge (delete) journal files. May be sent automatically
+          whenever a backup of the FATMEN RZ file has been taken.\\
+*FATLOG* & This command is issued automatically from the FATMEN user code to log
+           FATMEN activity.\\
+LOGOFF   & Shutdown the service machines prior to system shutdown or 
+          other scheduled interruption, such as ORACLE backup.\\
+\hline
+\end{tabular}\end{center}\end{table}
+\subsection{Names file entries for the FATMEN Servers}
+\par
+Each FATMEN server should have at least two entries in their NAMES file.
+Those on CERNVM may also have a third, FATSERVERS, which points to
+the list of remote servers who should automatically receive updates
+from CERNVM.
+\par
+The two entries that are always required are FATOWNERS and FATOPERATORS.
+At the present time, usernames in either of these lists are allowed
+to issue commands in the above table, and receive SMSGs when the servers
+stop.
+\begin{XMPt}{Example of \Lit{NAMES} file for the FATMEN server}
+:nick.FATOPERATORS                :list.fatop1 fatop2
+:nick.FATOP1                      :userid.console
+                                  :node.cernvm
+:nick.FATOP2                      :userid.opsutil
+                                  :node.cernvm
+:nick.FATOWN1                     :userid.fatone
+                                  :node.cernvm
+:nick.FATOWN2                     :userid.wojcik
+                                  :node.frcpn11
+:nick.FATOWNERS                   :list.fatown1 fatown2 jamie
+\end{XMPt}
+
+\Filename{H2Fatmeninstallation-Generating-ORACLE-tables}
+\section{Generating the ORACLE tables}
+\par
+\index{group}
+\index{ORACLE}
+The ORACLE tables for the new group are created by editting the
+SQL statements below, replacing {\bf throng}
+by the group name in question. Then, type
+\Lit{SQLPLUS user/password @file}, where \Lit{file} is
+the name of the file containing these statements.
+These SQL commands are in the patch \Lit{FATSQL} on the FATMEN pamfile.
+ 
+\begin{Fighere}
+\caption{Creation of the ORACLE table for a new throng}
+\label{FORATAB}
+\begin{minipage}[t]{.494\linewidth}
+\begin{XMP}
+INSERT INTO Fatmen VALUES ('CERN', 'throng')
+/
+REM ***   SPECIFIC TABLES FOR throng
+REM ***   Note: 1) CHAR(240) => Oracle V5.1
+REM ***         2) TMS later substitutes Volumes_
+ 
+CREATE TABLE GNames_throng ( GName CHAR(240) NOT NULL,
+                             GN# NUMBER NOT NULL)
+/
+CREATE TABLE Files_throng ( File# NUMBER NOT NULL,
+                            GN# NUMBER NOT NULL,
+                            Copylevel NUMBER(2) NOT NULL,
+                            Location NUMBER NOT NULL,
+                            Hostname CHAR(8) NOT NULL,
+                            Fullname CHAR(240) NOT NULL,
+                            Hosttype CHAR(16),
+                            Opersys CHAR(12),
+                            Fileformat CHAR(4) NOT NULL,
+                            Userformat CHAR(4),
+                            Startrec# NUMBER,
+                            Endrec# NUMBER,
+                            Startblk# NUMBER,
+                            Endblk# NUMBER,
+                            Recformat CHAR(4),
+                            Reclength NUMBER,
+                            Blklength NUMBER,
+                            Creation DATE,
+                            Catalogation DATE,
+                            Lastaccess DATE,
+                            Active CHAR(1) NOT NULL,
+                            Creatorname CHAR(8),
+                            Creatoraccount CHAR(8),
+                            Creatornode CHAR(8),
+                            Creatorjob CHAR(8),
+                            Protection NUMBER(2),
+\end{XMP}
+\end{minipage}\hfill
+\begin{minipage}[t]{.494\linewidth}
+\begin{XMP}
+                            Userword0 NUMBER,
+                            Userword1 NUMBER,
+                            Userword2 NUMBER,
+                            Userword3 NUMBER,
+                            Userword4 NUMBER,
+                            Userword5 NUMBER,
+                            Userword6 NUMBER,
+                            Userword7 NUMBER,
+                            Userword8 NUMBER,
+                            Userword9 NUMBER,
+                            Sysword0 NUMBER,
+                            Sysword1 NUMBER,
+                            Sysword2 NUMBER,
+                            Sysword3 NUMBER,
+                            Sysword4 NUMBER,
+                            Sysword5 NUMBER,
+                            Sysword6 NUMBER,
+                            Sysword7 NUMBER,
+                            Sysword8 NUMBER,
+                            Sysword9 NUMBER,
+                            Comments CHAR(80),
+                            Mediatype CHAR(1))
+/
+CREATE TABLE FXV_throng ( File# NUMBER NOT NULL,
+                          Fileseq# NUMBER NOT NULL,
+                          Vol# NUMBER NOT NULL,
+                          Volseq# NUMBER)
+/
+CREATE TABLE Volumes_throng ( Vol# NUMBER NOT NULL,
+                              VSN CHAR(6) NOT NULL,
+                              VID CHAR(6) NOT NULL,
+                              VIDprefix NUMBER,
+                              Density NUMBER)
+/
+\end{XMP}
+\end{minipage}
+\end{Fighere}
+\Filename{H2Fatmeninstallation-Generating-SQLDS-tables}
+\section{Generating the SQL/DS tables}
+\index{group}
+\index{SQL/DS}
+
+The SQL/DS tables for the new group are created by editting the
+SQL statements below, replacing {\bf throng}
+by the group name in question.
+
+\begin{Fighere}
+\caption{Creation of the SQL/DS tables for a new throng}
+\label{FSQLTAB}
+\begin{minipage}[t]{.498\linewidth}
+\begin{XMP}
+INSERT INTO Fatmen VALUES ('CERN', 'throng')
+ 
+CREATE TABLE GNames_throng ( GName CHAR(240) NOT NULL,   -
+                             GN# INTEGER NOT NULL)
+CREATE TABLE Files_throng ( File# INTEGER NOT NULL,      -
+                            GN# INTEGER NOT NULL,        -
+                            Copylevel INTEGER NOT NULL,  -
+                            Location INTEGER NOT NULL,   -
+                            Hostname CHAR(8) NOT NULL,   -
+                            Fullname CHAR(240) NOT NULL, -
+                            Hosttype CHAR(16),           -
+                            Opersys CHAR(12),            -
+                            Fileformat CHAR(4) NOT NULL, -
+                            Userformat CHAR(4),          -
+                            Startrec# INTEGER,           -
+                            Endrec# INTEGER,             -
+                            Startblk# INTEGER,           -
+                            Endblk# INTEGER,             -
+                            Recformat CHAR(4),           -
+                            Reclength INTEGER,           -
+                            Blklength INTEGER,           -
+                            Creation DATE,               -
+                            Catalogation DATE,           -
+                            Lastaccess DATE,             -
+                            Active CHAR(1) NOT NULL      -
+                            Creatorname CHAR(8),         -
+                            Creatoraccount CHAR(8),      -
+                            Creatornode CHAR(8),         -
+                            Creatorjob CHAR(8),          -
+                            Protection INTEGER(2))
+\end{XMP}
+\end{minipage}\hfill
+\begin{minipage}[t]{.498\linewidth}
+\begin{XMP}
+Alter table files_throng add (Userword0 INTEGER,         -                                  -
+                              Userword1 INTEGER,         -
+                              Userword2 INTEGER,         -
+                              Userword3 INTEGER,         -
+                              Userword4 INTEGER,         -
+                              Userword5 INTEGER,         -
+                              Userword6 INTEGER,         -
+                              Userword7 INTEGER,         -
+                              Userword8 INTEGER,         -
+                              Userword9 INTEGER,         -
+                              Sysword0 INTEGER,          -
+                              Sysword1 INTEGER,          -
+                              Sysword2 INTEGER,          -
+                              Sysword3 INTEGER,          -
+                              Sysword4 INTEGER,          -
+                              Sysword5 INTEGER,          -
+                              Sysword6 INTEGER,          -
+                              Sysword7 INTEGER,          -
+                              Sysword8 INTEGER,          -
+                              Sysword9 INTEGER,          -
+                              Comments CHAR(80),         -
+                              Mediatype CHAR(1))
+CREATE TABLE FXV_throng ( File# INTEGER NOT NULL,        -
+                          Fileseq# INTEGER NOT NULL,     -
+                          Vol# INTEGER NOT NULL,         -
+                          Volseq# INTEGER)
+CREATE TABLE Volumes_throng ( Vol# INTEGER NOT NULL,     -
+                              VSN CHAR(6) NOT NULL,      -
+                              VID CHAR(6) NOT NULL,      -
+                              VIDprefix INTEGER,         -
+                              Density INTEGER)
+\end{XMP}
+\end{minipage}
+\end{Fighere}
+
+\Filename{H1Fatmeninstallation-restoring-RZ-files-from-oracle}
+\chapter{Restoring the RZ files from ORACLE or SQL/DS}
+
+Data can be restored from ORACLE or SQL/DS in one of two ways: either by
+directly recreating the FATMEN RZ file, or by sending each entry
+as an update in FZ format to the RDR of the virtual machine.
+The former is useful if the entire file is lost or corrupt, the
+latter for recovering individual entries or for sending the
+recovered data to a remote system.
+
+\Filename{H2Fatmeninstallation-Recreating-FATMEN-RZfile-directly}
+\section{Recreating the FATMEN RZ file directly}
+
+To restore the complete RZ file from ORACLE or SQL/DS,
+logon to the service
+machine of the group in question and type RESTORE.
+This exec currently extracts all
+active.\footnote{Active files are those not marked for delete. File entries
+marked for delete are be recovered by resetting the active flag to \Lit{Y}.}
+information from the ORACLE SQL/DS tables.
+
+\Filename{H2Fatmeninstallation-Extracting-information-from-ORACLE-SQLDS-as-FZupdates}
+\section{Extracting information from ORACLE or SQL/DS as FZ updates}
+
+If a small number of entries are to be restored, or the restored
+file is to be sent to a remote site, it may be convenient to
+send each entry as an FZ file to the server, with disturbing
+its normal operation. The program in PATCH FATO2F on the FATMEN
+PAM can be used for this purpose. The program reads a group name
+followed by a list of generic names from FORTRAN unit 5, i.e. the
+terminal or program stack unless overridden by a FILEDEF command.
+The generic names input may include a wild-card as shown below.
+The comments, delimited by an exclamation mark (!), should not
+be included in a real file and are only used here to help explain
+the various options. The routine FMUPDT (see on Page~\pageref{FMUPDT})
+may be used to group the updates together if required.
+\begin{XMPt}{Example of a file for restoring from ORACLE into FZ}
+CHARM2                                 ! Initialise for group CHARM2
+//CERN/CHARM2/SPECIAL/R4248            ! Recover an individual entry
+//CERN/CHARM2/TEST/*                   ! Recover a complete tree
+\end{XMPt}
+\Filename{H1Fatmeninstallation-fatmen-code}
+\chapter{The FATMEN code}
+\Filename{H2Fatmeninstallation-Structure-FATMEN-PAM}
+\section{Structure of the FATMEN PAM file}
+\par
+Cradles to generate the FATMEN FORTRAN from the FATMEN pamfile are
+maintained on the FATMEN pamfile. In general, it is sufficient to
+{\tt +USE} the pilot patch plus the target machine,
+e.g. +USE,*FATLIB,IBM. In addition, the switch CZ must be selected
+with {\tt +USE,CZ.} for all machines which will access
+a central file catalogue using the ZEBRA server.
+\index{ZEBRA server}
+\index{ZS ZEBRA server}
+\begin{table}[h]
+\caption{Description of the cradles in the FATMEN PAM file}
+\begin{center} \begin{tabular}{|l|p{.8\linewidth}|}
+\hline
+*FATSQL   &FORTSQL for the CERNVM service machines.
+          The routines must be preprocessed using the PCC exec before 
+         compilation.\\
+*FATUSER &Sample program on the PAM file. \\
+*FATO2Z  &Code to restore the RZ files from the ORACLE database. \\
+*FATSRV  &Code for the VM service machines. \\
+*FMCDF   &Command definition file (CDF) for the FATMEN shell.
+         It must be processed with the KUIPC command before 
+         compilation.\\
+*FMKUIP  &Code for the FATMEN shell.
+          To generate the FATMEN shell, the output of FMINT and 
+          the CDF file,
+          preprocessed using the KUIPC command, must also be included.
+          The CDF file is in patch
+          FMCDF on the FATMEN pam.\\
+*FATLIB  &Code for the FORTRAN callable interface, maintained in FATLIB TXTLIB.
+          It is also required by the FATMEN shell.  \\
+\hline
+\end{tabular} \end{center}\end{table}
+\Filename{H2Fatmeninstallation-Installing-FATMEN-software}
+\section{Installing the FATMEN software}
+\par
+Installation of the FATMEN software consists of two steps:
+\begin{OL}
+\item
+Installation of the FATMEN library (part of PACKLIB).
+\item
+Creation of the FATMEN shell program.
+\end{OL}
+\subsection{Installation of FATMEN on CERNVM}
+\subsubsection{Generating the FATLIB library}
+\par
+The extraction of the code is made with the following PATCHY cradle:
+\begin{XMP}
++EXE.
++USE,QCDE.
++USE,*FATLIB,IBM.
++PAM,11, R=QCDE, T=A.ZEBRA
++PAM,12.       , T=A.FATMEN
++QUIT.
+\end{XMP}
+followed by the standard procedure to generate the TXTLIB, namely
+VFORT asm, EDITLIB asm, TXT GEN FATLIB asm.
+\subsubsection{The FATMEN module (for the command line interface)}
+\par
+The extraction of the code is made with the following PATCHY cradle:
+\begin{XMP}
++EXE.
++ASM,31.
++USE,*FMKUIP,IBM.
++USE,FMCDF,T=EXE,DIV.
++PAM,11, T=A.FATMEN
++QUIT.
+\end{XMP}
+which generates two files: the standard ASM file with the FORTRAN code
+and the diverted ASM2 file containing input to the KUIP processor.
+Both the ASM code and the output from the KUIP processor must be
+compiled and linked to build the FATMEN module.
+\par
+The following exec has been used at CERN
+to perform the complete operation:
+\begin{XMP}
+/**/
+ Address Command
+ 'EXEC ZPATCHY FATMEN ( CRADLE(FATMEN) ASM(FATMEN) ASM2(FMCDF CDF)'
+ 
+ 'KUIPC FMCDF'  /* To generate the FORTRAN equivalent of the CDF file */
+ 
+ 'EXEC VFORT FATMEN'
+ 'EXEC VFORT FMCDF'
+ 'EXEC VFORT ENDMODU'         /* Dummy routine to "squeeze" the module*/
+ 'EXEC CERNLIB FATLIB ( LINK'
+ 
+ 'LOAD FATMEN FMCDF ( CLEAR NOAUTO'
+ 'INCLUDE ENDMODU'
+ 'GENMOD FATMEN ( TO ENDMODU'
+ Exit
+/*BEGIN ENDMODU FORTRAN */
+      BLOCK DATA ENDMODU
+      END
+\end{XMP}
+\subsubsection{\protect\label{HORACLE}Processing the ORACLE routines for the 
+FATMEN server}
+The ORACLE
+FORTSQL routines can be generated using the following cradles:
+\begin{XMP}
++EXE.
++ASM, 21,R=!./*BEGIN ! FORTSQL */
++USE,ORACLE.
++USE,*FATSQL.
++PAM,11.
++QUIT.
+\end{XMP}
+The output file should then be processed by the SPLITFIL command,
+which will create a separate file for each routine.
+These can then be pre-processed by the PCC exec as follows:
+\begin{XMP}
+splitfile fatsql fortsql
+-----> Split FATSQL FORTSQL A1 into pieces
+Generate BLANKDEK FORTSQL A
+Generate FMLOGI FORTSQL A
+Generate FODEL FORTSQL A
+Generate FOGET FORTSQL A
+Generate FOPUT FORTSQL A
+FAT3@cernvm;
+pcc iname=fmlogi host=fortran
+ 
+ORACLE Precompiler: Version 1.2.13.10 - Production on Thu Feb 22 17:32:04 1990
+ 
+Copyright (c) 1987, Oracle Corporation, California, USA.  All rights reserved.
+ 
+ 
+Precompiling FMLOGI.FORTSQL
+FAT3@cernvm;
+vfort fmlogi
+VFORT compilation options in effect are: CHARLEN(32767) FLAG(W) GOSTMT OPT(2) 
+MAP NOSDUMP.
+File 'FMLOGI FORTRAN A1' will be processed.
+VS FORTRAN VERSION 2 ENTERED.  17:32:07
+ 
+**FMLOGI** END OF COMPILATION 1 ******
+ 
+VS FORTRAN VERSION 2 EXITED.   17:32:10
+ 
+FAT3@cernvm;
+\end{XMP}
+\subsubsection{Generating the code for the FATMEN server}
+This code can be generated with the following cradle:
+\begin{XMP}
++USE,IBM,*SQL,*FATSRV.
++EXE.
++PAM,11, R=QCDE, T=A.  ZEBRA PAM *
++PAM,12,  T=A. FATMEN PAM *
++QUIT.
+\end{XMP}
+The server module can then be built as follows:
+\begin{XMP}
+CERNLIB V5ORAFIX V5ORACLE FATLIB
+LOAD FATSRV OSDDAT OSDU2OS (CLEAR NOMAP NODUP NOAUTO)
+GENMOD FATSRV
+\end{XMP}
+\subsubsection{Generating the FATMEN server for remote VM systems}
+This is performed in the same way as on CERNVM with the following
+exception:
+\begin{UL}
+\item
+If neither ORACLE or SQL/DS are to be used, the \begin{XMP}+USE,*SQL\end{XMP}
+statement should be omitted.
+\end{UL}
+If ORACLE is to be used, the procedure for generating the FORTSQL
+routines is described on Page~\pageref{HORACLE}
+should be followed. If SQL/DS is to be used, the procedure
+below should be followed.
+\subsubsection{\protect\label{HSQLDS}Processing the SQLDS routines for the 
+FATMEN server}
+The SQL/DS
+FORSQL routines can be generated using the following cradles:
+\begin{XMP}
++EXE.
++ASM, 21,R=!./*BEGIN ! FORSQL */
++USE,SQLDS.
++USE,*FATSQL.
++PAM,11.
++QUIT.
+\end{XMP}
+The output file should then be processed by the SPLITFILE command,
+which will create a separate file for each routine.
+These can then be pre-processed by the SQLIFY exec as follows:
+\begin{XMP}
+splitfile fatsql forsql
+-----> Split FATSQL FORSQL A1 into pieces
+Generate BLANKDEK FORSQL A
+Generate FMLOGI FORSQL A
+Generate FODEL FORSQL A
+Generate FOGET FORSQL A
+Generate FOPUT FORSQL A
+FAT3@Cernvm;
+sqluser
+SQL195 ( 01A8  R ) RR
+FAT3@Cernvm;
+sqlify fmlogi
+ARI0717I START SQLPREP EXEC: 02/23/90 10:27:47 SET
+ARI0320I THE DEFAULT DATABASE NAME IS SQLDBA.
+ARI0663I FILEDEFS IN EFFECT ARE:
+SYSIN    DISK     FMLOGI   FORSQL   A1
+SYSPRINT DISK     FMLOGI   LISTPREP A1
+SYSPUNCH DISK     FMLOGI   FORTRAN  A1
+ARISQLLD DISK     ARISQLLD LOADLIB  R1
+ARI0713I PREPROCESSOR ARIPRPF CALLED WITH THE FOLLOWING PARAMETERS:
+........ PREP=FMLOGI, NOCHECK,ISOLATION(CS)
+ARI0710E ERROR(S) OCCURRED DURING SQLPREP EXEC PROCESSING.
+ARI0796I END SQLPREP EXEC: 02/23/90 10:27:48 SET
+FAT3@Cernvm(00008);
+FAT3@Cernvm;
+vfort fmlogi
+CRNVFT030I VFORT compilation options in effect are: CHARLEN(32767) FLAG(W) 
+GOSTMT OPT(2) MAP NOSDUMP NOPRINT.
+CRNVFT000I File 'FMLOGI FORTRAN A1' will be processed.
+VS FORTRAN VERSION 2 ENTERED.  10:27:55
+ 
+**FMLOGI** END OF COMPILATION 1 ******
+ 
+**SQLINT** END OF COMPILATION 2 ******
+ 
+VS FORTRAN VERSION 2 EXITED.   10:27:55
+ 
+/**********************************************************************/
+/*                                                                    */
+/*  Title  : Invoke SQL preprocessor                                  */
+/*  ======                                                            */
+/*                                                                    */
+/*  Format : SQLIFY   fn <ft>                                         */
+/*  ======               $ASMSQL                                      */
+/*                                                                    */
+/*  Author : J. Wood, Systems Group, CCD, RAL, 10/04/86               */
+/*  ======                                                            */
+/*                                                                    */
+/**********************************************************************/
+Address Command
+Signal on HALT ; buf=0
+ 
+Arg fn ft fm . '(' 'USERID' user pwd .
+ 
+If user='' Then foruser=''
+   Else Do
+      user='STRIP'(user)
+      foruser='USERID='user'/'pwd','
+      End   /* Else Do */
+ 
+ 
+ret=0
+ 
+If fm = '' Then fm = 'A'
+ 
+Select
+   When fn='' Then Do
+      Say 'Format is: SQLIFY file_name <file_type>'
+      Exit 4
+      End   /* Do When fn='' */
+   When Abbrev('PLISQL',ft,1) Then ft='PLISQL'
+   When Abbrev('ASMSQL',ft,1) Then ft='ASMSQL'
+   When Abbrev('FORSQL',ft,1) Then ft='FORSQL'
+   Otherwise Do
+      ft='*'
+      'MAKEBUF' ; buf=rc
+      'LFILE' fn ft '* ( FIFO'
+      n=Queued()
+      reply=1
+      j=0
+      type.1='PLISQL'
+      mode.1='A'
+      typlist='/PLISQL/ASMSQL/FORSQL'
+      Do i=1 To n
+         Pull fn1 ft1 fm1 .
+         loctyp='/'||Strip(ft1)
+         If Pos(loctyp,typlist)>0 Then Do
+            Do k=1 To j
+               If ft1=type.k & fm1=mode.k Then Iterate i
+               End   /* Do k=1 ... */
+            j=j+1
+            type.j=ft1
+            mode.j=fm1
+            End   /* Do If Pos ... */
+         End   /* Do n */
+ 
+      If j>1 Then Do k=1 While 1
+         Say 'There is more than one file of filename' fn
+         Say 'Select by number:'
+         Do i=1 To j
+            Say i':' fn type.i mode.i
+            End   /* Do i= ... */
+         Pull reply
+         Select
+            When ^Datatype(reply,'W') Then Iterate k
+            When reply >j | reply < 1 Then Iterate k
+            Otherwise Leave k
+            End   /* Select */
+         End   /* Do k=1 ... */
+ 
+      ft=type.reply
+      fm=mode.reply
+      End   /* Do Otherwise */
+   End   /* Select */
+ 
+'STATE' fn ft fm
+If rc^=0 Then Do
+   Say fn ft fm 'does not exist'
+   ret=rc
+   Signal HALT
+   End   /* Do If rc^=0 */
+rc='CPUSH'('PRT')
+'CP SPOOL 00E TO' Userid()
+ 
+lang = left(ft,3)
+if ft = 'FORSQL' then lang = 'FORTRAN'
+'EXEC SQLPREP' lang 'PP(PREP='fn','foruser,
+                 'NOCHECK,ISOLATION(CS))',
+                 'SYSIN('fn ft fm')'
+ret=rc
+rc='CPOP'('PRT')
+HALT:
+If buf^=0 Then 'DROPBUF' buf
+Exit ret
+\end{XMP}
+\Filename{H2Fatmeninstallation-Tailoring-FATMEN-shell}
+\section{Tailoring the FATMEN shell}
+\index{KUIP}
+\index{shell}
+\index{Tailoring the FATMEN shell}
+\index{Modifying the FATMEN shell}
+\par
+The FATMEN shell may be tailored by
+\begin{OL}
+\item
+The use of KUIP macros
+\item
+Modifying the FATMEN CDF file, e.g. adding extra commands
+\end{OL}
+\subsection{KUIP macros}
+\par
+KUIP macros consist of files containing FATMEN or KUIP system commands.
+A trivial example might contain commands such as
+\begin{XMPt}{Example macro CDOPAL KUMAC}
+MESS 'Initialise FATMEN for OPAL'
+INIT OPAL
+MESS 'Change directory to PROD/PASS3/FILT/P1R1039L044'
+CD PROD/PASS3/FILT/P1R1039L044
+MESS 'Count the number of files in this directory'
+FC
+\end{XMPt}
+
+\par
+The output of the above macro is given below:
+\begin{XMPt}{Result of executing CDOPAL KUMAC}
+FAT3@cernvm;
+fm
+Type INIT to initialise FATMEN>
+exec cdopal
+ 
+FMINIT.  Initialisation of FATMEN package
+FATMEN   1.05  900312 13.00  CERN PROGRAM LIBRARY FATMEN=Q123
+         This version created on      900312  at        1600
+Linked to FMOPAL               mode Z
+FAOPEN : for FARZ on Unit    1 opened File CERN FATRZ
+Current Working Directory = //CERN/OPAL
+Current Working Directory = //CERN/OPAL/PROD/PASS3/FILT/P1R1039L044
+Files:    5
+FM>
+\end{XMPt}
+
+Further details can be found in the KUIP Long writeup<BIBREF REFID=KUIP>.
+\subsection{Adding commands to the FATMEN shell}
+\par
+Extra commands maybe added to the FATMEN shell by
+\begin{OL}
+\item
+Creating a Command Definition File (CDF)
+\item
+Merging this with the FATMEN CDF file (Patch FMCDF on the FATMEN PAM)
+\item
+Processing the resultant CDF file using the command KUIPC
+\item
+Compiling the FORTRAN file produced by the KUIPC command
+\item
+Linking with the FATMEN library
+\end{OL}
+\par
+For example, we could add the command XLS which would
+\begin{OL}
+\item
+Accept a generic name which could contain wild cards at any point
+\item
+Find all matching files
+\item
+Display the file entries
+\end{OL}
+(In fact, the ls command has been modified to do just this!)
+\begin{XMPt}{CDF file for XLS command}
+>COMMAND XLS
+>GUIDENCE
+Use the XLS command to perform an extended LS command.
+Syntax: XLS path options
+Options:
+  A - list all attributes, except DZSHOW (option Z).
+  C - display comment field associated with file
+  F - list file attributes, such as start/end record and block
+  G - list the full generic name of each file
+  K - list keys associated with this file (copy level, media type, location)
+  L - list logical attributes, such as FATMEN file format
+      (ZEBRA exchange etc.)
+  M - list media attributes, such as VSN, VID, file sequence number for tape
+      files, host type and operating system for disk files.
+  N - lists dataset name on disk/tape of this file
+  O - list owner, node and job of creator etc.
+  P - list physical attributes, such as record format etc.
+  S - lists security details of this file (protection)
+  T - list date and time of creation, last access etc.
+  U - list user words.
+  Z - dump ZEBRA bank with DZSHOW.
+>ACTION FMXLSC
+>PARAMETERS
++
+FILE 'File or pathname' C D='CURRENT_DIRECTORY'
+OPTN 'Options'          C D=' '
+\end{XMPt}
+\par
+Our action routine, FMXLSC, might look like the following:
+\begin{XMPt}{Example action routine, FMXLSC}
+      SUBROUTINE FMXLSC
+      PARAMETER     (MAXFIL=10000)
+      PARAMETER     (LKEYFA=10)
+      DIMENSION     KEYS(LKEYFA,MAXFIL)
+      CHARACTER*255 FILES(MAXFIL)
+      CHARACTER*255 PATH
+      CHARACTER*25  CHOPT
+*
+      CALL KUGETC(PATH,LPATH)
+      CALL KUGETC(CHOPT,LCHOPT)
+*
+      CALL FMLIST(PATH(1:LPATH),FILES,KEYS,NFOUND,MAXFIL,IRC)
+*
+      DO 10 I=1,NFOUND
+10    CALL FMSHOW(FILES(I),LBANK,CHOPT(1:LCHOPT),IRC)
+*
+      END
+\end{XMPt}
+
+\Filename{H1Fatmen-Monitoring-information}
+\chapter{Monitoring information}
+
+\Filename{H2Fatmen-Monitoring-introduction}
+\section{Introduction}
+
+{\tt FATMEN} maintains three types of monitoring information:
+
+\begin{OL}
+\item
+Information recorded in the {\tt FATMEN} catalogue
+\item
+Information logged per file access
+\item
+Information logged per session
+\end{OL}
+
+\subsection{Monitoring information in the {\tt FATMEN} catalogue}
+
+The monitoring information that is stored in the {\tt FATMEN} catalogued
+consists of the {\tt file size}, the {\tt date} and {\tt time} of
+last access and the {\tt number of file accesses}.
+
+This information is stored per entry at the offsets {\tt MFSZFA},
+{\tt MLATFA} and {\tt MUSCFA}. See page~\pageref{BANK-OFFSETS}
+for a description of the bank offsets.
+
+This information can be histogrammed with the example program
+{\tt FATPLOT}, included in the {\tt FATMEN} source file
+in patch {\tt EXAMPLE}, deck {\tt FATPLOT} and reproduced below.
+
+\begin{XMPt}{Histogramming monitoring information}
+*=======================================================================
+*
+*  Example of using HBOOK to plot various FATMEN catalogue values.
+*  This program histograms the file size, number of days since last
+*  access, medium type etc.
+*=======================================================================
+      PARAMETER (LURCOR=200000)
+      COMMON/CRZT/IXSTOR,IXDIV,IFENCE(2),LEV,LEVIN,BLVECT(LURCOR)
+      DIMENSION    LQ(999),IQ(999),Q(999)
+      EQUIVALENCE (IQ(1),Q(1),LQ(9)),(LQ(1),LEV)
+*
+      COMMON /USRLNK/LUSRK1,LUSRBK,LUSRLS
+*
+      COMMON /QUEST/IQUEST(100)
+      CHARACTER*8   THRONG
++CDE,FATPARA.
++CDE,FATBUG.
+      EXTERNAL      UROUT
+*
+*
+*     Initialise ZEBRA
+*
+      CALL MZEBRA(-3)
+      CALL MZSTOR(IXSTOR,'/CRZT/','Q',IFENCE,LEV,BLVECT(1),BLVECT(1),
+     +            BLVECT(5000),BLVECT(LURCOR))
+      CALL MZLOGL(IXSTOR,-3)
+ 
+*
+* *** Define user division and link area like:
+*
+      CALL MZDIV  (IXSTOR, IXDIV, 'USERS', 50000, LURCOR, 'L')
+      CALL MZLINK (IXSTOR, '/USRLNK/', LUSRK1, LUSRLS, LUSRK1)
+*
+*     Units for FATMEN RZ/FZ files
+*
+      LUNRZ = 1
+      LUNFZ = 2
+      CALL GETENVF('THRONG',THRONG)
+      LTH = LENOCC(THRONG)
+*
+*     Initialise FATMEN
+*
+      CALL FMINIT(IXSTOR,LUNRZ,LUNFZ,'//CERN/'//THRONG(1:LTH),IRC)
+      CALL FMLOGL(0)
+*
+*     Initialise HBOOK
+*
+      CALL HLIMIT(-20000)
+*
+*     Book histograms
+*
+      CALL HBOOK1(1,'File Size (MB)',50,0.,200.,0.)
+      CALL HBOOK1(2,'Number of accesses',50,0.,50.,0.)
+      CALL HBOOK1(3,'Number days since last access',50,0.,300.,0.)
+      CALL HBOOK1(4,'Number days since catalogued',50,0.,300.,0.)
+      CALL HBOOK1(5,'Number days since created',50,0.,300.,0.)
+      CALL HBOOK1(6,'Medium',5,0.,5.,0.)
+      CALL HIDOPT(0,'BLAC')
+*
+*     Loop over all files
+*
+      CALL FMLOOP('//CERN/*/*',-1,UROUT,IRC)
+*
+*     Print and store the histograms
+*
+      CALL HPRINT(0)
+      CALL HRPUT(0,'FATTUPLE.'//THRONG(1:LTH),'N')
+*
+*     Terminate cleanly
+*
+      CALL FMEND(IRC)
+      END
+ 
+      SUBROUTINE UROUT(PATH,KEYS,IRC)
++CDE,FATPARA.
+      PARAMETER (LURCOR=200000)
+      COMMON/CRZT/IXSTOR,IXDIV,IFENCE(2),LEV,LEVIN,BLVECT(LURCOR)
+      DIMENSION    LQ(999),IQ(999),Q(999)
+      EQUIVALENCE (IQ(1),Q(1),LQ(9)),(LQ(1),LEV)
+      CHARACTER*(*) PATH
+      PARAMETER     (LKEYFA=10)
+      DIMENSION     KEYS(LKEYFA)
+      DIMENSION     NDAYS(3)
+      COMMON/QUEST/IQUEST(100)
+      IRC   = 0
+      LBANK = 0
+      LP    = LENOCC(PATH)
+      CALL FMGETK(PATH(1:LP),LBANK,KEYS,IRC)
+*
+*     Fill histograms
+*
+      IF(IQ(LBANK+MFSZFA).NE.0)
+     +CALL HFILL(1,FLOAT(IQ(LBANK+MFSZFA)),0.,1.)
+      IF(IQ(LBANK+MUSCFA).NE.0)
+     +CALL HFILL(2,FLOAT(IQ(LBANK+MUSCFA)),0.,1.)
+      CALL FMDAYS(PATH(1:LP),LBANK,KEYS,NDAYS,' ',IRC)
+      CALL HFILL(3,FLOAT(NDAYS(3)),0.,1.)
+      CALL HFILL(4,FLOAT(NDAYS(2)),0.,1.)
+      CALL HFILL(5,FLOAT(NDAYS(1)),0.,1.)
+      CALL HFILL(6,FLOAT(IQ(LBANK+MMTPFA)),0.,1.)
+      CALL MZDROP(IXSTOR,LBANK,' ')
+      END
+\end{XMPt}
+
+\Filename{H2Fatmen-Monitoring-fileaccess}
+\section{Monitoring information logged per file access}
+
+For each call to \Rind{FMOPEN}, an update is sent to
+the {\tt FATMEN} server to update the last access date
+and time, use count etc. as described above.
+This logging record also records additional information,
+which is stored in the logs of the servers.
+
+This information consists of the following quantities:
+
+\begin{DLtt}{1234567890}
+\item[CHFNFA]The fully qualified name of the actual file that
+was accessed. 
+\item[IHOWFA]A bit pattern indicating how the file was accessed.
+\begin{DLtt}{1234567890}
+\item[JLOCFA=1]Local disk (standard file system)
+\item[JSFSFA=2]VM shared file system
+\item[JMSCFA=3]MSCP (VAXcluster)
+\item[JAFSFA=4]Andrew file system
+\item[JOSFFA=5]OSF distributed file system
+\item[JDFSFA=6]DEC DFS
+\item[JNFSFA=7]Sun NFS
+\item[JDECFA=8]DECnet
+\item[JCSPFA=9]CSPACK server
+\item[JFPKFA=10]FPACK server
+\item[JRFIFA=11]RFIO
+\item[JSTGFA=31]Stage required
+\item[JTPMFA=32]TPMNT (=not staged)
+\end{DLtt}
+\item[ITIMFA]The time in seconds spent in the routine 
+\Rind{FMOPEN} (including the time for {\tt STAGE} operations etc.)
+\end{DLtt}
+
+In addition, the username and nodename from which the file
+was accessed is logged, together with the generic name
+and {\tt FATMEN} keys (location code, media type and data representation).
+These permit further information to be extracted from the {\tt FATMEN}
+catalogue if required.
+
+\Filename{H2Fatmen-Monitoring-session-logging}
+\section{Session logging}
+
+At the end of each {\tt FATMEN} session, {\bf provided} that a
+call to \Rind{FMEND} is made, a log record is written to
+the server. The server ignores this record (apart from
+counting the number that it receives, unless installed
+with the flag {\tt +USE,FATLOG.}
+
+If installed with this flag, the logging records are
+collected into a daily summary for subsequent processing.
+
+The logging records consists of the following blocks:
+
+\begin{OL}
+\item
+Hollerith block
+\begin{DLtt}{1234567}
+\item[KFMSYS]FATMEN system (e.g. CERN)
+\item[KFMGRP]FATMEN group (e.g. DELPHI)
+\item[KFMTIT]Title of FATMEN source file
+\item[KFMUSR]User name
+\item[KFMHST]Host name
+\item[KFMTYP]Host type
+\item[KFMOS]Host operating system
+\end{DLtt}
+\item
+MB counts
+\begin{DLtt}{1234567}
+\item[KFMMBR]Number of MB read
+\item[KFMMBW]Number of MB written
+\item[KFZMBR]Number of MB read with ZEBRA FZ
+\item[KFZMBW]Number of MB written with ZEBRA FZ
+\item[KFMMBC]Number of MB copied
+\item[KFMMBN]Number of MB copied over the network
+\item[KFMMBQ]Number of MB queued for copy (e.g. {\tt CHEOPS})
+\end{DLtt}
+\item
+Dates and times (packed with \Rind{FMPKTM})
+\begin{DLtt}{1234567}
+\item[KFMIDQ]Date and time of PATCHY installation job
+\item[KFMIDS]Date and time of start of FATMEN session
+\item[KFMIDE]Date and time of end of FATMEN session
+\end{DLtt}
+\item
+Catalogue modifications
+\begin{DLtt}{1234567}
+\item[KFMADD]Number of disk entries added (\Rind{FMADDD})
+\item[KFMADL]Number of links added (\Rind{FMADDL})
+\item[KFMADT]Number of tape entries added (\Rind{FMADDT})
+\item[KFMMDR]Number of \Rind{MKDIR} commands
+\item[KFMRDR]Number of \Rind{RMDIR} commands
+\item[KFMRLN]Number of \Rind{RMLN} commands
+\item[KFMRTR]Number of \Rind{RMTREE} commands
+\item[KFMRMF]Number of \Rind{RM} commands
+\item[KFMCPF]Number of \Rind{CP} commands
+\item[KFMMVF]Number of \Rind{MV} commands
+\item[KFMMOD]Number of \Rind{MODIFY} commands
+\item[KFMTCH]Number of \Rind{TOUCH} commands
+\end{DLtt}
+\item
+File accesses
+\begin{DLtt}{1234567}
+\item[KFMOPN]Number of files opened, e.g. by \Rind{FMOPEN}
+\item[KFMCLS]Number of files closed, e.g. by \Rind{FMCLOS}
+\item[KFMCPY]Number of files copied, e.g. by \Rind{FMCOPY}
+\item[KFMCPQ]Number of files queued for copy, e.g. by \Rind{FMCOPQ}
+\item[KFMCPN]Number of files copied over the network, e.g. by \Rind{FMRCOP}
+\end{DLtt}
+\item
+SYSREQ and TMS operations
+\begin{DLtt}{1234567}
+\item[KFMSRQ]Number of calls to SYSREQ (\Rind{FMSREQ})
+\item[KFMQVL]Number of {\tt QVOL} commands (\Rind{FMQVOL})
+\item[KFMAVL]Number of volumes allocated (\Rind{FMALLO})
+\item[KFMASP]Number of space allocations (\Rind{FMGVOL} or \Rind{FMGVID})
+\item[KFMPOL]Number of {\tt TRANSFER} commands (pool operations, e.g. \Rind{FMPOOL}
+\item[KFMLCK]Number of volumes locked, e.g. \Rind{FMLOCK}
+\item[KFMULK]Number of volumes unlocked, e.g. \Rind{FMULOK}
+\item[KFMDTG]Number of tags deleted, e.g. \Rind{FMTAGS}
+\item[KFMGTG]Number of tags obtained, e.g. \Rind{FMTAGS}
+\item[KFMSTG]Number of tags set, e.g. \Rind{FMTAGS}
+\end{DLtt}
+\item
+Catalogue processing
+\begin{DLtt}{1234567}
+\item[KFMBNK]Number of banks read from the catalogue (\Rind{FMRZIN})
+\item[KFMGET]Number of banks read with default selection (\Rind{FMGET})
+\item[KFMGTK]Number of banks user selected (\Rind{FMGETK})
+\item[KFMSHW]Number of calls to \Rind{FMSHOW}
+\item[KFMSCN]Number of calls to \Rind{FMSCAN}
+\item[KFMLOP]Number of calls to \Rind{FMLOOP}
+\item[KFMLDR]Number of calls to \Rind{FMLDIR}
+\item[KFMLFL]Number of calls to \Rind{FMLFIL}
+\item[KFMSRT]Number of calls to \Rind{FMSORT}
+\item[KFMRNK]Number of calls to \Rind{FMRANK}
+\item[KFMSLK]Number of calls to \Rind{FMSELK}
+\item[KFMMTC]Number of calls to \Rind{FMATCH}
+\end{DLtt}
+\end{OL}

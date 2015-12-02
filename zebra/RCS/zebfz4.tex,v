@@ -1,0 +1,849 @@
+head	1.3;
+access;
+symbols;
+locks
+	goossens:1.3; strict;
+comment	@% @;
+
+
+1.3
+date	95.02.02.08.53.11;	author goossens;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	95.01.27.07.37.00;	author goossens;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	93.11.13.15.25.14;	author goossens;	state Exp;
+branches;
+next	;
+
+
+desc
+@initial entry
+@
+
+
+1.3
+log
+@ version Feb 1995
+@
+text
+@%  $Header: /afs/.cern.ch/project/cnas_doc/sources/zebra/RCS/zebfz4.tex,v 1.2 1995/01/27 07:37:00 goossens Exp goossens $
+\Filename{H1-FZ-Format-specifications}
+\chapter{Format specifications}
+\label{sec:H1-FZ-format-specs}
+
+\Filename{H2-FZ-native-mode}
+\section{Native mode}
+
+In native mode
+a data-structure is represented by a series of logical records (LR).
+These records are written and read by Fortran \Lit{WRITE} and \Lit{READ}
+statements.
+
+Since indefinitly large records would cause problems in
+auxiliary programs,
+\Rind{FZOUT} will make sure that no record exceeds the maximum
+logical record size declared for the file with \Rind{FZFILE},
+breaking a chunk of information into several records if necessary.
+Independently, the pilot record may not exceed 1024 words.
+
+A data-structure starts with the 'pilot' record (type 2 or 3),
+\index{pilot record}\index{record!pilot}%
+which may be continued with 'pilot continuation' records (type 4)
+\index{pilot continuation record}\index{record!pilot!continuation}%
+if necessary; this is followed by as many 'bank material' records
+\index{bank material record}\index{record!bank material}%
+as needed (type 7 for all except the last which has type 8).
+
+\subsection*{Native mode, logical records: general format}
+
+\begin{verbatim}
+word -1:  NWLR, the number of words in this record,
+            excluding the first two (!) words
+            (except for padding records in exchange file format)
+
+ word 0:  logical record type LRTYP:
+
+            LRTYP= 1: record 'start or end of run'
+
+                   2: pilot record for d/s 'start of event'
+
+                   3: pilot record for d/s 'event continued'
+
+                   4: pilot continuation record
+
+              5 or 6: padding records, ignored on input,
+                       (not used in native mode)
+
+                   7: bank material record, with more to come
+
+                   8: last bank material record of a d/s
+
+                   9: emergency-stop record
+
+words 1 -> NWLR:  data words of the logical record
+\end{verbatim}
+
+\subsection{Native mode, logical records: start-of-run and end-of-run}
+
+\begin{verbatim}
+word -1:  NWLR, the record length
+
+      0:  LRTYP=1, the record type
+
+      1:  NRUN, the run number, a positive integer
+          NRUN=0 signals 'end-of-run'
+
+      2 -> NWLR:  user information, integers only
+\end{verbatim}
+
+A record \Lit{LRTYP=1} with \Lit{NRUN} positive may be used to mark the beginning
+of a run; this is not obligatory.
+
+A record \Lit{LRTYP=1} with \Lit{NRUN=0} may be used to signal the end of a run.
+
+\subsection*{Native mode, logical records: the pilot record}
+
+\begin{verbatim}
+word -1:  NWLR, record length limited to NWLR < 1020
+
+      0:  LRTYP = 2 or 3, the record type
+
+      1:  the floating point number 12345.0 as a check word
+
+      2:  Zebra version number, integer = 10000. * QVERSIO
+           zero if written by a user routine
+
+      3:  processing option bits
+
+      4:  zero (reserve word)
+
+      5:  NWTX, number of words in the text-vector, may be zero
+
+      6:  NWSEG, number of words in the segment table,
+           = 3 * number of table entries
+
+             if NWSEG=0: no table, but not necessarily empty d/s
+
+      7:  NWTAB, number of words in the relocation table,
+           = 2 * number of table entries
+
+             if NWTAB=0:  linkless data-structure
+
+      8:  NWBK, total number of words occupied by the bank material,
+           both on memory and on the file, may be zero if empty d/s
+
+      9:  LENTRY, entry address into the d/s
+
+     10:  NWUHIO = NWUH + NWIO, number of words in the user header
+           vector plus its I/O characteristic, zero if no header
+
+           11: control-word for the I/O characteristic
+                either: immediate, NWIO=1,
+                         the whole vector is of the same type
+                         = 1  all bits
+                           2  all integer
+                           3  all floating
+                           7  self-decriptive
+
+                    or: complex, start of the I/O characteristic
+                         as delivered by MZIOCH, NWIO words in all
+
+           11 + NWIO: start of the user header vector,
+                       NWUH < 401 words
+
+     11+NWUHIO:  start of the segment table, NWSEG words
+
+     11+NWUHIO+NWSEG:  start of the text-vector, NWTX words
+
+     11+NWUHIO+NWSEG+NWTX: start of the relocation table, NWTAB words
+\end{verbatim}
+
+\subsection{Native mode, logical records: the pilot continuation records}
+
+If the text vector is too large to fit into the pilot record
+it is written out as a separate \Lit{LRTYP=4} continuation record:
+
+\begin{verbatim}
+       word -1:  NWTX
+             0:  LRTYP=4
+             1:  start of the text vector, NWTX words
+\end{verbatim}
+
+The relocation table is written as a separate \Lit{LRTYP=4} continuation
+record (or even several such records in the very unlikely case
+that the table is larger than the maximum record length) if:
+
+\begin{itemize}
+\item text vector did not fit into the pilot record
+\item table is too large to join the pilot record
+\item table is longer than 40 words (because the buffer space for
+      the 'early table words' in the control-bank associated to the
+      file has this size) as follows:
+\begin{verbatim}
+      word -1:  NWTAB
+            0:  LRTYP=4
+            1:  start of the relocation table, NWTAB words
+\end{verbatim}
+\end{itemize}
+
+\subsection*{Native mode, logical records: the bank material records}
+
+\begin{verbatim}
+word -1:  NWLR, the number of words in this record,
+            excluding the first two words
+
+      0:  LRTYP = 7 or 8, record type
+
+      1 -> NWLR:  the bank material
+\end{verbatim}
+
+The bank material is dumped directly in sequential order
+into either one or several records;
+all but the last record are given the type \Lit{LRTYP=7},
+the last has \Lit{LRTYP=8}.
+
+\subsection*{Pilot: The segment table}
+
+Each entry has 3 words:
+
+\begin{itemize}
+\item    2 words are the Hollerith name of the division of origin,
+\item    1 word indicates the number of words of bank material for 
+         this segment.
+\end{itemize}
+
+The table on the file gives first the names of the divisions
+for the segments, followed by the size indicators;
+in both cases in the order in which the segments occur on the file,
+which is also the order in which they where in memory at \Rind{FZOUT} time.
+
+For example: suppose data from two divisions,
+called \Lit{'BGO'} and \Lit{'CALORIM'}, where written.
+Division \Lit{BGO} was physically lower in the store at output time
+and delivered 21469 words, whilst division \Lit{CALORIM} gave 9199 words.
+The segment table for this would consist of six words:
+
+\begin{verbatim}
+         4HBGO , 4H    , 4HCALO, 4HRIM , 21469, 9199
+\end{verbatim}
+
+If all the bank material comes from one single division only
+the segment table is suppressed.
+
+\subsection*{Pilot: The text vector}
+
+This is stored as a series of lines,
+each line is preceded by a word-count indicating the number of
+4-character Hollerith words to follow (this corresponds to the
+\Rind{MZIOCH} format \Lit{'/*H'}).
+
+\subsection*{Pilot: The relocation table}
+
+There is one entry for each contiguous section of memory,
+containing an integral number of banks, which has been written
+to the file. The entry consists of the original start address
+of the section, followed by the end+1 address.
+The entries follow each other in the table, thus:
+
+\begin{verbatim}
+       word 1:  start adr of first storage region
+            2:  end+1 adr of first storage region
+            3:  start adr of second storage region
+                 ...           ...
+        NWTAB:  end+1 adr of last storage region
+\end{verbatim}
+
+
+\Filename{H2-FZ-exchange-mode}
+\section{Exchange mode}
+
+The exchange mode provides an interface between computers of
+different architecture, through which data-structures can travel.
+This interface has two distinct components:
+
+\begin{itemize}
+ \item The {\bf exchange data format} defines the representation
+       of the data for the data-types allowed with ZEBRA:
+       bit pattern, integer, floating, double-precision, Hollerith.
+ \item The {\bf exchange file format} defines the organisation of
+       the data into logical records,
+       and their blocking into physical records.
+\end{itemize}
+
+Normal blocking methods (e.g., IBM's VBS)
+use control-information associated to every phy\-si\-cal record;
+for good reasons, because this provides safe and easy recovery to the
+next logical record in case a physical record is lost.
+In ZEBRA this could not be used because the intention was to provide
+a format which would allow data-taking computers to dump rapidly
+large amounts of data directly from memory to the file,
+without copying through a buffer and without distroying the data
+in the store,
+which implies the use of physical records without
+any control-information.
+Such physical records we call 'fast blocks'.
+We do however need a different kind of physical record,
+which does provide control information,
+and which can be used for recovery.
+Such blocks are called 'steering blocks'.
+Any data-structure starts on a steering block and may continue on as
+many fast blocks as needed,
+their number being recorded in the control-information of the
+steering block.
+
+To permit recovery, the steering blocks carry a particular bit
+pattern on the first 4 words,
+i.e. a pattern of 128 bits.
+This reduces the a priori chance of a fast block
+simulating a steering block to 1 in \(4.*10^{38}\).
+This is further reduced by contraints on the contents of the control
+information for the steering block.
+(To keep this probability low the user must not deliberately
+use elements of this pattern as signals,
+such as end markers.)
+
+Some copy utilities copy a magnetic tape with suppression of faulty
+blocks.
+If a fast block of a particular data-structure is lost in this way,
+\Rind{FZIN} would read the copy without getting an error signal
+for the fast block,
+and it would try to absorb the first block after the d/s,
+a steering block, using it as data.
+To prevent this, \Rind{FZIN} is programmed never to accept as fast
+a block which looks like a steering block.
+If a d/s contains a genuine fast block simulating a steering block,
+it will be lost.
+The chance of this happening is sufficiently low to be tolerable,
+as shown above.
+
+A file to be read by \Rind{FZIN} is not necessarily the result of \Rind{FZOUT},
+it may have been produced by a user program,
+and this may not yet be fully debugged.
+FZIN has been programmed to catch hopefully all logical errors
+possible in the user's output routines,
+and to give full diagnostics with logging level 4.
+
+Whilst files in native mode can be written and read by identical
+code on all machines,
+specific code is provided for each type of machine
+to read and write files in exchange mode.
+Idiosyncracies of any given machine (like the ones of the VAX)
+must remain local to the specific code of that machine.
+This is an important principle,
+as it avoids the combinatorial problem of every machine
+having to know about all other machines.
+Also,
+it provides for a clean solution to the advent of a new machine,
+or the disappearance of an obsolete machine.
+
+\Filename{H2-FZ-Exchange-Data-format}
+\section{Exchange Data format}
+
+The unit of information is a word of 32 bits,
+(double-precision numbers require two words each).
+A word may contain:
+
+\begin{verbatim}
+ - positive integer:  true binary
+ - negative integer:  two's complement of the absolute value
+ - floating point:    IEEE standard as shown below
+ - Hollerith:         4 character 8-bit ASCII, stored left to right
+ - bit pattern:       32 bits of zero or one (no conversion)
+\end{verbatim}
+
+The following reduction may occur when transforming
+to the exchange representation on machines with a word-size
+larger than 32 bits:
+
+\begin{verbatim}
+ - integer:     'bad conversion' if more than 31 significant bits
+ - floating:    reduced precision, but correctly rounded
+ - Hollerith:   only the first 4 characters are taken
+                 (trailing characters should be blank anyway)
+ - bit pattern: only the right-hand 32 bits are taken
+\end{verbatim}
+
+The following expansions may occur for the inverse transformation:
+
+\begin{verbatim}
+ - Hollerith:   blank fill
+ - bit pattern: zero-fill of the leading bits
+\end{verbatim}
+
+The IEEE representation of
+single and double precision floating-point numbers is:
+
+\begin{verbatim}
+Single precision:  1  bit  32       the sign-bit 's'
+                   8  bits 31 - 24  the characteristic 'c'
+                  23  bits 23 -  1  the mantissa 'm'
+
+Double precision:  1  bit  64       the sign-bit 's'
+                  11  bits 63 - 53  the characteristic 'c'
+                  52  bits 52 -  1  the mantissa 'm'
+\end{verbatim}
+
+A normal floating point number is represented by 3 fields
+on one or two 32-bit words:
+
+\Lit{'m'} is the fractional part of the mantissa M;
+the binary point is assumed to be immediately to the left
+of the most significant bit of m,
+preceded by an implied 1 (hidden bit), for example:
+
+\begin{verbatim}
+         m             M mantissa       decimal value
+
+         0000...0      1.0000...0       1.
+         1000...0      1.1000...0       1.5
+         1100...0      1.1100...0       1.75
+\end{verbatim}
+
+\Lit{'c'} is the characteristic, being the binary exponent with a bias of
+127 or 1023 added, for example:
+
+\begin{verbatim}
+         c             exponent        c              exp
+
+         011...101     -2              100...000      1
+         011...110     -1              100...001      2
+         011...111      0              100...011      3
+\end{verbatim}
+
+A normal floating-point number does not have a c of all ones
+or all zeros, such characteristics are used to represent Exceptions.
+
+\Lit{'s'} is the sign-bit, the number is negative if this bit is on.
+The representation of floating-point numbers is of the
+sign/magnitude form, ie. only the sign-bit is complemented
+to change the sign of the number.
+
+The Exceptions are:
+\begin{verbatim}
+   c=0, m=0            floating-point zero
+   c=0, m= not 0       'de-normalized number',
+                       value:   +/-  0.m  *  2**(-126 or -1022)
+   c=all 1, m=0        signed infinity  (c=255 or 2047)
+   c=all 1, m= not 0   'not a number (NaN)'
+\end{verbatim}
+
+\Filename{H2-FZ-Exchange-File-Format}
+\section{Exchange File Format}
+
+The logical records of the exchange file format look much like those
+of the native mode,
+except that a data-structure may be represented by a single LR
+of type 2 or 3.
+LR type 4 is used for bank material continuation,
+LR types 7 and 8 do not exist.
+
+\subsection*{Exchange File Format, logical records: general format}
+
+\begin{verbatim}
+word -1:  NWLR, the number of words in this record,
+          excluding the first two (!) words, except:
+          excluding the first word only for padding records
+          for NWLR = 0  the LR type 5 is implied
+
+ word 0:  logical record type LRTYP:
+
+            LRTYP= 1: record 'start or end of run'
+
+                   2: (start of) data-structure 'start of event'
+
+                   3: (start of) data-structure 'event continued'
+
+                   4: data-structure continued
+
+              5 or 6: padding records, ignored on input,
+
+words 1 -> NWLR:  data words of the logical record
+\end{verbatim}
+
+\subsection*{Exchange File Format, logical records: start-of-run and end-of-run}
+
+\begin{verbatim}
+word -1:  NWLR, the record length
+
+      0:  LRTYP=1, the record type
+
+      1:  NRUN, the run number, a positive integer
+          NRUN = 0  signals 'end-of-run'
+          NRUN =-1  signals 'Zebra end-of-file'
+
+      2 -> NWLR:  user information, integers only
+\end{verbatim}
+
+A record \Lit{LRTYP=1} with \Lit{NRUN} positive may be used to mark the beginning
+of a run; this is not obligatory.
+
+A record \Lit{LRTYP=1} with \Lit{NRUN=0} may be used to signal the end of a run.
+
+\subsection*{Exchange File Format, logical records: (start of) data-structure}
+
+\begin{verbatim}
+word -1:  length NWLR = 10 + NWIO + NWUH + NWSEG + NWTX + NWTAB
+                           + NWBKST  (bank material in this record)
+
+      0:  LRTYP = 2 or 3, the record type
+
+      1:  the floating point number 12345.0 as a check word
+
+      2:  Zebra version number, integer = 10000. * QVERSIO
+           zero if written by a user routine
+
+      3:  processing option bits
+           = 0  normally
+             1  Direct-access-Table record
+             2  DaT forward reference record
+
+      4:  zero (reserve word)
+
+      5:  NWTX, number of words in the text-vector, may be zero
+
+      6:  NWSEG, number of words in the segment table,
+           = 3 * number of table entries
+
+      7:  NWTAB, number of words in the relocation table,
+                  = 2 * number of table entries,
+           if = 0:  linkless data-structure
+
+      8:  NWBK, total number of words occupied by the bank material,
+           both on memory and on the file, may be zero if empty d/s
+
+      9:  LENTRY, entry address into the d/s
+
+word 10:  NWUHIO = NWUH + NWIO, number of words in the user header
+           vector plus its I/O characteristic, zero if no header
+
+           11: control-word for the I/O characteristic
+               either: immediate, NWIO=1,
+                         the whole vector is of the same type
+                         = 1  all bits
+                           2  all integer
+                           3  all floating
+                           7  self-decriptive
+
+                    or: complex, start of the I/O characteristic
+                         as delivered by MZIOCH, NWIO words in all
+
+\end{verbatim}
+
+The 10 words of basic pilot information are followed by
+these data sectors:
+
+\begin{DLtt}{123456}
+\item[NWIO]   words of the I/O characteristic for the user header vector
+\item[NWUH]   words of the user header vector
+\item[NWSEG]  words of the segment table
+\item[NWTX]   words of the text-vector
+\item[NWTAB]  words of the relocation table
+\item[NWBKST] words of bank material in this record, at most = \Lit{NWBK}
+\end{DLtt}
+
+A decription of the contents of the segment table, the text vector,
+and the relocation table is found in the format decription of the
+native mode.
+The bank material is a direct copy
+(but normally transformed to exchange data format)
+of the data in the dynamic store.
+
+\subsection*{Exchange File Format, logical records: data-structure continued}
+
+\begin{verbatim}
+   word -1:  NWLR, the record length
+
+         0:  LRTYP=4, the record type
+
+         1 -> NWLR:  further bank material
+\end{verbatim}
+
+\subsection*{Exchange File Format, logical records: padding records}
+
+Padding records must be used to mark unused areas of
+physical records.
+
+\begin{verbatim}
+   word  0:  NWLR, the record length (excluding the first word only!)
+
+         1:  LRTYP = 5 or 6, the record type
+
+         2 -> NWLR:  words to be ignored on input
+\end{verbatim}
+
+The total size of a padding record is \Lit{NWLR+1},
+including the LR length and the \Lit{LR} type;
+thus a padding record with \Lit{NWRL=1} occupies two words.
+To pad exactly one word, \Lit{NWRL=0}  should be stored,
+in this case the \Lit{LR} type 5 is implied
+without being present in the data.
+
+The maximum size of a padding record is the size of a
+physical record.
+
+There must not be more than 4 consecutive padding records.
+
+\subsection*{Exchange File Format: physical records}
+
+A file in exchange file format is supported by physical records of
+identical length (fixed-length records), this being the only
+format which can safely be read on all machines.
+A physical record consists of \Lit{NWPHR} words;
+the word size is 32 bits for the Exchange Data Format,
+for the Native Data Format it is the word size of the machine.
+
+The physical record size \Lit{NWPHR} is 900 words standard,
+but a different size may be specified at OPEN time.
+For the Exchange Data format, \Lit{NWPHR} must be a multiple of 90 words,
+ie. 360 bytes = 64x5x9 bits,
+this being the smallest size compatible with all machines.
+
+The following table shows, for the Exchange Data Format,
+some possible values of \Lit{NWPHR}, being multiples of 90 words.
+On machines with a word size of more than 32 bits the apparent
+record size, which may be needed in JCL, will be less;
+this is also shown, supposing that packing is dense.
+
+\begin{verbatim}
+        n  NWPHR   bytes  is words of  36    48    60    64  bits
+
+        1     90     360               80    60    48    45
+       10    900    3600              800   600   480   450
+       20   1800    7200             1600  1200   960   900
+       40   3600   14400             3200  2400  1920  1800
+       50   4500   18000             4000  3000  2400  2250
+       64   5760   23040 = 512*45    5120  3840  3072  2880
+       80   7200   28800             6400  4800  3840  3600
+\end{verbatim}
+
+{\bf Note}: with Zebra version 3.61
+the '90 word rule' has been relaxed such that the size of
+physical recods is required to be a multiple of 30 words only.
+One should not take advantage of this if one has 36-bit machines
+in the experiment.
+
+There are two kinds of physical records:
+the {\bf steering} blocks start with 8 words of control information;
+the {\bf fast} blocks have no control information at all.
+
+Several fast blocks in succession are called a {\bf burst};
+each burst of fast blocks is preceded by a steering block,
+whose control information indicates the number of fast blocks
+to be expected.
+
+The format of a steering block is as follows:
+
+\begin{verbatim}
+L+0  word 1:  hex  0123CDEF
+ +1  word 2:       80708070
+ +2  word 3:       4321ABCD
+ +3  word 4:       80618061
+
+ +4  word 5:  bits  1 -> 24: NWPHR, the physical record length
+                               (in 32-bit words)
+
+              bits 25 -> 32: flag bits:
+                               32 emergency stop block
+                               31 end-of-run
+                               30 start-of-run in this block
+
+ +5  word 6:  physical record counter (fast blocks do not count)
+               to permit checking for blocks lost by read errors;
+               if zero: no checking
+
+ +6  word 7:  NWTOLR, the off-set to the first logical record
+               starting in this block:
+
+               unless NWTOLR=0, the first new LR in this block starts
+               at word NWTOLR+1, this word being its record size.
+
+               if NWTOLR = 0: the whole block continues data
+                               of the current logical record.
+
+ +7  word 8:  NFAST, the number of fast blocks to follow just behind
+               the current steering block
+
+ +8  words 9 -> NWPHR:  the data body of the block
+\end{verbatim}
+
+The decimal values of the steering block stamp,
+either as 16-bit half-words or as 32-bit words, unsigned or signed,
+are:
+
+\begin{verbatim}
+    0123CDEF =  (  291 | 52719) =     19 123 695
+    80708070 =  (32880 | 32880) =  2 154 856 560  or  -2 140 110 736
+    4321ABCD =  (17185 | 43981) =  1 126 280 141
+    80618061 =  (32865 | 32865) =  2 153 873 505  or  -2 141 093 791
+
+    0123CDEF =  001 1074 6757  octal
+    80708070 =  200 3410 0160
+    4321ABCD =  103 1032 5715
+    80618061 =  200 3030 0141
+\end{verbatim}
+
+\Filename{H2-FZ-Example-dedicated-online}
+\section{Example for coding dedicated on-line output}
+
+To see the implications of this format, let us sketch what
+an output routine would have to do which has \Lit{NWD} words
+in a vector \Lit{MDATA} in a common \Lit{/DATA/} already in exchange data format,
+say they are all integers,
+to be written out as a Zebra file in exchange file format.
+
+It has to preceed this vector by four kinds of control information,
+going backward in this order:
+
+\begin{itemize}
+\item add the bank system words to make it into a Zebra bank
+\item add the pilot information
+\item add two words to make it into a logical record
+\item add eigth control words to make the first physical record,
+      a steering block
+\end{itemize}
+
+Most of this information can be set up once by initialization,
+and only a few holes must be filled in for each data-structure.
+In particular, the user header vector which identifies the
+structure must be filled,
+in the example we chose a header of 4 words.
+Remember that all numbers must be in exchange representation;
+but most numbers are positive integers, and hence are no problem.
+Numbers where one has to be careful are flagged by \Lit{!!},
+numbers which must be re-filled are marked by \Lit{*}.
+
+\begin{verbatim}
+   COMMON /DATA/MPR(8),MLR(2),MPILI(15),MBK(10),MDATA(100000)
+   DIMENSION     MREC(100035)
+   EQUIVALENCE  (MREC(1),MPR(1))
+
+      PARAMETER (NWPHR=900)
+\end{verbatim}
+
+\subsubsection*{Initialize}
+
+Physical record control words
+
+\begin{verbatim}
+      MPR(1) = hex 0123CDEF  (markers)
+      MPR(2) =     80708070
+      MPR(3) =     4321ABCD
+      MPR(4) =     80618061
+      MPR(5) = NWPHR         (block size)
+    * MPR(6) = 0             (block number)
+      MPR(7) = 8             (8 words before start of LR)
+    * MPR(8) no init         (no. of fast blocks to follow)
+\end{verbatim}
+
+Logical record control words
+
+\begin{verbatim}
+    * MLR(1) no init         (record size)
+      MLR(2)   = 3           (record type, d/s)
+\end{verbatim}
+
+Pilot information
+
+\begin{verbatim}
+   !! MPILI(1) = 12345.0     (check word, floating point)
+                              IEEE:  hex 4640E400
+      MPILI(2) = 0           (Zebra version, user origin)
+      MPILI(3) = 0           (processing option)
+      MPILI(4) = 0           (reserve)
+      MPILI(5) = 0           (no text vector)
+      MPILI(6) = 0           (no segment table)
+      MPILI(7) = 0           (no relocation table, linkless d/s)
+    * MPILI(8) no init       (total bank space)
+      MPILI(9) = 0           (no entry link)
+      MPILI(10)= 5           (length of the user header, =NWIO+NWUH)
+      MPILI(11)= 2           (I/O characteristic: all integer)
+    * MPILI(12->15)          (user header vector)
+\end{verbatim}
+
+Bank system words
+
+\begin{verbatim}
+      MBK(1) bits 17-32:  2      (I/O char., all integer, say,
+                                              cf book MZ, para 1.15)
+                   1-16: 12      (= NIO + NL + 12)
+      MBK(2) = 0             (next pointer)
+      MBK(3) = 0             (  up pointer)
+      MBK(4) = 0             (orig pointer)
+      MBK(5) = 0             (Numeric   bank ID)
+   !! MBK(6) = 4HDATA        (Hollerith bank ID)
+      MBK(7) = 0             (number of links)
+      MBK(8) = 0             (number of structural links)
+    * MBK(9) no init         (number of data words)
+      MBK(10)= 0             (status word)
+\end{verbatim}
+
+\subsubsection*{Event by event}
+
+Suppose now \Lit{NWD} words are received into the vector \Lit{MDATA},
+just behind \Lit{MBK(10)}, in exchange data format, and the lot is to be
+written out. We first have to fill the variable part in the control
+information for this data structure:
+
+\begin{verbatim}
+      MBK(9)   = NWD         (size of the data part of the bank)
+      MPILI(8) = NWD+10      (amount of bank space required)
+      MLR(1)   = NWD+25      (logical record size)
+      MPILI(12)= run number         (user header vector)
+      MPILI(13)= event number
+      MPILI(14)= date
+      MPILI(15)= time
+
+      NWT  = NWD + 35           (total number of words to be written)
+      NREC = (NWT-1)/NWPHR + 1  (number of physical records)
+      MPR(8) = NREC -1          (number of fast blocks)
+
+      NWPAD = NWPHR*NREC - NWT  (no. of unused words in last block)
+      MDATA(NWD+1) = NWPAD-1    (logical record length)
+      MDATA(NWD+2) = 5          (padding record)
+\end{verbatim}
+
+and now we can dump the lot with
+
+\begin{verbatim}
+      JD = 0
+      DO  19  JREC=1,NREC
+      write physical record, words (MREC(J+JD),J=1,NWPHR)
+   19 JD = JD + NWPHR
+      MPR(6) = MPR(6) + 1      (bump the block number)
+\end{verbatim}
+@
+
+
+1.2
+log
+@version before latex2e
+@
+text
+@d1 1
+a1 1
+%  $Header: /afs/cern.ch/project/cnas_doc/sources/zebra/RCS/zebfz4.tex,v 1.1 1993/11/13 15:25:14 goossens Exp goossens $
+d245 2
+a246 2
+Normal blocking methods, such as IBM's VBS,
+use control-information associated to every physical record;
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d1 1
+a1 1
+%  $Header: ch1.tex,v 1.11 93/08/02 21:16:12 goossens Exp $
+d435 1
+a435 1
+\subsection*u{Exchange File Format, logical records: start-of-run and end-of-run}
+@

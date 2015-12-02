@@ -1,0 +1,421 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%  GEANT manual in LaTeX form                              %
+%                                                                 %
+%  Michel Goossens (for translation into LaTeX)                   %
+%  Version 1.00                                                   %
+%  Last Mod. Jan 24 1991  1300   MG + IB                          %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ 
+ 
+ 
+ 
+\Origin{J.Vuoskoski, N. H\mbox{\o}imyr}
+\Submitted{22.03.94}         \Revised{23.09.94}
+\Version{Geant 3.21}         \Routid{GEOM910}
+ 
+\Makehead{The CADINT Interface}
+ 
+\section*{1 Introduction}
+ 
+The engineering work in HEP for design,
+analysis and manufacturing of detectors
+requires Computer Aided Engineering (CAE) tools.
+To ensure coherent design the same detector descriptions should
+be used by physicists, engineers and, eventually, manufacturers. Efficient
+exchange of data between CAE tools and
+{\tt GEANT} becomes crucial.
+ 
+ 
+The CADINT interface allows to export detector models from {\tt GEANT}
+to Computer Aided Design (CAD) systems.
+CADINT outputs detector models in the SET (Standard d'Echange
+et de Transfert)~\cite{set} neutral file format.
+A detector model is written as an assembly
+of solid volumes, with respect to a global coordinate system. The geometric
+representation used is
+Constructed Solid Geometry (CSG)~\cite{mortenson}.
+ 
+A {\tt GEANT} detector geometry exported through CADINT
+into a CAD system can be used to
+check the coherence of the model used in simulation.
+The CADDFAS service at CERN can be used to convert SET files into IGES
+(Initial Graphics Exchange Specification, an American
+standard for exchange of CAD data)~\cite{iges} format, which is readable
+by most CAD systems.
+For more information about the CADDFAS service, send an e-mail to {\it
+caddfas@cadd.cern.ch} with subject: {\it info}
+ 
+ 
+ 
+ 
+ 
+\section*{2 SET File Format}
+ 
+ 
+SET is a French standard
+to exchange and archive CAD data.  It was developed as a neutral file format for
+exchanging data between different CAD systems at Aerospatiale in 1983.
+The aim was to develop
+a more reliable alternative to IGES.  It became an official
+French standard,
+Afnor Z68-300, SET, in 1985.  SET was revised and extended in 1989.  The
+version (89-06) used in CADINT, supports wireframe, surface and solid entities.
+Entities for drafting and connectivity applications, as well as scientific
+data and FEM (Finite Element Method) modelling are also included.
+The philosophy behind the standard is that it should be able to
+handle the complete information that may occur.
+It is also considered to be important to have an unambiguously defined format,
+that is compact in size,
+and is flexible enough to handle future demands from the CAD/CAM industry.
+ 
+ 
+The structure of SET is based upon a three level hierarchical structure,
+which consists of data assemblies, data blocks, and data sub-blocks.
+Information that is common to several blocks or assemblies, is stored in a
+so-called dictionary.
+ 
+\begin{itemize}
+\item{\bf Assembly:} A SET data assembly is a collection of data defining
+a certain piece of information, such as a mechanical part.
+A SET file can contain one or more data assemblies;
+ 
+\item{\bf Block:} In the nomenclature of the SET files,
+the blocks are identified by an {\bf @},
+followed by the number of the block identifying its type.
+This number is followed by the block's reference number in the file.
+(i.e. in a file with {\it n} blocks, the block sequence numbers will be from 0
+ to {\it n}.)
+After this, sub-blocks and dictionary entries used in the block follows.
+A SET data block is an elementary entity, which consists of
+definition or control data that are used in different applications.
+Such entities could be geometric objects as points or lines, or other entities
+like matrices, drawings and views or SET file identifiers;
+ 
+ 
+\item{\bf Sub-block:} A sub-block consists of an identifier, and a list of data
+that contributes to the description of the entity defined by the data block.
+The different parameters inside a sub-block, such as coordinates, are
+represented by their values. A sub-block has the identifier ``\#'', followed by
+ its
+type number, possible references to the dictionary, and parameters applicable in
+the sub-block;
+ 
+\item{\bf Dictionary:} The dictionary is a set of predefined parameters in the
+specifications of the standard. They are accessible as dictionary entries which
+are assigned an identifier (a colon ``{\bf :}'' and the dictionary number), and
+ a
+precise meaning given by authorised and/or default values.
+ 
+\end{itemize}
+ 
+References among entities in a SET file are made by using pointers,
+either directly
+from the blocks, or via sub-blocks or dictionary entries.  Pointers
+to other blocks are identified by an ``{\bf !}'', followed by the sequence
+numbers of the blocks.
+SET has no unique mapping of  sub-block types and dictionary
+entries into blocks. Several combinations are allowed for each different
+block.  Definitions of possible combinations and guidelines for implementation
+are given in the SET standard~\cite{set}.
+ 
+ 
+ 
+\section*{3 Implementation}
+ 
+ 
+In the CADINT interface,
+a user can indicate a subtree of a detector by giving the name of a volume.
+All the contents of this volume will be written into a SET file.
+A user can also choose the contents by setting the daughter volumes
+visible or invisible using the visibility attribute. Only the visible
+volumes will be written into the SET file.
+In order to avoid repeated volumes, a number of divisions can be chosen.
+The rest of the divisions can be reproduced in a CAD system, if needed.
+The colors of volumes defined by the {\tt GEANT} color attribute are
+also transmitted into SET files.
+ 
+ 
+The CADINT interface writes the geometry of a {\tt GEANT} detector model
+in the SET file format in two basic phases:\\[-0.7cm]
+ 
+\begin{enumerate}
+\item write the volume information;\\[-0.7cm]
+\item write the position information.\\[-0.5cm]
+\end{enumerate}
+ 
+The interface writes volumes into the SET format as
+CSG solids i.e. the volumes are created using extrusions, revolutions,
+ruled solids, rectangular parallelepipeds, etc.
+Divisions are written as normal volumes.
+Every division of a divided volume is
+a distinct volume in a SET file. An index is attached to the end
+of the name of each of
+the divisions in order to distinguish each division instance.
+The indexing of instances is reset in each division.
+An index is attached to the end of the volume name of multiple copies
+of normal volumes as well.
+ 
+In SET format, a volume must be first written, after that it can
+be positioned. All volumes are positioned with respect to
+the global coordinate system. Thus, the tree structure
+in the SET file is flat. There will be overlaps between volumes,
+since no Boolean operations
+are used to define the tree structure. However, the tree structure
+is written into a separate file. The material information
+is written into this same text file.
+ 
+The interface  decodes the {\tt JVOLUM} data structure and
+computes the necessary parameters if needed (negative parameters,
+dimensions of divisions, etc.).
+These computations are based on the {\tt GEANT} drawing routines.
+The interface decodes a detector model starting from the global
+mother volume. After that it decodes the first daughter volume in the
+left side of the tree. The daughter volume can be a normal volume or a division.
+It continues decoding daughter volumes until it
+is at the bottom of the tree. After that the interface
+returns one level and decodes the next daughter of the current volume
+if any exists. In a case of a divided volume, the divisions are treated
+in the same way as the daughter volumes.
+The creation of the SET file is performed simultaneously.
+ 
+ 
+\subsection*{3.1 Volume Information}
+ 
+ 
+The tree decoding routine transfers the volume information
+during decoding to the relevant
+shape routine which writes the volumes into the SET file.
+Every different shape has its own routine.
+For example, the simplest shape, {\tt BOX}, is written
+in the  SET format as follows:
+ 
+\noindent{\tt@50,N1,:5,2\#60,X,Y,Z\\
+@302,N2\#317,-DX,-DY,-DZ\\
+@100,N3,:5,2,:9,'Name'\#101,!N1,!N2}\\
+ 
+\newpage
+ 
+\noindent Where\\[-0.7cm]
+\begin{itemize}
+\item {\bf{\tt @50}} is the block number which defines a primitive
+ solid;\\[-0.7cm]
+\item {\bf{\tt N1,N2,N3}} are the sequence numbers of each block;\\[-0.7cm]
+\item {\bf{\tt :5,2}}  is the dictionary entry number which gives a total
+subordination to one block;\\[-0.7cm]
+\item {\bf{\tt \#60}} is the sub-block number which defines the geometric
+parameters of a solid rectangular parallelepiped;\\[-0.7cm]
+\item {\bf{\tt X,Y,Z}} are the dimensions of the rectangular
+ parallelepiped;\\[-0.7cm]
+\item {\bf{\tt @302}} is the block number for geometric
+ transformation;\\[-0.7cm]
+\item {\bf{\tt \#317}} is the sub-block number for translation;\\[-0.7cm]
+\item {\bf{\tt DX,DY,DZ}} are the coefficients of the translation;\\[-0.7cm]
+\item {\bf{\tt @100}} is the block number which defines a constructed
+ solid;\\[-0.7cm]
+\item {\bf{\tt :9}}  is the dictionary entry number for a name associated
+with the block;\\[-0.7cm]
+\item {\bf \tt Name} is the name of the volume;\\[-0.7cm]
+\item {\bf{\tt \#101}} is the sub-block number for transformation
+ operation.\\[-0.5cm]
+\end{itemize}
+ 
+The rectangular parallelepiped is first defined with the given parameters.
+Then the translation of coordinates is defined. The translation is necessary
+since {\tt GEANT} and SET use origins in different places. Finally,
+the transformation operation is defined for a constructed solid which
+in this case is the translation of the coordinates of a primitive solid.
+The GEANT shapes are converted to SET as follows:
+ 
+\begin{center}
+ \begin{tabular}{|l|p{9.0 cm}|}
+ \hline
+ \bf SHAPE           &  \bf DEFINITION IN SET \\
+ \hline
+BOX  &   rectangular parallelepiped \\
+TRD1 &   ruled solid between 2 faces   \\
+TRD2 &   ruled solid between 2 faces \\
+TRAP &   ruled solid between 2 faces \\
+TUBE &   solid of revolution of a face \\
+TUBS &   solid of revolution of a face \\
+CONE &   solid of revolution of a face \\
+CONS &   solid of revolution of a face \\
+SPHE &   sphere \\
+PARA &   ruled solid between 2 faces \\
+PGON &   first segment ruled solid, other segments copied and rotated,
+         finally boolean union for all the segments \\
+PCON &   solid of revolution of a face \\
+ELTU &   solid of linear extrusion of a face \\
+HYPE &   not implemented \\
+GTRA &   ruled solid between 2 faces \\
+CTUB &   solid of revolution and boolean subtraction by 2 half-spaces \\
+ \hline
+ \end{tabular}
+\end{center}
+ 
+ 
+\subsection*{3.2 Position Information}
+ 
+The position information of
+a volume is handled by a routine,
+which writes the coordinates and the rotation matrix. The tree decoding
+routine transforms the coordinates and the rotation matrix of a volume 
+to the global coordinate system, and then transfers the data
+to the routine which writes the translation and rotation of a volume into
+the SET format as follows:
+ 
+\noindent{\tt @302,N1\#301,M1,M2,M3,M4,M5,M6,M7,M8,M9,XC,YC,ZC\\
+@100,N2,:9,'Name'\#101,!N1(of the shape),!N1}\\
+ 
+\newpage
+ 
+\noindent Where\\[-0.7cm]
+\begin{itemize}
+\item {\bf{\tt @302}} is the block number for geometric
+ transformation;\\[-0.7cm]
+\item {\bf{\tt N1,N2}} are the sequence numbers of each block;\\[-0.7cm]
+\item {\bf{\tt \#301}} is the sub-block number which defines the coefficients
+of the rotation-translation matrix;\\[-0.7cm]
+\item {\bf{\tt M1...M9}} are the  coefficients of the rotation matrix;\\[-0.7cm]
+\item {\bf{\tt XC,YC,ZC}} are the components of the translation
+ vector;\\[-0.7cm]
+\item {\bf{\tt @100}} is the block number which defines a constructed
+ solid;\\[-0.7cm]
+\item {\bf{\tt :9}}  is the dictionary entry number for a name associated
+with the block;\\[-0.7cm]
+\item {\bf{\tt Name}} is the name of the volume;\\[-0.7cm]
+\item {\bf{\tt \#101}} is the sub-block number for transformation
+ operation;\\[-0.7cm]
+\item {\bf{\tt !N1}} is the reference to sequence number of the mother
+volume.\\[-0.5cm]
+\end{itemize}
+ 
+The geometric transformation is first defined with the given parameters
+and then the transformation operation is defined for a constructed solid.
+The principle of writing divisions into the SET format is
+equivalent to the case of normal volumes.
+ 
+\subsection*{3.3 Material and Tree Information}
+ 
+The material file is written into a separate file simultaneously with the
+SET file. It contains information on tracking medium, material and density for
+each defined volume. The {\tt GEANT} tree is written into this same file. After
+ the
+volume name there follows the number of daughters and daughter names.
+In a case of divided volume, the negative number of divisions is given after
+the name of the divided volume, and followed by the offset, step
+and the name of the division instance.
+An output of a material file of a {\tt GEANT} example program:
+ 
+\footnotesize{
+\begin{verbatim}
+ GEANT-SET MATERIAL LISTING FILE
+ --------------------------------
+ Materials in the geometry described in
+ the .SET file:  gexam4.set
+ 
+Volume name  Tracking media   Material         Density
+ 
+CALO         1 AIR            1 AIR            0.12000001E-02
+CAL1         1 AIR            1 AIR            0.12000001E-02
+MOD1         1 AIR            1 AIR            0.12000001E-02
+CAL2         1 AIR            1 AIR            0.12000001E-02
+MOD2         1 AIR            1 AIR            0.12000001E-02
+CAL3         1 AIR            1 AIR            0.12000001E-02
+MOD3         1 AIR            1 AIR            0.12000001E-02
+EPO1         4 CARBON         4 CARBON         0.22650001E+01
+CHA1         6 BRASS          6 BRASS          0.85600004E+01
+TUB1         6 BRASS          6 BRASS          0.85600004E+01
+GAS1         5 GAS            5 ARG/ISOBU      0.21360000E-02
+ 
+ GEANT TREE
+ ----------
+  The GEANT tree starting from the given volume
+ 
+CALO    6  CAL1  CAL2  CAL3  EPO1  CHA1  EPO1
+CAL1  -64  -0.48000000E+02   0.15000000E+01  MOD1
+CAL2  -35  -0.43750000E+02   0.25000000E+01  MOD2
+CAL3  -13  -0.24050001E+02   0.37000003E+01  MOD3
+CHA1  -40  -0.25000000E+02   0.12500000E+01  TUB1
+MOD1    6  SHIL  URPL  SHIL  EPO1  CHA1  EPO1
+MOD2    4  SHIL  URPL  SHIL  CHA2
+MOD3    2  COPL  CHA2
+TUB1    1  GAS1
+CHA2  -72  -0.23500000E+02   0.65277779E+00  TUB2
+TUB2    1  GAS2
+ 
+        ------ end of file -------
+\end{verbatim}
+}
+\normalsize
+ 
+\section*{4 Usage}
+ 
+ 
+ 
+In order to carry out a successful transfer of a detector model,
+a user needs to be
+aware of certain limitations of the interface. The user is recommended
+to communicate
+with the engineers using CAD systems to establish a proper transfer methodology.
+If a CAD system is not capable of receiving the whole detector geometry
+in a single SET file, a user can transfer a detector model in smaller parts.
+These parts can then be joined together in the CAD system.
+Normally it is a good idea to just export one instance of each division
+in order to limit the number of exported volumes.
+The divisions can be reproduced in CAD systems.
+It is impossible to give an exact size-limit for a detector model
+which can be transferred in one file, because the limitation
+depends on the structure of the detector model.
+ 
+ 
+The {\tt GEANT} graphics package  provides excellent capabilities for
+viewing parts of a detector model which is to be exported. Using
+the visibility attribute and the number of division instances, a
+user will be able to see what is to be exported. A user can use different
+colors in order to help to distinguish different volumes (eg division
+instances, etc.) in a CAD system.
+Dummy volumes, such as mothers made of air or vacuum should be suppressed using
+the visibility attribute, since the interface is currently not able to discard
+such information.
+A user must remember to specify the drawing parameters again if he
+wants to draw the detector model after using the interface.
+This is because the interface uses modified drawing routines.
+ 
+A plot of the {\tt GEANT} tree can be useful for engineers to understand the
+structure of the {\tt GEANT} detector model. {\tt GEANT}
+volume names are useful references
+regarding the material and tree information. The tree information is also
+provided in the material file, but a graphical presentation is often useful.
+ 
+ 
+ 
+ 
+ 
+\begin{thebibliography}{99}
+ 
+ 
+ 
+ 
+\bibitem{set} French Standardization, Data exchange and transfer
+standard specification, Afnor 1989.
+ 
+ 
+\bibitem{mortenson} Michael E. Mortenson, Geometric Modeling, John
+Wiley \& Sons, Inc., 1985.
+ 
+ 
+ 
+\bibitem{iges} US department of Commerce, Initial Graphics Exchange
+Specification, 1988.
+ 
+ 
+ 
+\end{thebibliography}
+ 
+ 
+ 
+ 
+ 
+ 

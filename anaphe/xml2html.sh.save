@@ -1,0 +1,164 @@
+#!/bin/sh
+# 	$Id: $
+# Script to prepare HTML files from XML file (LHC++ manual)
+# 1) split source file into separate files
+#
+# parameter   Input file
+# Author:     M.Goossens IT/ASD
+# Last mod:   Mar 9 1999 
+
+Name=`basename $0`
+Usage="Usage: $Name "
+
+xt.sh lhcppintro.xml makehtml.xsl lhcppmain.html
+# Cut files into various other files based on comments of the
+# form <!--filename=FILENAME--> and output labels to file "/tmp/ttt"
+# to get later cross-references correct.
+
+if (test -f temp.tmp)
+  then
+    rm temp.tmp
+  fi    
+
+gawk ' BEGIN	{ nout = 0
+                }	
+$0 ~  /<!--filename=/ { gsub("-->","")               # new file name
+#		       print $0
+                       split($0,a,"=") 
+		       filename=a["2"]
+#                       print filename
+                       next 
+                      }
+$0 ~  /<A.*NAME=/    {str=$0
+#                      print "*** str ORIG  **** " str 
+			while (match(str,"<A.*NAME=.*>")){
+#                          print "*** str **** " str   
+                          sstr = substr(str,RSTART,RLENGTH)
+                          ii   = index(sstr,"\">")
+			  sstr = substr(sstr,1,ii-1)
+#			  print "**** sstr RSTART RLENGTH ii ***** " sstr " " RSTART " " RLENGTH " " ii
+			  sub ("<A.*NAME=\"","",sstr)
+			  label=sstr
+                          str=substr(str,RSTART+ii)
+                          if ( nout == 0 ) 
+                            print label " " filename "#" label > "temp.tmp"
+ 		          else
+			    print label " " filename "#" label >> "temp.tmp"
+		          nout = 1
+#                            print " ****** label filename ****** " label " " filename "#" label 
+                       } 
+                          next
+                       }'   lhcppmain.html
+
+echo '********************************************************'
+
+rm lhcppmaster.html
+
+cat LHCPPBEGIN.HTML > lhcppmaster.html
+
+# First make an associative array out of labels in temp.tmp
+# then cut files accorging to filename comments and correct
+# cross-references thanks to temp.tmp information in ass. array.
+# A main file lhcppmaster.html will contain top level pointers
+# to the various chapters. 
+
+gawk ' BEGIN	{ while (getline < "temp.tmp" > 0 ) 
+ 		  { ref[$1] = $2 }
+		  nout = 0
+                  masterfile="lhcppmaster.html"
+                  outfile=masterfile
+                  headtext="<!DOCTYPE HTML PUBLIC  \"-//W3C//DTD HTML 4.0//EN\">\n\
+<HTML>\n\
+<HEAD>\n\
+<TITLE>Class Libraries for HEP Computing</TITLE>\n\
+<STYLE TYPE=\"text/css\">\n\
+body       { background: white; color: black}\n\
+P.CENTERP  { text-align: center}\n\
+pre.preprogramlisting { background: #FFFF88; color: black; white-space: pre}\n\
+TD.LISTING { background: #88FFFF; color: black; white-space: pre}\n\
+TD.LPROUT  { background: #FFBBFF; color: black; white-space: pre}\n\
+tt         { color: red }\n\
+</STYLE>\n\
+<!-- Changed by: Michel Goossens, " strftime("%d-%b-%Y") " -->\n\
+</HEAD>\n\
+<BODY>\n"
+                }
+
+       END      { print "</BODY>\n</HTML>\n" >> outfile
+                  close(masterfile)
+                }
+
+$0 ~ /<!DOCTYPE/ { # DOCTYPE --> skip
+                  next
+                } 
+
+$0 ~  /<!--filename=/ { gsub("-->","")              # new file name
+                       split($0,a,"=") 
+		       filename=a["2"] ".html"
+                       if (nout != 0) { print "</BODY>\n</HTML>\n" >> outfile
+                                        close(outfile)
+                                      }
+                       outfile  = filename
+		       nout += 1
+                       
+                       print headtext>filename
+                       next 
+                     }
+$0 ~ /<H1>/  	{ # chapter start
+                  print >> outfile 
+                  gsub("</A></H1>","</A></H2>")
+                  gsub("<H1><A.*\">","<H2><A HREF=\""filename"\">")
+                  print 
+                  print >> masterfile
+                  next
+                } 
+
+$0 ~  /<A HREF=\"#/  { str=$0		# Substitute the references
+			while (match (str,"<A HREF.*\">"))
+                        { sstr = substr(str,RSTART,RLENGTH)
+print $0 "\n 1 str " str  "\n sstr " sstr "\n\n"
+			  ii = index(sstr,"\">")
+			  sstr = substr(sstr,1,ii-1)
+			  sub ("<A.*#","",sstr)
+			  label=sstr
+                          str=substr(str,RSTART+ii)
+print $0 "\n 2 str " str "\n ii " ii "\n sstr " sstr "\n ref[label] " ref[label] "\n\n"
+			  if (ref[label] !="")
+				{ sub ("#"label,ref[label])
+                                   print "\$0 " $0 "\n"
+				}
+			  else
+				{ print "?? file " outfile "Unresolved cross-reference ***** " label
+				  print $0
+				}
+			} # end of while
+			  print >> outfile
+			  next
+		     }
+		     { print >> outfile				 # normal line
+		}
+     '  lhcppmain.html
+
+echo "Specify whether you want to delete the large HTML working file"
+#rm -i lhcppmain.html
+
+rm -f a
+cat  lhcppmaster.html LHCPPEND.HTML >> a
+date=`date | gawk '{print $3 "-" $2 "-" $6}'`
+sed -e "s/!!DATE!!/$date/g" < a > lhcpp.html
+
+echo "Now you should copy all these HTML files to "
+echo "/afs/.cern.ch/project/cndoc/wwwasd/lhc++/lhcppguide/"
+
+exit
+
+
+
+
+
+
+
+
+
+
+

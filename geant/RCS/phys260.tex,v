@@ -1,0 +1,592 @@
+head     1.1;
+access   ;
+symbols  ;
+locks    goossens:1.1; strict;
+comment  @@;
+
+
+1.1
+date     94.04.25.09.23.42;  author goossens;  state Exp;
+branches ;
+next     ;
+
+
+desc
+@Initial Entry
+@
+
+
+
+1.1
+log
+@Initial revision
+@
+text
+@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%  GEANT manual in LaTeX form                                     %
+%                                                                 %
+%  Michel Goossens (for translation into LaTeX)                   %
+%  Version 1.00                                                   %
+%  Last Mod. Jan 24 1991  1300   MG + IB                          %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\Origin{F.Carminati, R.Jones}
+\Documentation{F. Carminati}
+\Submitted{03.02.93}\Revised{16.12.93}
+\Version{Geant 3.16}\Routid{PHYS260}
+\Makehead{\v{C}erenkov photons}
+\v{C}erenkov photons are produced when a charged particle traverses
+a dielectric material.
+
+\section{Physics processes for optical photons}
+A photon is called optical when its wavelength is much greater than the
+typical atomic spacing, for instance when $\lambda \geq 10nm $
+which corresponds to an energy $E \leq 100eV$.
+Production of an optical photon in a HEP detector is primarily due to:
+\begin{enumerate}
+\item \v{C}erenkov effect;
+\item Scintillation;
+\item Fluorescence.
+\end{enumerate}
+
+Fluorescence is taken into account in {\tt GEANT} in the context of the
+photoelectric effect ({\tt [PHYS230], [PHYS231]}), but only above the energy cut
+{\tt CUTGAM}. Scintillation is not yet simulated by {\tt GEANT}.
+
+Optical photons undergo three kinds of interactions:
+\begin{enumerate}
+\item Elastic (Rayleigh) scattering;
+\item Absorption;
+\item Medium boundary interactions.
+\end{enumerate}
+
+\subsection{Elastic scattering}
+For optical photons elastic scattering is usually unimportant. For
+$\lambda=.200\mu m$ we have $\sigma_{Rayleigh} \approx .2b$ for $N_{2}$ 
+or $O_{2}$ which gives a mean free path of $\approx 1.7$ km in air
+and $\approx 1$ m in quartz. 
+An important exception to this is found in aerogel, which is used as a 
+\v{C}erenkov radiator for some special applications. Because of the 
+spectral properties of this material, Rayleigh scattering is extremely
+strong and this limits its usefulness as a RICH radiator. At present,
+elastic scattering of optical photons is not simulated in {\tt GEANT}.
+
+\subsection{Absorption}
+Absorption is important for optical photons because it determines the
+lower $\lambda$ limit in the {\it window} of transparency
+of the radiator. Absorption competes with
+photo-ionisation in producing the signal in the detector, so it must be
+treated properly in the tracking of optical photons.
+
+\subsection{Medium boundary effects}
+When a photon arrives at the boundary of a dielectric medium,
+its behaviour depends on the nature
+of the two materials which join at that boundary:
+\begin{itemize}
+\item Case dielectric $\rightarrow$ dielectric. \\
+The photon can be transmitted (refracted ray) or reflected (reflected ray).
+In case where
+the photon can only be reflected, total internal reflection takes place.
+\item Case dielectric $\rightarrow$ metal. \\
+The photon can be absorbed by the metal or reflected back into the
+dielectric. If the photon is absorbed it can be detected according to the
+photoelectron efficiency of the metal.
+\item Case dielectric $\rightarrow$ black material. \\
+A {\it black} material is a tracking medium for which the user has not
+defined any optical property. In this case the photon is immediately
+absorbed undetected.
+\end{itemize}
+
+\section{Photon polarisation}
+The photon polarisation is defined as a two component vector normal to the
+direction of the photon:
+\[
+\left ( \begin{array}{c}
+a_{1} e^{i \phi_{1}} \\
+a_{2} e^{i \phi_{2}}
+\end{array} \right ) =
+e^{\phi_{o}} \left (
+\begin{array}{l}
+a_{1} e^{i \phi_{c}} \\
+a_{2} e^{-i \phi_{c}}
+\end{array} \right )
+\]
+where
+$\phi_{c} = (\phi_{1}-\phi_{2})/2$ is called circularity and
+$\phi_{o} = (\phi_{1}+\phi_{2})/2$ is called overall phase. Circularity
+gives the left- or right-polarisation characteristic of the photon. RICH
+materials usually do not distinguish between the two polarisations and
+photons produced by the \v{C}erenkov effect are linearly polarised, that is
+$\phi_{c}=0$. The circularity of the photon is ignored by {\tt GEANT}.
+
+The overall phase is important in determining interference effects between
+coherent waves. These are important only in layers of thickness comparable
+with the wavelength, such as interference filters on mirrors. The effects
+of such coatings can be accounted for by the empirical reflectivity factor
+for the surface, and do not require a microscopic simulation.
+{\tt GEANT} does not keep track of the overall phase.
+
+Vector polarisation is described by the polarisation angle
+$\tan \psi = a_{2}/a_{1}$.
+Reflection/transmission probabilities are sensitive to the state of linear
+polarisation, so this has to be taken into account. One parameter is
+sufficient to describe vector polarisation, but to avoid too many
+trigonometrical transformations, a unit vector perpendicular to the direction
+of the photon is used in {\tt GEANT}.
+
+The polarisation vectors are stored in a special track structure which
+is lifted at the link {\tt LQ(JSTACK-1)} when the first \v{C}erenkov
+photon is stored in the stack.
+
+\section{Method}
+
+\subsection{Generation of the photons}
+
+For the formulas contained in this chapter, please see \cite{bib-JACK}.
+Let $n$ be the refractive index of the dielectric material
+acting as a radiator
+($n=c/c'$ where $c'$ is the group velocity of light in
+the material: it follows that $1 \leq n$). In a dispersive material $n$ is
+an increasing function of the photon momentum $p_{\gamma},
+dn/dp \geq 0$.  A particle travelling
+with speed $\beta = v/c$ will emit photons at an angle  $\theta$
+with respect to its direction, where $\theta$ is given by the
+relation:
+
+\[
+\cos \theta = \frac{1}{\beta n}
+\]
+
+from which follows the limitation for the momentum of the
+emitted photons:
+
+\[
+n(p_{\gamma}^{min}) = \frac{1}{\beta}
+\]
+
+Additionally, the photons must be within the window of transparency of
+the radiator. All the photons will be contained in a cone of opening
+$\cos \theta_{max}  = 1/(\beta n(p_{\gamma}^{max}))$.
+
+The average number of photons produced is given by the relations
+(Gaussian units):
+\[
+dN =
+\frac{2 \pi z^{2}e^{2}}{\hbar c} \sin^{2} \theta \frac{d \nu}{c} dx =
+\frac{2 \pi z^{2}e^{2}}{\hbar c} \left ( 1- \cos^{2} \theta
+\right ) \frac{d \nu}{c} dx =
+\frac{2 \pi z^{2}e^{2}}{\hbar c} \left ( 1- \frac{1}{n^{2} \beta^{2}}
+\right ) \frac{d \nu}{c} dx =
+\]
+
+\[
+= \frac{z^{2}e^{2}}{\hbar^{2} c^{2}} \left ( 1- \frac{1}{n^{2} \beta^{2}}
+\right ) dp_{\gamma} \: dx \approx
+370 z^{2} \frac{\rm photons}{\rm cm \; eV}
+\left ( 1- \frac{1}{n^{2} \beta^{2}} \right ) dp_{\gamma} \: dx
+\]
+
+and
+
+\[
+\frac{dN}{dx} \approx 370 z^{2}
+\int^{p_{\gamma}^{max}}_{p_{\gamma}^{min}}{dp_{\gamma}
+\left ( 1- \frac{1}{n^{2} \beta^{2}} \right ) }
+= 370 z^{2} \left ( p_{\gamma}^{max} -
+p_{\gamma}^{min} - \frac{1}{\beta^{2}}
+\int^{p_{\gamma}^{max}}_{p_{\gamma}^{min}}{dp_{\gamma}
+\frac{1}{n(p_{\gamma})^{2}}} \right )
+\]
+
+The number of photons produced is calculated from a Poissonian distribution
+with average value $\bar{n} = \mbox{\tt STEP} \: dN/dx$. 
+The momentum distribution of
+the photon is then sampled from the density function:
+
+\[
+f(p_{\gamma}) = \left ( 1- \frac{1}{n^{2}(p_{\gamma}) \beta^{2}} \right )
+\]
+
+\subsection{Tracking of the photons}
+
+\v{C}erenkov photons are tracked in the routine \Rind{GTCKOV}. 
+These particles are subject to {\it in flight} absorption (process
+{\tt LABS}, number 101) and {\it boundary action} 
+(process {\tt LREF}, number 102, see above). As explained
+above, the status of the photon is defined by 2 vectors, the 
+photon momentum ($\vec{p}=\hbar \vec{k}$) and photon polarisation 
+($\vec{e}$). By convention the direction of the polarisation vector
+is that of the electric field. Let also $\vec{u}$ be the normal to
+the material boundary at the point of intersection, pointing 
+out of the material which the photon is leaving and toward the one
+which the photon is entering.
+The behaviour of a photon at the surface
+boundary is determined by three quantities:
+\begin{enumerate}
+\item refraction or reflection angle, this represents the kinematics
+of the effect;
+\item amplitude of the reflected and refracted waves, this is 
+the dynamics of the effect;
+\item probability of the photon to be refracted or reflected,
+this is the quantum mechanical effect which we have to take
+into account if we want to describe the photon as a particle and
+not as a wave;
+\end{enumerate}
+
+As said above, we distinguish three kinds of boundary action, dielectric
+$\rightarrow$ black material, dielectric $\rightarrow$ metal, dielectric
+$\rightarrow$ dielectric. The first case is trivial,
+in the sense that the photon is immediately absorbed and it goes
+undetected. 
+
+To determine the behaviour of the photon at the boundary,
+we will at first treat it as an homogeneous monochromatic plane wave:
+
+\begin{eqnarray*}
+\vec{E} & = & \vec{E}_{0} e^{i \vec{k} \cdot \vec{x} - i \omega t} \\
+\vec{B} & = & \sqrt{\mu \epsilon} \frac{\vec{k} \times \vec{E}}{k}
+\end{eqnarray*}
+
+\subsubsection{Case dielectric $\rightarrow$ dielectric}
+
+In the classical description the incoming wave splits into a reflected
+wave (quantities with a double prime) and a refracted wave (quantities
+with a single prime). Our problem is solved if we find the following 
+quantities:
+
+\begin{eqnarray*}
+\vec{E'} & = & \vec{E'}_{0} e^{i \vec{k'} \cdot \vec{x} - i \omega t} \\
+\vec{E''} & = & \vec{E''}_{0} e^{i \vec{k''} \cdot \vec{x} - i \omega t}
+\end{eqnarray*}
+
+For the wave numbers the following relations hold:
+
+\begin{eqnarray*}
+|\vec{k}| & = & |\vec{k}''| = k = \frac{\omega}{c} \sqrt{\mu \epsilon} \\
+|\vec{k}'| & = & k' = \frac{\omega}{c} \sqrt{\mu' \epsilon'}
+\end{eqnarray*}
+
+Where the speed of the wave in the medium is $v=c/\sqrt{\mu \epsilon}$
+and the quantity $n=c/v=\sqrt{\mu \epsilon}$ is called {\it refractive
+index} of the medium. The condition that the three waves, refracted, reflected
+and incident have the same phase at the surface of the medium, gives us the
+well known Fresnel law:
+
+\begin{eqnarray*}
+(\vec{k} \cdot \vec{x})_{surf} & = & (\vec{k}' \cdot \vec{x})_{surf} =
+(\vec{k}'' \cdot \vec{x})_{surf} \\
+k \sin{i} & = & k' \sin{r} = k'' \sin{r'}
+\end{eqnarray*}
+
+where $i, r, r'$ are, respectively, the angle of the incident, refracted and
+reflected ray with the normal to the surface. From this formula
+the well known condition emerges:
+
+\begin{eqnarray*}
+i & = & r'  \\
+\frac{\sin{i}}{\sin{r}} & = & \sqrt{\frac{\mu' \epsilon'}{\mu \epsilon}} =
+\frac{n'}{n}
+\end{eqnarray*}
+
+
+The dynamic properties of the wave at the boundary are derived from Maxwell's
+equations which impose the continuity of the normal components of $\vec{D}$ 
+and $\vec{B}$ and of the tangential components of $\vec{E}$ and $\vec{H}$ 
+at the surface boundary. The resulting ratios between the amplitudes of the
+the generated waves with respect to the incoming one are 
+expressed in the two following cases:
+
+\begin{enumerate}
+\item a plane wave with the electric 
+field (polarisation vector) perpendicular to the plane defined by the
+photon direction and the normal to the boundary:
+
+\begin{eqnarray*}
+\frac{E_{0}'}{E_{0}} & = & \frac{2 n \cos{i}}{n \cos{i} + \frac{\mu}{\mu'}
+n' \cos{r}} = 
+\frac{2 n \cos{i}}{n \cos{i} + n' \cos{r}} \\
+\frac{E_{0}''}{E_{0}} & = & \frac{n \cos{i} - \frac{\mu}{\mu'} n' \cos{r}}
+{n \cos{i} + \frac{\mu}{\mu'} n' \cos{r}} = 
+\frac{n \cos{i} - n' \cos{r}} {n \cos{i} + n' \cos{r}}
+\end{eqnarray*}
+
+where we suppose, as it is legitimate for visible or near-visible light, that
+$\mu/\mu' \approx 1$;
+
+\item a plane wave with the electric
+field parallel to the above surface: 
+
+\begin{eqnarray*}
+\frac{E_{0}'}{E_{0}} & = & \frac{2 n \cos{i}}
+{\frac{\mu}{\mu'} n' \cos{i} + n \cos{r}} =
+\frac{2 n \cos{i}} {n' \cos{i} + n \cos{r}} \\
+\frac{E_{0}''}{E_{0}} & = & \frac{\frac{\mu}{\mu'} n' \cos{i} 
+- n \cos{r}}{\frac{\mu}{\mu'} n' \cos{i} + n \cos{r}} = 
+\frac{n' \cos{i} - n \cos{r}}{n' \cos{i} + n \cos{r}}
+\end{eqnarray*}
+
+whith the same approximation as above.
+
+\end{enumerate}
+
+We note that in case of photon perpendicular to the surface, the following
+relations hold:
+\[
+\begin{array}{LcL@@{\hspace{4cm}}LcL}
+\frac{E_{0}'}{E_{0}} & = & \frac{2n}{n'+n} &
+\frac{E_{0}''}{E_{0}} & = & \frac{n'-n}{n'+n}
+\end{array}
+\]
+
+where the sign convention for the {\it parallel} field has been adopted.
+This means that if $n' > n$ there is a phase inversion for the reflected
+wave.
+
+Any incoming wave can be separated into one piece polarised parallel to the
+plane and one polarised perpendicular, and the two components treated
+accordingly.
+
+To mantain the particle description of the photon, the
+probability to have a
+{\it refracted} (mechanism 107) or {\it reflected} 
+(mechanism 106) photon must be calculated. 
+The constraint is that the number of photons be conserved, and this
+can be imposed via the conservation of the energy flux at the boundary,
+as the number of photons is proportional to the energy. The
+energy current is given by the expression:
+
+\begin{eqnarray*}
+\vec{S} & = & \frac{1}{2} \frac{c}{4 \pi} \sqrt{\mu \epsilon} \vec{E} \times
+\vec{H}^{*}
+ = \frac{c}{8 \pi} \sqrt{\frac{\epsilon}{\mu}} E_{0}^{2} \hat{k}
+\end{eqnarray*}
+
+and the energy balance on a unit area of the boundary requires that:
+
+\begin{eqnarray*}
+\vec{S} \cdot \vec{u} & = & \vec{S}' \cdot \vec{u} 
+- \vec{S}'' \cdot \vec{u} \\
+S \cos{i} & = & S' \cos{r} + S'' \cos{i} \\
+\frac{c}{8 \pi} \frac{1}{\mu} n E_{0}^{2} \cos{i} & = & 
+\frac{c}{8 \pi} \frac{1}{\mu'} n' E_{0}'^{2} \cos{r} +
+\frac{c}{8 \pi} \frac{1}{\mu} n E_{0}''^{2} \cos{i} 
+\end{eqnarray*}
+
+If we set again $\mu/\mu' \approx 1$, then the transmission
+probability for the photon will be:
+
+\[
+T = \left( \frac{E_{0}'}{E_{0}} \right ) ^{2} 
+\frac{ n' \cos{r}}{n \cos{i}}
+\]
+
+and the corresponding probability to be reflected will be $R=1-T$.
+
+In case of reflection the relation between the incoming photon ($\vec{k},
+\vec{e}$), the refracted one ($\vec{k}', \vec{e}\:'$)
+and the reflected one ($\vec{k}'', \vec{e}\:''$) is given by
+the following relations:
+
+\begin{eqnarray*}
+\vec{q} & = & \vec{k} \times \vec{u} \\
+e_{\parallel} & = & \frac{\vec{e} \cdot \vec{u}}{|q|} \\
+e_{\perp} & = & \frac{\vec{e} \cdot \vec{q}}{|q|} \\
+e_{\parallel}' & = & e_{\parallel} \frac{2 n \cos{i}} {n' \cos{i} + n \cos{r}}\\
+e_{\perp}' & = & e_{\perp} \frac{2 n \cos{i}} {n \cos{i} + n' \cos{r}} \\
+e_{\parallel}'' & = & \frac{n'}{n} e_{\parallel}'  - e_{\parallel} \\
+e_{\perp}'' & = & e_{\perp}' - e_{\perp}
+\end{eqnarray*}
+
+After transmission or reflection of the photon, the polarisation vector
+is renormalised to 1.
+In the case where $\sin{r} = n \: \sin i  /n' > 1$ then there cannot
+be a refracted wave, and in this case we have a total internal reflection 
+according to the following formulas:
+
+\begin{eqnarray*}
+\vec{k}'' & = & \vec{k} - 2 (\vec{k} \cdot \vec{u}) \vec{u} \\
+\vec{e}\:'' & = & -\vec{e} + 2 (\vec{e} \cdot \vec{u}) \vec{u}
+\end{eqnarray*}
+
+\subsubsection{Case dielectric $\rightarrow$ metal}
+
+In this case the photon cannot be transmitted. So the probability for the
+photon to be absorbed by the metal is estimated according to the table
+provided by the user. If the photon is not absorbed, it is reflected.
+
+\subsection{Surface effects}
+
+In the case where
+the surface between two bodies is perfectly polished, then the
+normal provided by the program is the normal to the surface defined by
+the body boundary. This is indicated by the the value {\tt POLISH}$=1$
+as returned by the \Rind{GUPLSH} function. When the value returned is 
+$< 1$, then a random point is generated in a sphere of radius 
+$1-${\tt POLISH}, and the corresponding vector is added to the normal.
+This new normal is accepted if the reflected wave is still inside the
+original volume.
+
+\section{Subroutines}
+
+\Shubr{GSCKOV}{(ITMED, NPCKOV, PPCKOV, ABSCO, EFFIC, RINDEX)}
+
+\begin{DLtt}{MMMMMMMMMM}
+\item[ITMED] ({\tt INTEGER}) tracking medium for which the optical
+properties are to be defined;
+\item[NPCKOV] ({\tt INTEGER}) number of bins in the tables;
+\item[PPCKOV] ({\tt REAL}) array containing {\tt NPCKOV} values
+of the photon momentum in GeV;
+\item[ABSCO] ({\tt REAL}) array containing {\tt NPCKOV} values
+of the absorption length in centimeters in case of dielectric and of the
+boundary layer absorption probabilities in case of a metal;
+\item[EFFIC] ({\tt REAL}) array containing {\tt NPCKOV} values of the
+detection efficiency;
+\item[RINDEX] ({\tt REAL}) array containing {\tt NPCKOV} values of the
+refractive index for a dielectric, if {\tt RINDEX(1) = 0} the material
+is a metal;
+\end{DLtt}
+
+This routine declares a tracking medium either as a radiator or as a
+metal and stores the tables provided by the user. In the case of a 
+metal the {\tt RINDEX} array does not need to be of length {\tt NPCKOV},
+as long as it is set
+to 0. The user should call this routine if he wants to use \v{C}erenkov
+photons. Please note that for the moment only 
+{\tt BOX}es, {\tt TUBE}s, {\tt CONE}s, {\tt SPHE}res, {\tt PCON}s,
+{\tt PGON}s, {\tt TRD2}s and {\tt TRAP}s can be assigned optical properties
+due to the current limitations of the \Rind{GGPERP} routine described
+below.
+
+\Shubr{GLISUR}{(X0, X1, MEDI0, MEDI1, U, PDOTU, IERR)}
+
+\begin{DLtt}{MMMMMMMMMM}
+\item[X0] ({\tt REAL}) current position ({\tt X0(1)=$x$},
+{\tt X0(2)=$y$}, {\tt X0(3)=$z$})
+and direction ({\tt X0(4)=$p_{x}$}, {\tt X0(5)=$p_{y}$},
+{\tt X0(6)=$p_{z}$})
+of the photon at the boundary of a volume;
+\item[X1] ({\tt REAL}) position ({\tt X1(1)=x, X1(2)=y, X1(3)=z})
+beyond the boundary of the current volume,
+just inside the new volume along the direction of the photon;
+\item[MEDI0] ({\tt INTEGER}) index of the current tracking medium;
+\item[MEDI1] ({\tt INTEGER}) index of the tracking medium into which the
+photon is entering;
+\item[U] ({\tt REAL}) array of three elements containing the normal to
+the surface to which the photon is approaching;
+\item[PDOTU] ({\tt REAL}) $-\cos \theta$ where $\theta$ is the angle between
+the direction of the photon and the normal to the surface;
+\item[IERR] ({\tt INTEGER}) error flag, \Rind{GGPERP} could not determine
+the normal to the surface if {\tt IERR} $\neq$ {\tt 0};
+\end{DLtt}
+
+This routine simulates the surface profile between two media as seen by
+an approaching particle with coordinate and direction given by {\tt X0}.
+The surface is identified by the arguments {\tt MEDI0} and {\tt MEDI1}
+which are the tracking medium indices of the region in which the track
+is presently and the one which it approaches, respectively. The input
+vector {\tt X1} contains the coordinates of a point on the other side of
+the boundary from {\tt X0} and lying in within medium {\tt MEDI1}. The
+result is a unit vector {\tt U} normal to the surface of reflection at
+{\tt X0} and pointing into the medium from which the track is approaching.
+
+The quality of the surface finish is given by the parameter returned by
+the user function \Rind{GUPLSH} (see below).
+
+\Sfunc{GUPLSH}{VALUE = GUPLSH(MEDI0, MEDI1)}
+
+This function must be supplied by the user. It returns a value between 0
+and 1 which decsribes the quality of the surface finish between {\tt MEDI0}
+and {\tt MEDI1}. The value 0 means maximum roughness with effective plane of
+reflection distributed as $\cos \alpha$ where $\alpha$ is the angle
+between the unit normal to the {\it effective} plane of reflection and
+the normal to the nominal medium boundary at {\tt X0}. The value 1 means
+perfect smoothness. In between the surface is modelled as a bell-shaped
+distribution in $\alpha$ with limits given by:
+\[
+\sin \alpha = \pm (1-\mbox{\tt GUPLSH})
+\]
+
+At the interface between two media the routine is called to evaluate the
+surface. The default version in {\tt GEANT} returns $1$, i.e. a perfectly
+polished surface is assumed. When {\tt GUPLSH = 0} the distribution of the
+normal to the surface is $\approx \cos \theta$.
+\begin{DLtt}{MMMMMMMMMM}
+\item[MEDI0] ({\tt INTEGER}) index of the current tracking medium;
+\item[MEDI1] ({\tt INTEGER}) index of the tracking medium into which the
+photon is entering;
+\end{DLtt}
+
+\Shubr{GGCKOV}{}
+
+This routine handles the generation of \v{C}erenkov photons and is called
+from \Rind{GTHADR}, \Rind{GTMUON} and \Rind{GTELEC} in radiative
+materials for which
+the optical characteristics have been defined via the routine \Rind{GSCKOV}.
+
+\Shubr{GSKPHO}{(IPHO)}
+
+\begin{DLtt}{MMMMMMMMMM}
+\item[IPHO] ({\tt INTEGER}) number of the \v{C}erenkov photon to store
+on the stack to be tracked. If {\tt IPHO = 0} all the generated photons
+will be put on the stack to be tracked.
+\end{DLtt}
+
+This routines takes the \v{C}erenkov photon {\tt IPHO} generated during
+the current step and stores it in the stack for subsequent tracking.
+This routine performs for \v{C}erenkov photons the same function that
+the \Rind{GSKING} routine performs for all the other particles. The
+generated photons are stored in the common \FCind{/GCKIN2/} ({\tt 
+[BASE030]}).
+
+\Shubr{GTCKOV}{}
+
+This routine is called to track \v{C}erenkov photons. The user routine
+\Rind{GUSTEP} is called at every step of tracking. When {\tt ISTOP} = 2
+the photon has been absorbed. If {\tt DESTEP} $\neq 0$ then the photon
+has been detected.
+
+\Shubr{GGPERP}{(X, U, IERR)}
+
+\begin{DLtt}{MMMMMMMMMM}
+\item[X] ({\tt REAL}) array of dimension 3 containing the current position
+of the track in the MARS;
+\item[U] ({\tt REAL}) array of dimension 3 containing on exit the normal to
+the surface of the current volume at the point {\tt X};
+\item[IERR] ({\tt INTEGER}) error flag: if {\tt IERR} $\neq 0$ \Rind{GGPERP}
+failed to find the normal to the surface of the current volume.
+\end{DLtt}
+
+This routine solves the general problem of calculating the unit vector
+normal to the surface of the current volume at the point X. The result
+is returned in the array {\tt U}. X is assumed to be outside the current
+volume and near a boundary
+(within {\tt EPSIL}). The current volume is indicated by the common
+\FCind{/GCVOLU/}.  U points from inside to outside in that
+neighbourhood. If {\tt X} is within {\tt EPSIL} of more than one boundary
+(i.e. in a corner) an arbitrary choice is made.
+If {\tt X} is inside the current volume
+or if the current volume is not handled by the routine,
+the routine returns with
+{\tt IERR=1}, otherwise {\tt IERR=0}. At the moment the routine only
+handles {\tt BOX}es, {\tt TUBE}s, {\tt SPHE}res and {\tt CONE}s.
+
+\section{Processes involving \v{C}erenkov photons}
+
+The process of generating a \v{C}erenkov photon is called {\tt CKOV}
+and corresponds to the process value 105 (variable {\tt LMEC} in
+common \FCind{/GCTRAK/}).
+This process is activated only in a radiator defined via the routine
+\Rind{GSCKOV}.
+
+The process of photon absorption (name {\tt LABS}, code 101) is controlled
+by the {\tt LABS} {\tt FFREAD} data record. By default the process is
+activated for all the materials for which optical properties have been
+defined.
+
+The action taken at the boundary is identified by the process name {\tt LREF},
+code 102.
+
+At a boundary a photon can be either reflected (name {\tt REFL}, code 106)
+or refracted (name {\tt REFR}, code 107).
+@

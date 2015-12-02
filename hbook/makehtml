@@ -1,0 +1,78 @@
+#!/bin/sh
+LT=$*
+#
+# Compile a set of directories for HBOOK chapters by breaking
+# up main document
+#
+# SPQRahtz 30.9.93
+#
+M=hboomain.tex
+#
+# HBOOK.tex will be the master document
+#
+cp $M HBOOK.tex
+#
+# we want separate documents; look for \include in the main file
+# 
+# comment out all the includes and copy
+#
+sed 's/^.include/\%\\include/'  < $M \
+| sed '/^.part/s/^/\%/' \
+| sed '/\\appendix/d' \
+| sed 's/\\bibliography{/\\cernbibliography/' \
+> dummy.tmp
+#
+# go through include files
+#
+for i in `egrep '^.include' hboomain.tex | sed 's/.*{\(.*\)}/\1/'`
+do
+#
+# uppercase name to make it clean
+#
+	U=`echo $i | tr '[a-z]' '[A-Z]'`
+	cp $i.aux $U.aux
+# uncomment this one
+	sed 's/^\%\\include{'$i'}/\\include{'$i'}/' < dummy.tmp > $U.tex
+#
+# wipe out old HTML directory
+#
+	rm -rf $U
+#
+	echo NOW PROCESSING $U.tex
+  $LT  $U.tex  
+#
+# note the chapter titles
+#
+	grep '^\\chapter' $i.tex | sed 's/{/{*'$U'*/' >$U.titles
+#
+# and put them into the master file
+#
+	sed 's/^\\include{'$i'}/\\input '$U'.titles/' < HBOOK.tex > tmp.tex
+	mv tmp.tex HBOOK.tex
+#	rm $U.tex
+#
+# change Up: reference to point to master document
+#
+	sed '/Up:/s/HREF=[^>]*/HREF=..\/..\/hbook\/HBOOK\/HBOOK.html/g' < $U/$U.html  > tmp.html
+	mv tmp.html $U/$U.html	
+	echo made $U
+done
+rm dummy.tmp
+#
+# process master document
+#
+rm -rf HBOOK
+$LT HBOOK.tex 
+#
+# dump dummy rubbish
+#
+rm HBOOK/[a-z]*.html
+#
+# make the chapters point at the real sections in separate files
+#
+sed 's/HREF=.*\*\(.*\)\*\(.*\)/HREF=..\/..\/hbook\/\1\/\1.html>\2/' \
+	< HBOOK/HBOOK.html \
+| sed 's/\<A NAME.*HREF=part.*\>\(.*\)\<.*/\1/' \
+> tmp.html
+mv tmp.html HBOOK/HBOOK.html
+

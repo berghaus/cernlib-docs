@@ -1,0 +1,238 @@
+%\newcount\higzdraft \higzdraft=1
+
+\def\listing#1{
+  \parindent=0pt \par
+  \begingroup
+    \def\par{\leavevmode\endgraf}
+    \footnotesize \tt
+    \obeylines \obeyspaces \frenchspacing
+    \def\do##1{ \catcode`##1=12 } \dospecials
+    \vobeyspaces
+    \input#1
+  \endgroup
+}
+{\catcode`\ =\active\gdef\vobeyspaces{\catcode`\ \active \let \xobeysp}}
+\def\xobeysp{\leavevmode{} }
+
+\documentstyle[12pt]{article}
+
+\begin{document}
+
+\title{Producing \LaTeX{} metafiles with HIGZ}
+\author{A.~Nathaniel \\
+        Univ. of Munich}
+\date{}
+\maketitle
+
+The graphics interface package HIGZ~\cite{HIGZ} is now able to write 
+metafiles which are ready to be included in \LaTeX{}~\cite{LATEX} documents.
+These metafiles make use of the \verb'\picture' environment.
+Compared to other possibilities of merging graphics
+into documents \LaTeX{} metafiles have a number of advantages:
+
+\begin{itemize}
+\item 
+It is not necessary to specify the space which has to be reserved for
+the picture.
+The picture size can be changed at formatting time.
+\item
+Because \verb'\special' commands are not used
+the {\tt dvi} file is fully transportable and can be output on any device 
+for which a driver exists.
+Documents can be written, formatted, and previewed on workstations
+while the {\tt dvi} file can be sent by network to a central server for
+printing.
+\item
+The metafile can eventually be merged into the \LaTeX{} file to keep the 
+full document in a single file.
+\LaTeX{} metafiles tend to be smaller than Postscript metafiles
+for pictures involving many line drawing commands.
+\end{itemize}
+
+\section{\LaTeX{} metafile capabilities}
+
+The capabilities of the \verb'\picture' environment are basically
+limited to drawing straight horizontal or vertical lines.
+Slanted lines do exist but only in a limited number of slopes and 
+a minimum length of $\approx 4 {\rm mm}$.
+Therefore slanted lines have to be approximated by small steps of
+straight lines where the step size should be close to the printer resolution.
+
+The workstation type for \LaTeX{} metafiles is -777.
+Coordinates written to the metafile are integral numbers assuming
+a grid spacing of $0.1 {\rm mm}$.
+Therefore the settings for {\tt XSIZE} and {\tt YSIZE} should approximately
+correspond to the final picture size.
+
+\subsection{Line and marker types}
+
+Supported are line types 1 through 4 and marker types 1 through 5.
+
+\subsection{Text fonts}
+
+Apart from software characters the font numbers -1 through~-8 at 
+precision~0 can be used.
+They map to the \TeX{} fonts
+{\rm Roman}, {\em Emphatic}, {\bf Bold}, {\it Italic}, {\sl Slanted},
+{\sf Sans Serif}, {\sc Small Caps}, and {\tt Typewriter}, respectively.
+
+\TeX{} fonts look much nicer and are faster to generate than
+software characters.
+But the disadvantage is that they are available in horizontal orientation only
+and the character size does not scale with the picture size.
+
+When using \TeX{} fonts the {\tt IGTEXT} control characters 
+``\verb'<>[]"#^?!''' are interpreted to obtain superscripts, greek letters,
+and other special characters.
+If a text string contains a ``\verb'\''' or ``\verb'{''' the remaining part
+is written verbatim into the metafile.
+This allows to use \TeX{} formatting commands for elaborate displays.
+Of course ``\verb'{''' and ``\verb'}''' must be properly matched.
+
+The whole text is typeset in math mode which does not allow a change of
+fontsize in between.
+In order to format a formula at a larger size the formula text must be
+preceded by ``\verb'{}$\large$'''.
+
+\section{Configuration parameters}
+
+To some extent the apperance of a picture can be changed at formatting time
+by defining configuration parameters which have the following default values:
+
+\begin{verbatim}
+\newdimen\higzunit \higzunit=0pt
+\newcount\higzstep \higzstep=2
+\newcount\higzdraft \higzdraft=0
+\end{verbatim}
+
+\subsection{\tt higzunit}
+
+By default the picture is automatically scaled to fill the full page width.
+The picture size can be changed by setting \verb'\higzunit'
+it to the wanted grid spacing, e.g. to get the true {\tt XSIZE}
+
+\begin{verbatim}
+\newdimen\higzunit \higzunit=0.1mm
+\end{verbatim}
+
+\subsection{\tt higzstep}
+
+Slanted lines are approximated by straight lines along the major axis.
+The step size along the minor axis is 
+\verb'\higzstep'$\times$\verb'\unitlength'.
+By setting \verb'\higzstep=1' curves will look smoother 
+but if line segments come too close to the printer resolution the 
+{\tt dvi} driver may choose not to display them.
+A larger value will result in faster formatting requiring less \TeX{} memory.
+
+\subsection{\tt higzdraft}
+
+Setting \verb'\higzdraft=1' replaces the actual picture by an empty box 
+of the same size to save formatting time during drafting.
+
+\section{Transfering {\tt dvi} files to CERNVM}
+
+The {\tt dvi} driver {\tt dvi38pp} for {\tt IBM3812} printers tests whether
+the last record of the {\tt dvi} file is padded with {\tt 0xDF} characters.
+This condition is normally not met by files which were formatted on another
+computer and a small program is needed to patch it up:
+
+\hbox{}
+\listing{dvipad.fortran}
+\hbox{}
+
+Then a {\tt dvi} file can be fetched over the network and printed by the
+following command sequence:
+
+\begin{verbatim}
+tcpipibm ftp host
+bin f 1024
+get file.tex
+quit
+dvipad file
+xprint file list38pp
+\end{verbatim}
+
+\section{{\tt tex} running out of memory}
+
+Here are some hints what to do if you cannot format the document
+because \TeX{} runs out of memory.
+
+\begin{enumerate}
+\item 
+Convince your system administrator to build a bigger {\tt tex} program.
+\item 
+Find another computer system which runs a bigger {\tt tex} program.
+\item 
+Use \TeX{} fonts instead of software characters.
+\item 
+Place figures such that each picture gets shipped out before the next one
+is formatted.
+\item 
+Fill areas with horizontal or vertical lines only.
+\item 
+Do not use fill areas.
+\item 
+Draw curves with dotted instead of solid lines.
+\item 
+Do not use marker types 3 or 5.
+\item 
+Use a larger value for \verb'\higzstep'.
+\item 
+Make the picture less complex.
+\item
+You lose.
+\end{enumerate}
+
+\begin{thebibliography}{1}
+\bibitem{HIGZ}
+R.Bock, R.Brun, O.Couet, R.Nierhaus, N.Cremel-Somon, C.Vandoni, P.Zanarini,
+{\em HIGZ - High level Interface to Graphics and Zebra},
+CERN program library Q120
+\bibitem{LATEX}
+L.Lamport,
+{\em \LaTeX{} user's guide and reference manual},
+Addison-Wesley Publishing Company
+\bibitem{PAW}
+R.Brun, O.Couet, N.Cremel-Somon, P.Zanarini,
+{\em PAW users guide},
+CERN program library Q121
+\end{thebibliography}
+
+\appendix
+
+\section{Examples}
+
+Here are some examples of \LaTeX{} metafiles produced with PAW~\cite{PAW}.
+The lego plot needed 250000~words of {\tt tex}~memory at \verb'\higzstep=4'.
+The formatting of this document took 150~seconds of CPU time
+on a DECstation~3100.
+
+\hbox{} 
+\listing{examples.kumac}
+
+\begin{figure}
+\include{example1}
+\listing{example1.kumac}
+\end{figure}
+\clearpage
+
+\begin{figure}
+\include{example2}
+\listing{example2.kumac}
+\end{figure}
+\clearpage
+
+\begin{figure}
+\include{example3}
+\listing{example3.kumac}
+\end{figure}
+\clearpage
+
+\begin{figure}
+\newcount\higzstep \higzstep=4
+\include{example4}
+\listing{example4.kumac}
+\end{figure}
+
+\end{document}

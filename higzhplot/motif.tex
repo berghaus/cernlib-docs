@@ -1,0 +1,497 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                              %
+%   HIGZ  User Guide -- LaTeX Source                                           %
+%                                                                              %
+%   Chapter: HIGZ inside a Motif application                                   %
+%                                                                              %
+%   Editor: Olivier Couet / CN-AS                                              %
+%   Last Mod.: 25 April 1994 oc                                                  %
+%                                                                              %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{How to access HIGZ or HPLOT high level graphics with Motif}
+
+People who have a Motif based application (concerning the user interface)
+can open one (or several) graphical window(s) (drawing area) managed by
+HIGZ. They mainly have to follow some strict (but well defined) rules and
+call the specific HIGZ/X11 routine ``ixmotif'', especially written for
+that purpose.
+
+To follow these rules, that we will describe in detail in this section,
+gives the application-programmer the possibility to benefit from the high
+level graphics output provided by the HIGZ or HPLOT packages with a
+minimum effort. (Note that to achieve the same level of graphical output
+directly with X11 and Motif would be very painful). In particular, these
+rules are used by KUIP-Motif, the high level CERN-written user interface
+package, whose Motif interface is used, for instance, by the well-known
+CERN written application Paw++ and Geant++.
+
+The following is addressed to people who have some notion of Motif and
+HIGZ/HPLOT programming.
+
+
+1-  Application Main Program
+____________________________
+
+As HBOOK, HIGZ and HPLOT are all FORTRAN packages it is easier to write
+the application main program (which will give control to the Motif main
+loop of events at the end) in FORTRAN. The structure (skeleton) of the
+application main program is:
+
+1) Initialize HBOOK,
+2) initialize a Motif application (XtVaAppInitialize), build the user
+   interface and initialize the communication with HIGZ and HPLOT
+   for X11 outputs by creating a ``drawing area'' (call ``ixmotif''),
+3) initialize HIGZ,
+4) initialize HPLOT by using the HIGZ/Motif ``specific'' workstation type
+   999 (this means that no HIGZ graphics window will be opened but the
+   Motif drawing area which has just been created before will be used),
+5) and finally, give control to the Motif main loop of events
+   (XtAppMainLoop).
+
+N.B. ``ixmotif'' has to be called before HIGZ initialization.
+
+
+
+2- ixmotif
+__________
+
+This HIGZ/X11 user callable function allows a Motif-based application
+to pass to HIGZ the address of three user written routines:
+
+   1) routine which open a Motif drawing area which will be used by HIGZ,
+   2) initialization routine (in particular one has to add a callback
+      for resizing the drawing area),
+   3) routine which close the Motif drawing area.
+
+The ``open'' routine has to return the ``Window identifier'' of the Motif
+drawing area, so that HIGZ is able to use it (instead of opening a new
+window).
+
+The calling sequence (C code) of this routine is:
+
+    ixmotif( Display *dsp, Window (*open)(), void (*init)(), void (*close)() )
+
+Display *dsp is the display resulting from ``XtVaAppInitialize''.
+
+
+
+3- Example (application ``Hmtest'')
+___________________________________
+
+
+The following is the code of a very basic Motif application which opens:
+
+- a bulletin board with 3 buttons: ``NULL'', ``NEXT'' and ``Close'',
+- a graphics window for HIGZ/HPLOT graphics.
+
+Pressing on the ``NULL'' button executes the HPLOT routine HPLNUL.
+Pressing on ``NEW'' executes the HPLOT routine HPLNEW. Pressing on ``Close''
+terminates the application and closes all windows.
+
+application main program (in FORTRAN)
+------------------------------------
+
+**************  START  ***********************
+*
+      PROGRAM KMTEST_MAIN
+*
+      PARAMETER (NWPAW=2000000)
+*
+      COMMON /PAWC/ PAWCOM(NWPAW)
+*
+*
+*           Initialize HBOOK
+*
+      CALL HLIMIT(NWPAW)
+*
+*           Initialize Motif drawing area
+*
+      CALL init_motif
+*
+*           Initialize HIGZ
+*
+      NWHIGZ=10000
+      CALL IGINIT(NWHIGZ)
+*
+*           Initialize HPLOT
+*
+      IWK = 999
+      CALL HPLINT(IWK)
+*
+*           Give control to Motif main loop
+*
+      CALL motif_loop
+*
+      STOP
+      END
+
+      subroutine qnext
+*     dummy
+      end
+*
+**************   END   ***********************
+
+
+Motif application code (in C) for user interface
+------------------------------------------------
+
+/**************************  start  ***********************************/
+
+#include <stdio.h>
+#include <Xm/Xm.h>
+#include <Xm/MwmUtil.h>
+#include <X11/Shell.h>
+#include <Xm/MenuShell.h>
+#include <Xm/Protocols.h>
+
+#include <Xm/PushB.h>
+#include <Xm/BulletinB.h>
+#include <Xm/MainW.h>
+#include <Xm/Frame.h>
+#include <Xm/Form.h>
+#include <Xm/DrawingA.h>
+
+#define RES_CONVERT( res_name, res_value) \
+        XtVaTypedArg, (res_name), XmRString, (res_value), strlen(res_value) + 1
+
+
+/* Local functions */
+
+static Window graph_open ();
+static void graph_close ();
+static void graph_init ();
+static void drawing_area_callback( Widget widget, XtPointer client_data,
+                                   XmDrawingAreaCallbackStruct *call_data);
+
+
+static void create_motif_interface ();
+static void close_cb( Widget widget, XtPointer client_data,
+                      XtPointer call_data);
+static void null_cb(Widget widget, XtPointer client_data,
+                    XtPointer call_data);
+static void new_cb(Widget widget, XtPointer client_data,
+                   XtPointer call_data);
+
+
+/* Global datas */
+
+XtAppContext AppContext;
+Widget TopLevel, Graphics, graphicsDraw;
+
+
+/***********************************************************************
+ *                                                                     *
+ *   Initialize a Motif application (XtVaAppInitialize) and set up     *
+ *   the interface with HIGZ and HPLOT (ixmotif).                      *
+ *                                                                     *
+ *   create a bulletin board with 3 buttons:                           *
+ *   - NULL (call HPLOT routine HPLNUL)                                *
+ *   - NEW  (call HPLOT routine HPLNEW)                                *
+ *   - Close (terminate application and close windows)                 *
+ *                                                                     *
+ ***********************************************************************/
+void init_motif_()
+{
+   int argc;
+   char    *argv[1];
+
+   /* init toolkit */
+   argc       = 0;
+   argv[argc] = NULL;
+   TopLevel = XtVaAppInitialize(&AppContext, "Hmtest", NULL, 0,
+                                &argc, argv, NULL,
+                                XmNallowShellResize, True,
+                                XmNdeleteResponse, XmDO_NOTHING,
+                                XmNtitle, "Hmtest",
+                                NULL);
+
+   /* build interface */
+   create_motif_interface ();
+
+   /*
+    * Creates Motif drawing area (graph_open) and pass information to HIGZ.
+    *
+    * ixmotif( Display *dsp, Window (*open)(), void (*init)(), void (*close)() )
+    * allows a Motif-based application to give to HIGZ the address of three
+    * routines:
+    *    1) open  : to open a Motif window
+    *    2) init  : to initialize a Motif window (add the callbacks for
+    *               resizing)
+    *    3) close : to close a Motif window
+    */
+
+   ixmotif (XtDisplay(TopLevel), graph_open, graph_init, graph_close);
+
+}
+
+/***********************************************************************
+ *                                                                     *
+ *   Start Motif infinite loop                                         *
+ *                                                                     *
+ ***********************************************************************/
+void motif_loop_ ()
+{
+   XtRealizeWidget(TopLevel);
+   XtAppMainLoop(AppContext);
+}
+
+/***********************************************************************
+ *                                                                     *
+ *   Build application user interface                                  *
+ *                                                                     *
+ ***********************************************************************/
+static void create_motif_interface ()
+{
+   Widget toplevel, button_null, button_new, button_close;
+
+   toplevel = XtVaCreateManagedWidget( "toplevel",
+                        xmBulletinBoardWidgetClass,
+                        TopLevel,
+                        XmNresizePolicy, XmRESIZE_NONE,
+                        XmNwidth, 320,
+                        XmNheight, 293,
+                        XmNunitType, XmPIXELS,
+                        NULL );
+
+   button_null = XtVaCreateManagedWidget( "button_null",
+                        xmPushButtonWidgetClass,
+                        toplevel,
+                        RES_CONVERT( XmNlabelString, " NULL "),
+                        XmNx, 70,
+                        XmNy, 20,
+                        XmNwidth, 180,
+                        XmNheight, 60,
+                        NULL );
+
+   button_new = XtVaCreateManagedWidget( "button_new",
+                        xmPushButtonWidgetClass,
+                        toplevel,
+                        RES_CONVERT( XmNlabelString, " NEW "),
+                        XmNx, 70,
+                        XmNy, 90,
+                        XmNwidth, 180,
+                        XmNheight, 60,
+                        NULL );
+
+
+   button_close = XtVaCreateManagedWidget( "button",
+                        xmPushButtonWidgetClass,
+                        toplevel,
+                        RES_CONVERT( XmNlabelString, " Close "),
+                        XmNx, 70,
+                        XmNy, 160,
+                        XmNwidth, 180,
+                        XmNheight, 60,
+                        NULL );
+
+   /* Add callback to button "NULL" (call HPLOT routine HPLNUL) */
+   XtAddCallback(button_null, XmNactivateCallback,
+        (XtCallbackProc)null_cb,  NULL);
+
+   /* Add callback to button "NEW" (call HPLOT routine HPLNEW) */
+   XtAddCallback(button_new, XmNactivateCallback,
+        (XtCallbackProc)new_cb,  NULL);
+
+   /* Add callback to button "Close" (terminate application) */
+   XtAddCallback(button_close, XmNactivateCallback,
+        (XtCallbackProc)close_cb,  NULL);
+
+   XmAddWMProtocolCallback(TopLevel,
+        XmInternAtom(XtDisplay(TopLevel), "WM_DELETE_WINDOW", True),
+        (XtCallbackProc)close_cb, (caddr_t) toplevel);
+}
+
+/***********************************************************************
+ *                                                                     *
+ *   Creates a Motif drawing area (for HIGZ)  and returns window id.   *
+ *                                                                     *
+ ***********************************************************************/
+static Window graph_open ()
+{
+   Widget        Parent, graphicsFrame, graphicsForm;
+
+   Parent = XtVaCreatePopupShell( "Graphics_shell",
+                        topLevelShellWidgetClass, TopLevel,
+                        XmNx, 570,
+                        XmNy, 10,
+                        XmNwidth, 530,
+                        XmNheight, 550,
+                        XmNtitle, "Hmtest Motif Graphics",
+                        NULL );
+
+   Graphics = XtVaCreateManagedWidget( "Graphics",
+                        xmMainWindowWidgetClass,
+                        Parent,
+                        XmNwidth, 530,
+                        XmNheight, 550,
+                        XmNmappedWhenManaged, TRUE,
+                        XmNborderWidth, 0,
+                        NULL );
+
+   graphicsFrame = XtVaCreateManagedWidget( "graphicsFrame",
+                        xmFrameWidgetClass,
+                        Graphics,
+                        NULL );
+
+   graphicsForm = XtVaCreateManagedWidget( "graphicsForm",
+                        xmFormWidgetClass,
+                        graphicsFrame,
+                        XmNautoUnmanage, FALSE,
+                        XmNborderWidth, 0,
+                        XmNmarginHeight, 0,
+                        XmNmarginWidth, 0,
+                        XmNhorizontalSpacing, 0,
+                        XmNverticalSpacing, 0,
+                        NULL );
+
+   graphicsDraw = XtVaCreateManagedWidget( "graphicsDraw",
+                        xmDrawingAreaWidgetClass,
+                        graphicsForm,
+                        XmNresizePolicy, XmRESIZE_NONE,
+                        XmNx, 0,
+                        XmNy, 10,
+                        XmNwidth, 530,
+                        XmNheight, 540,
+                        XmNbottomAttachment, XmATTACH_FORM,
+                        XmNrightAttachment, XmATTACH_FORM,
+                        XmNrightOffset, 0,
+                        XmNtopOffset, 0,
+                        XmNbottomOffset, 0,
+                        XmNleftAttachment, XmATTACH_FORM,
+                        XmNleftOffset, 0,
+                        XmNtopAttachment, XmATTACH_FORM,
+                        NULL );
+
+   XmMainWindowSetAreas( Graphics, (Widget) NULL, (Widget) NULL,
+                        (Widget) NULL, (Widget) NULL, graphicsFrame );
+
+   XtPopup (Parent, XtGrabNone);
+
+   return (XtWindow(graphicsDraw));
+}
+
+/***********************************************************************
+ *                                                                     *
+ *   Install callbacks for the graphics window (created for HIGZ)      *
+ *   (This has to be called after the creation of the HIGZ window)     *
+ *                                                                     *
+ ***********************************************************************/
+static void graph_init ()
+{
+   /* Add drawing area expose and resize callbacks */
+   XtAddCallback(graphicsDraw, XmNexposeCallback,
+                 (XtCallbackProc)drawing_area_callback, NULL);
+   XtAddCallback(graphicsDraw, XmNresizeCallback,
+                 (XtCallbackProc)drawing_area_callback, NULL);
+}
+
+/***********************************************************************
+ *                                                                     *
+ *   Handle the graphics window callbacks (expose and resize events).  *
+ *                                                                     *
+ ***********************************************************************/
+static void drawing_area_callback(widget, client_data, call_data)
+       Widget widget;
+       XtPointer client_data;
+       XmDrawingAreaCallbackStruct *call_data;
+{
+   XEvent *ev = call_data->event;
+
+   /* window identifier (in this example we open only one window) */
+   int wid = 1;
+
+   if (call_data->reason == XmCR_EXPOSE) {
+      if (ev->xexpose.count != 0) return;
+      /* Set new size (HIGZ routine IGRSIZ) */
+      igrsiz_ (&wid);
+   }
+
+   if (call_data->reason == XmCR_RESIZE) {
+      /* Set new size (HIGZ routine IGRSIZ) */
+      igrsiz_ (&wid);
+   }
+
+}
+
+/***********************************************************************
+ *                                                                     *
+ *   Destroy Motif drawing area                                        *
+ *                                                                     *
+ ***********************************************************************/
+static void graph_close ()
+{
+   XtDestroyWidget (Graphics);
+}
+
+/***********************************************************************
+ *                                                                     *
+ *   "NULL" callback routine.                                          *
+ *   Call HPLOT routine HPLNUL                                         *
+ *                                                                     *
+ ***********************************************************************/
+static void null_cb(widget, client_data,  call_data)
+     Widget widget;
+     XtPointer client_data;
+     XtPointer call_data;
+{
+   hplnul_();
+}
+
+/***********************************************************************
+ *                                                                     *
+ *   "NEW" callback routine.                                           *
+ *   Call HPLOT routine HPLNEW                                         *
+ *                                                                     *
+ ***********************************************************************/
+static void new_cb(widget, client_data,  call_data)
+     Widget widget;
+     XtPointer client_data;
+     XtPointer call_data;
+{
+   hplnew_();
+}
+
+
+
+/***********************************************************************
+ *                                                                     *
+ *   Close callback routine.                                           *
+ *                                                                     *
+ ***********************************************************************/
+static void close_cb(widget, client_data,  call_data)
+     Widget widget;
+     XtPointer client_data;
+     XtPointer call_data;
+{
+   exit (0);
+}
+
+/**************************   end   ***********************************/
+
+
+Makefile (on Hp)
+----------------
+
+SHELL=/bin/sh
+
+LPATH = /cern/new/lib/
+
+XLIBS= -L/usr/lib/Motif1.2 -L/usr/lib/X11R5 -lXm -lXt -lX11
+
+LIBC=  -ldld -Wl,-E -lm -lc -lPW
+
+
+FFLAGS=+ppu
+CFLAGS=-Ae -I/usr/include/X11R5 -I/usr/include/Motif1.2
+
+CERNLIB=\
+        $(LPATH)libgraflib.a \
+        $(LPATH)libpacklib.a \
+        $(LPATH)libgrafX11.a \
+        $(LPATH)libpacklib.a \
+        $(LPATH)libkernlib.a
+
+hmtest: hmtest_main.o \
+        hmtest_motif.o
+	fort77 -o hmtest -g +ppu hmtest_main.o hmtest_motif.o $(CERNLIB) $(XLIBS) $(LIB
+

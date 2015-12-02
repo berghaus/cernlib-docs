@@ -1,0 +1,2152 @@
+%  $Header: ch1.tex,v 1.11 93/08/02 21:16:12 goossens Exp $
+\Filename{H1-FZ-User-Specifications}
+\chapter{User specifications for the FZ package}
+
+\Filename{H2-FZ-Data-Structure-Representation}
+\section{Representation of a data-structure}
+
+The unit of information on a ZEBRA file is the
+\textbf{data-structure}.
+It may consist of zero, one, two, or more
+\textbf{data-segments}.
+The data-segments reflect the original residence of different
+parts of the data-structure in different divisions at the
+moment when the d/s was transferred from memory to the file with
+\Rind{FZOUT}.
+When the d/s is transferred back from the file to memory with \Rind{FZIN}
+individual data-segments may be directed to separate divisions,
+or may be ignored.
+
+User information which may be associated with each d/s is
+the 'user header vector',
+specified and received via parameters to \Rind{FZOUT} and \Rind{FZIN},
+and the 'text vector' taken from and delivered to the text-buffer
+associated to the file with \Rind{FZTXAS} (implementation of this routine
+is pending).
+
+On the file the data-structure is represented
+by the 'pilot information' followed by the 'bank material'.
+The pilot carries all the control and context information,
+namely:
+
+\begin{itemize}
+\item the amount of memory required to receive the data-structure;
+\item the entry address into the data-structure, if any;
+\item the user-header vector with its I/O characteristics, if any;
+\item the text-vector, if any;
+\item the segment table, if any, describing which data segment comes
+      from which division;
+\item the relocation table, if any, describing the original position
+      in memory of each contiguous set of banks, needed to update
+      all links in the data-structure for the new positions in
+      memory on input.
+\end{itemize}
+
+This is followed by the 'bank-material',
+which carries the copy of the memory regions originally occupied
+by the banks of the data-structure.
+The data-structure may in fact be empty,
+in which case there is no bank-material.
+
+In Native Data Format the bank material on the file
+is a simple dump of the memory;
+but in Exchange Data Format the numbers have to be transformed
+from the internal to the exchange representation.
+To make this possible automatically,
+every bank has to carry its 'I/O characteristic' describing
+the integer/floating/Hollerith nature of its contents exactly;
+see the Zebra Reference Manual, book MZ, paragraphs MZLIFT
+and MZFORM for a description.
+Banks of type 'undefined' cannot be transported.
+
+The exact details for the file and data formats
+are found in Chapter 3.
+
+\Filename{H2-F2-events-runs-files}
+\section{Events, Runs, and Files}
+
+The unit of information on a ZEBRA file is the data-structure.
+
+Several data-structures may be (but need not)
+be grouped into an \textbf{event}.
+On the file events are separated by the 'start-of-event'
+flag being present in the first data-structure of each event.
+\Rind{FZIN} may be asked to skip forward to and read the next
+'start-of-event' data-structure.
+
+Several events (or d/s) may (but need not) be grouped into a
+\textbf{run}.
+On the file the start and the end of a run are marked by
+special \textbf{StoR} and \textbf{EoR} records written by calling \Rind{FZRUN}.
+\Rind{FZIN} may be asked to skip forward to and read the next
+'start-of-run' record.
+(Skipping forward to next run or event should not be used
+for the medium Memory or Channel.)
+
+A ZEBRA file has to be terminated.
+The writing of End-of-File is a perennial problem,
+as the requirements for different kinds of files are
+different for different machines and different media.
+Thus for example, on the IBM system MVS one should not terminate
+a disk file by an ENDFILE statement,
+as this inhibits the release of the unused space on the disk.
+A tape, on the other hand,
+should be terminated by a double EoF which may or may not be
+provided by the system, yet on the VAX the program will collapse
+if one tries to ENDFILE an unlabelled tape.
+
+In principle, a Zebra file may logically consist of several
+files on the same medium.
+To implement this rigorously on all machines the special
+\textbf{Zebra EoF} record is provided
+(an end-of-run record which immediately follows a true end-of-run
+is also interpreted as EoF).
+It is written by a call to \Rind{FZENDO} with one of the options
+T, N, C, or I.
+
+Whether or not the writing of a Zebra EoF signal is followed
+by the explicit request to write one or two system file-marks
+(for end-of-file or end-of-data)
+depends on the circumstances.
+Most machines do not support multi-file disk files,
+and some machines do not even support multi-file tape files.
+
+In first approximation, a Zebra file is assumed not to
+contain imbedded system file-marks.
+For output this means that no file-marks are written explicitly,
+leaving the file termination to the system;
+for input it means that a system file-mark is interpreted
+as 'end-of-data'.
+A different behaviour can be selected when calling \Rind{FZFILE}
+by setting the NEOF parameter associated with the file
+to 1, 2, or 3  as explained in para. 1.04.
+
+\Filename{H2-FZ-Outline-Usage-for-disk-tape}
+\section{Outline of usage for medium Disk or Tape}
+
+Before using FZ, the routines MZEBRA and MZSTOR must have
+been called.
+FZ uses the system division of the primary store to hold
+the control-information about all its files.
+One bank per file is used, containing the parameters of the file,
+the statistics of usage of the file,
+and also the physical record buffer,
+if the file format is 'exchange'.
+
+{\large\bf Initialization}
+
+Before using a particular file,
+it should be \textbf{opened},
+normally with the Fortran OPEN statement
+or with the C interface routine CFOPEN
+(except for files which are read/written by special
+machine-dependent packages, such as IOPACK on IBM).
+The ZEBRA handling of this file must be \textbf{initialized}
+by calling \Rind{FZFILE}.
+
+Machine-dependent details about opening files are given in chapter 2.
+
+The call to \Rind{FZFILE} specifies the properties of the file
+and the processing direction, for example:
+\begin{verbatim}
+    CALL FZFILE (LUN,0,'.')    native mode, input only, disk file
+
+    CALL FZFILE (LUN,0,'IO')   native mode, disk file,
+                               input-output or output-input,
+
+    CALL FZFILE (LUN,0,'XO')   exchange mode, output only, disk file
+
+    CALL FZFILE (LUN,0,'D')    exchange mode, input only, disk file
+                               reading with direct-access Fortran
+
+    CALL FZFILE (LUN,0,'TL')   exchange mode, input only,
+                               tape file to be read via the C Library
+
+\end{verbatim}
+Note that the Fortran systems on some Unix machines,
+like on SUN or Silicon Graphics,
+are not capable of handling fixed-length records in sequential mode,
+ie. \Lit{RECORDTYPE='FIXED'} is not available in their Fortran
+OPEN statement.
+In this case one has to use the direct-access mode,
+or the C library mode, of FZ for exchange format files.
+
+If one is debugging a program,
+it can be useful to set the logging level of FZ for this file
+to 2 with
+\begin{verbatim}
+      CALL FZLOGL (LUN,2)
+\end{verbatim}
+causing FZ to print a log message
+whenever it is called for this file.
+
+\subsection*{Input}
+
+To simply read the next data-structure, one calls for example with:
+\begin{verbatim}
+      PARAMETER   (NUHMAX=100)
+      DIMENSION    IUHEAD(NUHMAX)
+      COMMON /QUEST/IQUEST(100)
+
+      NUH = NUHMAX
+      CALL FZIN (LUN, IXDIV, LSUP,JBIAS, '.', NUH,IUHEAD)
+      IF (IQUEST(1).NE.0)    GO TO special
+\end{verbatim}
+This will read the next d/s into the division indicated by IXDIV,
+it will transfer the user-header-vector into IUHEAD*,
+NUHMAX words at most, returning in *NUH* its useful size.
+It will connect the d/s read into a higher level d/s (if any)
+according to the parameters !LSUP and JBIAS,
+which have the same significance as with MZLIFT or ZSHUNT.
+(For the use of the symbols '*' and '!' see 'Principles'.)
+
+
+On normal completion \Rind{FZIN} returns IQUEST(1)=0;
+a positive value indicates an exception,
+like Start-of-run or End-of-data;
+a negative value signals trouble.
+IQUEST(1) \textbf{must} be tested after every call to \Rind{FZIN}.
+
+Frequently one is interested in processing only a particular
+kind of data-structure, wanting to rapidly skip any others
+which might be on the file.
+To make this possible the data must be organised to contain
+all the information relevant to selection in the user header vector,
+because one can ask \Rind{FZIN} to start the d/s by reading
+the pilot information only, delivering the user header vector to
+the caller, leaving the bank-material in suspense,
+waiting for a decision.
+If the d/s is to be rejected, all the work of bringing
+it into memory with adjustment of the links can be saved.
+
+To get the user header vector of the next d/s one specifies
+the S option (Select) in a first call to \Rind{FZIN};
+a second call with the A option will transfer the d/s to memory,
+for example:
+\begin{verbatim}
+C--       Ready to select next d/s
+
+   11 NUH = NUHMAX
+      CALL FZIN (LUN, IXDIV, 0,0, 'S', NUH,IUHEAD)
+      IF (IQUEST(1).NE.0)    GO TO special
+      IF (not wanted)        GO TO 11
+
+C--       Accept pending D/S
+
+      CALL FZIN (LUN, IXDIV, LSUP,JBIAS, 'A', 0,0)
+      IF (IQUEST(1).NE.0)    GO TO special
+\end{verbatim}
+Whilst accepting is done by an explicit call with the A option,
+rejection is done implicitly by asking for the next d/s.
+
+Having reached the end of the input file (or having decided
+to stop input for some other reason),
+one can get the statistics of file usage printed by
+\begin{verbatim}
+      CALL FZENDI (LUN,option)
+\end{verbatim}
+'option' indicates the further action to be taken on this file,
+such as REWIND and re-start reading from the beginning,
+or start writing on the file positioned by reading it,
+or simply terminate.
+
+Beware: for exchange format files one can switch from input
+to output only after having read an end-of-run or end-of-file.
+
+If one wants to read several different files on the same
+logical unit number (thereby possibly saving I/O buffers
+in the system), this can be done as indicated by this sketch,
+provided all the files have the same characteristics:
+\begin{verbatim}
+      OPEN (LUN,FILE=<file 1>,...)
+      CALL FZFILE (LUN,0,opt)
+         read first file
+      CALL FZENDI (LUN,'NX')            new file to be connected
+
+      OPEN (LUN,FILE=<file 2>,...)
+         read second file
+      CALL FZENDI (LUN,'NX')
+
+      OPEN (LUN,FILE=<file 3>,...)
+         read third file
+            . . . . .
+\end{verbatim}
+If the files are \textbf{not} of the same kind,
+for example if the first file is in native mode
+and the second file is in exchange mode,
+\Rind{FZENDI} must be told to forget all about the first file,
+so that a new file can be started on the same
+logical unit number, for example:
+\begin{verbatim}
+      OPEN (LUN,FILE=<file 1>,...)
+      CALL FZFILE (LUN,0,'.')           native mode
+         read first file
+      CALL FZENDI (LUN,'TX')            terminate
+
+      OPEN (LUN,FILE=<file 2>,...)
+      CALL FZFILE (LUN,0,'X')           exchange mode
+         read second file
+      CALL FZENDI (LUN,'TX')
+\end{verbatim}
+(This is necessary because the size and character
+of the FZ control bank depends on the nature of the file.)
+
+\subsection*{Output}
+
+It may be desirable to group the output into 'runs',
+in which case one would start a new run with, for example:
+\begin{verbatim}
+      JRUN = run number
+         . . .
+      CALL FZRUN (LUN,JRUN,0,0)
+\end{verbatim}
+It is possible to store user information into the 'start-of-run'
+record via the last two parameters of the call.
+There is however the danger,
+if this information is essential for the processing of the
+data of the run,
+that the start-of-run record may get lost due to read errors.
+
+(An end-of-run record can be requested explicitly,
+but normally this is not necessary, since it is triggered
+by a new run, or by \Rind{FZENDO}.)
+
+To ouput a d/s from the primary store,
+supported by the bank at !LHEAD,
+together with a user header vector in IUHEAD of NUH integer words,
+one may call:
+\begin{verbatim}
+      CALL FZOUT (LUN,0,LHEAD,0,'L',2,NUH,IUHEAD)
+\end{verbatim}
+In this case, the material to be output is defined solely by
+the entry address !LHEAD into the d/s.
+Therefore \Rind{FZOUT} has to do a logical walk through the complete d/s
+by following all the structural links, to mark all the banks
+belonging to this d/s.
+A subsequent sequential scan over the memory constructs
+the table of the memory regions to be output.
+For a large d/s the time spent on this operation may be
+non-negligible;
+it can be saved if the user has organized his data such
+that the d/s to be output resides in a separate division
+[or divisions] of which it has exclusive use.
+In this case one can instruct \Rind{FZOUT} to simply
+output the complete division IXDIV [or divisions IXDIV1 + IXDIV2],
+whithout the need for the logical walk, by calling:
+\begin{verbatim}
+    [ IXDIV = MZIXCO (IXDIV1,IXDIV2,0,0) ]
+
+      CALL FZOUT (LUN,IXDIV,LHEAD,0,'D',2,NUH,IUHEAD)
+\end{verbatim}
+The entry address !LHEAD is still needed,
+no longer to define the data to be written,
+but for the receiver to find his way into the d/s read.
+
+Although option 'D' saves the logical walk,
+\Rind{FZOUT} still has to do the sequential scan of the division[s]
+to identify the live banks to be written,
+and the dead banks to be suppressed.
+If the user knows that there are no dead banks,
+or that their volume is negligible,
+he can indicate this to \Rind{FZOUT} with the 'DI' option,
+causing it to write the complete division[s] as it stands:
+\begin{verbatim}
+      CALL FZOUT (LUN,IXDIV,LHEAD,0,'DI',2,NUH,IUHEAD)
+\end{verbatim}
+
+Occasionally the d/s to be written out is not described
+as easily as assumed above,
+for example one may want to write a data-structure
+minus some of its sub-structures.
+In this case (cf para. 1.21) the user may pre-mark
+the banks to be output and
+\begin{verbatim}
+      CALL FZOUT (LUN,IXDIV,LHEAD,0,'M',2,NUH,IUHEAD)
+\end{verbatim}
+Output of a file must be terminated,
+to make sure that the last physical record is transfered
+from the buffer to the file, for example with:
+\begin{verbatim}
+      CALL FZENDO (LUN,'I')
+\end{verbatim}
+to re-read the file just written; or with:
+\begin{verbatim}
+      CALL FZENDO (LUN,'TX')
+\end{verbatim}
+if the program no longer needs this file.
+
+The recommended procedure is to have a standard job-termination
+routine, called \Rind{ZEND},
+normally called from the Main program.
+This routine is called also from the ZEBRA recovery system in case
+of abnormal job termination.
+Into this routine one should include a
+\begin{verbatim}
+      CALL FZENDO (0,'TX')
+\end{verbatim}
+to terminate all pending output files.
+However, this call pulls in the non-negligible volume of code
+for the \Rind{FZOUT} complex, and should hence be present only
+for programs really using \Rind{FZOUT}.
+
+Writing several different files to the same logical unit
+can be done in complete analogy to the case of reading;
+in the examples given above one has to add the 'O' option
+for \Rind{FZFILE},
+and one has to change the calls to \Rind{FZENDI} into calls to \Rind{FZENDO}.
+
+\Filename{H2-FZ-Initialize-ZEBRA-file}
+\section{FZFILE - initialize a ZEBRA file}
+
+To initialize a Zebra file:
+\begin{verbatim}
+       Fortran:   OPEN (LUN, FILE=name, ...
+       C:         CALL CFOPEN (LUNPTR, ..., name, ...)
+                  IQUEST(1) = LUNPTR
+\end{verbatim}
+\Shubr{FZFILE}{(LUN,LREC,CHOPT)}
+\begin{verbatim}
+with    LUN:  logical unit number (Fortran)
+               or Zebra stream identifier (otherwise),
+               this must be a unique small positive integer
+
+       LREC:  record length, in words (ignored if A option)
+               native file format - maximum logical record length
+                  zero: standard limit: 2440 words
+                   +ve: user defined limit, but < 2500
+
+               exchange file format - physical record length
+                  zero: standard length: 900 words
+                   +ve: user defined length
+                         must be a multiple of 30 words
+
+      CHOPT:  character string,
+               individual characters select options:
+
+         medium:  *  sequential binary disk file, default
+                   T  magnetic tape
+                   D  direct access disk file
+                   A  alfa: 80 column card-image disk file
+                   C  channel mode
+                   M  memory mode
+
+          usage:  F  read/write with Fortran, default (except IBM)
+                   Y  read/write with special machine specific code
+                      (IBM has IOPACK, NORD has MAGTAP)
+                   L  read/write with interface to the C Library
+                   K  read/write with user supplied code
+
+    file format:     native file format is default
+                   X  exchange file format
+                      modes  M, C, A, D, L, K  all imply 'X'
+
+    data format:     native   is default for native   file format
+                      exchange is default for exchange file format
+                   N  native data format
+\end{verbatim}
+
+\begin{verbatim}
+      direction:     default direction is 'input only'
+                   I  input enabled
+                   O  output enabled
+                  IO  input/output enabled
+
+        various:  S  separate d/ss
+                   U  unpacked d/ss, only with modes M or C
+                   R  initial rewind
+                   Q  quiet, set logging level to -2
+                   P  permissive, enable error return,
+                      see 'Status returned' just below
+
+           NEOF:     handling of system EoF
+                      for output:
+                   0  write no file-marks at all
+                   1  write file-mark only for End-of-File
+                   2  write file-mark only for End-of-Data
+                   3  write file-marks both for EoF and EoD
+
+                      for input:
+              1 or 3  one file-mark signals 'end-of-file',
+                      otherwise: file-mark signals 'end-of-data'
+\end{verbatim}
+
+\subsection*{Status returned in \Lit{/QUEST/IQUEST(100)}}
+
+\begin{verbatim}
+IQUEST(1) =  0  all is well
+             1  file has already been initialized with FZFILE
+             2  LUN is invalid
+             3  requested format is not available on the particular
+                Zebra library (either because of the installation
+                options taken, or because the code is not ready
+                for the particular machine)
+             4  the file pointer is zero for modes L or K
+\end{verbatim}
+
+The error returns are enabled only if the P option is selected,
+otherwise control goes to ZFATAL. If the P option is selected,
+the status must be checked, because the file will not be initialized
+if an error exit is taken.
+
+\subsection*{Option compatibility diagram}
+
+\begin{verbatim}
+                   M C A D T * K L Y
+      channel   C  -                       +  combination useful
+      alfa      A  - -                     -  combination not allowed
+      direct    D  - + -                   i  option implied
+      tape      T  - -   -                 d  option default
+      neither   *  - - - - -               ?  depends on the user's
+                                                     implementation
+      user      K  - - - ? ? +
+      lib C     L  - - - + + + -
+      special   Y  - - - - + + - -
+      Fortran   F  - - i d d d - - -
+
+      exchange  X  i i i i + + i i i
+      native    N  + + + + + d + + +
+
+      separate  S  i + + + + + + + +
+      unpacked  U  + + - - - - - - -
+                   M C A D T * K L Y
+
+\end{verbatim}
+
+\subsection*{Notes}
+
+\subsubsection*{OPENing:}
+
+\Rind{FZFILE} initializes only the Zebra controls for this file;
+the opening of the file has to be done by the user in his calling
+program, according to the needs of his machine and operating system.
+
+\subsubsection*{Fortran OPEN:}
+
+if the file is to be handled with Fortran READ/WRITE one needs an
+OPEN statement; one will find some hints in chapter 2.
+
+\subsubsection*{C open:}
+
+for modes L or K the file should be opened by calling CFOPEN
+(see the specifications at the end of this paragraph)
+and the 'file pointer' returned by CFOPEN must be passed
+on to \Rind{FZFILE} via IQUEST(1).
+
+\subsubsection*{LUN:}
+
+this is the Zebra stream identifier which will be used in all subsequent
+calls for this file; if the file is to be handled with Fortran this
+is at the same time the logical unit number.
+
+\subsubsection*{LREC:}
+
+for exchange file format it is important to choose a good value for
+all one's files, and then stick to it.
+One has to compromise between conflicting things:
+on tapes one would like to make this large,
+but this costs memory for the Zebra buffer,
+multiplied by the number of files concurrently open,
+and it wastes disk space for end-of-run records which occupy
+a whole physical record.
+Some numbers can be found in chapter 3.
+
+The physical record size for the exchange file format needs to be
+specified both to Zebra with \Rind{FZFILE} and to the system with the OPEN
+statement and maybe even with some JCL,
+in which case the user may need to know this:
+the block size is specified to Zebra in words, the default is 900 words.
+These words correspond to words in the Zebra dynamic store,
+such that a bank of 900 words could just fill one block.
+Except for 32-bit machines,
+the number of bits written to the file for each word depends
+on the data format: for the exchange data format each word
+generates 32 bits, for the native data format a full machine word
+is transferred.
+To the system the block size has to be specified either in bytes
+or in native words.
+For example, on the CRAY (64-bit words) the record-size of
+a standard block will have to be given as 7200 bytes
+(900 machine words) for the native data format,
+but as 3600 bytes (450 machine words) for the exchange data format.
+
+\subsection*{medium M or C:}
+
+for the media 'memory' and 'channel' the Exchange File Format
+is implied, and this cannot be changed.
+The Native Data Format can be selected by giving the N option.
+Instructions on the use of these media is given in separate
+paragraphs near the end of this chapter.
+
+\subsection*{medium A:}
+
+Alfa mode should only be used to transmit data over a network
+connection which cannot handle binary file transfers.
+The character representation (ASCII, EBCDIC, etc) used
+is that of the originating machine;
+the translation is expected to happen in the network station.
+Alfa mode must not be used for writing magnetic tapes,
+it is at least a factor of ten slower than binary.
+
+\subsection*{medium D:}
+
+this serves two different purposes:
+on some machines Fortran is not capable of handling
+fixed-length records without system control words in sequential mode,
+only in direct-access mode, but this only for disk files.
+A side-effect advantage is better error recovery from lost records
+on files which have been moved from tape to disk.
+No timing studies have yet been made to check whether direct access
+is slower than sequential acccess.
+
+The other purpose is random access to the d/ss on the file,
+this is described in the para. 1.18 'Usage for random access'.
+Selecting D only gives the possibility, but no obligation for
+random access: for input Zebra will read the file sequentially
+except at moments when the user interfers with calls to FZINXT;
+for output Zebra operates strictly sequentially.
+
+\subsection*{medium T:}
+
+at the moment no distinction is made internally in Zebra between
+disk and tape files (exception: NORD),
+but it may turn out that the C interface will have to have
+a separate branch for tape files on some machines.
+
+\subsection*{usage F or Y:}
+
+read/write with Fortran, option F, is the default if none of Y, L, K
+are specified.
+Exception IBM: up to including Zebra version 3.66 the default
+for sequental files is Y, that is handling with IOPACK;
+from version 3.67 onwards the default will be F.
+Most people give now (version 3.65) option F,
+those who really want IOPACK should change their programs to
+request Y to be insensitive to the transition to 3.67.
+The only other machine sensitive to Y is presently the NORD:
+magnetic tapes must be written through the MAGTAP utility,
+on this machine TX implies Y.
+
+\subsection*{usage L:}
+
+read/write is with the routines CFGET/CFPUT which are part of the
+interface to the C Library for handling files with fixed-length records.
+This mode must be used for exchange file format tape files on those
+Unix machines where Fortran does not provide the parameter
+\Lit{RECORDTYPE='FIXED'} (or equivalent) in the OPEN statement,
+like the SUN, or SGI, or DECSTATION.
+On the same machines one might use this also for disk files as
+an alternative to option D; no studies have yet been made to
+see which is faster.
+L can be combined with D for random access using the C interface.
+
+\subsection*{usage K:}
+
+this is a hook to enable a user to write his own handling of physical
+records in case that none of the modes provided are satisfactory.
+Chapter 4 will give some hints of how to do this.
+
+\subsection*{file-format:}
+
+default is 'native' if none of D, A, C, M, L, K is given,
+which necessarily operate with exchange file format.
+
+\subsection*{data-format:}
+
+for native file format this is 'native';
+for exchange file format data format 'exchange' is assumed by default,
+but native data format can be requested by giving the N option.
+In this case LREC native words are written for each physical record,
+and no data translation, packing, or byte inversion, is done.
+
+\subsection*{direction:}
+
+the option 'IO' is needed in two separate cases:
+   - if the program first writes a new file which it then reads;
+   - if the program positions an existing file by reading
+     for further output.
+In this case the input or output mode of the file is defined
+by the first I/O action on the file;
+it can be changed at the end of the first phase only with \Rind{FZENDI}
+from input to output, or with \Rind{FZENDO} the other way round.
+
+\subsection*{various S:}
+
+for the exchange file format,
+\Rind{FZOUT} normally places the start of a given d/s just after
+the end of the previous structure in the same physical record,
+to economize file space.
+This may be inconvenient if the file is later to be handled
+by means other than calling \Rind{FZIN}: giving the S option
+will force each d/s to start on a new physical record.
+For the medium 'memory' the S option is implied.
+
+\subsection*{various U:}
+
+only for media 'memory' and 'channel':
+When handling the physical records for the Data Format 'exchange'
+it may be more convenient for the user to do himself the
+unpacking (\Rind{FZIN}) or packing (\Rind{FZOUT}) operation needed,
+because in this case he has immediate access to the control
+information in the records.
+(Note: on the VAX 'packing/unpacking' is in fact byte inversion.)
+The U option allows this:
+if given, \Rind{FZOUT} delivers the data non-packed,
+and \Rind{FZIN} expects data which have already been unpacked by the user.
+
+\subsection*{various R:}
+
+if the initial REWIND is selected the file has to be OPENed
+before calling \Rind{FZFILE}.
+
+\subsection*{various Q:}
+
+giving this option suppresses message printing for this file.
+
+\subsection*{NEOF:}
+
+this parameter controls for output
+the explicit writing of system file-marks;
+for input it controls the interpretation of a system file-mark,
+which can mean either end-of-file or end-of-data
+(two file-marks in succession always act as end-of-data).
+On most machines the default value is NEOF=0,
+meaning single-file files only.
+This can be over-ridden by giving the 1, 2, or 3 option
+if multi-file files must be handled.
+See also para. 1.02 for more explanations.
+
+\subsection*{Specifications for CFOPEN}
+
+Since this is a new KERNLIB routine not yet documented we print this
+here.
+
+\Shubr{CFOPEN}{(LUNPTR*,MEDIUM,NWREC,IOMODE,NBUF,NAME,ISTAT*)}
+\begin{verbatim}
+      LUNPTR*  is the 'file pointer' returned by the C library
+               routine 'fopen', CFOPEN returns it to the caller who
+               must hand it on to FZFILE via IQUEST(1).
+               This will be zero if the open fails.
+
+      MEDIUM   = 0  for disk file, normal
+                 1      tape file, normal
+                 2      disk file, user coded I/O
+                 3      tape file, user coded I/O
+
+      NWREC    the number of machine words per physical record, this
+               is used to calculate the buffer size if NBUF not zero.
+
+      MODE     the 'type' parameter of 'fopen', of type CHARACTER:
+                 r   open for reading
+                 w   truncate or create for writing
+                 a   append: open for writing at end of  file,  or
+                     create for writing
+                 r+  open for update (reading and writing)
+                 w+  truncate or create for update
+                 a+  append; open or create for update at EOF
+
+      NBUF     not currently used, always give zero
+
+      NAME     the name of the file, of Fortran type CHARACTER.
+
+      ISTAT*   status returned, zero if all is well,
+               otherwise a system error code.
+\end{verbatim}
+
+\Filename{H2-FZ-Change-logging-level}
+\section{FZLOGL - change the logging level of a file}
+
+To change the logging level for a file:
+
+\Shubr{FZLOGL}{(LUN,LOGLEV)}
+\begin{verbatim}
+with    LUN:  logical unit number
+
+     LOGLEV:  logging level
+                   -3: suppress all messages
+                   -2: print error messages only
+                    0: normal mode
+                    1: normal mode + details of conversion problems
+                    2: print to monitor CALLs to FZ
+                    3: print short diagnostic dumps to debug
+                    4: print full  diagnostic dumps to debug
+                                   user-written output routines
+\end{verbatim}
+A logging level is attached to each FZ file;
+by default this is the general system-wide default logging level
+set by MZEBRA.
+By giving the Q (quiet) option with \Rind{FZFILE} the level is set to -2.
+It can be changed later at any time by calling FZLOGL.
+
+\Filename{H2-FZMEMO-Connect-memory-area-for-medium-memory}
+\section{FZMEMO - connect user memory area for medium Memory}
+
+To connect the memory area for use by a 'file':
+
+\Shubr{FZMEMO}{(LUN,MBUF,NWBUF)}
+\begin{verbatim}
+with    LUN:  stream number
+
+       MBUF:  user memory of NWBUF machine words
+\end{verbatim}
+This must be called after the 'file' has been initialized
+with \Rind{FZFILE}, and before it is used with \Rind{FZIN} or \Rind{FZOUT}.
+Different memory areas may be connected by recalling this
+routine any number of times;
+see para. 1.19 for explanations.
+
+\Filename{H2-FZHOOK-connect-user-routine-for-medium-Channel}
+\section{FZHOOK - connect user routine for medium Channel}
+
+To connect a particular user routine to be called
+by \Rind{FZIN} or \Rind{FZOUT} for this 'file':
+\begin{verbatim}
+      EXTERNAL  UserSR
+\end{verbatim}
+\Shubr{FZHOOK}{(LUN, UserSR, 0)}
+\spcomp
+\begin{verbatim}
+with    LUN:  stream number
+
+     UserSR:  name of the user routine
+
+      dummy:  the third parameter is not at the moment used,
+               but it must be present in the call
+\end{verbatim}
+\spnorm
+This must be called after the 'file' has been initialized
+with \Rind{FZFILE}, and before it is used with \Rind{FZIN} or \Rind{FZOUT}.
+Different user routines may be connected by recalling this
+routine any number of times;
+see para. 1.20 for explanations.
+
+\Filename{H2-FZLIMI-limit-size-output-file}
+\section{FZLIMI - limit the size of an output file}
+
+\Shubr{FZLIMI}{(LUN,ALIMIT)}
+
+\begin{verbatim}
+with    LUN:  logical unit number
+
+      ALIMIT:  floating point number giving, in Mega-words, the
+                  limit of the data to be written to one reel of tape;
+               if zero: increase the limit by one more reel of tape
+               if  -ve: unlimited (as intialized by FZFILE)
+
+Example:   CALL FZLIMI (21, 12.75)   sets the file-size
+                                      to 12.75 Mwords for unit 21
+
+         Re-calling later with:
+
+            CALL FZLIMI (21, 0.)      sets the file-size to be the current
+                                      data-volume plus 12.75 Mwords
+\end{verbatim}
+\spnorm
+The reason for this facility is the fact that detecting 'end-of-tape'
+is a problem which cannot be solved satisfactorily in full
+generality.
+To help the user who wants control over tape reel switching,
+ZEBRA counts the total number of words written,
+and checks after every data-structure written out
+(but not for start-of-run, end-of-run, end-of-file)
+whether the limit has been reached.
+If so, it returns the 'pseudo end-of-tape' condition (cf. \Rind{FZOUT})
+for every data-structure output until an increase of the limit
+to include one more reel of tape is requested with ALIMIT=0.
+Thus the user can switch tape,
+call FZLIMI (LUN,0.),
+and continue to write another tape,
+again waiting for the 'end-of-tape' signal.
+
+\Filename{H2-FZODAT-storing-recovering-direct-access-table}
+\section{FZODAT - storing and recovering the direct access table}
+
+The routines FZODAT and FZIDAT store and retrieve the direct-acces table
+onto and from a file.
+
+See para. 1.18 'Usage for random access' for explanations.
+
+To store the Direct-access Table bank:
+
+\Shubr{FZODAT}{(LUN,IXDIV,!LDAT)}
+\begin{verbatim}
+with    LUN:  logical unit number
+
+      IXDIV:  index of division or store having the DaT bank
+
+      !LDAT:  address of the DaT bank, if non-zero
+\end{verbatim}
+If LDAT is zero the DaT 'forward reference' record is written
+to be updated later to contain the address of the DaT;
+this is useful only as the very first record on the file.
+
+If LDAT is non-zero the DaT bank is written and the forward reference
+record is updated if possible.
+
+\vspace*{12pt}
+To retrieve the DaT bank:
+
+\Shubr{FZIDAT}{(LUN,IXDIV,!LSUP,JBIAS)}
+\begin{verbatim}
+with    LUN:  logical unit number
+
+      IXDIV:  index of the division to receive the DaT bank
+
+           The d/s read is linked into a pre-existing d/s as directed by
+           !LSUP and JBIAS, which have the same significance as for MZLIFT:
+
+      !LSUP:  if JBIAS < 1: !LSUP is the supporting bank,
+      JBIAS:                 connection to link LQ(!LSUP-JBIAS)
+                              IQUEST(13) returns the entry adr to the d/s
+
+               if JBIAS = 1: *!LSUP is the supporting link,
+                              connection to *!LSUP* (top-level d/s)
+                              !LSUP* returns the entry adr to the d/s
+
+               if JBIAS = 2: stand-alone d/s, no connection
+                              !LSUP* returns the entry adr to the d/s
+
+     Status return:  IQUEST(1) =  0  success
+                                  -1  DaT not found
+                                  -2  file is empty
+\end{verbatim}
+For the symbols '!' and '*' see the convention in 'Principles'.
+
+\Filename{H2-FZRUN-write-RUN-record}
+\section{FZRUN - write a RUN record}
+
+To write a start-of-run or end-of-run record:
+
+\Shubr{FZRUN}{(LUN,NRUN,NUH,IUHEAD)}
+\begin{verbatim}
+with    LUN:  logical unit number
+
+       NRUN:  run number,
+               if  +ve: new run, run number literal
+                  zero: new run, increase current run number by one
+                   -ve: end-of-run record
+
+        NUH:  length of the user information, may be zero, < 401
+
+     IUHEAD:  NUH words of user information, integers only
+\end{verbatim}
+
+\textbf{Write / Error status} returned: as for \Rind{FZOUT}
+
+A start-of-run record will be preceded by an end-of-run signal
+if the last action on the file was the writing of a data-structure.
+
+The request to write an end-of-run will be by-passed if the last
+action on the file was the writing of EoR or EoF.
+
+For the media 'memory' or 'channel' the writing of end-of-run,
+if needed, should be requested by an explicit call to \Rind{FZRUN}
+with NRUN negative, since an implicit generation will not
+get through to the user.
+
+\Filename{H2-FZOUT-write-one-data-structure}
+\section{FZOUT - write one data-structure}
+
+To write one data-structure:
+
+\Shubr{FZOUT}{(LUN,IXDIV,!LENTRY,IEVENT,options,IOCH,NUH,IUHEAD)}
+\begin{verbatim}
+with    LUN:  logical unit number
+
+      IXDIV:  index of division(s)
+               may be zero [or IXSTOR] if the D option is not selected
+               may be a compound index if the D option is selected
+
+    !LENTRY:  entry address of the d/s
+               may be zero if the Z option is selected
+
+     IEVENT:  start-of-event flag
+                 = 0  for event continued
+                   1  for new event
+
+               the following values are for use by FZRUN and FZENDO
+               and are illegal for calls by the user:
+                  13  flush the buffer       15  write end-of-file
+                         (X mode only)       16  write end-of-data
+                  14  write end-of-run       -1  write start-of-run
+
+    options:  character string,
+               individual characters select options:
+
+     select d/s:    mutually exclusive options
+
+                     by default the d/s supported by the bank at
+                     LENTRY is written out (link 0 not followed)
+
+                   L write the d/s supported by the linear structure
+                     at LENTRY (link 0 followed)
+
+                   M write the banks marked by the user
+                     see para. 1.21 for details
+
+                   D  write complete division(s)
+                      default: dead banks are squeezed out
+                               (slower but maybe more economic than DI)
+                   DI immediate dump of division(s),
+                      dead banks, if any, are also written out
+
+                   S write the single bank at LENTRY
+                   Z zero banks, ie. empty d/s, header only
+\end{verbatim}
+
+\begin{verbatim}
+         others:  N no links, ie. linkless handling (cf 'Principles')
+                     default: links are significant
+
+                   P permit error returns
+                     default: exit to ZTELL
+
+       IOCH:  the I/O characteristic for the user header vector; as
+               for a bank this may be either 'immediate' if the whole
+               vector is of the same type, or it may be composite.
+
+               - immediate: IOCH = 1  all bits
+                                    2  all integers
+                                    3  all floating
+                                    4  all double precision
+                                    5  all Hollerith
+                                    7  self-describing
+
+               - composite: set up with
+
+                             CALL MZIOCH (IOCH,NW,'format')  where
+
+                             IOCH is now a vector of NW words at most
+
+        NUH:  number of words in the user header vector, < 401,
+               may be zero, in which case IOCH is not used
+
+     IUHEAD:  the user header vector
+\end{verbatim}
+
+\subsection*{Write status returned in \Lit{/QUEST/IQUEST(100)}}
+
+\begin{verbatim}
+   IQUEST(1)  =   0 normal completion
+                 +1 'pseudo end-of-tape' condition (cf. FZLIMI)
+                 -1 first attempt to write after end-of-data
+                 -2 error return
+   IQUEST(5)  =  word 1 of the direct access adr of the d/s just written
+   IQUEST(6)  =  word 2
+   IQUEST(9)  =  # of useful machine words ready in the user's memory
+                 only for medium 'memory'
+   IQUEST(11) =  NWBK, number of words of bank material
+   IQUEST(12) =  NWTB, size of the relocation table
+   IQUEST(13) =  number of pilot records written so far
+   IQUEST(14) =  number of Mwords written so far
+   IQUEST(15) =  number of words (up to 1 M) written so far
+                 ie. the total is  IQUEST(15) + IQUEST(14)*10**6
+   IQUEST(16) =  number of logical records written so far
+   IQUEST(17) =  number of physical records written (exchange mode only)
+\end{verbatim}
+   Further information about the file can be obtained
+   by calling \Rind{FZIN}FO, see para. 4.01.
+
+\subsection*{Error status returned in \Lit{/QUEST/IQUEST(100)}
+
+Normally \Rind{FZOUT} does not return to the caller for (program) errors,
+but exits to ZTELL.
+Exceptionally, error returns may be enabled by the P option.
+\begin{verbatim}
+   IQUEST(1) = -2
+   IQUEST(2) = 11: !LENTRY invalid or pointing to a dead bank
+             = 12: bank chaining clobbered
+             = 13: not enough space for the relocation table
+             = 14: medium 'memory': user's memory too small
+\end{verbatim}
+If the P option is not taken exit is with
+\Lit{CALL ZTELL (i,1)} with $i=11,12,13,14$. \\[2mm]
+
+If the actual write operation fails,
+for example because the disk is full,
+control is handed to \Rind{ZTELL} (which may return) with:
+\begin{verbatim}
+      CALL ZTELL (19,0)
+with
+      IQUEST(1) = 19
+      IQUEST(2) = who is in trouble ?
+                    1 - Fortran sequential
+                    2 - Fortran direct access
+                   21 - L mode sequential
+                   22 - L mode direct-access
+                   41 - Alfa mode
+      IQUEST(3) = IOSTAT error code return by the 'write'
+      IQUEST(4) = LUN (Zebra stream identifier)
+      IQUEST(5) = C file descriptor if writing in L mode
+\end{verbatim}
+
+\Filename{H2-FZIN-read-one-data-structure}
+\section{FZIN - read one data-structure}
+
+To read the next data-structure one calls \Rind{FZIN}.
+The return code in IQUEST(1) will tell the caller whether
+the READ operation was free of error, and whether the
+object read was a d/s, a start-of-run, an end-of-run,
+or an end-of-file signal.
+\Rind{FZIN} may be asked to skip to and then read the next start-of-event
+d/s or the next start-of-run record.
+
+In the simplest case (opt = '.' or blank) \Rind{FZIN} will read the next
+data-structure into the division indicated by the parameter IXDIV,
+at the same time delivering the user-header vector to IUHEAD.
+
+The selective read has been provided to rapidly skip unwanted
+d/ss without expansion into memory and without relocation
+of the links:
+calling \Rind{FZIN} with opt='S' causes reading of the next pilot
+information only,
+returning to the user the header-vector (and the text-vector, if any)
+for taking a decision to read or to skip the 'pending d/s'.
+Skipping is done by asking for the next d/s;
+accepting is done by calling \Rind{FZIN} with opt='A'.
+Note that every call to \Rind{FZIN} has to be checked for the success of
+the operation by testing on IQUEST(1).
+
+In the cases described so far the complete data-structure is
+read and is deposited into one particular division.
+It is however possible to steer individual data segments of
+the d/s into particular divisions, or to cause them to be ignored.
+This can be done by using the options T and D,
+as described separately in the next paragraph.
+
+\subsection*{Specifications for \Rind{FZIN}}
+
+\Rind{FZIN} returns the read status, either normal or error, in IQUEST;
+be careful about the meaning of status codes 4 and 5:
+'4' means EoF seen on a file which can be a multi-file file;
+'5' means 'End-of-Data'.
+Reading a file which cannot be multi-file can never
+produce status 4, the end will always be indicated by status 5.
+
+\subsubsection*{Error status}
+
+\begin{verbatim}
+IQUEST(1) =  -8  . . .
+             -7  for 3 consecutive errors
+             -6  for 2 consecutive errors
+             -5  read error
+             -4  bad constructs, maybe not a file written by FZOUT
+             -3  bad data
+             -2  not enough space to read the d/s and its table
+             -1  faulty call: T,D,A option given, but no pending d/s
+
+IQUEST(2) =  number of logical records read so far
+
+IQUEST(3) =  number of physical records read so far (exchange mode)
+\end{verbatim}
+Details about the error occurred are stored in IQUEST(11) ff.
+as described in the Zebra Reference Manual, book DIA.
+
+To read the next data-structure:
+
+\Shubr{FZIN}{(LUN,IXDIV,!LSUP,JBIAS,opt,*NUH*,IUHEAD*)}
+\begin{verbatim}
+with    LUN:  logical unit number
+
+      IXDIV:  index of the default division to receive the d/s
+               zero: division 2 of the primary store
+               (ignored if S option given)
+
+               The d/s read is linked into a pre-existing d/s as directed by
+               !LSUP and JBIAS, which have the same meaning as for MZLIFT:
+
+      !LSUP:  if JBIAS < 1: !LSUP is the supporting bank,
+      JBIAS:                 connection to link LQ(!LSUP-JBIAS)
+                              IQUEST(13) returns the entry adr to the d/s
+
+               if JBIAS = 1: *!LSUP is the supporting link,
+                              connection to *!LSUP* (top-level d/s)
+                              !LSUP* returns the entry adr to the d/s
+
+               if JBIAS = 2: stand-alone d/s, no connection
+                              !LSUP* returns the entry adr to the d/s
+               (ignored if options S or T selected)
+
+    options:  character string,
+               individual characters select options:
+
+          event:    default: go for the next d/s
+                   E skip to and read the next start-of-event d/s
+                   R skip to and read the next start-of-run record
+                   2 skip to and read the next   end-of-run record
+                   3 skip to and read the next   Zebra end-of-file
+                   4 skip to and read the next machine end-of-file
+
+                     any skip operation stops also on machine EoF;
+                     option E or 2 skipping stop also on Zebra EoF,
+                     option R skipping does not stop on Zebra EoF.
+
+         select:    default: read the next header and its d/s
+                     (may mean: skip pending d/s or current event)
+
+                   S select, read next header and text-vector only
+                     (may mean: skip pending d/s or current event)
+                     (LSUP and JBIAS not used)
+
+                   T table,  load the segment table for the current
+                             d/s into /FZCSEG/
+                     (LSUP, JBIAS, NUH, and IUHEAD not used)
+
+                   A accept, read the pending d/s
+                     (NUH and IUHEAD not used)
+
+                   D divisional accept, read the pending d/s under
+                                        control from /FZCSEG/
+                     (NUH and IUHEAD not used)
+
+                   F accept also DaT records, which are normally ignored;
+                     see para. 1.18 'Usage of random access'
+
+      *NUH*:  size of the user header vector
+                 on  input:  maximum size of IUHEAD
+                 on output:  useful size stored in IUHEAD
+               (ignored if options T, A, or D  selected)
+
+    IUHEAD*:  user header vector
+               (ignored if options T, A, or D  selected)
+\end{verbatim}
+
+\subsubsection*{Normal read status returned in \Lit{/QUEST/IQUEST(100)}}
+
+\begin{verbatim}
+IQUEST(1) =  -ve  error, see separate list
+               0  normal completion
+               1  start-of-run record
+               2  end-of-run record
+               3  Zebra  end-of-file
+               4  system end-of-file, continuation possible
+               5  system end-of-data, continuation not possible
+               6  first attempt to read beyond EoD
+
+IQUEST(2) =  number of logical records read so far
+
+IQUEST(3) =  number of physical records read so far (exchange mode)
+
+IQUEST(5) =  word 1 of the direct access adr of the d/s read
+IQUEST(6) =  word 2                     (exchange mode only)
+
+IQUEST(11)   if IQUEST(1)=0:  = 1 or 0 for yes/no start new event
+             if IQUEST(1)=1:  = run number for start/end of run
+
+IQUEST(12) = processing bits of pilot, normally zero
+
+IQUEST(13) = LENTRY, the entry address into the data structure
+             zero means: empty d/s
+             (not yet a valid address if S option return)
+
+IQUEST(14) = NWBK, the number of words occupied by the d/s in memory
+             zero means: empty d/s
+
+IQUEST(20) = NWIOCH, size of the I/O characteristic
+
+IQUEST(21) = NWIOCH words of I/O characteristic
+      ...           for the user header vector
+\end{verbatim}
+   Further information about the file can be obtained
+   by calling FZINFO, see para. 4.01.
+\spnorm
+
+\Filename{H2-FZIN-read-one-data-structure-by-segments}
+\section{FZIN - read one data-structure by segments}
+
+It may be convenient to represent an event by several separate
+d/ss on the file.
+This permits in an easy way to selectively read only a particular
+part of every event.
+This method has one draw-back:
+if there are reference links pointing from one part to an other part
+of the event, where both parts are residing simultaneously in
+memory, and if the two parts are written out by two separate calls to
+\Rind{FZOUT}, the cross links will be lost on read-back.
+
+To amend for this, the following scheme has been implemented:
+when a data-structure is transferred from several divisions to the
+FZ file, the data are 'segmented', i.e. a table is included
+into the pilot information, indicating the divisions from which
+the different data segments originated, together with their sizes.
+On read-back the user can either skip particular data-segments or
+he can direct data-segments into particular divisions individually.
+
+To do so, three calls to \Rind{FZIN} are necessary:
+\begin{enumerate}
+  \item call with the S option to read the pilot;
+  \item call with the T option to ready the segment table in /FZCSEG/;
+  \item call with the D option to read the d/s with distribution.
+\end{enumerate}
+
+The second call will present the 'segment table' to the caller
+in the labelled Common Block
+\begin{verbatim}
+  COMMON /FZCSEG/ NQSEG,IQSEGH(2,20),IQSEGD(22)    where:
+
+           NQSEG  = number of segments contained in the pending d/s
+                             if NQSEG = 0:  d/s is not segmented
+      IQSEGH(1,J) = char 1-4
+      IQSEGH(2,J) =      5-8  of the Hollerith name of the division
+                              from which segment J derives
+       IQSEGD(J)    index of division selected for segment J
+
+      Note: IQSEGD(21+22) are working elements of the system and,
+             like NQSEG, must not be modified by the user.
+\end{verbatim}
+To direct segment J into a given division one should set
+IQSEGD(J) to the index of that division
+(or merely to the division number;
+the store is selected by the parameter IXDIV to \Rind{FZIN}).
+To cause this segment to be ignored IQSEGD(J) = --1 should be set.
+IQSEGD(J) containing zero directs this segment into the
+'default' division selected by the parameter IXDIV to \Rind{FZIN}.
+(The vector IQSEGD is preset to zero by \Rind{FZIN}.)
+
+Since /FZCSEG/ is used for segment handling with all streams,
+both input and output, there must not occur some other call
+to FZ for any stream between the second and the third call.
+Also, having called with the T option does not oblige the user
+to follow it by a call with the D option;
+he may call with the A or even the S option,
+in which cases the segment table is simply ignored.
+
+\Filename{H2-FZINXT-reset-read-point-on-direct-access-file}
+\section{FZINXT - reset the read point on a direct access file}
+
+To reset the read point:
+
+\Shubr{FZINXT}{(LUN,MDSA1,MDSA2)}
+\begin{verbatim}
+with    LUN:  logical unit number or Zebra stream ID
+
+               the 2 word d/s address of the next d/s to be read,
+      MDSA1:  word 1:  physical record number
+      MDSA2:       2:  off-set within the record,
+                         if this is zero the first d/s
+                         starting in the record will be used
+\end{verbatim}
+See para. 1.18 for context information.
+
+\Filename{H2-FZCOPY-copy-one-data-structure-from-input-to-output}
+\section{FZCOPY - copy one data-structure from input to output}
+
+FZCOPY will copy a data-structure from the input to the output 'file'
+without expansion into memory and without translating the data
+representation, thereby saving the time which would otherwise
+be spent on these operations.
+
+The file-format and the data-format of the input or the output file
+may be 'exchange' or 'native', but the following restrictions are
+imposed:
+\begin{enumerate}
+   \item the data-format of the output file must be the same as that
+      of the input file, ie. FZCOPY will not translate between
+      native and exchange data-format. (Note however that on some
+      machines native and exchange data-format are identical.)
+   \item the input and the output cannot both be in 'channel' mode.
+   \item Alfa format is not handled.
+   \item the locical record length for the input in native file-format
+      must not be longer than 2500 words.
+\end{enumerate}
+
+To copy a data-structure one has first to start reading it by calling
+\Rind{FZIN} with the S option; thereby one obtains the user header,
+which will normally be used to decide whether or not the copy is
+wanted. This 'pending' data-structure may then be copied by
+calling:
+
+\Shubr{FZCOPY}{(LUNIN,LUNOUT,IEVENT,options,IOCH,NUH,IUHEAD)}
+\begin{verbatim}
+with  LUNIN:  logical unit number of the input file
+     LUNOUT:  logical unit number of the output file
+
+     IEVENT:  start-of-event flag
+                 = 0  for event continued
+                   1  for new event
+
+    options:  character string,
+               individual characters select options:
+
+     I/O descr.:    by default the I/O descriptor from the input
+                     file is used for IUHEAD
+
+                   I use the new I/O descriptor given in IOCH for
+                     the user header vector
+
+               P special 'permit' option not normally given
+
+       IOCH:  the I/O characteristic for the user header vector;
+               this is ignored if the I option is not given;  as
+               for a bank this may be either 'immediate' if the whole
+               vector is of the same type, or it may be composite.
+
+               - immediate: IOCH = 1  all bits
+                                    2  all integers
+                                    3  all floating
+                                    4  all double precision
+                                    5  all Hollerith
+                                    7  self-describing
+
+               - composite: set up with
+
+                             CALL MZIOCH (IOCH,NW,'format')  where
+
+                             IOCH is now a vector of NW words at most
+
+        NUH:  number of words in the user header vector, < 401,
+               may be zero, in which case IOCH is not used
+
+     IUHEAD:  the user header vector
+\end{verbatim}
+
+\subsection*{Status returned in \Lit{/QUEST/IQUEST(100)}}
+\begin{verbatim}
+   IQUEST(1)  =   0 normal completion
+                 +1 'pseudo end-of-tape' condition (cf. FZLIMI)
+                < 0 input  error return, see below
+                > 1 output error return, see below
+
+   If normal completion:
+
+   IQUEST(5)  =  word 1 of the direct access adr of the d/s just written
+   IQUEST(6)  =  word 2
+   IQUEST(9)  =  # of useful machine words ready in the user's memory
+                 only for medium 'memory'
+   IQUEST(11) =  NWBK, number of words of bank material
+   IQUEST(12) =  NWTB, size of the relocation table
+   IQUEST(13) =  number of pilot records written so far
+   IQUEST(14) =  number of Mwords written so far
+   IQUEST(15) =  number of words (up to 1 M) written so far
+                 ie. the total is  IQUEST(15) + IQUEST(14)*10**6
+                 careful: if this compound is bigger than 2G it
+                          needs more than 32 bits to hold it
+   IQUEST(16) =  number of logical records written so far
+   IQUEST(17) =  number of physical records written (exchange mode only)
+\end{verbatim}
+
+\subsubsection*{Input error status}
+
+\begin{verbatim}
+IQUEST(1) =  -8   . . .
+             -7  for 3 consecutive errors
+             -6  for 2 consecutive errors
+             -5  read error
+             -4  bad constructs, maybe not a file written by FZCOPY
+             -3  bad data
+             -2  not enough space to read the d/s and its table
+             -1  faulty call: no pending d/s, or: Alfa mode,
+                 or: input/output have differen data format,
+                 or: both input/output in channel mode,
+                 or: native input record length too long;
+                 (code -1 causes ZFATAL unless P option given)
+
+IQUEST(2) =  number of logical records read so far
+
+IQUEST(3) =  number of physical records read so far (exchange mode)
+\end{verbatim}
+Details about the error occurred are stored in IQUEST(11) ff.
+as described in the Zebra Reference Manual, book DIA for \Rind{FZIN}.
+
+\subsubsection*{Output error status returned in \Lit{/QUEST/IQUEST(100)}}
+
+Normally \Rind{FZCOPY} does not return to the caller for (program) errors,
+but exits to \Rind{ZTELL} or to \Rind{ZFATAL}. 
+Exceptionally, some such error
+returns may be enabled by giving the P option in the call.
+
+\begin{verbatim}
+   IQUEST(1) = +2
+   IQUEST(2) = 14: medium 'memory': user's memory too small
+\end{verbatim}
+
+\Filename{H2-FZENDO-output-file-termination}
+\section{FZENDO - output file termination}
+
+To terminate one or all \textbf{output} files:
+
+\Shubr{FZENDO}{(LUN,options)}
+
+\begin{verbatim}
+with    LUN:  logical unit number
+               if zero: all FZ output files
+
+    options:  character string,
+               individual characters select options:
+
+         main:  T  terminate:
+                    - ensure end-of-data (unless done)
+                    - print file statistics (unless done)
+                    - drop FZ control-bank
+
+                 N  continue output to a new file to be connected
+                    by the user to LUN after this call:
+                    - ensure end-of-data (unless done)
+                    - print file statistics (unless done)
+
+                 C  continue on the next file of the same stream:
+                    - ensure end-of-file (unless done)
+                    - print file statistics (unless done)
+
+                 I  switch to input, to read the file just written:
+                    - ensure end-of-data (unless done)
+                    - print file statistics (unless done)
+                    - remove the 'output' permission
+                    - rewind and change status to 'input'
+
+                 O  output again, to over-write the file just written:
+                    - ensure end-of-data (unless done)
+                    - print file statistics (unless done)
+                    - rewind
+
+              none  print file statistics only
+
+                    over-ruling:   T -> N -> C -> I -> O
+
+     variants:  R  execute REWIND function, only with T or N
+                 U  execute UNLOAD function, only with T or N (no action yet)
+                 X  execute CLOSE function, only with T or N
+                 O  keep the 'output' permission, only with I
+                 Q  quiet, suppress printing of file statistics
+        0,1,2 or 3  only with I: change the NEOF parameter
+                    of FZFILE for reading
+\end{verbatim}
+To be sure that all output files are closed correctly,
+even on abnormal job termination,
+the user should call from \Rind{ZEND}: \qquad\Lit{CALL FZENDO (0, 'TX')}
+
+If necessary this is taken as a final close-down signal
+to be passed on to special I/O packages on some machines
+(such as \Rind{IOPACK} on IBM).
+
+\Filename{H2-FZENDI-input-file-termination}
+\section{FZENDI - input file termination}
+
+To terminate one or all \textbf{input} files:
+
+\Shubr{FZENDI}{(LUN,options)}
+
+\begin{verbatim}
+with    LUN:  logical unit number
+               if zero: all FZ input files
+
+    options:  character string,
+               individual characters select options:
+
+         main:  T  terminate:
+                    - print file statistics (unless done)
+                    - drop FZ control-bank
+
+                 N  continue input from a new file to be connected
+                    by the user to LUN after this call:
+                    - print file statistics (unless done)
+
+                 C  continue on the next file of the same stream:
+                    - print file statistics (unless done)
+                    - step over the system EOF as required on some machines
+
+                 I  input again, to re-read the same file:
+                    - print file statistics (unless done)
+                    - rewind
+
+                 O  switch to output, to permit writing on a file
+                    positioned by reading:
+                    - print file statistics (unless done)
+                    - change status to 'output'
+
+              none  print file statistics only
+
+                    over-ruling:   T -> N -> C -> I -> O
+
+     variants:  R  execute REWIND function, only with T or N
+                 U  execute UNLOAD function, only with T or N (no action yet)
+                 X  execute CLOSE function, only with T or N
+                 Q  quiet, suppress printing of file statistics
+        0,1,2 or 3  only with O: change the NEOF parameter
+                    of FZFILE for writing
+\end{verbatim}
+\spnorm
+Both \Rind{FZENDI} and \Rind{FZENDO} also load the file statistics
+into the Common \Lit{/FZSTAT/} just like the routine \Rind{FZINFO},
+to provide the final statistics,
+which are not yet available just before \Rind{FZENDO},
+and maybe no longer available just after \Rind{FZENDO}.
+
+\Filename{H2-Usage-for-random-access}
+\section{Usage for random access}
+
+\subsection*{Principles}
+
+For random access the location of a d/s within its file is specified
+by its 'data-structure address', the DsA, consisting of 2 words:\\
+\hspace*{8mm}
+word 1 is the number of the physical record in which the d/s starts,\\
+\hspace*{8mm}
+word 2 is the off-set within this record.\\
+If the file contains less than 2 Gigawords one can pack this into
+one word with\\
+\hspace*{16mm}
+      $ JDSAP = (JDSA1-1) * LREC  + JDSA2 $\\
+with LREC the number of words in each physical record, as specified
+to \Rind{FZFILE}.
+
+For every successful call to \Rind{FZOUT} or \Rind{FZIN} Zebra returns the DsA
+of the latest d/s in IQUEST(5) and IQUEST(6),
+provided the file-format is 'exchange' and even for a tape file.
+To prepare a file for reading it randomly the user would construct
+a table, the 'direct access table', or DaT, which contains the
+relevant properties of the d/ss on the file plus their DsA's.
+This can be done either by an extra read pass over the file
+to collect the data, or more economically at the time when the
+file is created.
+In the latter case the DaT can be written to the file as
+the last d/s before end-of-file,
+and is then ready for use for any future reading of the file.
+
+When reading a file initialized with mode D given to \Rind{FZFILE},
+repeated calls to \Rind{FZIN} will read the data sequentially.
+To obtain a particular data-structure one has to call \Rind{FZIN}XT specifying
+the DsA of the wanted d/s; this will reset the 'current read point'
+for the file and the next call to \Rind{FZIN} will then deliver the wanted d/s.
+
+\subsection*{File creation}
+
+Do this:
+\begin{enumerate}
+\item call \Rind{FZFILE} giving\\
+      \hspace*{35mm} CHOPT = 'DO' or 'LDO' if it is a disk file,\\
+      \hspace*{35mm} CHOPT = 'TO' or 'TLO' if it is a tape file.
+\item lift a bank, generously large enough to hold the DaT.
+\item \Lit{CALL FZODAT (LUN,0,0)}  to create the
+ 'DaT forward-reference record'.
+This is a small record to provide 2 words to hold the DsA of the DaT
+itself; they are initialized to zero and on the final call FZODAT will
+try to update them with the true address if the file is ready for
+random access.
+This should be provided on every file which later one may want
+to access randomly, like a tape file to be copied to disk.
+This is useful only if this record is the very first record on the file.
+\item create the file by repeated calls to \Rind{FZOUT},
+compiling at the same the Direct Acces Table,
+including into it IQUEST(5) and (6) returned from \Rind{FZOUT}.
+\item call \Rind{MZPUSH} to reduce the bank holding the DaT to the size
+actually needed.
+\item \Lit{CALL FZODAT (LUN,IXDIV,LBANK)}  to store the bank with the DaT
+onto the file and to update the forward reference record if possible;
+Zebra will remember the DsA of this d/s in the control-bank for this file.
+\item \Lit{CALL FZENDO (LUN,'TX')}  to terminate and close the file.
+This will store the DsA of the DaT bank into the user header of
+the special Zebra EoF record, which is the very last item on the file.
+\end{enumerate}
+
+\subsection*{Reading the file}
+
+Do this:
+
+1) call \Rind{FZFILE} giving CHOPT = 'D' or 'LD' to permit random access.
+
+2) retrieve the direct-access table:
+\begin{verbatim}
+        CALL FZIDAT (LUN,IXDIV,LDAT,1)
+        IF (IQUEST(1).NE.0)             GO TO trouble
+\end{verbatim}
+   \hspace*{4mm} This will try to find the Direct access Table:
+\begin{enumerate}
+\item first it will read the first record on the file to see whether
+      it is a DaT forward reference record containing a non-zero DsA.
+      If so it will use this adr to read the DaT and deliver it to the user.
+\item if this is not successful it will try to get from the operating
+      system the length of the file and then read its last physical record;
+      this should contain the Zebra EoF record with the DsA of the DaT.
+\item if this fails it will scan either the last 24 physical records
+      or the whole file for the DaT record, depending on whether
+      it did or did not get some indication of the file size.
+\end{enumerate}
+
+3) to get a wanted d/s: find it in the DaT, get its DsA
+and call FZINXT (LUN,MDS1,MDS2),
+with MDS the 2-word data-structure address.
+This resets the read point, calling \Rind{FZIN} (LUN,...) will then
+deliver the wanted d/s.
+
+\vspace*{12pt}
+If acccess to the table was not immediate,
+FZIDAT will try to update the forward reference record, if it exists,
+to ease future use.
+It can do this only if the file hase been opened for read/write,
+and this has to be signalled by giving CHOPT='DIO' to \Rind{FZFILE}.
+
+\vspace*{12pt}
+Keeping the DaT on the file to be read is obviously the simplest
+way to proceed, but other organisations are possible.
+For example, if one has a large disk with many files as the
+data-base for the events of an experiment,
+one may want to have a separate global DaT
+for all the events on the disk,
+with a structure reflecting the files and holding their names.
+
+Remember: if one needs a data-base with key-word access
+or update capability one should use the RZ package of Zebra.
+
+\Filename{H2-Usage-for-medium-Memory}
+\section{Usage for medium Memory}
+
+In this mode all the records assembled by \Rind{FZOUT} to represent
+one particular data-structure are placed one after the other
+contiguously into an area of memory belonging to the user
+(rather than being written to a file).
+One is then free to move the data around,
+normally from a machine which has no I/O facilities
+to a machine which has, as in emulator farms.
+They may there be written to tape.
+Eventually the data will be brought back to be read with \Rind{FZIN},
+either directly from a file, or again from user memory.
+To 'read' a d/s from user memory,
+\Rind{FZIN} expects all the records representing the d/s
+to be present in the memory area.
+
+FZ handles the medium 'memory' only with the
+\textbf{file format} 'exchange',
+ie.~with logical 'records' blocked onto fixed-length physical
+'records'.
+The \textbf{data format} can be 'exchange' or 'native'.
+
+The details of this format are found in chapter 3.
+
+To use this mode the following is necessary:
+\begin{itemize}
+ \item[--]  the 'stream' must be initialized with the M option in \Rind{FZFILE},
+ \item[--]  the options I or O set this stream for input or output
+               (it cannot be used for both concurrently),
+ \item[--]   the parameter LUN to \Rind{FZFILE} identifies the stream,
+ \item[--]   the N option selects the native data format,
+ \item[--]   the U option selects unpacked mode, as explained below;
+ \item[--]  the user memory to be used for this stream
+has to be connected by calling FZMEMO;
+different streams may use different memory regions.
+\end{itemize}
+
+The connection call is
+
+\Shubr{FZMEMO}{(LUN,MBUF,NWBUF)}
+
+indicating to FZ the where-abouts and the size of one's
+memory region for stream LUN.
+NWBUF gives the size in terms of machine words,
+it must be large enough to hold the largest d/s to be handled;
+see the memory-size considerations further down.
+
+\subsection*{Output}
+
+In the case of output one calls \Rind{FZOUT} (also \Rind{FZRUN}),
+on return one will find the physical records representing
+the d/s in one's memory.
+\Rind{FZOUT} starts this string of records with a 'steering block',
+ie.~a physical record with 8 control words
+(see chapter 3 for details),
+placed at the start of the user's memory;
+the remaining data are placed as 'fast blocks', if any.
+The last block is normally used only partially,
+the unused part is marked out with a padding record,
+ie.~a logical record of type 5,
+of which only the record length and the type code are significant,
+the data contents are irrelevant.
+
+\Rind{FZOUT} returns in IQUEST(9) the number of useful machine words
+stored into the memory.
+It includes the (normally) 2 control words of the padding record,
+but not its data words.
+If one needs it,
+one can compute the number of physical records
+as  1 + (IQUEST(9)-1)/LENREC  where LENREC
+is the physical record size in machine words.
+On machines with a word-size greater than 32 bits this needs
+a little care,
+as explained in the note about LREC of para. 1.04 for \Rind{FZFILE},
+and also below.
+
+To obtain a start-of-run record one can call \Rind{FZRUN}
+to get it into the memory, the useful size is again found
+in IQUEST(9).
+To get an end-of-run record one has to call \Rind{FZRUN} explicitly;
+one may call \Rind{FZENDO} to have the file statistic printed,
+but this will not put anything into the user's memory.
+
+\subsection*{Input}
+
+To read back a d/s originally produced by \Rind{FZOUT}
+and then shipped around,
+one has to store it in the user memory,
+connected with FZMEMO,
+and call \Rind{FZIN}.
+This will transfer the data to the dynamic store,
+converted if the Exchange Data Format is in use,
+and relocate the links.
+The user's memory is left intact.
+IQUEST(1) returns the read status and must be checked after
+every call to \Rind{FZIN}.
+
+\subsection*{Lay-out of the memory and size considerations}
+
+Using the information of chapter 3,
+one obtains the lay-out of the d/s in the memory
+produced by \Rind{FZOUT} as shown on the next page.
+NWPHR is the physical record length as defined by the call
+to \Rind{FZFILE}, it is 900 by default.
+
+If one is using the native data format
+(or if one is running on a machine where the native format
+is identical to the exchange format, ie.~on IEEE machines
+such as Apollo, Alliant, Motorola)
+this lay-out applies literally,
+the numbers are usable directly,
+and \Rind{FZOUT} will return IQUEST(9)=NWUSE.
+
+However, if one is using the exchange data format
+the data are converted to their exchange representation,
+and they are also 'packed'.
+For example, on the Cray two words are packed into one
+machine word,
+and \Rind{FZOUT} will return IQUEST(9)=(NWUSE+1)/2.
+On a VAX 'packing' means byte inversion,
+so also in this case the data are not usable directly.
+
+Use of the U option:
+the situation can arise that one needs the exchange format,
+because communication is between different machines,
+but that one also needs access to the control information
+at the beginning of the data.
+One could gain this access by local unpacking, but this is messy.
+It is more elegant to take charge of the packing oneself,
+and instruct \Rind{FZOUT} to deliver the data non-packed
+(by selecting the U option in \Rind{FZFILE}).
+In this case the lay-out shown on the next page
+applies again literally, or almost:
+the data are delivered as one word per each machine word
+(and on the VAX the bytes are not yet inverted),
+but they are converted to the exchange representation,
+32 bits right justified with zero-fill.
+This conversion affects negative integers, floating point numbers,
+Hollerith, but not positive integers and bit patterns.
+Since the control information has been deliberately chosen
+to be of this invariant kind, it remains usable.
+\Rind{FZOUT} returns again IQUEST(9)=NWUSE.
+When shipping the data one has to execute the 'packing' operation
+applicable on the given machine such that they arrive in
+the correct form at the destination.
+
+From these considerations one easily derives the size
+requirement on the memory to be connected with FZMEMO.
+On the Cray for example, to handle data-strutures of not more
+than 80000 words (including the control and context information)
+one needs a memory region of 40000 words if one operates
+in normal exchange mode,
+but 80000 words for native mode or if the U option is selected.
+
+\subsection*{Lay-out of a data-structure in the user memory}
+
+\begin{verbatim}
+ word
+    1-4  steering block stamp
+         =  hex  0123CDEF  80708070  4321ABCD  80618061
+      5  bits 1->24: NWPHR, the physical record length
+                 30: set if start-of-run in this block
+                 31: set if end-of-run
+                 32: set if emergency stop block
+      6  zero (physical record counter)
+      7  NWTOLR = 8
+      8  NFAST, the number of fast blocks to follow
+
+      9  NWLR, logical record length
+     10  LRTYP = 2 or 3, the record type
+     11  floating point 12345.0 as check word
+     12  Zebra version number, integer = 10000. * QVERSIO
+     13  zero
+     14  zero
+     15  NWTX=0, number of words in the text-vector
+     16  NWSEG, number of words in the segment table
+     17  NWTAB, number of words in the relocation table
+     18  NWBK,  number of words of bank material
+     19  LENTRY, entry address into the d/s
+     20  NWUHIO = NWUH + NWIO, number of words in the user header
+           vector plus its I/O characteristic, zero if no header
+
+      NWIO words of the I/O characteristic for the u. h. vector
+      NWUH words of the user header vector
+     NWSEG words of the segment table
+      NWTX words of the text-vector
+     NWTAB words of the relocation table
+      NWBK words of bank material
+
+ word
+     NT  is the last word of the d/s
+   NT+1  NWPAD, record length of the padding record
+   NT+2  5, record type
+
+          NWPAD-1 untouched padding words
+\end{verbatim}
+The following numbers are calculated:
+\begin{verbatim}
+   log. record length   NWLR = 10+NWIO+NWUH+NWSEG+NWTX+NWTAB+NWBK
+   incl. log. c/words   NWDS = 2 + NWLR
+  incl. phys. c/words     NT = 8 + NWDS
+     # of fast blocks  NFAST = (NT-1) / NWPHR
+     total # of words   NALL = NWPHR * (NFAST+1)
+       padding length  NWPAD = NALL - NT - 1         (can be 0 or -1)
+    # of useful words  NWUSE = NT + 1 + MIN(NWPAD,1)
+\end{verbatim}
+
+\Filename{H2-Usage-for-medium-Channel}
+\section{Usage for medium Channel}
+
+In this mode the records assembled by \Rind{FZOUT} are channelled
+through a user routine one-by-one to their destination;
+(rather than being written to a file or to memory).
+Similiarly for \Rind{FZIN} the data are acquired not
+from tape or disk directly, but through the same user routine.
+The name of this routine is not decided by Zebra.
+
+Channelled mode operates with
+\textbf{file format} 'exchange',
+ie.~the data are collected into fixed-length records,
+and each record is handed to the user routine when complete
+(for \Rind{FZOUT}, the inverse for \Rind{FZIN}).
+
+The details of this format are found in chapter 3.
+
+The \textbf{data format} can be 'exchange' or 'native'.
+
+To use this mode the following is necessary:
+
+\begin{itemize}
+\item the 'stream' must be initialized with the C option in \Rind{FZFILE},
+\item the options I or O set this stream for input or output
+      (it cannot be used for both concurrently),
+\item the parameter LUN to \Rind{FZFILE} identifies the stream,
+\item the N option selects the native data format,
+\item the S option forces each d/s to start on a new
+      physical record, the U option selects unpacked mode, as explained
+      in the previous paragraph;
+\item the user routine UserSR to be used for this stream
+      must be hooked up to FZ by calling FZHOOK;
+      different streams may use different user routines;
+\item the user routine UserSR must be provided.
+\end{itemize}
+
+The connection call is
+\begin{verbatim}
+      EXTERNAL  UserSR
+\end{verbatim}
+\Shubr{FZHOOK}{(LUN, UserSR, 0)}
+
+passing to FZ the address of the user routine;
+the third argument is not used for the time being.
+
+The specifications for the user routine are:
+
+\fbox{\Lit{SUBROUTINE UserSR (IBUF,IOWAY)}}
+\begin{verbatim}
+with   IBUF:  the data of the 'record'
+
+      IOWAY:  the I/O direction:
+                = 0  if called from FZIN  for input
+                  1  if called from FZOUT for output
+                     other values are reserved to the user
+
+     IQUEST
+        (1):  on entry: LUN, the stream ID
+               on exit:  status flag
+        (2):  on entry: the number of machine words for transmission
+               on exit:  number of machine words delivered
+        (3):  kind of record
+        (4):  = zero if sequential access
+               = ordinal number of the record wanted if direct-access
+        (5):  0 / 1 for disk / tape
+        (6):  if FZIN: number of words per physical record
+
+\end{verbatim}
+
+\subsection*{UserSR called from \Rind{FZIN}}
+
+In this case IOWAY is zero on entry, and IQUEST(2) specifies
+the maximum number of words which the buffer IBUF can accept
+without the program being destroyed.
+
+\Lit{IQUEST(3)} indicates the kind of record expected,
+if this is zero a normal continuation record is wanted;
+if it is =1 then \Rind{FZIN} is expecting a physical record
+starting a new d/s;
+the user routine is supposed to discard trailing records
+of the previous d/s if this has been de-selected.
+Note that selective reading with \Rind{FZIN} in channel mode
+is not yet fully tuned.
+
+UserSR is supposed to fill the buffer \Lit{IBUF},
+store into \Lit{IQUEST(2)} the number of words received,
+and return zero in \Lit{IQUEST(1)}.
+Exeptions may be signalled by setting
+\begin{verbatim}
+  IQUEST(1) =  -1  end of data
+              > 0  error, the value of this status code will be
+                   displayed to the caller of FZIN in IQUEST(14)
+\end{verbatim}
+
+\subsection*{User routines called from \Rind{FZOUT}}
+
+In this case IOWAY is 1 on entry, and IQUEST(2) specifies
+the number of words in the buffer IBUF waiting to be transmitted.
+
+UserSR is supposed to dispatch the buffer IBUF,
+and return zero in IQUEST(1).
+(At least for the time being, a non-zero status code in IQUEST(1)
+is ignored.)
+
+\Filename{H2-User-marking-of-data-structures-for-FZOUT}
+\section{User marking of data-structures for \protect\Rind{FZOUT}}
+
+Normally the identification of the banks belonging to the
+data-structure to be written out is left to \Rind{FZOUT} itself.
+Naturally this can cover only logically simple cases,
+such as the complete d/s supported by the bank at the
+entry address specified to \Rind{FZOUT}.
+
+The situation does however arise that one needs a more
+complex description.
+For this the M option has been provided which tells \Rind{FZOUT}
+that the user has already marked the banks to be transfered
+by setting system status-bit IQMARK (=26),
+and that he has designated the memory interval which contains
+his banks by storing the addresses of the lowest and the highest
+bank into the COMMON /ZLIMIT/LLOW,LHIGH.
+Thus in principle one can set up one's selection in full
+generality,
+except that one must take care that the banks marked
+actually form a connected d/s with the entry address LENTRY.
+
+It may however be quite tedious to do this job completely
+'by hand'.
+So one tries to provide some tools for formalizable situations.
+At present the only such tool is MZMARK (cf. book MZ chapter 2),
+which scans a d/s for marking,
+but at the start of every new linear structure reached during
+the scan it checks the Hollerith ID of the start bank
+with a list to see whether the new sub-structure should
+be included into the marking process.
+
+To take an example, suppose the header bank at LENTRY
+supports 4 primary sub-structures with bank names
+RAW, GEOM, KIN, DST, of which the first 3 support in turn
+4 sub-structures with bank names TEC, BGO, CAL, MUC,
+and at the even lower levels there may be any unspecified further
+sub-structures.
+
+If now one wants to write out only the data for GEOM, KIN, DST,
+and for the first 2 only the BGO results,
+one can do this with
+
+\begin{verbatim}
+      PARAMETER  (NID=4)
+      DIMENSION  IDLIST(NID)
+      DATA       IDLIST  /  4HRAW , 4HTEC  , 4HCAL , 4HMUC  /
+
+      CALL MZMARK (0,LENTRY,'-',NID,IDLIST)
+      CALL FZOUT (LUN,0,LENTRY,IEVENT,'M',IOCH,NUH,IUHEAD)
+\end{verbatim}
+
+Note that we have used the anti-selection option (--) of \Rind{MZMARK}
+to veto at the high levels,
+which permits the low level linear stuctures to be accepted without
+one having to specify which exactly they are.
+
+\Filename{H2-Suppress-loading-of-unused-parts-of-FZ}
+\section{Suppress loading of unused parts of FZ}
+
+Because the format for processing an FZ file
+(native, exchange, ALFA mode)
+is selected by the initializing call to \Rind{FZFILE},
+and because the handling of all formats is done
+by the one set of routines \Rind{FZIN} and \Rind{FZOUT},
+the user's call to \Rind{FZIN} or to \Rind{FZOUT} causes the loading
+of all the code to handle all the formats.
+This volume is non-negligible,
+and for production programs one may want to suppress
+loading of the non-used parts of it.
+This can be done by adapting this dummy routine,
+which as it stands is valid for a program which only
+reads files in native mode and which does not call
+\Rind{FZOUT}/\Rind{FZENDO}:
+
+\begin{verbatim}
+      SUBROUTINE FZDUMY
+      CHARACTER  NAME*6
+
+C--       No output native mode
+*n    ENTRY   FZOFFN
+*n    NAME = 'FZOFFN'
+*n    GO TO 17
+
+C--       No output exchange mode, neither binary nor ALFA
+*n    ENTRY   FZOFFX
+*n    NAME = 'FZOFFX'
+*n    GO TO 17
+
+C--       No output ALFA mode, but binary mode
+*n    ENTRY   FZOASC
+*n    NAME = 'FZOASC'
+*n    GO TO 17
+
+C--       No input native mode
+*u    ENTRY   FZIFFN
+*u    NAME = 'FZIFFN'
+*u    GO TO 17
+
+C--       No input exchange mode, neither binary nor ALFA
+      ENTRY   FZIFFX
+      NAME = 'FZIFFX'
+      GO TO 17
+
+C--       No input ALFA mode, but binary mode
+*n    ENTRY   FZIPHA
+*n    NAME = 'FZIPHA'
+
+   17 CALL ZFATAM (NAME//' in FZDUMMY reached.')
+      END
+\end{verbatim}
+
+Note that the dummy entry \Lit{FZIFFN} is not active because
+the true routine is needed, \Lit{FZIPHA} is not needed because
+\Lit{FZIFFX} is stronger, and that the entries \Lit{FZO...} are not
+needed because \Rind{FZOUT} is not called.
+If the dummy is reached by mistake, the program is stopped
+via \Rind{ZFATAL} with a message.
+
+\Filename{H2-FZ-installation-options}
+\section{FZ installation options}
+
+The various modes of operation
+of FZ have been made optional at the source code level
+to allow a tailor-made installation for specific applications.
+For example, if on a given machine, like an emulator,
+FZ is used exclusively in 'channeled mode',
+the code for all other modes can be removed
+by giving the command line
+\begin{verbatim}
+   +USE, FZFFNAT, FZDACC, FZLIBC, FZMEMORY, FZALFA, T=INHIBIT.
+\end{verbatim}
+in the cradle to the Patchy run which generates the code
+to be compiled for the Zebra Library.
+
+These are the options:
+\begin{DLtt}{123456789}
+\item[FZFFNAT]   file format Native
+\item[FZFORTRAN] sequential Fortran I/O for file format exchange
+\item[FZLIBC]    read/write through the C library interface
+\item[FZDACC]    any direct access mode
+\item[FZDACCF]   direct access with Fortran
+\item[FZDACCL]   direct access with C Library
+\item[FZCHANNEL] channeled mode
+\item[FZMEMORY]  memory mode
+\item[FZALFA]    Alfa exchange mode
+\end{DLtt}
+
+The standard Zebra libraries are usually prepared with all
+FZ modes selected, except \Lit{FZLIBC} which is selected only under UNIX.

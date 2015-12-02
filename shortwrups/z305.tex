@@ -1,0 +1,235 @@
+% 20 may 1992  mg
+\Version {VMPACK}                    \Routid{Z305}
+\Keywords{IBM INTERFACE SYSTEM VM/CMS VMBEEP VMCMS VMPACK VMREXX VMSATN VMTATN}
+\Keywords{FORTRAN REXX VMRTRM}
+\Author{R. Matthews, A. Cass}        \Library{KERNLIB, IBM  VM/CMS only}
+\Submitter{}                \Submitted{08.06.1989}
+\Language{IBM Assembler}           %   %\Revised{}
+\Cernhead {IBM VM/CMS System Interface}
+{\tt VMPACK} is a package of Fortran--callable subprograms
+providing an interface to the VM/CMS operating system.
+\Structure
+{\tt SUBROUTINE} subprograms \\
+User Entry Names:
+\Rdef{VMBEEP}, \Rdef{VMCMS},  \Rdef{VMREXX}, \Rdef{VMRTRM},
+\Rdef{VMSATN}, \Rdef{VMTATN} \\
+Files Referenced: Virtual console
+\Usage
+{\bf Subroutine VMBEEP:}
+\begin{verbatim}
+    CALL VMBEEP
+\end{verbatim}
+will sound the alarm on the virtual console. \\[3mm]
+{\bf Subroutine VMCMS:} \\[2mm]
+This subroutine can be used to issue CMS or CP commands from a
+Fortran program. They are processed in the same way as commands
+issued from a {\tt REXX} exec in which {\tt 'ADDRESS COMMAND'}
+has been specified, i.e. the {\tt EXEC} command must be used to invoke
+execs and CP commands must be prefixed by the CMS command prefix CP.
+\begin{verbatim}
+    CALL VMCMS(COMAND,IRC)
+\end{verbatim}
+\begin{DLtt}{12345678}
+\item[COMAND]({\tt CHARACTER}) A command.
+\item[IRC] ({\tt INTEGER}) Contains, on exit, the return code from the
+command.
+\end{DLtt}
+Refer to the appropriate IBM publications for a list and explanation of
+the return codes which may be produced by the command.
+\Examples
+\begin{verbatim}
+    CALL VMCMS('FILEDEF 27 TERMINAL',IRC)
+    MSG='EXEC TELL JIM THE FILEDEF HAS BEEN ISSUED'
+    CALL VMCMS(MSG,IRC)
+\end{verbatim}
+\Restrict
+It is not permitted to issue a CMS command which runs in the user area,
+nor a command which invokes another program, as this will overwrite
+the program which is executing.
+The commonly used commands which run in the user area are: \\[2mm]
+\begin{tabular}{l*{8}{@{\hspace{4pt}}l}}
+{\tt ASSEMBLE}, & {\tt COPYFILE}, & {\tt EXECUPDT}, & {\tt FORMAT}, &
+{\tt LISTDS},   & {\tt LKED},     & {\tt LOADLIB},  {\tt MACLIB},   &
+{\tt MACLIST},  \\
+{\tt MODMAP},   & {\tt MOVEFILE}, &  {\tt OSRUN},   & {\tt SORT},   &
+{\tt TAPEMAC},  & {\tt TAPPDS},   & {\tt TXTLIB},   & {\tt UPDATE}.
+\end{tabular} \\[2mm]
+\newpage
+{\bf Subroutine VMREXX:} \\[2mm]
+This subroutine can be called from a program which has been invoked
+from a {\tt REXX} exec to set, inspect or drop any of the exec's
+variables.
+\begin{verbatim}
+    CALL VMREXX(CODE,NAME,VALUE,IRC)
+\end{verbatim}
+\begin{DLtt}{123456}
+\item[CODE] ({\tt CHARACTER*1}) Indicates the function to be performed:
+\begin{DLtt}{12}
+\item[A] Move {\tt REXX} stem variables to Fortran array.
+See {\bf Examples}.
+\item[B] Move Fortran array to {\tt REX} stem variables.
+See {\bf Examples}.
+\item[D] Drop the variable. If the name given is a stem, all
+variables with that stem are dropped.
+\item[F] Fetch the value of the variable.
+\item[S] Set the value of the variable.
+\item[N] Fetch the next variable. This function code be used
+to search through all the variables of the exec file.
+\item[P] Fetch 'private' information. When this function code is used
+the variable name refers to certain fixed information:
+\begin{DLtt}{12345678}
+\item[ARG] Fetch the primary argument list.
+\item[SOURCE] Fetch the source string as provided by the
+{\tt REXX PARSE SOURCE} instruction.
+\item[VERSION] Fetch the version string as provided by the
+{\tt REXX PARSE VERSION} instruction.
+\end{DLtt}
+\end{DLtt}
+\item[NAME] ({\tt CHARACTER}) Name of the {\tt REXX} variable as a
+constant or variable (in UPPER case).
+\item[VALUE] ({\tt CHARACTER}) Value of the {\tt REXX} variable as a
+constant or variable.
+\item[IRC] ({\tt INTEGER}) Return code. Contains, on exit,
+one of the following values to indicate the result of the operation:
+\begin{DLtt}{1234}
+\item[\ \ 0] Execution was successful.
+\item[\ \ 1] The variable did not exist.
+\item[\ \ 2] Last variable transferred for function code {\tt 'N'}.
+\item[\ \ 4] Truncation occurred during fetch.
+\item[\ \ 8] Invalid variable name.
+\item[\ 16] Invalid integer in {\tt stem.0} for function codes
+{\tt 'A'} and {\tt 'B'}.
+\item[128] Invalid function code.
+\end{DLtt}
+\end{DLtt}
+\Examples
+\begin{verbatim}
+    CALL VMREXX('P','ARG',CHARS,IRC)
+\end{verbatim}
+will store the value of the primary argument list in
+the 80-character variable {\tt CHARS}. If the argument list contains
+more than 80 characters, then only the first 80 will be transferred and
+the value of the return code will be $\mathtt{IRC = 4}$.
+\par
+Fetching and Setting Stem variables: Function codes {\tt 'A'} and
+{\tt 'B'} allow transfer of data between Fortran arrays and
+{\tt REXX} stem variables. The {\tt REXX} variable {\tt stem.0} must
+contain the number of elements to be transferred. Then {\tt 'A'} moves
+data from {\tt REXX} to Fortran, {\tt 'B'} from Fortran
+to {\tt REXX}:
+\newline
+\begin{verbatim}
+    /**/
+    line.0 = 5
+    line.1 = 'Hello'
+    line.2 = 33
+    line.3 = 'alpha'
+    line.4 = 'Beta'
+    line.5 = 8567
+    'LOAD TEST(START'
+    Do l = 1 To 5
+    Say mine.l
+    End
+ 
+    PROGRAM TEST
+    CHARACTER*5 GET(MAX),SET(MAX)
+    DATA SET/'DUMMY','LINES',' TO  ','GIVE ','REXX '/
+    CALL VMREXX('A','LINE.',GET,IRC)
+    WRITE (6,'(1X,A10)') GET
+    CALL VMREXX('S','MINE.0','5',IRC)
+    CALL VMREXX('B','MINE.',SET,IRC)
+    END
+\end{verbatim}
+If an error is detected accessing the {\tt stem.0} variable then the
+return code is set and processing stops -- no data is transferred.
+Otherwise all elements are processed regardless of truncation or
+existence errors and the return code is set to zero.
+Return code {\tt 16} indicates that the contents of {\tt stem.0}
+were not a valid integer. Return code {\tt 4} implies the same or that
+the integer was larger than {\tt 999,999,999}.
+\Restrict
+Note that the {\tt REXX} variables within an Exec which calls a
+second Exec are not visible within the second Exec. This means
+that, for example, {\tt VMREXX} has no knowledge of the variables within
+an Exec which invokes program execution by using the {\tt GO} option
+of the {\tt VFORT} exec.
+\par
+The maximum number of elements that can be transferred with
+codes {\tt 'A'} and {\tt 'B'} is {\tt 999,999,999}. \\[3mm]
+{\bf Subroutine VMRTRM:} \\[2mm]
+This subroutine will read a line from the console stack or, if the
+stack is empty, directly from the console (i.e. the user must type
+in a line):
+\begin{verbatim}
+    CALL VMRTRM(LINE,LENGTH)
+\end{verbatim}
+\begin{DLtt}{12345678}
+\item[LINE] ({\tt CHARACTER}) Contains, on exit, the line
+read from the console.
+\item[LENGTH] ({\tt INTEGER}) Number of characters placed in {\tt LINE}.
+\end{DLtt}
+If the data read from the console exceeds the length of {\tt LINE}
+then it is truncated. \\[3mm]
+\newpage
+{\bf Subroutines VMSATN and VMTATN:} \\[2mm]
+These subroutines can be used by interactive programs to process
+attention interrupts from the virtual console. An attention interrupt
+occurs when the user enters a string of characters on the command line
+and presses the enter (or return) key at a time when the program has not
+issued a read to the console, i.e. the user wishes to bring something to
+the attention of the program even though the program has not requested
+any input. This mechanism may be used, for example, to temporarily halt
+a long-running program in order to query its status.
+ 
+{\tt VMSATN} is used to establish the attention interrupt
+mechanism and must be called before any attention
+interrupts can be detected:
+\begin{verbatim}
+    CALL VMSATN(IRC)
+\end{verbatim}
+\begin{DLtt}{1234}
+\item[IRC] ({\tt INTEGER}) Contains, on exit, the value zero if the
+attention mechanism has been established, and a non-zero value otherwise.
+\end{DLtt}
+{\tt VMTATN} is used to determine whether an attention
+interrupt has occurred. A Fortran {\tt READ} issued to the
+virtual console (Fortran logical unit 5) can then be used
+to obtain the character string that was entered:
+\begin{verbatim}
+    CALL VMTATN(IRC)
+\end{verbatim}
+\begin{DLtt}{1234}
+\item[IRC] ({\tt INTEGER}) Contains, on exit, a non-zero
+value if an interrupt has occured, and the value zero otherwise.
+\end{DLtt}
+\Examples
+The following example shows a program which establishes the
+attention mechanism and then performs an iterative process.
+\par
+{\tt VMTATN} is called at the beginning of each iteration
+to determine whether an attention interrupt has occurred:
+\begin{verbatim}
+*...  ESTABLISH THE ATTENTION MECHANISM
+      CALL VMSATN(IRC)
+      IF(IRC .NE. 0) THEN
+        process the error
+      ENDIF
+*...  PERFORM ITERATIVE PROCESSING
+    1 CALL VMTATN(IRC)
+      IF(IRC .NE. 0) THEN
+        READ '(A)',LINE
+        process the attention interrupt
+      ELSE
+        perform normal processing
+      ENDIF
+      GOTO 1
+      END
+\end{verbatim}
+\Restrict
+CMS support for immediate commands (e.g. HX) requires that CMS
+handles attention interrupts from the virtual console. Immediate
+commands will therefore not be recognized by CMS when {\tt VMSATN} and
+{\tt VMTATN} are used to handle attention interrupts. The PA1 key may,
+however, be used to interrupt execution of the virtual machine and
+put the virtual console into 'CP READ' status.
+\\ $\bullet$

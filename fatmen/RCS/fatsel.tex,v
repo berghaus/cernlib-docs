@@ -1,0 +1,211 @@
+head	1.1;
+access;
+symbols;
+locks
+	goossens:1.1; strict;
+comment	@% @;
+
+
+1.1
+date	93.11.02.16.16.11;	author goossens;	state Exp;
+branches;
+next	;
+
+
+desc
+@ Initial entry
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@\section{Routines to tailor FATMEN selection}
+\par
+By default, FATMEN makes no check on location code or copy
+level when accessing a dataset or listing a catalogue entry.
+When attempting to access a dataset, FATMEN searches
+for a copy first on disk, then 3480 cartridge, and so on.
+The following routines may be used to modify the selection
+procedure.
+\par
+If a call to FMSETL or FMSETC is made, only entries with
+a location code or copy level that match one of those
+specified will be accessible (unless the key serial number
+is given explicitly) or visible via a call to FMLS.
+\par
+The routine FMSETM permits not only the range of medium
+types to be set but also the order.
+For example, a call to FMSETM with the following values
+will limit the selection to medium types 3, 5, 1 and 2,
+in that order.
+\begin{XMP}
+      NMTP = 4
+      MTP(1) = 3
+      MTP(2) = 5
+      MTP(3) = 1
+      MTP(4) = 2
+\end{XMP}
+\par
+Alternatively, the routine FMSETK can be used. This allows the
+user to declare a keys matrix and character option which will
+be used in all future file selections. That is, it overrides
+both the FATMEN default selection and that set by the routines
+FMSETC, FMSETL and FMSETM.
+\par
+The difference between these three approaches is explained below.
+With the default FATMEN selection, no check is made on copy level
+or location code. FATMEN takes in turn media types 1 to 4 and
+looks for an accessible dataset. The first one found is taken,
+with the proviso that robotically mounted tapes are given preference
+over manually mounted tapes.
+\par
+The FMSETC, FMSETL and FMSETM routines allow the user to specify
+allowed values for the copy level and location code, and the
+order in which the different media types are to be processed.
+This allows media types that are not in the default selection
+to be processed, and the order to be changed. 
+However, the user is unable to indicate that, for example,
+a location code or 31 is preferable to one of 21, within
+a given media type.
+\par
+The FMSETK routine provides the user with more control.
+One might wish to set the order to be native mode copy
+on disk, native mode copy on 3480 robotically mounted
+cartridge, exchange mode copy on disk, exchange mode
+copy on 3480 cartridge. 
+\subsection{Declare location codes to FATMEN}
+\Sbox{FMSETL}{CALL FMSETL(LOC,NLOC,IRC*)}
+\index{Location code}
+\begin{DLtt}{1234567}
+\item[LOC]
+Array of length NLOC containing a list of location codes
+to be used in FATMEN selection of an entry.
+\item [NLOC]
+The number of location codes declared, maximum 99
+\item[IRC]
+Integer variable in which the return code is returned.
+\end{DLtt}
+\subsection{Declare media types to FATMEN}
+\Sbox{FMSETM}{CALL FMSETM(MTP,NMTP,IRC*)}
+\index{Media type}
+\begin{DLtt}{1234567}
+\item[MTP]
+Array of length NMTP containing a list of media types
+to be used in FATMEN selection of an entry.
+\item[NMTP]
+The number of media types declared, maximum 99
+\item[IRC]
+Integer variable in which the return code is returned.
+\end{DLtt}
+\subsection{Declare copy levels to FATMEN}
+\Sbox{FMSETC}{CALL FMSETC(CPL,NCPL,IRC*)}
+\index{Copy level}
+\begin{DLtt}{1234567}
+\item[CPL]
+Array of length NCPL containing a list of copy levels
+to be used in FATMEN selection of an entry.
+\item[NCPL]
+The number of copy levels declared, maximum 99
+\item[IRC]
+Integer variable in which the return code is returned.
+\end{DLtt}
+\subsection{Declare selection matrix and options to FATMEN}
+\Sbox{FMSETK}{CALL FMSETK(KEYM,NK,CHOPT,IRC*)}
+\index{Key selection}
+\index{Key matrix}
+\begin{DLtt}{1234567}
+\item[KEYM]
+Matrix of size (LKEYFA,NK) containing an ordered
+list of key vectors 
+to be used in FATMEN selection of an entry.
+\item[NK]
+The number of copy levels declared, maximum 99
+\item[CHOPT]
+The options to be used when selecting a dataset,
+as defined by the routine FMSELM.
+\item[IRC]
+Integer variable in which the return code is returned.
+\end{DLtt}
+\par
+See the description of the FMSELM routine for more information
+on how the key matrix is used in dataset selection.
+\subsection{Select files using keys matrix}
+\Sbox{FMSELM}{CALL FMSELM(GENAM,LBANK*,KEYS*,KEYM,NKEY,CHOPT,IRC*)}
+\begin{DLtt}{1234567}
+\item[GENAM]
+Character variable of maximum length 255 to specify the generic name.
+\item[LBANK]
+Integer variable in which the address of the FATMEN bank is returned.
+\item[KEY]
+Integer array of length 10 in which the keys vector associated with
+the bank at LBANK is returned.
+\item[KEYM]
+Integer matrix of size (10,NKEY) containing the ordered selection
+criteria.
+\item[NKEY]
+Integer variable to specify the second dimension of
+the matrix KEYM.
+\item[CHOPT]
+Character variable containing the user specified options.
+\item[IRC]
+Integer variable in which the return code is returned.
+\end{DLtt}
+\par
+This routine takes each row of the input matrix KEYM in turn,
+and attempts to find a matching dataset. If no matching dataset
+is found, it then proceeds to the next row.
+Currently, checks are only made on media type (MKMTFA), location code
+(MKLCFA) and copy level (MKCLFA). A value of -1 indicates that no
+check on this item is to be made.
+\par
+The following options are available:
+\begin{XMP}
+   I - issue FORTRAN inquire for disk datasets (with full support
+       for SHIFT files, Unix environmental variables, VM mini-disks,
+       SFS pools etc.)
+   N - check host name for disk datasets against current host
+   M - require that tape datasets reside on manually mounted volumes
+   R - require that tape datasets reside on robotically mounted volumes
+\end{XMP}
+\begin{XMPt}{Example of using the FMSELM routine}
+*     Argument declarations
+      PARAMETER (LKEYFA=10)
+      PARAMETER (NKEY=3)
+      DIMENSION KEYS(LKEYFA),KEYM(LKEYFA,NKEY)
+*
+*     Define search criteria: first, disk dataset in location 31,
+*        with no check on copy level,
+*                             next, dataset on media type 2 in location 1,
+*                             next, dataset on any media in any location 
+*                             with copy level 1
+*
+      KEYM(MKMTFA,1) = 1
+      KEYM(MKCLFA,1) = -1
+      KEYM(MKLCFA,1) = 31
+
+      KEYM(MKMTFA,2) = 2
+      KEYM(MKCLFA,2) = -1
+      KEYM(MKLCFA,2) = 1
+
+      KEYM(MKMTFA,3) = -1
+      KEYM(MKCLFA,3) = 1
+      KEYM(MKLCFA,3) = -1
+*
+*     Options NM: No check on host name for disk files,
+*                 Manually mounted tape required
+*
+      CALL FMSELM('//CERN/OPAL/DDST/PASS3/FYZ1/P20/R02222C01',
+     +   LBANK,KEYS,KEYM,NK,'NM',IRC)
+
+      PRINT *,'Return code from FMSELM = ',IRC
+
+      IF(IRC.EQ.0)
+     +   CALL FMSHOW('//CERN/OPAL/DDST/PASS3/FYZ1/P20/R02222C01',
+     +                LBANK,KEYS,'A',IRC)
+
+
+\end{XMPt}
+@

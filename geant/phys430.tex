@@ -1,0 +1,470 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%  GEANT manual in LaTeX form                              %
+%                                                                 %
+%  Michel Goossens (for translation into LaTeX)                   %
+%  Version 1.00                                                   %
+%  Last Mod. Jan 24 1991  1300   MG + IB                          %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\Origin{G.N.Patrick, L.Urb\'{a}n, D.Ward}
+\Version{Geant 3.16}\Routid{PHYS430}
+\Submitted{12.03.82}  \Revised{16.12.93}
+\Makehead{Ionisation processes for muons and protons}
+
+\section{Subroutines}
+
+\Shubr{GDRELA}{}
+
+\Rind{GDRELA} initialises the ionisation energy-loss tables for different
+materials and particles.
+The energy binning is in the array
+{\tt ELOW} (\FCind{/GCMULO/}) initialised in the routine \Rind{GPHYSI}.
+The tables are filled with the quantity $dE/dx$ in GeV cm$^{-1}$,
+for elements, mixtures and compounds. A
+temporary table is also filled, containing 
+additional points for integration, to obtain the range-energy
+table (see {\tt [PHYS010]}).
+
+\Rind{GDRELP} computes the ionisation energy loss for protons,
+and the values are stored in the energy loss table.
+This value is used for other charged hadrons with scaled energy bin.
+
+\Rind{GDRELM} computes the ionisation energy loss for muons,
+and sums it in the muon table
+with the energy loss due to the other processes
+(bremsstrahlung, pair production and nuclear interactions). 
+
+The following pointers are used:
+
+\begin{DLtt}{MMMMMMMMMMMMMMMMMM}
+\item[JMA = LQ(JMATE-I)]    I$^{th}$ material bank;
+\item[JEL1 = LQ(JMA-1)]     $dE/dx$ for \Pep/\Pem (see {\tt [PHYS330]});
+\item[JEL2 = LQ(JMA-2)]     $dE/dx$ for $\mu^+/\mu^-$;
+\item[JEL3 = LQ(JMA-3)]     $dE/dx$ for protons (used also 
+for other charged particles).
+\end{DLtt}
+
+\Rind{GDRELA} is called during initialisation by \Rind{GPHYSI}.
+
+\Shubr{GDRELP}{(A,Z,DENS,T,DEDX*)}
+
+\Rind{GDRELP} computes the ionisation energy loss for 
+protons. It is called by the routine \Rind{GDRELA}. See \Rind{GDRELX}
+below for the meaning of the parameters.
+
+\Shubr{GDRELM}{(A,Z,DENS,T,DEDX*)}
+
+\Rind{GDRELM} computes the energy loss due to ionisation for 
+muons. It is called by the routine \Rind{GDRELA}. See \Rind{GDRELX}
+below for the meaning of the parameters.
+
+\Shubr{GDRELX}{(A,Z,DENS,T,HMASS,DEDX*)}
+
+\begin{DLtt}{MMMMMMMM}
+\item[A] ({\tt REAL}) mass number of the material;
+\item[Z] ({\tt REAL}) atomic number of the material;
+\item[DENS] ({\tt REAL}) density of the material in g cm$^{-3}$; it is only used 
+to calculate the density correction in case of high values of {\tt T};
+\item[T] ({\tt REAL}) kinetic energy of the particle in GeV;
+\item[HMASS] ({\tt REAL}) mass of the particle;
+\item[DEDX] ({\tt REAL}) energy loss of the particle in GeV cm$^{2}$ g$^{-1}$.
+\end{DLtt}
+
+This routine calculates the ionisation energy loss for a muon or a
+proton. It is called by \Rind{GDRELM} and \Rind{GDRELP}.
+
+
+\Shubr{GDRSGA}{}
+
+\Rind{CDRSGA} calculates the total cross-section for the production
+of $\delta$-rays by electrons (M\"{o}ller scattering), positrons
+(Bhabha scattering) and muons.
+For hadrons, this value is calculated
+at tracking time. The mean free path as a function of the energy
+is stored for every medium. The following pointers are used: 
+
+\begin{DLtt}{MMMMMMMMMMMMMMMMMM}
+\item[JMA = LQ(JMATE-I)]  pointer to the I$^{th}$ material;
+\item[JDRAY = LQ(JMA-11)]  $\delta$-ray cross-section for electrons;
+\item[JDRAY+NEK1]  $\delta$-ray cross-section for positrons;
+\item[JDRAY+2*NEK1]  $\delta$-ray cross-section for muons.
+\end{DLtt}
+
+The routine is called during initialisation by {\tt GPHYSI}.
+
+\section{Method}
+
+In {\tt GEANT}, $\delta$-rays are generated only above a threshold energy
+$T_{cut}$ which corresponds to the variable {\tt DCUTE} for electrons and 
+positrons, {\tt DCUTM} for all other charged particles. The total cross-section 
+for the production of a $\delta$-ray electron of kinetic
+energy $T > T_{cut}=${\tt DCUTE, DCUTM} by a particle of kinetic energy $E$
+is:
+\begin{equation}
+\label{eq:phys430-3}
+\sigma (E,T_{cut}) = \int_{T_{cut}}^{T_{max}} \frac{d \sigma (E,T)}{dT} dT
+\end{equation}
+where $T_{max}$ is the maximum energy transferable to the free electron:
+\begin{equation}
+T_{max} =\frac{2m(\gamma^2 -1)}
+      {1+2\gamma\frac{m}{M}+
+      \left(\frac{m}{M} \right)^2 }
+\end{equation}
+
+The energy lost in 
+ionising collisions producing $\delta$-rays below ${T_{cut}}$
+are included in the continuous energy loss. The mean value of the
+energy lost due to these {\it soft} collisions is:
+\begin{equation}
+\label{eq:phys430-1}
+E_{loss}(E,T_{cut}) = \int_{0}^{T_{cut}} 
+T \frac{d \sigma (E,T)} {dT} dT
+\end{equation}
+where $m$ is the electron mass and $M$ is the mass of the incident particle.
+
+In this chapter, the method of calculation of the continuous energy loss
+and the total cross-section are
+explained. The generation of $\delta$-rays is explained in 
+chapter {\tt [PHYS331]}.
+
+\subsection{Continuous energy loss}
+The integration of (\ref{eq:phys430-1}) leads to the Bethe-Block
+stopping power or to the restricted energy 
+loss formula \cite{bib-PDGB}:
+\begin{equation}
+\label{eq:phys430-2}
+\frac{1} {\rho} \left(\frac{dE}{dx} \right) =
+\left \{
+\begin{array}{LcL}
+D \frac{Z Z_{inc}^{2}}{A \beta^{2}} \left [
+\ln \left ( 
+\frac{2 m_{e} \beta^{2} \gamma^{2} T_{max} }{I^{2}} 
+\right ) - 2 \beta^{2} - 
+\delta -
+\frac{ 2 C_{e}}{Z} \right ] 
+\hfill & \mbox{if} & T_{cut} \geq T_{max} \\ [0.5cm]
+D \frac{Z Z_{inc}^{2}}{A \beta^{2}} \left [
+\ln \left ( 
+\frac{ 2 m_{e} \beta^{2} \gamma^{2} T_{c} }{I^{2}} 
+\right ) - 
+\beta^{2} \left ( 1 + \frac{T_{c}}{T_{max}} \right )
+ - \delta
+-\frac{2 C_{e}}{Z} \right ] \hfill & \mbox{if} & T_{cut} < T_{max}
+\end{array} 
+\right .
+\end{equation}
+
+where,
+\[
+\begin{array}{LL@{\hspace{2cm}}LL}
+D & 2\pi N_A r_e^2 m c^2 = 0.000153537 \: \mbox{GeV cm$^2$ g$^{-1}$}
+& Z & \mbox{atomic number of medium}  \\
+A   & \mbox{mass number} & \rho & \mbox{density of medium} \\
+T_c &  \min(T_{cut},T_{max}) & m_e & \mbox{electron mass}
+\end{array}
+\]
+
+and $I$ is the average ionisation potential of the atom in question.
+There exists a variety of phenomenological approximations for this.
+In former versions of {\tt GEANT} the formula quoted by
+\cite{bib-BRIC} was used ($I=16\:Z^{0.9}$ eV). At present the
+values recommended by~\cite{bib-ANZI} are used. The ionisation
+potential $I$ only enters into the logarithmic term of the energy
+loss formula, but it has been verified that the new parameterisation
+gives better accuracy especially in the case of high $Z$.
+It should be noted that this is not the value of $I$ which
+is stored in the material data structure by \Rind{GPROBI}, 
+which is still calculated as $I=16\:Z^{0.9}$ eV.
+
+{\bf Note:} the ionisation potential $I$ must not be changed blindly,
+hoping that the most up-to-date values give the better results. The
+value of $I$ is closely connected to the shell correction term (see
+later). 
+
+$\delta$ is a correction term which takes account of the reduction
+in energy loss due to the so-called density effect. This becomes
+important at high energy because media have a tendency to become
+polarised as the incident particle velocity increases. As a consequence,
+the atoms in a medium can no longer be considered as isolated. To correct
+for this effect the formulation of Sternheimer~\cite{bib-STE1,bib-STE2} 
+is used:
+ 
+\begin{equation}
+\delta = \left \{ \begin{array}{L@{\hspace{1cm}}lL} 
+            0                   &    \mbox{if} & X  < X_0      \\
+            4.606X + C + a(X_1-X)^m & \mbox{if} & X_0 \leq X < X_1 \\
+            4.606X + C  & \mbox{if}  & X  \geq X_1
+            \end{array} \right .
+\end{equation}
+ 
+where the medium-dependent constants are calculated as follows:
+\[
+\begin{array}{LcL@{\hspace{1.5cm}}LcL}
+X & = & \log_{10}(\gamma \beta) = \ln(\gamma^{2} \beta^{2})/4.606 & 
+\nu_{p} & = & \sqrt{ \frac{N_{el} e^2 }{\pi m} }
+\mbox{\hspace{0.25cm}s$^{-1}$ plasma frequency} \\
+N_{el} & = & \frac{\rho Z N_{Av}}{A} \mbox{\hspace{0.25cm}electrons cm$^{-3}$}
+& C & = & -2 \ln \left ( \frac{I}{h\nu_{p}} \right ) - 1 \\
+a & = & \frac{4.606(X_a - X_0)}{(X_1 - X_0)^m} & 4.606 \: X_{a} & = & -C
+\end{array}
+\]
+
+For condensed media we have:
+ 
+\[
+\begin{array}{LL}
+I < 100 \: \mbox{eV} & \left \{
+\begin{array}{LcL}
+X_{0} & = & \left \{
+\begin{array}{LlL}
+0.2 & \mbox{if} & -C \leq 3.681 \\
+-0.326C-1.0 & \mbox{if} & -C > 3.681
+\end{array} \right . \\
+X_{1} & = & 2.0 \\
+m & = & 3.0
+\end{array} \right . \\ [1.0cm]
+I \geq 100 \: \mbox{eV} & \left \{
+\begin{array}{LcL}
+X_{0} & = & \left \{
+\begin{array}{LlL}
+0.2 & \mbox{if} & -C \leq 5.215 \\
+-0.326C-1.5 & \mbox{if} & -C > 5.215
+\end{array} \right . \\
+X_{1} & = & 3.0 \\
+m & = & 3.0
+\end{array} \right .
+\end{array}
+\]
+
+and in the case of gaseous media $m=3$ and:
+
+\[
+\begin{array}{LLcr@{}c@{}l}
+X_0 = 1.6 & X_1 = 4 & \mbox{for} &       & C & \leq 9.5 \\
+X_0 = 1.7 & X_1 = 4 & \mbox{for} & 9.5 < & C & \leq 10 \\
+X_0 = 1.8 & X_1 = 4 & \mbox{for} & 10  < & C & \leq 10.5 \\
+X_0 = 1.9 & X_1 = 4 & \mbox{for} & 10.5 < & C & \leq 11 \\
+X_0 = 2.  & X_1 = 4 & \mbox{for} & 11  < & C & \leq 12.25 \\
+X_0 = 2.  & X_1 = 5 & \mbox{for} & 12.25 < & C & \leq 13.804 \\
+X_0 = 0.326C-2.5 & X_1 = 5 & \mbox{for} & 13.804 < & C &  \\
+\end{array}
+\]
+
+$C_e/Z$ is a so-called {\it shell correction term}
+which accounts for the fact that, at
+low energies for light elements and at all energies for heavy ones, the
+probability of collision with the electrons of the inner atomic shells
+(K, L, etc.) is negligible. The semi-empirical formula used in
+{\tt GEANT}, applicable to all materials, is due to Barkas \cite{bib-BARK}:
+\begin{eqnarray*}
+ C_e(I,\eta) & = & (0.42237\eta^{-2}+0.0304\eta^{-4}-0.00038\eta^{-6})
+10^{-6} I^2 \\
+& +& (3.858\eta^{-2}-0.1668\eta^{-4}+0.00158\eta^{-6})10^{-9}I^3 \\
+\eta & = &  \gamma \beta
+\end{eqnarray*}
+$C_e$ is a dimensionless constant, but as $I$ in the original
+article was expressed in eV and in {\tt GEANT} it is expressed in GeV,
+the exponent of ten in the $I^2$-term is $10^{-6+2 \times 9} = 10^{12}$, and
+that of the $I^3$-term is $10^{-9+3 \times 9} = 10^{18}$.)
+This formula breaks down at low energies, and it only applies for values 
+of $\eta > 0.13$ (i.e. $T > 7.9$ MeV for a proton). For $\eta \leq
+0.13$ the shell correction term is calculated as:
+
+\[
+\left . C_{e}(I,\eta) \rule{0mm}{5mm} \right |_{\eta \leq
+0.13} = C_{e}(I,\eta=0.13)\frac{\ln \left ( \frac{T}{T_{2l}} \right )}
+{\ln \left ( \frac{7.9 \: 10^{-3} \: \rm GeV}{T_{2l}} \right )}
+\]
+ 
+i.e. the correction is {\it switched off} logarithmically from $T=7.9$
+MeV to $T=T_{2l}=2$ MeV.
+\Rind{GDRELX} has been tested for protons against energy loss tables 
+\cite{bib-SERR,bib-SER1}
+for various materials in the energy range 50 MeV-25 GeV. 
+Typical discrepancies are as follows:
+ 
+\begin{flushleft}
+\begin{tabular}{lll}
+Beryllium: &   1.1\%  at 0.05 GeV      &  0.02\%  at  25 GeV\\
+Hydrogen : &   1.5\%  at 0.05 GeV      &  12.1\%  at  25 GeV\\
+Water   :  &   8.1\%  at 0.05 GeV      &  4.4\%  at  6  GeV\\
+\end{tabular}
+\end{flushleft}
+
+The mean energy loss can be described by the Bethe-Bloch formula 
+(\ref{eq:phys430-2}) only if the projectile velocity is larger than that
+of orbital electrons. In the low-energy region where this is not 
+verified, a different kind of parameterisation has been chosen \cite{bib-ANZI}:
+\[
+\frac{1}{\rho} \frac{dE}{dx} =  \left \{
+\begin{array}{rLcL}
+I: & C_{1} \tau^{\frac{1}{2}} & \mbox{for} & 0 \leq T \leq T_{1l} = 10 \:
+\mbox{keV} \\
+II: & \frac{S_{L} \times S_{H}}{S_{L} - S_{H}} & \mbox{for} & T_{1l}
+< T \leq T_{2l} = 2 \: \mbox{MeV} \\
+III: & \left \{ \mbox{Bethe-Bloch} \right \} \left ( 1+\frac{\nu}{T} \right )
+& \mbox{for} & T_{2l} < T
+\end{array} \right .
+\]
+
+where
+
+\[
+\begin{array}{LcL@{\hspace{1.5cm}}LcL}
+S_{L} & = & C_{2} \tau^{0.45} & S_{H} & = & \frac{C_{3}}{\tau}
+\ln \left [ 1+\frac{C_{4}}{\tau}+C_{5} \tau \right ] \\
+\tau & = & \frac{T}{M_{p}} & M_{p} & = & \mbox{proton mass}
+\end{array}
+\]
+
+\begin{table}
+\begin{centering}
+\begin{tabular}{l|c|c|c}
+\multicolumn{4}{c}{$\displaystyle 
+\frac{dE}{dx}^{calculated} - \frac{dE}{dx}^{measured}$}\\ [0.3cm]
+\hline 
+experiment & A~\cite{bib-REYN} & B~\cite{bib-GREE} & C~\cite{bib-SAKA} \\
+\hline
+projectile & p & p & p \\
+T (MeV) & 0.03-0.6 & 0.4-1 & 55,65,73 \\ [0.2cm]
+material 
+& \parbox{3cm}{H$_2$, He, N$_2$, O$_2$, Ne, Ar, Xe}
+& \parbox{3cm}{Cu, Ge, Sn, Pb}
+& \parbox{3cm}{Al, Ti, Cu, Sn, Pb} \\
+exp err (\%) & $\sim$ 3 & $\sim$ 2.5 & $\sim$ 0.7 \\
+\hline\hline
+tot N$^{\circ}$ of pts & 121 & 52 & 15 \\
+\hline 
+N$^{\circ}$ of pts \hfill & & & \\
+\hfill with $|\Delta| < 1 \sigma$ & 94 & 50 & 8  \\
+\hfill      $|\Delta| < 2 \sigma$ & 114 & 52 & 13  \\
+\hfill      $|\Delta| < 3 \sigma$ & 119 & 52 & 14  \\
+\hfill      $|\Delta| < 4 \sigma$ & 121 & 52 & 15  \\
+\hline
+\end{tabular}
+\caption{Test of {\tt GDRELP} with low energy protons.}
+\end{centering}
+\label{tb:phys430-1}
+\end{table}
+
+The formula used in the region $T > T_{2l}$ ensures the continuity of the
+energy loss function at $T = T_{2l}$ when the Bethe-Bloch formula and
+the parameterisation meet. The parameter $\nu$ is chosen in such a
+way that:
+
+\[
+\frac{1}{\rho} \left . \frac{dE}{dx}^{II} \right |_{T=T_{2l}} =
+\frac{1}{\rho} \left . \frac{dE}{dx}^{III} \right |_{T=T_{2l}}
+\]
+ 
+The routine {\tt GDRELP} calculates the stopping power or restricted
+energy loss only for $T > T_{2l}$; below this kinetic energy it gives
+the stopping power (i.e. total energy loss) irrespectively of the 
+value of $T_{cut}$. This approximation does not introduce a serious
+source of error since, in the case of a proton, at $T=T_{2l}$ the 
+maximum energy transferable to the atomic electron is $T_{max}
+\approx 4$ keV, and the restricted loss should be calculated only if
+$T_{cut} < T_{max}$.
+
+{\tt GDRELP} has been tested against experimental data and energy loss
+tables. Some of the test results are summarised in tables \ref{tb:phys430-1},
+\ref{tb:phys430-2} and \ref{tb:phys430-3}.
+
+\begin{table}
+\begin{centering}
+\begin{tabular}{rl|c|c}
+\multicolumn{4}{c}{1 keV $ \leq T \leq $ 100 MeV,
+31 pts per element~\cite{bib-ANZI}}\\
+\hline
+Z & element & \parbox{2.2cm}{mean (r.m.s.) deviation in \%} &
+\parbox{2.2cm}{max (r.m.s.) deviation in \%} \\ [0.2cm]
+\hline
+1 & H$_2$ & 0.4 & 1.1 \\
+6 & O & 0.5 & 1.6 \\
+13 & Al & 0.6 & 2.1 \\
+29 & Cu & 0.7 & 2.0 \\
+82 & Pb & 0.7 & 2.3 \\
+\hline
+\end{tabular}
+\caption{Test of {\tt GDRELP} against stopping power tables.
+Stated accuracy of the tables is $\sim 5\%$ for $T > 0.5$ MeV and
+$\sim 10\%$ for $T<0.5$ MeV}
+\end{centering}
+\label{tb:phys430-2}
+\end{table}
+The energy lost due to the soft $\delta$-rays is tabulated during
+initialisation as a function of the medium and of the energy by routine
+\Rind{GDRELA}
+
+\begin{table}
+\begin{centering}
+\begin{tabular}{|l|r||l|r||l|r|}
+\multicolumn{6}{c}{$\displaystyle
+\Delta = \frac{\frac{dE}{dx}^{min}_{calc} - \frac{dE}{dx}^{min}_{table}}
+{\frac{dE}{dx}^{min}_{table}} (\%)$} \\[0.5cm]
+\multicolumn{6}{c}{Data from~\cite{bib-BAR1}} \\
+\hline
+material & $\Delta$ (\%) & material & $\Delta$ (\%) 
+& material & $\Delta$ (\%)\\
+\hline
+H$_{2}$ & -0.4 & Na & -0.4 & Sn & 1.7 \\
+D$_{2}$ & -0.3 & Al & -0.6 & Xe & 1.0 \\
+He & 0.0 & Si & 0.5 & W & 1.1 \\
+Li & 3.1 & Ar & 0.4 & Pt & 0.3 \\
+Be & -0.2 & Ti & -1.4 & Pb & 1.5 \\
+C & -0.1 & Fe & -0.4  & U & 1.4 \\
+N$_{2}$ & -0.2 & Cu & -0.9 & & \\
+O$_{2}$ & -1.2 & Ge & -0.8  & & \\
+\hline
+\end{tabular}
+\caption{The minimum stopping power
+calculated from the formula used is compared
+with values from the tables.}
+\end{centering}
+\label{tb:phys430-3}
+\end{table}
+
+The tables are filled with the quantity $dE/dx$ in GeV cm$^{-1}$
+(formula (\ref{eq:phys430-2})
+above). For a molecule or a mixture the following formula
+is used:
+\begin{equation}
+\frac{dE} {dx} = \rho \sum_{i} p_i
+      \left( \frac{dE}{dX} \right)_i
+\end{equation}
+where $x$ is in cm, $X$ in g cm$^{-2}$ and $p_{i}$ is the proportion
+by weight of the I$^{th}$ element.
+
+The energy loss of all charged particles other than electrons,
+positrons and muons is obtained from that of protons 
+by calculating the kinetic energy of a proton with the same
+$\beta$, and using this value to interpolate the tables:
+\begin{equation}
+ T_{proton} =\frac{M_{\rm p}}{M}T
+\end{equation}
+
+\subsection{Total cross-section}
+The integration of formula (\ref{eq:phys430-3}) gives the total cross-section :
+\begin{equation}
+\label{eq:phys430-4}
+\sigma (Z,E,T_{cut}) = \left \{
+\begin{array}{LL}
+2 \pi r^2_0 m  \frac{Z}{\beta^2}
+   \frac{1-Y+\beta^2 Y\ln Y}{T_{cut}} & \mbox{for spin-0 particles} \\ [.5cm]
+2 \pi r^2_0 m  \frac{Z}{\beta^2} \left (\frac{1-Y+\beta^2 Y\ln Y}{T_{cut}}
++ \frac{T_{max}-T_{cut}} {2E^2} \right) & 
+\mbox{for spin-}\frac{1}{2}\mbox{~particles}
+\end{array} \right .
+\end{equation}
+
+The mean free path is tabulated during initialisation 
+as a function of the medium and of the energy by the routine
+\Rind{GDRSGA}
+{\it for leptons only}.
+ 
+The cross-section (\ref{eq:phys430-4}) is strongly dependent on the mass of 
+the incident
+particle, and cannot be tabulated in a general way for any charged hadrons.
+Therefore, for such particles, the cross-section is computed
+at tracking time in the routine \Rind{GTHADR}.

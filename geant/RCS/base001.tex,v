@@ -1,0 +1,307 @@
+head     1.1;
+access   ;
+symbols  ;
+locks    goossens:1.1; strict;
+comment  @@;
+
+
+1.1
+date     94.04.25.09.23.05;  author goossens;  state Exp;
+branches ;
+next     ;
+
+
+desc
+@Initial Entry
+@
+
+
+
+1.1
+log
+@Initial revision
+@
+text
+@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%  GEANT manual in LaTeX form                                     %
+%                                                                 %
+%  Michel Goossens (for translation into LaTeX)                   %
+%  Version 1.00                                                   %
+%  Last Mod. Jan 24 1991  1300   MG + IB                          %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\Documentation {F.Bruyant}       \Origin{GEANT}
+\Submitted{01.10.84}       \Revised{08.11.93}
+\Version{Geant 3.16}\Routid{BASE001}
+\Makehead{Introduction to {\tt GEANT}}
+\section{{\tt GEANT} applications}
+ 
+The {\tt GEANT} program simulates the passage of elementary particles through
+the matter. Originally designed for the High Energy Physics experiments,
+it has today found applications also outside this domain in areas such as
+medical and biological sciences, radio-protection and astronautics.
+
+The principal applications of {\tt GEANT} in High Energy Physics are:
+\begin{itemize}
+\item the {\it transport} 
+of particles ({\it tracking} in this manual)
+through an experimental setup for the simulation
+of detector response;
+\item
+the graphical representation of the setup and of the particle trajectories.
+\end{itemize}
+
+The two functions are combined in the interactive version of {\tt GEANT}.
+This is very useful,
+since the direct
+observation of what happens to a particle inside the detector
+makes the debugging easier and may reveal possible weakness of the
+setup (also sometimes of the program!).
+
+In view of these applications, the {\tt GEANT} system allows you to:
+\begin{itemize}
+\item
+describe an experimental setup
+by a structure of geometrical volumes.
+A {\tt MEDIUM} number 
+is assigned to each volume
+by the user ({\tt [GEOM]}). Different volumes may have
+the same medium number. A medium is defined by
+the so-called {\tt TRACKING MEDIUM} parameters, which
+include reference to the {\tt MATERIAL}
+filling the volume {\tt [CONS]};
+\item
+accept events simulated by Monte Carlo generators {\tt [KINE]};
+\item transport particles through the various
+regions of the setup, taking
+into account geometrical volume boundaries and
+physical effects according to the nature of the
+particles themselves, their interactions
+with matter and the magnetic field {\tt [TRAK], [PHYS]};
+\item
+record particle trajectories and the response of
+the sensitive detectors {\tt [TRAK], [HITS]};
+\item visualise the
+detectors and the particle trajectories {\tt [DRAW], [XINT]}.
+\end{itemize}
+
+The program contains {\it dummy} and {\it default}
+user subroutines called whenever application-dependent
+actions are expected.
+
+It is the responsibility of the user to:
+\begin{itemize}
+\item code the relevant user subroutines providing the data describing the
+experimental environment;
+\item assemble the appropriate program segments and utilities into an 
+executable program;
+\item compose the appropriate data records
+which control the execution of the program. 
+\end{itemize}
+The
+section {\tt [BASE]} of this manual gives more information on the above.
+
+{\bf Note:}
+the names of the dummy or default user subroutines have {\tt GU} or {\tt UG} 
+as their first two letters.
+ 
+\section{Event simulation framework}
+
+The framework offered by {\tt GEANT} for event simulation is described in
+the following paragraphs, in order
+to familiarise the reader with the areas where user
+interventions are expected.
+For each item we will indicate in brackets the relevant section where more
+information can be found.
+
+At the same time, the {\tt GEANT} data structures are introduced. 
+This is
+important as the coding to be provided by the user
+most often consists of storing and retrieving information from
+data structures, or reading or writing data structures.
+For simple applications
+user routines are provided as an interface to the data structures
+partially hiding them from the users. For advanced users of 
+{\tt GEANT}, some idea of the layout of the data in memory is helpful.
+{\tt GEANT} data structures are logically related set of data which are
+physically stored in the \FCind{/GCBANK/} common block. The position
+of each structure is contained in an {\tt INTEGER} variable which
+is constantly kept up-to-date by {\tt ZEBRA}. By convention the names
+of these variable, called {\it pointers} begin with {\tt J}, and they
+are used in this manual to designate the structure they point to.
+
+A main program has to be provided by the user ({\tt [BASE100]}) for
+{\it batch} type operation. For interactive operation a main program is
+provided, both binary and source, in the library directory
+both at CERN and in the standard distribution tape of the CERN Program
+Library. The file is called {\tt gxint<ver>.<ext>}, where {\tt <ver>}
+is the version of {\tt GEANT} to which this file belongs and {\tt <ext>}
+is the system-dependent file-name extension to denote a FORTRAN source
+or an object file. This file should be loaded in front of all other
+files when assembling a {\tt GEANT} application. The source is provided
+in case the user wants to modify it, in particular changing the size
+of the commons \FCind{/GCBANK/} or \FCind{/PAWC/}.
+
+The main program allocates the dynamic memory for {\tt ZEBRA} and 
+{\tt HBOOK} and passes control to the three phases of the run:
+ 
+\begin{enumerate}
+\item initialisation
+\item event processing
+\item termination
+\end{enumerate}
+
+where in each of the three phases the user can implement his own code
+in the appropriate routines.
+ 
+\section{Initialisation}
+
+The initialisation is controlled by the user in the subroutine {\tt UGINIT}  
+who has the responsibility to call the appropriate routines
+({\tt [BASE100]}).
+It consists of the following steps, most of them
+performed through calls to {\tt GEANT} subroutines:
+ 
+\begin{DLtt}{MMMMMMMMMM}
+\item[\Rind{GINIT}]
+initialise the {\tt GEANT} common blocks
+with default values ({\tt [BASE030], [BASE110]});
+\item[\Rind{GFFGO}]
+read {\it free format} data records either to
+modify the default options ({\tt [BASE040],
+[BASE110]}) or to provide information on the current run;
+\item[\Rind{GZINIT}]
+initialise the memory manager, the link areas
+and the run header bank {\tt JRUNG} ({\tt [BASE110]});
+\item[\Rind{GDINIT}]
+initialise the drawing package ({\tt [DRAW]}), calling this routine
+without having initialised the graphics package via a call to \Rind{IGINIT}
+or \Rind{HPLINT} will cause {\tt GEANT} to abort;
+\item[\Rind{GPART}]
+(or \Rind{GSPART}) fill the data structure {\tt JPART}
+with the particle properties ({\tt [CONS]});
+\item[\Rind{GMATE}] (or \Rind{GSMATE})
+fill the data structure {\tt JMATE}
+with the characteristics of the materials used
+({\tt [CONS]});
+\item[User code] it is the responsibility of the user to:
+\begin{itemize}
+\item define the geometry of the different components of
+the setup ({\tt [GEOM]}), stored in the {\tt JROTM} and {\tt JVOLUM} data
+structures; 
+\item define tracking medium parameters ({\tt [CONS],[TRAK]}), stored
+in the {\tt JTMED} data structure;
+\item specify which elements of the geometrical
+setup should be considered as {\it sensitive detectors}, giving
+a {\it response} when hit by a particle ({\tt [HITS]});
+\item usually all done in a user routine called \Rind{UGEOM};
+\end{itemize}
+\item[\Rind{GGCLOS}]
+process all the geometrical information
+provided by the user and prepare for particle transport;
+\item[\Rind{GBHSTA}]
+book standard {\tt GEANT} histograms if required by
+the user with the data record {\tt HSTA} ({\tt [BASE040], [BASE110]});
+\item[\Rind{GPHYSI}]
+compute energy loss and cross-section tables
+and store them in the data structure {\tt JMATE} ({\tt [CONS], [PHYS]}).
+\end{DLtt}
+ 
+\section{Event processing}
+ 
+The processing phase is triggered by a call to the subroutine \Rind{GRUN} which,
+for each event to be processed, gives control to the subroutines:
+ 
+\begin{DLtt}{MMMMMMMM}
+\item[\Rind{GTRIGI}] initialise event processing and create the
+event header bank {\tt JHEAD};
+\item[\Rind{GTRIG}] process one event;
+\item[\Rind{GTRIGC}] clean up the portion of memory used by the event
+and check that enough time is left for the next event ({\tt [BASE200]}).
+\end{DLtt}
+\Rind{GTRIG} calls the following user routines:
+\begin{DLtt}{MMMMMMMM}
+\item[\Rind{GUKINE}]
+generates or reads ({\tt [IOPA]})
+the kinematics of the event and stores it
+in the data structures {\tt JVERTX} and {\tt JKINE} ({\tt [KINE]});
+
+\item[\Rind{GUTREV}]
+calling \Rind{GTREVE} which performs the following operations for each
+vertex in turn:
+\begin{enumerate}
+\item moves all the particles attached to the vertex from the permanent 
+stack {\tt JKINE} to the temporary stack {\tt JSTAK};
+\item controls the propagation of each particle though the setup by 
+calling \Rind{GUTRAK}/\Rind{GTRACK} ({\tt [TRAK]}); 
+each particle is tracked in turn and when a sensitive detector
+is traversed, the user may store
+any useful information in the data structure {\tt JHITS} 
+via the routines described in the section {\tt [HITS]};
+\end{enumerate}
+ 
+The {\tt JSTAK} data structure is a LIFO (Last In -- First Out) stack.
+Secondary products generated by the current particle transported
+are processed before proceeding to the next particle. 
+It is very important to understand that by default {\tt GEANT} does not
+follow the secondary particles generated. It is the responsibility of the
+user to indicate which particles should be followed via the
+routines \Rind{GSKING}/\Rind{GSKPHO}.
+
+The data structure {\tt JXYZ}, containing the
+coordinates of space points along the tracks,
+can be filled by the user during tracking ({\tt [TRAK]}).
+
+\item[\Rind{GUDIGI}]
+simulate the detector responses for the event, using 
+the information recorded in the data
+structure {\tt JHITS} during particle transport, and store
+the results in the data structure {\tt JDIGI} ({\tt [HITS]});
+
+\item[\Rind{GUOUT}]
+perform all the processing at the end of the event and 
+output the relevant data structures ({\tt [IOPA]}).
+\end{DLtt}
+ 
+Other routines called during the tracking phase triggered
+by {\tt GTREVE} should be mentioned for completeness:
+\begin{itemize}
+\item
+hadronic interactions can be simulated via either the 
+{\tt GHEISHA}~\cite{bib-GHEI} or 
+{\tt FLUKA}~\cite{bib-FLUK,bib-FLU1,bib-FLU2,bib-FLU3,bib-FLU4}
+hadronic shower generator.
+In the
+subroutines \Rind{GUPHAD} and \Rind{GUHADR} ({\tt [TRAK]}) the user
+may select the hadronic shower generation program to be used.
+The default for {\tt GEANT} is {\tt GHEISHA};
+\item after each tracking step along the
+track, control is
+given to the subroutine \Rind{GUSTEP}. From the information
+available in labelled common blocks the user
+is able to take the appropriate action, such as
+storing a hit or transferring a secondary product either in the
+stack {\tt JSTAK} or in the event structure {\tt JVERTX/JKINE} via
+the subroutine 
+\Rind{GSKING}. In the subroutine \Rind{GSSTAK},
+called by \Rind{GSKING}, a user routine \Rind{GUSKIP} is called which permits
+skipping any unwanted track before entering it in the stack for subsequent
+transport;
+\item the subroutine
+\Rind{GUSWIM} is called by the the routines which transport charged particles
+when in a magnetic field; it selects and calls the appropriate routine to
+transport the particle. Although formally a user routine, the default version
+provided by {\tt GEANT} is usually appropriate for most situations.
+The magnetic field, unless it is constant along the {\tt Z} axis,
+has to be described via the subroutine \Rind{GUFLD}.
+\end{itemize}
+ 
+\section{Termination}
+ 
+The termination phase is under the control of the user ({\tt [BASE300]})
+via the routine \Rind{GULAST}. In 
+simple cases it may consist of a call to the subroutine \Rind{GLAST} 
+which computes and prints some statistical information (time per
+event, use of dynamic memory, etc.).
+@

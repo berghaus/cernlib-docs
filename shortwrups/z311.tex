@@ -1,0 +1,179 @@
+% 24 mar 1994  ksk
+\Version {CIO}                              \Routid{Z311}
+\Keywords{UNIX DISK FILE OPEN CLOSE PUT GET}
+\Author{J. Zoll}         \Library{KERNLIB, VAX and UNIX systems only}
+\Submitter{}                                 \Submitted{31.10.1991}
+\Language{Fortran + C}                       \Revised{01.04.1994}
+\Cernhead {Handle Unix Disk Files}
+ 
+The routines of this package are an interface to the
+C library functions open, read, write, lseek, close,
+to permit a Fortran program to handle an unstructured
+Unix file as a string of bytes.
+Both sequential and direct-access READ / WRITE can be done.
+ 
+New files are opened with the default permissions 644;
+one may set different permissions by calling {\tt CIPERM}
+just before calling {\tt CIOPEN}, which resets to the
+default after every call.
+ 
+One parameter is common to almost all routines :
+{\tt LUNDES} is the file-descriptor of C to identify the file;
+with CIOPEN this is an output parameter,
+for all other routines it is an input parameter.
+ 
+\Structure
+{\tt SUBROUTINE} subprograms \\
+User Entry Names:
+\Rdef{CIOPEN}, \Rdef{CIGET}, \Rdef{CIGETW},
+\Rdef{CIPUT}, \Rdef{CIPUTW},
+\Rdef{CISIZE}, \Rdef{CITELL}, \Rdef{CISEEK}, \Rdef{CIREW},
+\Rdef{CICLOS}, \Rdef{CIPERM} \\
+Files Referenced: Parameter
+ 
+\Usage
+Note: the symbol {\tt *} designates output parameters. \\[2mm]
+ 
+{\bf Open a file}
+\begin{verbatim}
+    CALL CIOPEN(LUNDES, CHMODE, CHNAME, ISTAT)
+ 
+        LUNDES* file-descriptor returned
+ 
+        CHMODE  CHARACTER string selecting the IO mode :
+ 
+                = 'r'   open for reading
+                  'r+'  open for read/write
+                  'w'   create or truncate for writing
+                  'w+'  open for write/read, create or truncate
+                  'a'   append
+                  'a+'  open for append/read
+ 
+        CHNAME  name of the file, of type CHARACTER
+        ISTAT*  status, =zero if success
+\end{verbatim}
+   For example, create a new file in the current directory :
+\begin{verbatim}
+        CALL CIOPEN(LUNDES, 'w', 'concert.car', ISTAT)
+        IF(ISTAT .NE. 0)          GO TO trouble
+\end{verbatim}
+\newpage
+{\bf Read next string of bytes}
+\begin{verbatim}
+    CALL CIGET (LUNDES, CHBUF, NBDO, NBDONE, ISTAT)
+ 
+        CHBUF*  text vector to be read into
+         NBDO   maximum number of bytes to be read
+       NBDONE*  number of bytes actually read
+        ISTAT*  status, = zero if success,
+                = -1   if end-of-file
+\end{verbatim}
+ 
+{\bf Read next string of full words}
+\begin{verbatim}
+    CALL CIGETW(LUNDES, MBUF, NWDO, NWDONE, ISTAT)
+ 
+         MBUF*  vector to be read into
+         NWDO   maximum number of words to be read
+       NWDONE*  number of words actually read
+        ISTAT*  status, = zero if success,
+                = -1   if end-of-file
+\end{verbatim}
+A full word is normally 4 bytes; on the CRAY it is 8 bytes.
+ 
+   To simulate direct-access reading one has to call {\tt CISEEK} first.
+ 
+   For example:
+\begin{verbatim}
+    To read the next 2048 bytes:
+ 
+     << starting at byte 8193 :
+        CALL CISEEK(LUNDES, 8192, ISTAT)
+        IF(ISTAT .NE. 0)              GO TO trouble   >>
+ 
+        CALL CIGET(LUNDES, CHBUF, 2048, NBDONE, ISTAT)
+        IF(ISTAT .EQ. -1)         GO TO eof
+        IF(ISTAT .NE. 0)          GO TO trouble
+\end{verbatim}
+ 
+{\bf Write next string of bytes}
+\begin{verbatim}
+    CALL CIPUT(LUNDES, CHBUF, NBDO, ISTAT)
+ 
+        CHBUF   text vector to be written, NBDO bytes
+        ISTAT*  status, =zero if success
+\end{verbatim}
+ 
+{\bf Write next string of full words}
+\begin{verbatim}
+    CALL CIPUTW(LUNDES, MBUF, NWDO, ISTAT)
+ 
+         MBUF   vector to be written, NWDO words
+        ISTAT*  status, =zero if success
+\end{verbatim}
+ 
+\newpage
+{\bf Get the size of the file}
+\begin{verbatim}
+    CALL CISIZE(LUNDES, NBYTT, ISTAT)
+ 
+        NBYTT*  number of bytes on the file
+        ISTAT*  status, =zero if success
+ 
+    Careful : this will position the file to the end.
+\end{verbatim}
+ 
+{\bf Get the current file position}
+\begin{verbatim}
+    CALL CITELL(LUNDES, NBYTC, ISTAT)
+ 
+        NBYTC*  number of bytes before current
+        ISTAT*  status, =zero if success
+\end{verbatim}
+ 
+{\bf Set the current file position}
+\begin{verbatim}
+    CALL CISEEK(LUNDES, NBYTC, ISTAT)
+ 
+        NBYTC   number of bytes before current
+        ISTAT*  status, =zero if success
+\end{verbatim}
+   For example :
+\begin{verbatim}
+    CALL CISEEK(LUNDES, 0, ISTAT)    position to start-of-file
+    CALL CISEEK(LUNDES, 8, ISTAT)    position to 9th byte
+    use CISIZE to position to end-of-file
+\end{verbatim}
+ 
+{\bf Rewind the file}
+\begin{verbatim}
+    CALL CIREW(LUNDES)
+\end{verbatim}
+ 
+{\bf Close the file}
+\begin{verbatim}
+    CALL CICLOS(LUNDES)
+\end{verbatim}
+ 
+{\bf Set the permissions for the next open}
+\begin{verbatim}
+    CALL CIPERM(IPERM)
+ 
+        IPERM   the permissions as a decimal integer,
+                as returned by STATF (Z265) for example
+\end{verbatim}
+   For example (using {\tt NCOCTI} of {\tt M432)} :
+\begin{verbatim}
+    CALL CIPERM(NCOCTI('664'))
+ 
+          set read for everybody, and write for owner and group.
+\end{verbatim}
+{\bf Note}: formally the buffer for reading and writing should be of
+type {\tt CHARACTER} for {\tt CIGET} and {\tt CIPUT},
+and of type {\tt INTEGER} for {\tt CIGETW} and {\tt CIPUTW}.
+On most machines there is no difference, but on the
+VAX this must be observed, because the parameter passing mechanisme
+differs crucially for the two cases. Also, on the CRAY there would
+be problems if one were using {\tt CIGETW} to read
+into a Character address other than a word boundary.
+\\ $\bullet$

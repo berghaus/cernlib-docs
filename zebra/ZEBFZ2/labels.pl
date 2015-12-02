@@ -1,0 +1,24 @@
+$external_labels{"secFZMEMO"} ="../../zebra/ZEBFZ2/chapter2_1.html"; 
+$external_labels{"FZOUT"} ="../../zebra/ZEBFZ2/chapter2_1.html"; 
+$external_labels{"FZODAT"} ="../../zebra/ZEBFZ2/chapter2_1.html"; 
+$external_labels{"FZFILE"} ="../../zebra/ZEBFZ2/chapter2_1.html"; 
+$external_labels{"FZIN"} ="../../zebra/ZEBFZ2/chapter2_1.html"; 
+$external_labels{"secFZmarking"} ="../../zebra/ZEBFZ2/chapter2_1.html"; 
+$external_labels{"secrandomaccess"} ="../../zebra/ZEBFZ2/chapter2_1.html"; 
+$external_labels{"FZIDAT"} ="../../zebra/ZEBFZ2/chapter2_1.html"; 
+$external_labels{"FZCOPY"} ="../../zebra/ZEBFZ2/chapter2_1.html"; 
+$external_labels{"FZHOOK"} ="../../zebra/ZEBFZ2/chapter2_1.html"; 
+$external_labels{"secFZFILE"} ="../../zebra/ZEBFZ2/chapter2_1.html"; 
+$external_labels{"FZENDO"} ="../../zebra/ZEBFZ2/chapter2_1.html"; 
+$external_labels{"FZINXT"} ="../../zebra/ZEBFZ2/chapter2_1.html"; 
+$external_labels{"FZLIMI"} ="../../zebra/ZEBFZ2/chapter2_1.html"; 
+$external_labels{"secFZHOOK"} ="../../zebra/ZEBFZ2/chapter2_1.html"; 
+$external_labels{"FZENDI"} ="../../zebra/ZEBFZ2/chapter2_1.html"; 
+$external_labels{"CFOPEN"} ="../../zebra/ZEBFZ2/chapter2_1.html"; 
+$external_labels{"FZRUN"} ="../../zebra/ZEBFZ2/chapter2_1.html"; 
+$external_labels{"secH1FZuserspecs"} ="../../zebra/ZEBFZ2/chapter2_1.html"; 
+$external_labels{"seceventsrunsfiles"} ="../../zebra/ZEBFZ2/chapter2_1.html"; 
+$external_labels{"FZLOGL"} ="../../zebra/ZEBFZ2/chapter2_1.html"; 
+$external_labels{"FZMEMO"} ="../../zebra/ZEBFZ2/chapter2_1.html"; 
+
+1;

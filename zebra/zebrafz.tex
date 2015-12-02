@@ -1,0 +1,502 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%   ZEBRA User Guide -- LaTeX Source                              %
+%                                                                 %
+%   Chapter FZ (Sequential input/output)                          %
+%                                                                 %
+%   The following external EPS files are referenced:              %
+%   none                                                          %
+%                                                                 %
+%   Editor: Michel Goossens / AS-MI                               %
+%   Last Mod.:  8 Dec. 1990   mg                                  %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{FZ: The sequential Input-Output Package}
+\section{Principles}
+\par The aim of the FZ package
+is to transfer ZEBRA data structures from and to a sequential file,
+i.e. disk or tape, or to another part of memory.
+It should fit both online and offline processing requirements.
+Speed is important in both cases,
+but is more critical in the online context.
+For this it must be possible to write large areas of memory
+to a file, without the need to insert control information
+during the transfer; all control information needed
+should be grouped at the begining.
+Also, since ZEBRA may not be running on the online machine,
+the format should be such that it is easy to program in other systems.
+\subsection{Native and exchange I/O modes}
+\index{FZ!mode!native}
+\index{FZ!mode!exchange}
+\par Files written in {\bf native} mode can be read only on machines
+of the same kind as the writing machine.
+The logical records are written with ordinary unformatted {\tt WRITE}
+statements,
+directly transferring the memory areas to the file.
+Hence the representation of the data in the file is the same as
+the internal representation of the machine;
+the blocking of the logical records and the addition of
+system control words
+is done by the operating system,
+and is of no concern to ZEBRA.
+\par {\bf Exchange} mode enables transfer of files between different
+machines. The input/output routines, of which there is
+one set for each machine, have to handle two things:
+one is the blocking of the logical records into physical records,
+the other is the translation of every word from the internal
+to the exchange representation,
+according to the nature of the word
+(floating-point, integer, Hollerith, bit pattern).
+\subsection{Logical records structure}
+\par The unit of information to be written or read is one data structure,
+which in the simplest case may consist of zero or one bank.
+A data structure on a file is represented by two,
+or possibly several,
+{\bf logical records.}
+\index{FZ!record!logical}
+\footnote{The format of logical records and of the files written
+are described in the ZEBRA reference manual.}
+The first record, called the ``pilot record'',
+\index{FZ!record!pilot}
+contains context information about the data structure which follows,
+such that the program can set up everything necessary before
+initiating a read to receive the data structure
+at the right place in memory.
+Amongst other things,
+this specifies the amount of memory required to hold
+the data structure and the table to drive the relocation
+of all the links in the structure.
+The pilot record also contains a user-defined identification
+and characteristic of the data structure, the so-called
+{\bf user header vector}.
+It permits selective reading without expanding unwanted
+data structures into memory.
+\par The second logical record (and subsequent ones, if any)
+contain the dump of the memory area occupied by the banks
+making up the data structure;
+these records are called the {\bf bank material records}.
+\index{FZ!record!bank material}
+\par Banks of a data structure on a recording medium
+are interconnected by links,
+and the relocation table contained in the pilot record provides
+the description of how to convert these links to their new values
+in memory.
+\par Data structures follow each other on the recording medium
+in a sequential manner.
+A series of data structures is often called an {\bf event}.
+Events are seperated by {\bf start-of-event} and
+{\bf end-of-event} system markers.
+\index{FZ!event}
+\index{FZ!marker!start-of-event}
+\index{FZ!marker!end-of-event}
+ 
+Events can be grouped in a {\bf run}. On the file these are
+separated by {\bf start-of-run} and {\bf end-of-run}
+marker records, which can also contain user information.
+\index{FZ!marker!end-of-run}
+\index{FZ!marker!start-of-run}
+ 
+To avoid problems with hardware end-of-files,
+a software simulation is provided by ZEBRA {\bf end-of-file}
+records, which can carry user information.
+\index{FZ!marker!end-of-file}
+\section{File operations}
+\Subr{CALL FZFILE (LUN,LREC,CHOPT)}
+This routine should be called to declare a file to ZEBRA.
+\index{FZ!input!declare file}
+\index{FZ!output!declare file}
+\Idesc
+\begin{DL}{MMM}
+\item[LUN]Logical unit number
+\item[LREC]Record length (in {\bf words})\\
+{\bf Native} file format - maximum logical record length
+\begin{DL}{MM}
+\item[=0:] Standard length: 2440 words
+\item[>0:] User defined length
+\end{DL}
+{\bf Exchange} file format - physical record length
+\begin{DL}{MM}
+\item[=0:] Standard length: 900 words
+\item[>0:] User defined length (must be a multiple of 90 words).
+\end{DL}
+\item[CHOPT]Character variable specifying the selected options.
+\begin{DL}{MMMMMM}
+\item[medium]{\tt' '} Disk (default),\\
+{\tt'M'} Memory,                    \\
+{\tt'T'} Magnetic tape
+\item[file format]{\tt' '} Native (default),\\
+{\tt'A'} Exchange format, ASCII mapping    \\
+{\tt'X'} Exchange format, binary
+\item[data format]for medium {\bf disk or tape:}
+\begin{DL}{MM}
+\item[' ']default - {\it 'native'} for {\it native} file format\\
+or    {\it 'exchange'} for {\bf exchange} file format
+\item['N']Native data format
+\end{DL}
+for medium {\bf memory}
+\begin{DL}{MM}
+\item[' ']default - 'native'
+\item['X']exchange data format
+\end{DL}
+\item[processing]default - Input only
+\item[direction]
+\begin{DL}{MM}
+\item['I']Input enabled
+\item['O']Output enabled
+\item['IO']Input/output enabled
+\end{DL}
+\item[EoF handling]
+\begin{DL}{MM}
+\item[' ']default - Chosen dependent on file and machine
+\item['0']No hardware file marks
+\item['1']Hardware file mark only for level 2 EoF.
+\item['2']Hardware file marks both for level 1 and 2 EoFs.
+\end{DL}
+\item[various]
+\begin{DL}{MM}
+\item['R']Initial rewind
+\item['Q']Quiet, print error messages only
+(log level -2 with \Rind{FZLOGL}, see below).
+\item['P']Permissive, enable error return
+(valid only if the user code checks the error status).
+\end{DL}
+\end{DL}
+\end{DL}
+\subsection{FZFILE return code}
+\index{QUEST!IQUEST}
+\begin{DL}{MMMMMM}
+\item[IQUEST(1)=0]Everything is all right
+\item[IQUEST(1)=1]The file has already been initialized with \Rind{FZFILE}
+\item[IQUEST(1)=2]LUN invalid
+\item[IQUEST(1)=3]The requested format is not yet available on the given machine
+\end{DL}
+\subsection{Notes:}
+Non-zero error returns are only enabled with the 'P' option,
+otherwise control goes to \Rind{ZFATAL}. If the 'P' option is selected
+the status must imperatively be checked by the user.
+\par \Rind{FZFILE} does {\bf not} itself execute a FORTRAN
+{\tt OPEN} statement in
+order to leave the latter under the control of the user.
+\subsection{Set the log level for an I/O unit number}
+The logging level
+(i.e. the verboseness of the messages of the ZEBRA system) can be
+controlled for each input/output unit by a call to \Rind{FZLOGL}.
+\Subr{CALL FZLOGL (LUN,LOGLEV)}
+\index{FZ!logging level}
+\index{logging level}
+\Idesc
+\begin{DL}{MMMM}
+\item[LUN]Number of the input/output unit
+for which the logging level has to be set
+\item[LOGLEV]Logging level
+\begin{DL}{MM}
+\item[-3]Suppress all messages
+\item[-2]Print error messages only
+\item[-1]Terse mode
+\item[ 0]Normal mode
+\item[ 1]Normal mode and details of conversion problems
+\item[ 2]Print to monitor calls to the FZ routines
+\item[ 3]Short diagnostics
+(Short dumps to debug user-written output routines).
+\item[ 4]Full diagnostics
+(Full dumps to debug user-written output routines)
+\end{DL}
+\end{DL}
+\par
+As indicated above, each declaration of an input/output file via
+\Rind{FZFILE}
+associates a logging level equal to the system-wide logging level
+set be \Rind{MZEBRA}.
+At any point in a program the logging level can be reset to a new
+value by calling \Rind{FZLOGL} with the appropriate parameters.
+\subsection{Limit the size of an output file}
+The size of an output file can be limited by issuing a call to \Rind{FZLIMI}.
+\par
+The reason for having this facility is the fact that ``end-of-tape''
+is a problem which cannot be solved satisfactorily in general.
+To assist the user in controling reel switching,
+ZEBRA counts the total number of words written,
+and checks after every data structure written out
+(but not for start-of-run, end-of-run, end-of-file)
+whether the limit specified has been reached.
+If so, it returns the ``pseudo end-of-tape'' condition (cf. \Rind{FZOUT})
+for every data structure output until a new request is made
+with {\tt ALIMIT=0}. Thus the user can switch tape, call
+{\tt FZLIMI(LUN,0.)},
+and continue to write another tape,
+again waiting for the ``end-of-tape'' signal.
+\Subr{CALL FZLIMI (LUN,ALIMIT)}
+\index{FZ!limit output}
+\Idesc
+\begin{DL}{MMMM}
+\item[LUN]Logical unit number
+\item[ALIMIT]Floating point number giving the limit in mega-words
+\begin{DL}{MM}
+\item[>0]User defined limit
+\item[=0]Increase the limit by the amount specified in a previous call
+with {\tt ALIMIT > 0}
+\item[<0]Unlimited (as initialized by \Rind{FZFILE})
+\end{DL}
+\end{DL}
+\subsection{Examples:}
+\par Set the file-size to 12.75 Mwords for unit 21
+\begin{verbatim}
+      CALL FZLIMI (21,12.75)
+\end{verbatim}
+Set the file-size to be the current data-volume plus 12.75 Mwords
+\begin{verbatim}
+      CALL FZLIMI (21,0.)
+\end{verbatim}
+\Subr{CALL FZRUN (LUN,NRUN,NUH,IUHEAD)}
+\par writes a start-of-run or end-of-run record.
+\index{FZ!start-of-run}
+\index{FZ!end-of-run}
+\Idesc
+\begin{DL}{MMMM}
+\item[LUN]Logical unit number
+\item[NRUN]{\tt>0:} The run number\\
+{\tt=0:} Increment the run number by 1 \\
+{\tt<0:} End-of-run record
+(ignored if the run is already terminated)
+\item[NUH]Length of the user information vector (length can be zero)
+\item[IUHEAD]Vector of length {\tt NUH}
+containing the user information (integers only).
+\end{DL}
+\Subr{CALL FZENDI (LUN,CHOPT)}
+\par
+Terminates one or several input files.
+\index{FZ!input!close file}
+\Idesc
+\begin{DL}{MMMM}
+\item[LUN]Logical unit number.
+If zero: All FZ input files
+\item[CHOPT]Character variable specifying the selected options.
+\begin{DL}{MM}
+\item['O']Switch to output.
+Permit write after read    \\
+Needed in case the file
+has been positioned for output by reading
+\item['Q']Quiet, suppress printing of file statistics
+\item['R']Final rewind
+\item['T']Terminate, drop control-bank for this file
+and print file statistics
+\item['U']Unload file
+\end{DL}
+\end{DL}
+\Subr{CALL FZENDO (LUN,CHOPT)}
+\par Terminates one or several output files and by default
+will write an end-of-run, will flush the output buffer in
+exchange mode, and will leave the file positioned for further output.
+\index{FZ!output!close file}
+\Idesc
+\begin{DL}{MMMM}
+\item[LUN]Logical unit number.
+If zero: All FZ output files
+\item[CHOPT]Character variable specifying the selected options.
+\begin{DL}{MM}
+\item['E']Write end-of-file (unless done)
+\item['E2']Write end-of-data (unless done)
+\item['F']Flush the buffer only
+\item['I']Switch to input.\\
+Write end-of-data and rewind (if not yet done),
+cancel the output permission.\\
+Useful for reading back a file just written.
+\item['Q']Quiet, suppress printing of file statistics
+\item['R']Rewind (unless done)
+\item['T']Terminate: write end-of-run (if not yet done).\\
+Print the file statistics (unless done) and
+drop the control-bank for this file.
+\item['U']Unload file
+\end{DL}
+\end{DL}
+\section{Output a data structure}
+\Subr{CALL FZOUT (LUN,IXDIV,LENTRY,IEVENT,CHOPT,IOD,NUH,IUHEAD)}
+Writes one data structure.
+\index{FZ!output!data structure}
+\Idesc
+\begin{DL}{MMMMM}
+\item[LUN]Logical unit number
+\item[IXDIV]Index of the store/division containing the data structure.
+May be a compound index (see \Rind{MZIXCO})
+on page~\pageref{SR_MZIXCO}
+for more details) if the 'D' option is selected.
+\item[LENTRY]Entry address of the data structure.
+It may be zero if the 'Z' option is selected
+\item[IEVENT]Start-of-event flag. Possible values are
+$0$ for event continued and $1$ for new event.
+\item[CHOPT]Character variable specifying the selected options.
+\begin{DL}{MM}
+\item[' ']The data structure supported by the bank at {\tt LENTRY} is written
+out (the next link is not followed)
+\item['D']Complete division(s)\\
+default: Dropped banks are squeezed out\\
+\phantom{default: }(slower but maybe more economic than 'DI')
+\item['DI']Immediate dump of divisions with dropped banks included
+\item['L']Write the data structure supported by the linear structure at LENTRY
+(the next link is followed)
+\item['N']No links, i.e. linkless handling.
+By default links are significant.
+\item['S']Single bank at {\tt LENTRY}
+\item['Z']Zero banks, i.e. empty data structure, header only
+\end{DL}
+\item[IOD]Description of the nature of the user header vector.
+Either immediate type descriptors (see Table~\ref{MZFORMS})
+or an I/O characteristic obtained by \Rind{MZIOCH}
+\index{I/O characteristic}
+(see Page~\pageref{MZIOCH})
+\item[NUH]Number of words in the user header vector (may be zero)
+\item[IUHEAD]The user header vector
+\end{DL}
+\subsection{FZOUT return codes}
+\Rind{FZOUT} returns the write status in the QUEST vector as follows:
+\index{QUEST!IQUEST}
+\begin{DL}{MMMMMM}
+\item[IQUEST(1)]Operation status code
+\begin{DL}{MM}
+\item[+1]``pseudo end-of-tape'' (cf. \Rind{FZLIMI})
+\item[ 0]normal completion
+\item[-1]first attempt to write after end-of-data
+\item[-2]error return
+\end{DL}
+\item[IQUEST(11)]NWBK, number of words of bank material
+\item[IQUEST(12)]NWTB, size of the relocation tables
+\item[IQUEST(13)]number of pilot records written so far
+\item[IQUEST(14)]number of words written (in millions)
+\item[IQUEST(15)]number of words (up to 1 million) written so far
+\item[IQUEST(16)]number of logical records written so far
+\item[IQUEST(17)]Number of physical records written so far (exchange mode only)
+\end{DL}
+\section{Input a data structure}
+To read the next data structure one calls \Rind{FZIN}.
+The return code in the user communication vector
+\index{QUEST!IQUEST}
+{\tt IQUEST(1)} will tell the caller whether
+the {\tt READ} operation was free of error, and whether the
+object read was a data structure, or a start-of-run,
+or an end-of-run,
+or an end-of-file signal.
+\Rind{FZIN} may be asked to skip to and then read the next start-of-event
+data structure or the next start-of-run record.
+\subsection{Read a single data structure}
+\par In the simplest case (opt = '.' or blank) \Rind{FZIN} will read the next
+data structure into the division indicated by the parameter {\tt IXDIV},
+at the same time delivering the user header vector to the
+parameter {\tt IQHEAD}.
+\par The selective read has been provided to rapidly skip unwanted
+data structures without expansion into memory and without relocation
+of the links:
+calling \Rind{FZIN} with opt='S' causes reading of the next pilot record
+only, returning to the user the header vector for taking a
+decision to read or skip the ``pending data structure''.
+Skipping is done by asking for the next data structure;
+accepting is done by calling \Rind{FZIN} with opt='A'.
+\par {\bf Remember
+that every call to FZIN has to be checked for the success of
+the operation by testing on IQUEST(1).}
+\subsection{Read a data structure by segment}
+\par In the cases described so far the complete data structure is
+read and is deposited into one particular division.
+It is however possible to steer individual data segments of
+the data structure into particular divisions,
+or to cause them to be ignored.
+(see the ZEBRA reference manual for more details)
+\par The parameters {\tt LSUP} and {\tt JBIAS} in the calling sequence below
+describe how the data structure should be inserted into
+an already existing data structure. Their meaning
+is similar to that for routine \Rind{MZLIFT} on page~\pageref{SR_MZLIFT}.
+\Subr{CALL FZIN (LUN,IXDIV,*LSUP*,JBIAS,CHOPT,*NUH*,IUHEAD*)}
+\index{FZ!FZIN}
+\index{FZ!input!data structure}
+\Idesc
+\begin{DL}{MMMM}
+\item[LUN]Logical unit number
+\item[IXDIV]Index of the division to receive the data structure.\\
+{\tt IXDIV = 0} means division 2 of the primary store
+\item[*LSUP*]
+\item[JBIAS]{\tt JBIAS < 1: LSUP} is the supporting bank
+and {\tt JBIAS} is the link bias specifying where the data structure has to be
+introduced into this bank, i.e. the data structure will be connected
+to {\tt LQ(LSUP+JBIAS)}.\\
+{\tt JBIAS = 1: LSUP} is the supporting link, i.e. the data structure
+is connected to LSUP (top level data structure)\\
+{\tt JBIAS = 2:} Stand alone data structure, no connection.
+\item[CHOPT]Character variable specifying the selected options.
+\begin{DL}{MMMM}
+\item[Event]
+\begin{DL}{MM}
+\item[' ']default - go to next data structure
+\item['E']go for next start-of-event data structure
+\item['R']go for next start-of-run record
+\end{DL}
+\item[Select]
+\begin{DL}{MM}
+\item[' ']default - Read the next header and its data structure
+(may mean: skip pending data structure or current event)
+\item['A']Accept, read the pending data structure
+({\tt NUH} and {\tt IUHEAD} are not used)
+\item['S']Select, read the next header only
+(may mean: skip pending data structure or current event)
+({\tt LSUP} and {\tt JBIAS} are not used)
+\end{DL}
+\end{DL}
+\item[*NUH*]Maximum size available for header vector {\tt IUHEAD}
+\end{DL}
+\Odesc
+\begin{DL}{MMMM}
+\item[*LSUP*]For {\tt JBIAS = 1 or 2, LSUP} receives
+the entry address to the data structure
+In any case {\tt IQUEST(13)} returns the entry address
+into the data structure
+\item[*NUH*]Useful size of the header vector stored in {\tt IUHEAD}
+\item[IUHEAD*]User header vector
+\end{DL}
+\subsection{FZIN return codes}
+\par \Rind{FZIN} returns the read status, either normal or error completion,
+in the {\tt QUEST} vector as follows:
+\index{QUEST!IQUEST}
+\subsubsection{Normal read status returns are:}
+\begin{DL}{MMMMMM}
+\item[IQUEST(1)]Operation status code
+\begin{DL}{MM}
+\item[<0]error, see below
+\item[ 0]normal completion
+\item[ 1]start-of-run record
+\item[ 2]end-of-run record
+\item[ 3]ZEBRA end-of-file
+\item[ 4]system end-of-file  (level 1 EoF)
+\item[ 5]system end-of-data  (level 2 EoF)
+\item[ 6]first attempt to read beyond EoD
+\end{DL}
+\item[IQUEST(2)]number of logical records read so far
+\item[IQUEST(3)]number of physical records read so far (exchange mode)
+\par
+\item[IQUEST(11)]for {\tt IQUEST(1)=0:1 or 0} for yes/no start
+new event \\
+for {\tt IQUEST(1)=1:} run number for start-of-run
+\item[IQUEST(12)]zero
+\item[IQUEST(13)]{\tt LENTRY}, the entry address into the data structure.\\
+Zero means: empty data structure.\\
+(Not yet a valid address if return from 'S' option)
+\item[IQUEST(14)]{\tt NWBK},
+the number of words occupied by the data structure in memory.\\
+Zero means: empty data structure
+\item[IQUEST(20)]{\tt NWIOCH}, size of the IO characteristic
+\item[IQUEST(21)...]{\tt NWIOCH} words of IO characteristic for the user
+header vector
+\end{DL}
+\subsubsection{Error status returns are:}
+\begin{DL}{MMMMMM}
+\item[IQUEST(1)]Error status
+\begin{DL}{MM}
+\item[-8]  . . .
+\item[-7]for 3 consecutive errors
+\item[-6]for 2 consecutive errors
+\item[-5]read error
+\item[-4]bad constructs, probably not a file written by \Rind{FZOUT}
+\item[-3]bad data
+\item[-2]break in block sequence number (exchange mode only)
+\item[-1]faulty call: A option given, but no pending data structure
+\end{DL}
+\item[IQUEST(2)]number of logical records read so far
+\item[IQUEST(3)]number of physical records read so far (exchange mode)
+\end{DL}

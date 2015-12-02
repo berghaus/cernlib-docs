@@ -1,0 +1,544 @@
+<HEAD>
+<TITLE> ZEBRA - An overview</TITLE>
+</HEAD>
+<BODY><P>
+ <HR> <A NAME=tex2html61 HREF=tex2htmlindex2_2.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/next_motif.gif"></A> <A NAME=tex2html59 HREF=ZEBINTR.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/up_motif.gif"></A> <A NAME=tex2html53 HREF=ZEBINTR.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/previous_motif.gif"></A>  <A NAME=tex2html63 HREF=tex2htmlindex2_2.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/index_motif.gif"></A><BR>
+<B> Next:</B> <A NAME=tex2html62 HREF=tex2htmlindex2_2.html>Index</A>
+<B>Up:</B> <A NAME=tex2html60 HREF=ZEBINTR.html>No Title</A>
+<B> Previous:</B> <A NAME=tex2html54 HREF=ZEBINTR.html>No Title</A>
+<HR> <P>
+<H1><A NAME=SECTION0010000000000000000> ZEBRA - An overview</A></H1>
+<P>
+<H1><A NAME=SECTION0011000000000000000> Why ZEBRA?</A></H1>
+<P>
+All off-line programming in high-energy physics is carried out, for
+various reasons, in the Fortran 77 programming language. While this
+language offers certain advantages over its competitors, it does suffer
+from one serious defect, namely its lack of dynamic data structuring
+facilities. The only data structures it contains at all are the array of
+homogeneous elements and the common block for shared data. Neither of
+these structures can be manipulated as an entity, and neither of them
+can be defined dynamically at execution-time. No pointers are available
+to link these structures together at a higher level.
+If we were to attempt to
+define structures using standard Fortran they would thus, at best, be in
+the following style:
+<P>
+<b>Example of defining data structure with Fortran</b><PRE><TT>PARAMETER (NTRACKS = 100 , NPTS = 20)
+      COMMON/POINTS/PTRACK(3,NTRACK),XYZ(NPTS,NTRACK),...</TT></PRE>
+<P>
+and almost the whole program would have to be regenerated and recompiled
+every time one of the symbolic constants is altered.
+Relationships between data items would have to be programmed explicitly
+using integer arrays of indices.
+<P>
+It is to overcome these limitations that the ZEBRA system has been
+designed and written. It allows not only a truely dynamic
+creation of data structures at execution-time, but also the added
+advantage of being able to
+<b>manipulate</b> those structures, and even to write them to an external
+storage medium and to recover them intact on some other computer.
+In order to achieve this, the
+user has to communicate with the ZEBRA system by (mostly) simple calls
+to ZEBRA routines, and by following a number of rules and conventions.
+Once a program has been written in this fashion, it becomes easy
+for anyone knowing rather few of the details to use and to modify the
+program, without having to worry about the side-effects of any changes
+he or she makes, and without having to recompile large sections of the
+code solely in order to obtain a few extra storage locations.
+<P>
+ZEBRA provides a significant extension to the power of Fortran, in
+general at an insignificant cost in terms of execution-time overheads.
+However, even that small cost is tiny compared with the extra time which
+would otherwise be wasted in developing large programs using only the
+conventional facilities.
+<P>
+The purpose of this chapter is to introduce the novice user to the basic
+terms and concepts of ZEBRA. The actual use of the system
+is described in later
+chapters, where all the relevant information on calling sequences and so
+forth is set out.
+<P>
+<H1><A NAME=SECTION0012000000000000000> Logical Data Structures</A></H1>
+<P>
+<H2><A NAME=SECTION0012100000000000000> The bank</A></H2>
+<P>
+Imagine that we wish to store all the information about, say, a track in
+a single unit, containing perhaps details of its momentum, direction,
+coordinates etc. Using a call to the ZEBRA routine <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZBOOK>MZBOOK</A>, we can ask
+for an area of contiguous storage of a given length to be provided. The
+actual location of this area is returned by <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZBOOK>MZBOOK</A> as a
+<b>base address</b> which has to be used in all references to that area.
+<A NAME=58><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+This unit of storage is called a
+<b>bank</b>, and in Fortran code will be referenced as in:
+<b>Addressing data words in a ZEBRA bank</b><PRE><TT>Q(LTK+1) = PX
+      Q(LTK+2) = PY
+      etc.</TT></PRE>
+<tt>Q</tt>, by convention, is the name of the Fortran array underlying the
+data structure, and <tt>LTK</tt> is the base address,
+provided by <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZBOOK>MZBOOK</A>, being the location of the word
+preceding the first data word in the bank.
+<P>
+An advantage of ZEBRA is that it allows banks to contain data of
+differing types. This is explained in detail later, but a simple
+application would allow us to address another data word in the bank just
+referenced as an integer, e.g.
+<b>Addressing integer data in a ZEBRA bank</b><PRE><TT>IQ(LTK+19) = NPOINTS</TT></PRE>
+It is important to understand that for data structuring purposes
+ZEBRA requires no knowledge of or control
+over the actual contents of a bank. 
+Whether it contains track data or a
+list of family birthdays is not ZEBRA's concern. 
+The internal details of
+the data in a bank are solely the responsibility of the user(s), and it is
+vital to maintain an adequate documentation of bank contents.
+However, for input/output across computers and for printing
+purposes, ZEBRA has to know the type of the bank contents, i.e. whether
+the numbers are floating point, integer, Hollerith, etc.
+This can be declared by a call to <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZFORM>MZFORM</A>.
+<P>
+<H2><A NAME=SECTION0012200000000000000> The linear structure</A></H2>
+<P>
+In our example of a track bank, it is clear that in a given application
+there may be a large and variable number of tracks to deal with.
+To permit the realization of sets of objects of the same kind, ZEBRA
+provides the construct of the <b>linear structure</b> (figure <A HREF=chapter2_1.html#LINSTRU>1.1</A>).
+A linear structure consists of a series of linked banks, with each bank
+holding in a reserved system word, called the <b>next link</b>,
+the base address of the next member of the set. The next link of the
+last bank of a linear structure has the value zero, indicating that
+there is no next bank.
+<A NAME=70><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<A NAME=71><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<P>
+
+<P>
+<P><A HREF="../linstru.eps"><IMG ALIGN=MIDDLE SRC="EPS1.xbm"></A>
+<kbd>A simple linear structure</kbd>
+<A NAME=LINSTRU><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<P>
+<P>
+<b>Example of loop over linear chain</b><PRE><TT>LTK = LFIRST                      ! Address of the first bank
+   10 IF (LTK.EQ.0) GO TO finished      ! No next bank left ?
+            .....                       ! Process data for the bank at LTK
+          LTK = LQ(LTK)                 ! Get the address of the next bank
+      GO TO 10                          ! Loop</TT></PRE>
+The next link is stored in the word <tt>LQ(LTK)</tt> of the bank,
+with the vector <tt>LQ</tt>
+in offset EQUIVALENCE to the vector <tt>Q</tt> and <tt>IQ</tt>, as explained later.
+The example above shows the ZEBRA equivalent of a Fortran DO-loop to process
+all the banks of a linear structure.
+<P>
+Banks are created dynamically at execution time, and because each
+bank has one word to connect the rest of the structure of which it is a
+member, the linear structure permits the creation at
+execution time of sets of an arbitrary number of objects,
+independent of any declaration of maximum dimension, either at
+execution time or at compile time, as would be the case with Fortran
+arrays.
+<P>
+The order of the banks in a linear structure, although defined, is not
+normally significant. It depends on the details of the creation process,
+as will be seen later. The user may, however, associate significance to
+the defined order, and ZEBRA utilities are provided to re-order the
+banks in a linear structure by re-arranging the next links (<A HREF=../../zebra/ZEBMZ2/chapter2_1.html#ZSORT>ZSORT</A>).
+<P>
+It will be necessary to refer to the
+``address of a linear structure''.
+This is simply the base address of its first bank. If this address is
+available, all the banks of the linear structure can be reached.
+<H2><A NAME=SECTION0012300000000000000> The general data structure</A></H2>
+<P>
+<A NAME=90><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<A NAME=91><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<P>
+In the general case, more complex structures are needed than the linear
+one just described.
+<P>
+<P><A HREF="../genstru.eps"><IMG ALIGN=MIDDLE SRC="EPS2.xbm"></A>
+<kbd>An example of a general structure</kbd>
+<A NAME=GENSTRC><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<P>For instance, in the context of a high-energy
+physics program a number of track banks may depend on a bank at a
+logically higher level which
+describes a track vertex. 
+This vertex bank will
+contain a link to the first of the track banks. 
+Such a link is called a <b>down</b> link.
+It is possible for a given bank to have a large number of
+down links, and for it to depend similarly on a logically yet higher bank
+through a down link in that bank.
+We thus see that the down links allow the construction of
+a tree structure, and that at each node there may be either a
+single bank or a linear structure. This may be pictured as in
+Figure <A HREF=chapter2_1.html#GENSTRC>1.2</A>.
+<P>
+All the links so far described are stored by ZEBRA as part of the bank
+concerned. We note that the down and next links are referred to collectively
+as <b>structural</b> links, as they represent the basic connections
+of a data structure.
+<P>
+<H2><A NAME=SECTION0012400000000000000> Reverse links</A></H2>
+<P>
+Each ZEBRA bank contains a link pointing to the bank on which the
+whole linear structure of which it is a member depends. 
+This is called the <b>up link</b>. 
+The value of this link is zero if the bank concerned is 
+itself at the top of the tree structure.
+Finally, each bank has also an <b>origin</b> link, which points
+to the structural link supporting the bank.
+The up link and the origin link are known as <b>reverse</b> links.
+A summary of the four types of links known to ZEBRA is given in
+Figure <A HREF=chapter2_1.html#ZEBLINK>1.3</A><A NAME=107><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<A NAME=108><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<A NAME=109><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<P>
+<H2><A NAME=SECTION0012500000000000000> Reference links</A></H2>
+<P>
+The links so far described are an integral part of the data structure
+which they represent. It often happens that a user wishes to establish
+links between various banks which are not part of the structure itself,
+but merely references that the user wishes to record.
+These are then known as
+<b>reference links</b>. A bank can contain a large number of such links,
+and their use is at the discretion of the user, and entirely his
+responsiblity. For the reference links the task of
+the ZEBRA system is limited to changing their
+values in the event that, for reasons to be explained
+below, banks have to be moved, or relocated, in memory. Reference links
+provide a high level of generality in the design of complete data
+structures, and are another of those features which so greatly
+enhances the power of Fortran.
+<P>
+<P><A HREF="../zeblink.eps"><IMG ALIGN=MIDDLE SRC="EPS3.xbm"></A>
+<kbd>A schematic overview of the links known to ZEBRA</kbd>
+<A NAME=ZEBLINK><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<P>
+<H1><A NAME=SECTION0013000000000000000> Physical Storage</A></H1>
+<P>
+It is clear that somehow the banks just described have to be mapped on
+to physical computer storage, or memory.
+This is achieved in ZEBRA by declaring to the system one or more common
+blocks which are to provide the actual storage for the data structures.
+It is often sufficient for off-line programs to declare a single large
+common block; it is for on-line applications, or for certain large
+off-line applications that the possibility to define several distinct
+blocks is foreseen. A typical declaration has the following form:
+<b>Declaration of the ZEBRA storage</b><PRE><TT>COMMON /MYSTOR/ IFENCE(10),LINKS(10),LINKR(20),ISTORE(10000)
+      DIMENSION     LQ(999),IQ(999),Q(999)
+      EQUIVALENCE  (LINKS(9),LQ(9),IQ(1),Q(1))</TT></PRE>
+An actual common block is declared to ZEBRA by a call to <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZSTOR>MZSTOR</A>,
+and in ZEBRA is termed a <b>dynamic store</b>.
+The actual layout of memory in a store declared by the example above is shown
+in figure <A HREF=chapter2_1.html#FMZSTOR>1.4</A>.
+<P>
+<P><A HREF="../mzstor.eps"><IMG ALIGN=MIDDLE SRC="EPS4.xbm"></A>
+<kbd>The layout of the ZEBRA default store</kbd>
+<A NAME=FMZSTOR><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<P>Within the common block just described, we notice that the effect of th
+<tt>EQUIVALENCE</tt> statement is to offset the arrays <tt>Q</tt> and 
+<tt>LQ</tt> by eight locations. 
+This permits in the references to the data words and to the
+links a simple form of subscript, namely that each data word is
+addressed as <tt>Q(L+n)</tt>, 
+as already seen, and that each link is referenced as <tt>LQ(L-m)</tt>. 
+This may be better appreciated by studying the layout of an
+actual bank, whose layout is detailed in Figure <A HREF=chapter2_1.html#BNKFORM>1.5</A>,
+where the various sections of the bank may be seen, in particular the
+data and the links.
+<P>
+<A NAME=142><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><P>[p]
+<A HREF="../bnkform.eps"><IMG ALIGN=MIDDLE SRC="EPS5.xbm"></A>
+<kbd>The format of a ZEBRA bank</kbd>
+<A NAME=BNKFORM><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<P>The total number of links <tt>NL</tt> plus a constant plus the number of the
+optional, so-called extra I/O words, stored
+in the lower part of the first word of the bank (see below),
+is required to step over the link
+region to reach the central area during a sequential scan
+through the store.
+The upper part of the first word contains the I/O control-byte.
+Together with the extra I/O words, if any, it constitutes the
+``I/O characteristic'', describing the nature of the bank contents,
+as needed for conversion if the bank is written to a file for reading
+on some other computer, and also for interpretative dumps
+(see the description of routine <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZFORM>MZFORM</A>).
+<A NAME=147><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<A NAME=148><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<A NAME=149><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<A NAME=150><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<P>
+The central part of the bank starts with the next link,
+accessed as <tt>LQ(L)</tt>.
+The up link at <tt>LQ(L+1)</tt> points to the header bank supporting
+the linear structure of which the bank is a member;
+it is zero if the bank is a primary header bank.
+The origin link at <tt>LQ(L+2)</tt> points to the link
+through which the bank is reached.
+The origin link is not usually of interest to the user,
+its sole purpose is to free the user from having to remember the
+supporting link. These three links, next, up and origin are present
+in every bank and are not counted in <tt>NL</tt> and <tt>NS</tt>.
+<A NAME=156><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<A NAME=157><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<P>
+The two words <tt>IQ(L-5)</tt> and <tt>IQ(L-4)</tt> contain the numeric and Hollerith bank
+identifiers, <tt>IDN</tt> and <tt>IDH</tt>. 
+Usually all the banks of a linear structure
+have the same <tt>IDH</tt>, but different <tt>IDN</tt>'s to permit ready
+identification of a particular bank in interactive work.
+Words <tt>IQ(L-3)</tt> and <tt>IQ(L-2)</tt>
+hold the total number of links (<tt>NL</tt>) and the number of structural
+links (<tt>NS</tt>), respectively,
+and word <tt>IQ(L-1)</tt> holds the number of data words (<tt>ND</tt>).
+<P>
+The status word at <tt>IQ(L)</tt> provides in positions
+1 to 18 for user status bits,
+while positions 19 to 32 are reserved for system use. In particular
+bits 19 to 22 contain the number of extra I/O descriptor words <tt>NIO</tt>,
+needed to go backwards from the centre to the start of a bank.
+<P>
+With this format the smallest possible, but useless, ZEBRA
+bank (<tt>NL=NS=ND=0</tt>) occupies 10 words.
+<P>
+<H2><A NAME=SECTION0013100000000000000> Divisions</A></H2>
+<P>
+<A NAME=174><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<P>
+So far we have seen how banks are stored in a dynamic
+store. In fact, a dynamic store may physically be subdivided into
+<b>divisions</b>. The purpose of the division is to enable ZEBRA to
+manipulate groups of logically associated banks efficiently, for instance
+for input-output or for dropping banks, and also to allow it to handle links
+more efficiently when it knows that they are restricted to a single
+division.
+<P>
+When a store is initialized by <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZSTOR>MZSTOR</A>, it automatically creates three
+divisions, one for itself and two for the user. Further divisions may be
+created explicitly by a call to <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZDIV>MZDIV</A>.
+<P>
+It should be noted that stores and divisions are identified by
+means of a store/division index whose value never changes. These indices
+should be maintained in, for instance, the common block to which they
+refer, for reasons of
+data integrity.
+<P>
+<H2><A NAME=SECTION0013200000000000000> Link areas</A></H2>
+<P>
+<A NAME=179><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<P>
+It is possible for a user to store bank addresses or links, for ease
+of manipulation, in a user-defined area, or <b>link area</b>.
+These should be kept in a common block, and a call to
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZLINK>MZLINK</A> or <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZLINT>MZLINT</A> is necessary to declare these areas to ZEBRA, which
+will then maintain them in the event of a bank relocation. For this
+reason, the link areas associated with different stores have to be kept
+separately.
+<P>
+<H2><A NAME=SECTION0013300000000000000> Working space</A></H2>
+<P>
+<A NAME=184><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<P>
+It happens frequently in a program that some temporary working space is
+required, perhaps for use within one or two routines. 
+ZEBRA permits a user to ask for such working space by a call to <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZWORK>MZWORK</A>. 
+The necessary
+storage is made physically available at the beginning of the relevant
+store, and may contain reference links and data. It should be noted that
+the first division in the store is logically part of the working space,
+and its existing contents are destroyed by a call to <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZWORK>MZWORK</A>. 
+Normally, therefore, the first division should itself be used only for 
+banks which are very short term.
+<P>
+<H1><A NAME=SECTION0014000000000000000> Dropping banks and garbage collection</A></H1>
+<P>
+Initially a dynamic store is empty, except for a few system banks in the
+system division. As banks are created the occupied space increases and
+the free space decreases. 
+By calling <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZDROP>MZDROP</A> the user may <b>drop</b>
+banks, which are not needed any longer. 
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZDROP>MZDROP</A> logically removes banks,
+or whole sub-structures, from the surrounding data structure and marks
+the banks as dropped. These dropped banks stay intact in memory and in
+particular, reference links pointing to dropped banks continue to point
+to valid information.
+<A NAME=192><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<P>
+Possibly, but not normally, the situation can arise, that the free space
+is not sufficient to satisfy a request for creating a bank, in which case
+ZEBRA will recuperate the space occupied by the dropped banks. 
+This operation, called <b>garbage collection</b>, moves the active
+banks of
+a division to form one contiguous area, squeezing out the dropped banks
+and thereby increasing again the free space, updating all links for the
+new positions of the banks in memory, including a reset to zero of
+reference links which used to point to the dropped banks which have now
+disappeared. The process of changing the links for the new position in
+memory is called <b>relocation</b>.
+<A NAME=195><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<P>
+ZEBRA triggers a garbage collection automatically whenever a request
+for memory cannot be satisfied. If even after garbage collection there
+is not enough space, <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZBOOK>MZBOOK</A> etc. will take an error exit and thus the
+user does not have to test, after each call to <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZBOOK>MZBOOK</A> etc., for the
+successful completion of the request.
+<P>
+For garbage collection the ZEBRA system has to know the whereabouts of
+<b>all</b> the links in the program. 
+For this reason it
+is essential that the user keeps all bank addresses in locations known
+to ZEBRA, either in the link part of banks, or in the link part of the
+working space or in link areas. 
+Any link kept elsewhere will be invalid after a garbage collection.
+<P>
+The memory move involved in a garbage collection is represented in
+Figure <A HREF=chapter2_1.html#RELOCAT>1.6</A>.
+<P>
+<P><A HREF="../relocat.eps"><IMG ALIGN=MIDDLE SRC="EPS6.xbm"></A>
+<kbd></kbd>[The layout of memory in a division before and after garbage
+         collection.]        The layout of memory in a division before and after garbage
+collection.<BR>The top part of the picture
+shows a number of ``live'' banks numbered 1 to 7
+and 5' to 1', which interspersed ``dead''
+banks (i.e. banks whose information is no longer needed and whose space
+can hence be recovered).
+The bottom part of the picture shows the same ``live''
+banks which have been left justified to increase the free space.
+<A NAME=RELOCAT><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<P>
+<H1><A NAME=SECTION0015000000000000000> Wiping divisions</A></H1>
+<P>
+In high energy physics repetitive ``event processing''
+is a very common
+situation: event-by-event the data are read, processed, output and
+dropped. Each event is represented by one or several data structures,
+which disappear completely before the next event is dealt with.
+In this situation it would be inefficient to drop the event with <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZDROP>MZDROP</A>
+and to rely on garbage collection to recover the space of the previous
+event only later, maybe at the moment when the data volume of the new
+event is already substantial and would have to be copied. It is much
+more efficient to separate the short term data of the event from the
+long term data (data held by the program over many events), by
+directing them into separate divisions. The event can then be
+abandoned with <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZWIPE>MZWIPE</A> which resets one or several divisions to be empty,
+thereby freeing the space for immediate re-use.
+<P>
+<H1><A NAME=SECTION0016000000000000000> Input/Output</A></H1>
+<P>
+One of the important features of ZEBRA is its ability to handle the
+transfer of data structures to and from an external medium. 
+This is performed by calls to routines in the FZ part of the
+<A NAME=214><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=215><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>system, and the user does not need to program any explicit Fortran input/output
+statements. 
+But the power of the system goes beyond that of a simple data transfer. 
+It is able to maintain the integrity of a data structure
+between an output operation and a subsequent input operation by
+appropriate changes to the values of the links connecting the structure. 
+In addition, ZEBRA permits input/output to either sequential or direct 
+access files, depending on the nature
+of the data and, very important, it also provides two modes of data
+representation. 
+<A NAME=216><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>The first is called <b>native</b> mode, and implies that the data 
+undergo no conversion when
+transfered between storage and the external medium. Such data may be read
+only on a computer of a compatible architecture. 
+The <b>exchange</b> mode, on the other hand,
+<A NAME=219><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>allows transfer of data between a large variety of
+computers by making appropriate conversions to and from an interchange
+format.
+<P>
+On the other hand the ZEBRA RZ package permits the storage and retrieval of 
+ZEBRA data structures or Fortran vectors in random access files. 
+Files may reside on standard
+direct access devices such as magnetic disk, or be
+mapped to virtual memory. 
+RZ file<A NAME=281><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=282><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A> s can be accessed by several users simultaneously,
+even across networks.
+Remote file access and transfer is provided for RZ files
+using standard tools, such as NFS and ftp. In the heterogeneous
+environment, the tools provided in the CSPACK <A HREF=../../general/biblio/bibliography.html#bibCSPACK>[7]</A> 
+package may be used.
+<P>
+The RZ package is not a relational database management system,
+but organises data in a hierarchical manner which is suitable
+for many applications in High Energy Physics, and probably outside.
+<P>
+<H1><A NAME=SECTION0017000000000000000> Debugging problems</A></H1>
+<P>
+<H2><A NAME=SECTION0017100000000000000> The debugging and documentation package</A></H2>
+<P>
+It is inevitable that errors will sometimes be made in constructing and
+manipulating the data structures supported by ZEBRA. 
+In order to allow
+a simple and convenient means of checking the integrity of the structures,
+including the links and the data, the DZ package has been provided
+(see chapter <A HREF=#secdzdescription><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/cross_ref_motif.gif"></A>).
+It has various options to display and validate the whole or part of a dynamic
+store.
+<P>
+The DZDOC package contains routines for generating and maintaining documentation
+on ZEBRA data structures (see chapter <A HREF=#secdzdocdescription><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/cross_ref_motif.gif"></A>).
+<P>
+<H2><A NAME=SECTION0017200000000000000> The user communication array <tt>IQUEST</tt></A></H2>
+<P>
+Information about problems or important input/output running
+parameters is available in the user communication array 
+<tt>IQUEST</tt><A NAME=289><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=290><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=291><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=292><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A> in common <tt>/<tt>QUEST</tt><A NAME=299><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=300><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=301><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=302><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>/</tt>. 
+In order to have access to the information in this array
+the user should include the following definition in his code:
+<b>Fortran definition of the user communication vector <tt>IQUEST</tt></b><PRE><TT>COMMON /QUEST/IQUEST(100)</TT></PRE>
+When a routine detects an error, it identifies itself and gives the
+case number describing the problem. 
+This number, together with the
+detailed description of the contents of the <tt>IQUEST</tt><A NAME=309><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=310><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=311><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=312><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A> elements, will allow
+the user to trace the problem.
+<P>
+In the case of input/output routines (i.e. the FZ and RZ packages)
+information about the last operation is available via <tt>IQUEST</tt><A NAME=319><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=320><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=321><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=322><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+(see the description of each routine for the meaning of individual 
+<tt>IQUEST</tt><A NAME=329><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=330><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=331><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=332><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A> values).
+<P>
+<H1><A NAME=SECTION0018000000000000000> Some conventions</A></H1>
+<P>
+ZEBRA uses certain conventions,
+for instance that the second letter of each routine or common block
+name is a <tt>Q</tt> or <tt>Z</tt>. 
+For this reason, users are urged not to
+write common block or routine names which could be confused with ZEBRA
+names, by avoiding these two letters in that position. 
+Users are also
+recommended to begin all link names with an <tt>L</tt>, in order that this become
+a common convention, thereby improving the readability of programs.
+<P>
+<H1><A NAME=SECTION0019000000000000000> Summary</A></H1>
+<P>
+This chapter has tried to set out the basic features of ZEBRA, together
+with a justification for attempting to increase the power of the
+programming facilities available to a programmer in this way. The nature
+of the data structures has been described, together with the manner
+in which they
+can be manipulated, displayed, and written and read.
+<P>
+The ZEBRA system has been developed, in part, because of weaknesses in
+Fortran 77. 
+The new language standard Fortran 90 provides high level data structure
+constructs, whose impact on high-energy physics programming are being
+investigated.
+Until then, high-energy physicists are able
+to develop data structures, one of the most important parts of
+programming, using ZEBRA.
+<P>
+ <H2>References</H2>
+<P><A NAME=BIBLIO HREF=../../general/biblio/bibliography.html>Global CERN library references</A><P>/user/goossens/cnasall/cnasbibl,/user/goossens/cnasall/textproc}    
+<HR> <A NAME=tex2html61 HREF=tex2htmlindex2_2.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/next_motif.gif"></A> <A NAME=tex2html59 HREF=ZEBINTR.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/up_motif.gif"></A> <A NAME=tex2html53 HREF=ZEBINTR.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/previous_motif.gif"></A>  <A NAME=tex2html63 HREF=tex2htmlindex2_2.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/index_motif.gif"></A><BR>
+<B> Next:</B> <A NAME=tex2html62 HREF=tex2htmlindex2_2.html>Index</A>
+<B>Up:</B> <A NAME=tex2html60 HREF=ZEBINTR.html>No Title</A>
+<B> Previous:</B> <A NAME=tex2html54 HREF=ZEBINTR.html>No Title</A>
+<HR> <P>
+<HR>
+
+</BODY>
+<P><ADDRESS>
+goossens@cern.ch
+</ADDRESS>

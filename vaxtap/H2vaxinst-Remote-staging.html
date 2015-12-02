@@ -1,0 +1,134 @@
+<TITLE>VAXTAP -- H2vaxinst-Remote-staging </TITLE>
+<P>
+<H2><A NAME=H2vaxinst-Remote-staging.html>Remote staging</A></H2>
+<P>
+Remote staging is currently only available through the FATMEN <A
+HREF=H1Bibliography.html#bib-FATMEN>[bib-FATMEN]</A> package. However, the
+implementation requires the creation of special batch queues, definition
+of logical names and other configuration details which are best described
+here. The technique used to provide remote staging requires no
+modification to VAXTAP.
+<P>
+Remote staging is possible in two cases:
+<P>
+<OL>
+<LI>The remote tape drive is attached to a VAX in the same VAXcluster as
+the client
+<LI>The remote tape drive is attached to a VAX that is in not in the same
+VAXcluster
+</OL>
+<P>
+On the client machine, a file SETUPEXE:TPSERV.CONF must be created. This
+file contains a list of generic device names and the nodes on which they
+are served.
+<P>
+<PRE>
+                    <B>An example TPSERV.CONF file</B>
+                                  </PRE>
+<P>
+<PRE>
+TPSERV 8200 VXCRNQ
+TPSERV CTRS FNALD
+</PRE>
+<P>
+When a remote stage is required, a batch job will be submitted to a
+special queue on that node. If the server node is in the same VAXcluster
+as the client, the batch job is submitted directly. In other cases, DECnet
+task to task is used to start a server to submit the job and check its
+status.
+<P>
+<H3>Configuring the batch queues</H3>
+<P>
+A generic batch queue is required for each generic device type that is to
+be served. If the queue is to be used to stage devices of type 8200, then
+the queue name must be STAGE8200S. A physical queue fed by this generic
+queue must be created on each node that is to serve devices of this type.
+The job limit should be set to the number of devices that are concurrently
+available for this type of operation. Thus, if one has two devices of type
+8200 that are dedicated to staging, the job limit should be set to 2.
+<P>
+<H3>Log files from the batch jobs</H3>
+<P>
+The log files from the staging jobs are written to the directory defined
+by the system logical name STAGELOGS.
+<P>
+<H3>Accessing the staging disk</H3>
+<P>
+It is assumed that the staging disk is DFS mounted on the client machine.
+<P>
+<H3>Installing the stage server</H3>
+<P>
+On server systems which are not in the same VAXcluster as prospective
+clients, a small stage server must be built and defined as a DECnet
+object.
+<P>
+<PRE>
+              <B>DECnet definitions for the stage server</B>
+                                  </PRE>
+<P>
+<PRE>
+MCR NCP
+NCP>SET OBJECT STGSERV NUMBER 0 FILE CERN:[PRO.EXE]STGSERV.COM
+NCP>DEF OBJECT STGSERV NUMBER 0 FILE CERN:[PRO.EXE]STGSERV.COM
+NCP>EXIT
+</PRE>
+<P>
+The actual command file simple runs the corresponding .EXE, and is
+automatically extracted as part of the FATMEN installation procedure.
+<P>
+<PRE>
+                     <B>The STGSERV command file</B>
+                                  </PRE>
+<P>
+<PRE>
+$ set noon
+$!
+$! STGSERV.COM
+$!
+$! This command file is invoked when a remote stage operation is
+$! required.
+$!
+$! Display remote user and node name
+$!
+$  remote_user = f$trnlnm("SYS$REM_ID")
+$  remote_node = f$trnlnm("SYS$REM_NODE")
+$!
+$  date_time   = f$cvtime(,"ABSOLUTE")
+$!
+$  write sys$output ""
+$  write sys$output ">>> Start of STGSERV command file"
+$  write sys$output ""
+$!
+$  write sys$output "Remote stage submit/query request from user ",-
+"''remote_user' at ''remote_node' at ''date_time'"
+$!
+$! Set messages how we want them...
+$!
+$  SET MESSAGE/FACILITY/IDENTIFICATION/SEVERITY/TEXT
+$!
+$! Run the server
+$!
+$  RUN SETUP_EXE:STGSERV
+$!
+$  write sys$output ""
+$  write sys$output ">>> End of STGSERV command file"
+$  write sys$output ""
+$!
+</PRE>
+<P>
+The server code can be extracted with the following command file
+<P>
+<PRE>
+                    <B>Extracting the stage server</B>
+                                  </PRE>
+<P>
+<PRE>
+$ypatchy cern:[pro.src.car]fatmen.car stgserv.for :go <<!
++use,qcde.
++use,vaxvms,*stgserv.
++exe.
++pam,11,t=c.
++quit
+$for stgserv.for
+</PRE>
+<P>

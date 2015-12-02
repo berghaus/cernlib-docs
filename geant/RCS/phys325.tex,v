@@ -1,0 +1,549 @@
+head     1.1;
+access   ;
+symbols  ;
+locks    goossens:1.1; strict;
+comment  @@;
+
+
+1.1
+date     94.04.25.09.23.43;  author goossens;  state Exp;
+branches ;
+next     ;
+
+
+desc
+@Initial Entry
+@
+
+
+
+1.1
+log
+@Initial revision
+@
+text
+@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%  GEANT manual in LaTeX form                                     %
+%                                                                 %
+%  Michel Goossens (for translation into LaTeX)                   %
+%  Version 1.00                                                   %
+%  Last Mod. Jan 24 1991  1300   MG + IB                          %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\Origin{M.S. Dixit}
+\Revision{G.Lynch} 
+\Documentation{F.Carminati} 
+\Submitted {17.06.85}  \Revised {16.12.93}
+\Version{Geant 3.16}\Routid{PHYS325}
+\Makehead {Moli\`ere  scattering}
+\section{Subroutines}
+\subsection{Initialisation}
+
+\Shubr{GMULOF}{}
+\Rind{GMULOF} calculates the table of maximum
+steps corresponding to the
+energies in the array {\tt ELOW} for electrons and muons.
+It is called during initialisation by \Rind{GPHYSI}.
+For hadrons and ions the computation is performed during 
+tracking in the routines \Rind{GTHADR} and \Rind{GTHION}.
+
+\Shubr{GMOLI}{(AC,ZC,WMAT,NLM,DENS,OMC*,CHC*)}
+\begin{DLtt}{MMMMMMMM}
+\item[AC] {\tt REAL} array of dimenstion {\tt NLM} containing
+the mass numbers;
+\item[ZC] {\tt REAL} array  of dimenstion {\tt NLM} 
+containing the atomic numbers;
+\item[WMAT] {\tt REAL} array containing the proportions by
+weight of the component of a mixture/compound. {\tt 1} in case
+of a single component;
+\item[NLM] {\tt INTEGER} number of the elements in the mixture/compound;
+\item[DENS] {\tt REAL} density in g cm$^{-3}$;
+\item[OMC] {\tt REAL} $b_{c}$ constant of Moli\`{e}re theory;
+\item[CHC] {\tt REAL} $\chi_{cc}$ constant of Moli\`{e}re theory.
+\end{DLtt}
+
+\Rind{GMOLI} calculates the two material-dependent constants 
+({\tt OMC} and {\tt CHC}). These are 
+needed during initialisation by \Rind{GMULOF} and during tracking
+to sample the scattering angle, as explained below.
+It is called at initialisation time by the routine
+\Rind{GPROBI} which initialises some material constants and computes
+the probabilities for various processes.
+
+\subsection{Sampling of the multiple scattering angle}
+
+\Shubr{GMULTS}{}
+\Rind{GMULTS} is the steering routine for the sampling
+of the multiple scattering angle when the variable {\tt IMULTS}
+in common \FCind{/GCPHYS/} is {\tt 1} or {\tt 2}. This variable
+can be controlled by the {\tt MULT} data record.
+The routine decides if the material-dependent constant {\tt OMC}
+computed by \Rind{GMOLI} during initialisation has to
+be corrected due to its dependence on $\beta$ and $Z_{inc}$, and
+selects Moli\`ere theory (\Rind{GMOLIE}) 
+or single Coulomb scattering (\Rind{GMCOUL}).
+It updates the direction of the particle in the array 
+{\tt VECT} (COMMON \FCind{GCTRAK}).
+It is called by the tracking routines \Rind{GTELEC}, \Rind{GTHADR},
+\Rind{GTHION} and \Rind{GTMUON}.
+
+\Shubr{GMOLIO}{(AC,ZC,WMAT,NLM,DENS,BETA2,CHARG2,OMC*)}
+\begin{DLtt}{MMMMMMMM}
+\item[BETA2] {\tt REAL} $\beta^2$ of the particle;
+\item[CHARG2] {\tt REAL} charge squared of the particle in electron
+charge unit ($Z_{inc}^2$ in the following).
+\end{DLtt}
+
+All the other arguments are routine \Rind{GMOLI}.
+\Rind{GMOLIO} re-evaluates the material-dependent constant {\tt OMC}.
+It is called by \Rind{GMULTS}, if needed. 
+
+\Shubr{GMOLIE}{(OMEGA,BETA2,DIN*)}
+\begin{DLtt}{MMMMMMMM}
+\item[OMEGA] {\tt REAL} $\Omega_0$ of the Moli\`{e}re theory;
+\item[BETA2] {\tt REAL} $\beta^2$ of the particle;
+\item[DIN]   {\tt REAL} array of dimension 3 containing the
+new direction cosines with respect to the original direction of the
+particle.
+\end{DLtt}
+\Rind{GMOLIE} samples the multiple scattering angle according to
+Moli\`{e}re theory, as explained in the next section.
+It is called by the multiple scattering steering routine \Rind{GMULTS},
+
+\Shubr{GMOL4}{(Y*,X,VAL,ARG,EPS,IER*)}
+\begin{DLtt}{MMMMMMMM}
+\item[Y] {\tt REAL} value of the interpolated function;
+\item[X] {\tt REAL} value at which the function should be interpolated;
+\item[VAL] {\tt REAL} array of four values of the function to
+interpolate;
+\item[ARG] {\tt REAL} array of four values of the argument of the
+function to which the values contained in {\tt VAL} correspond;
+\item[EPS]  {\tt REAL} required precision for the interpolation;
+\item[IER] {\tt INTEGER} error flag;
+\end{DLtt}
+\Rind{GMOL4} inverts the integral of Moli\`ere distribution
+function using four-points continued-fraction interpolation.
+It is called by \Rind{GMOLIE}.
+
+\section{Method} 
+\subsection{Introduction}
+When traversing ordinary matter, elementary particles undergo deflection
+from their originary trajectory due to the interaction with the atoms.
+This effect is rather large for charged particles, which are deflected
+by the electric field of nuclei and electrons via a large number of 
+small elastic {\it collisions}. To simulate precisely the transport of
+particles in matter, it is important to provide a precise description 
+of this effect. Considerable effort has gone over the years into
+the formulation of a theory of Coulomb multiple scattering. In 
+{\tt GEANT} we follow the theory originally formulated by Moli\`{e}re
+\cite{bib-MOLI} \cite{bib-MOL1} and then elaborated by Bethe 
+\cite{bib-BET1}. A review of this theory can be found in \cite{bib-SCOT}.
+
+It should be noted that this is not the only theory which describes
+multiple Coulomb scattering, and a thorough analysis of the problem has
+been performed by Goudsmit and Saunderson \cite{bib-GOUD} \cite{bib-GOU1}.
+
+A complete account of the Moli\`{e}re theory is outside the scope of this
+manual. For more information the interested reader could refer to the
+works cited above and to the EGS4 manual
+\cite{bib-EGS4}, from which the notation used in the present chapter
+has been derived. 
+
+The principal limitations of Moli\`{e}re theory are the following:
+\begin{enumerate}
+\item the angular deflection is {\it small}. Effectively this
+constraint provides the upper limit for the step-size;
+\item the theory is a {\it multiple scattering} theory; that is, many
+atomic collisions participate in causing the incident particle to be
+deflected. In some implementations, this constraints provides a lower 
+limit on the step size. In {\tt GEANT}, when the number of scatters is
+below the limit of applicability of Moli\`{e}re single Coulomb scatterings
+are simulated, so that there is no effective minimum step size below which
+multiple scattering is {\it switched off};
+\item the theory applies only in semi-infinite homogeneous media. This 
+constraint calls for a very careful handling of particles near to a
+medium's boundary;
+\item there is no energy loss built into the theory. This again introduces
+the necessity to take small steps;
+\end{enumerate}
+
+In Moli\`{e}re theory corrected for finite angle
+scattering ($\sin\theta \neq \theta$) as described by 
+Bethe~\notHTML{\cite{bib-BET1,bib-SCOT}}\HTML{\cite{bib-BET1} 
+\cite{bib-SCOT}},
+the angular distribution is given by:
+\begin{eqnarray}
+      f(\theta) \: \theta d\theta & = & \sqrt{\frac{\sin\theta}{\theta}} \:
+f_r(\eta) \: \eta d\eta,
+\end{eqnarray}
+ 
+where for $f_r(\eta)$ we use the first three terms of Bethe's expansion:
+\begin{eqnarray}
+\label{eq:phys325-1}
+f_r(\eta) & = & f_{r}^{(0)}(\eta)+
+f_{r}^{(1)}(\eta)B^{-1}+f_{r}^{(2)}(\eta)B^{-2} \\
+\eta & = & \frac{\theta}{\chi_c \sqrt{ B }} \nonumber
+\end{eqnarray}
+$\eta$ is called the {\it reduced angle}.
+
+\subsection{Calculation of the reduced angle}
+In formula (\ref{eq:phys325-1}) above $\chi_c$ the {\it critical
+scattering angle} defined as:
+\begin{equation}
+\chi^2_c = \frac{4 \pi e^4  Z_s \rho N_{Av} Z_{inc}^2 t}{W c^2 p^2\beta^2} 
+= \chi^2_{cc} Z_{inc}^2 \frac{t}{E^2\beta^4}
+\end{equation}
+with
+\[
+\begin{array}{ll}
+Z_{inc} & \mbox{incident particle charge}               \\
+Z_{s}   & \mbox{defined below}                           \\
+N_{Av}  & \mbox{Avogadro's number}                      \\
+\rho  & \mbox{density}                                  \\
+W     & \sum_{i=1}^{N} n_i A_i \mbox{\hspace{0.5cm}molecular weight}  \\
+E     & \mbox{particle energy in $MeV$}                    \\
+r_0   & e^2/(m c^2) \mbox{\hspace{0.5cm} classical electron radius} \\
+t     & \mbox{total path length in the scatterer (and not its thickness).}
+\end{array}
+\]
+
+The variable $\chi_c$ is factorised into two parts.
+The first part, $\chi_{cc}$, is a constant of the medium for 
+a given incident particle.
+The second part depends on the incident particle energy and on the
+path length in the medium. 
+
+\begin{equation}
+\chi^2_{cc} = \frac{4 \pi e^{4} Z_s \rho N_{Av}}{W} = \frac{4 \pi c^4 r_0^2
+m_e^2 Z_s \rho N_{Av}}{W} \approx (0.39612 \: 10^{-3})^2
+Z_s \frac{\rho}{W}
+\left [ \: GeV^2 \: cm^{-1} \right ] 
+\end{equation}
+
+The variable {\tt CHC} or {\tt CHCMOL} stored in {\tt Q(JPROB+25)} corresponds
+to $\chi_{cc}$. 
+$B$ is defined by the equation
+\begin{equation}
+\label{eq:phys325-2}
+B-\ln B =\ln\Omega_0, 
+\end{equation}
+
+where $\Omega_0$ can be interpreted as the number of collisions in the step:
+
+\begin{equation}
+\Omega_0 =\frac{ \chi^2 _c}{e^{2\gamma-1}\chi_\alpha^2} 
+= b_c Z_{inc}^2\frac{t}{\beta^2}
+\end{equation}
+
+Here $\gamma$ is Euler's constant ($\gamma =0.57721\dots$)
+and $\chi_\alpha$ the atomic electron
+screening angle. For a single element this is given by:
+
+\[
+\chi_\alpha^2 = \left ( \frac{\lambda_0}{2 \pi r_{TF}} \right ) ^2
+\left [ 1.13 + 3.76 \left ( \frac{\alpha Z Z_{inc}}{\beta} \right ) ^2 \right ]
+\]
+
+where
+
+\begin{eqnarray*}
+\frac{\lambda_0}{2 \pi} & = & \hbar/p 
+\mbox{\hspace{0.5cm}Compton wavelength of the electron} \\
+r_{TF} & = & 0.885 a_0 Z^{-\frac{1}{3}} \mbox{\hspace{0.5cm}Thomas-Fermi
+radius of the atom} \\
+a_0 & = & \frac{\hbar^2}{m e^2} \mbox{\hspace{0.5cm}Bohr's radius} \\
+\alpha & = & 1/137.035 \dots \mbox{\hspace{0.5cm}the fine-structure constant}
+\end{eqnarray*}
+
+so that we have
+
+\[
+\chi_\alpha^2 = \frac{m^2 e^4 1.13}{p^2 \hbar^2 (0.885)^2} Z^{\frac{2}{3}}
+\left [ 1 + 3.34 \left ( \frac{\alpha Z Z_{inc}}{\beta} \right ) ^2 \right ].
+\]
+
+For a compound/mixture the following rule holds:
+
+\begin{eqnarray*}
+\ln(\chi_\alpha^2) & = & \frac{\displaystyle \sum_{i=1}^N n_i Z_i (Z_i+1) \ln
+( \chi_{\alpha i}^2)}{\displaystyle \sum_{i=1}^N n_i Z_i (Z_i+1)} = 
+\frac{\displaystyle \sum_{i=1}^N \frac{p_i}{A_i} Z_i (Z_i+1) \ln
+( \chi_{\alpha i}^2) }{\displaystyle \sum_{i=1}^N \frac{p_i}{A_i} Z_i (Z_i+1)}\\
+& = & \frac{\displaystyle \sum_{i=1}^N \frac{p_i}{A_i} Z_i (Z_i+1) \ln \left \{
+\frac{m^2 e^4 1.13}{p^2 \hbar^2 (0.885)^2} Z_i^{\frac{2}{3}}
+\left [ 1 + 3.34 \left ( \frac{\alpha Z_i Z_{inc}}{\beta} \right ) ^2 \right ]
+\right \} }{\displaystyle \sum_{i=1}^N \frac{p_i}{A_i} Z_i (Z_i+1)} \\
+& = & \ln \left ( \frac{m^2 e^4 1.13}{p^2 \hbar^2 (0.885)^2} \right ) -
+\frac{\displaystyle \sum_{i=1}^N \frac{p_i}{A_i} Z_i (Z_i+1) \ln 
+Z_i^{-\frac{2}{3}}}{\displaystyle \sum_{i=1}^N \frac{p_i}{A_i} Z_i (Z_i+1)} \\
+ & & + \frac{\displaystyle \sum_{i=1}^N \frac{p_i}{A_i} Z_i (Z_i+1) 
+\left [ 1 + 3.34 \left ( \frac{\alpha Z_i Z_{inc}}{\beta} \right ) ^2 \right ]}
+{\displaystyle \sum_{i=1}^N \frac{p_i}{A_i} Z_i (Z_i+1)} \\
+\end{eqnarray*}
+
+To understand the transformations in the above formulae, the following 
+should be noted. Let $n_i$ be the number of atoms
+of type $i$ in a compound/mixture, that is the number of moles
+of element $i$ in a mole of material, and $p_i$ the proportion by weight
+of that element. We have the following relation:
+
+\[
+p_i = \frac{n_i A_i}{\sum_{j=1}^{N} n_j A_j} \mbox{\hspace{2cm} that
+is\hspace{2cm}} n_i = \left ( \sum_{j=1}^{N} n_j A_j \right ) 
+\frac{p_i}{A_i} = W  \frac{p_i}{A_i}
+\]
+
+so that we can simplify expressions in the following way:
+
+\[
+\frac{\sum_{i=1}^{N} n_i \dots}{W} = \sum_{i=1}^{N} (p_i/A_i) \dots
+\]
+
+If now we set
+
+\[
+\begin{array}{L@@{}c@@{}L@@{}c@@{}L@@{}c@@{}L}
+Z_s & = & \sum^{N}_{i = 1} n_i Z_i(Z_i+1)  & =  &
+W \sum^{N}_{i = 1} \frac{p_i}{A_i} Z_i(Z_i+1) & = & W Z_s'  \\
+Z_E & = & \sum^{N}_{i = 1} n_i Z_i(Z_i + 1 )\ln Z_i^{-2/3}  & = &
+W\sum \frac{p_i}{A_i} Z_i(Z_i + 1 )\ln Z_i^{-2/3} & = & W Z_E' \\
+Z_x & = & \sum^{N}_{i = 1} n_i Z_i(Z_i + 1 ) \ln \left [ 1+3.34
+\left( \frac{\alpha Z_i Z_{inc}}{\beta}\right)^2 \right ] \\
+ & = & W \sum^{N}_{i = 1} \frac{p_i}{A_i} Z_i(Z_i + 1 ) \ln \left [ 1+3.34
+\left( \frac{\alpha Z_i Z_{inc}}{\beta}\right)^2 \right ] & &  & = & W Z_x'
+\end{array}
+\]
+
+we can write:
+
+\begin{eqnarray*}
+\ln(\chi_{\alpha}^2) & = & 
+\ln \left ( \frac{m^2 e^4 1.13}{p^2 \hbar^2 (0.885)^2} \right )
++ \frac{Z_x-Z_E}{Z_s} \\
+\chi_{\alpha}^2 & = & \frac{m^2 e^4 1.13}{p^2 \hbar^2 (0.885)^2} 
+e^{(Z_x  - Z_E )/Z_s} = \frac{m^2 e^4 1.13}{p^2 \hbar^2 (0.885)^2}
+e^{(Z_x'  - Z_E' )/Z_s'}
+\end{eqnarray*}
+
+and finally:
+
+\begin{eqnarray*}
+\Omega_0 & = & \frac{ \chi^2 _c}{e^{2\gamma-1}\chi_\alpha^2} \\
+ & = & \frac{1}{1.167} \:
+\frac{4 \pi e^4  Z_s \rho N_{Av} Z_{inc}^2 t}{W c^2 p^2\beta^2} \:
+\frac{p^2 \hbar^2 (0.885)^2}{1.13 m^2 e^4}e^{-(Z_x'  - Z_E' )/Z_s'} \\
+ & = & b_c Z_{inc}^2\frac{t}{\beta^2} \\
+b_c & = & \frac{4 \pi N_{Av} \hbar^2}{m^2 c^2}
+\frac{(0.885)^2}{1.13 \times 
+1.167} \rho Z_s' e^{(Z_E'  - Z_x' )/Z_s'} \approx 6702.33 \rho Z_s'
+e^{(Z_E'  - Z_x' )/Z_s'}
+\end{eqnarray*}
+
+The quantity $b_c$ is calculated during initialisation by
+the routine \Rind{GMOLI} setting $\beta=1$ and $Z_{inc}=1$. 
+This variable is called
+{\tt OMC} or {\tt OMCMOL} and it is stored in {\tt Q(JPROB+21)}.
+It has, via the atomic electron screening angle $\chi_{\alpha}^2$,
+a small dependence
+on $\beta$  and $Z_{inc}$ in the term $Z_x$. The quantity $b_c \rho Z_s'$
+is re-evaluated during tracking by the routine \Rind{GMOLIO}, called by
+\Rind{GMULTS}, only when necessary.
+
+The dependence of $Z_x$ on $\beta$ and $Z_{inc}$ is via a term of the form:
+$1+3.34\left(\alpha Z Z_{inc}\beta^{-1} \right )^2$, so it is not 
+necessary to recalculate it as long as
+$1 + 3.34\left(\alpha Z Z_{inc}\beta^{-1} \right )^2 \approx
+1 + 3.34\left(\alpha Z \right )^2$ that is:
+
+\[
+\begin{array}{RcLcLcL}
+3.34 (Z \alpha)^2  \left [ \left( \frac{Z_{inc}}{\beta} \right )^2
+-1 \right] & \ll & 1 & \Rightarrow &
+Z^2 \frac{Z_{inc}^2 - \beta^2}{\beta^2} & \ll & 3.34 \alpha^{-2} 
+\approx 5500 \\ [.2cm]
+ Z^2 ( Z_{inc}^2 - \beta^2 ) & \leq & 50 \beta^2
+\end{array}
+\]
+
+For mixtures/compounds this condition should be checked for every component
+and this would be unacceptable from the point of view of computer time. So
+we simply make the condition more restrictive multiplying the first term
+by the number of elements in the mixture/compound.
+
+\subsection{Sampling of the distribution function}
+
+The component distribution functions (\ref{eq:phys325-1}) are given by
+ 
+\[
+\begin{array}{lcccr}
+f_{r}^{(0)}(\eta)   & = & 2e^{-\eta^2}  & = &  2D_0(1,1,-\eta^2)         \\
+f_{r}^{(1)}(\eta)   &   &               & = &  2D_1(2,1,-\eta^2)         \\
+f_{r}^{(2)}(\eta)   &   &               & = &   D_2(3,1,-\eta^2),
+\end{array}
+\]
+ 
+where $ D_n(a,b,z) = d^n[\Gamma(a)M(a,b,z)]/d a^n $, with
+$M(a,b,z)$ the Kummers hypergeometric function.
+ 
+Integrals of the functions $f_{r}^{(1)}$ and $f_{r}^{(2)}$ needed for the
+Monte Carlo can be written down directly in terms of the $D$ functions
+\begin{eqnarray*}
+\int_{\eta}^{\infty}\eta f_{r}^{(1)} \: \eta  d\eta & = &
+     D_1 ( 2,1, - \eta^2)-D_1( 1,1, - \eta^2 ) - D_0 ( 1,1,-\eta^2)\\
+\int_{\eta}^{\infty}\eta f_{r}^{(2)} \: \eta d\eta    & = &
+\frac{1}{2} D_2 (3,1,-\eta^2) - D_2 (2,1,-\eta^2) - D_1(2,1,-\eta^2)
+\end{eqnarray*}
+ 
+We note that the first term is just the Gaussian part and it dominates
+for large $B$, that is, for large number of scatters, as it has to
+be expected. Recalling the definition of $\eta$ in (\ref{eq:phys325-1})
+we can say that the half-width of the Gaussian part of the Moli\`{e}re
+distribution is $\sigma^{2} = \chi_{c}^2 B/2$.
+Routine \Rind{GMOLIE} performs the sampling of the Moli\`{e}re 
+distribution via the following steps:
+
+\begin{enumerate}
+\item the value of $B$ is calculated recursively. If we set $f(B) = 
+B$ with $f(B) = \ln \Omega_0  + \ln B$ the relation used is
+$B_n = B_{n-1} + \Delta B = B_{n-1} + (f(B_{n-1}) - B_{n-1})/
+(1-1/B_{n-1})$. Convergence is assumed when $|\Delta B| \leq 10^{-4}$.
+
+\item a random number $r_1$ is sampled and
+a table of four values $F_{r}(\eta_i)$ is built with
+$i = j-2,j-1,j,j+1$ and $F_{r}(\eta_j) \geq r_1$. $F$ is the distribution
+function derived from (\ref{eq:phys325-1}):
+\begin{eqnarray*}
+F_{r}(\eta) & = & \int_{0}^{\eta}{f_{r}(t) \: dt}
+= \int_{0}^{\eta}{f_{r}^{(0)}(t)+f_{r}^{(1)}(t)B^{-1}+f_{r}^{(2)}(t)B^{-2} \: dt} \\
+& = & \int_{0}^{\eta}{f_{r}^{(0)}(t) \: dt} + 
+B^{-1} \int_{0}^{\eta}{f_{r}^{(1)}(t) \: dt} +
+B^{-2} \int_{0}^{\eta}{f_{r}^{(2)}(t) \: dt} \\
+& = & F_{r}^{(0)}(\eta) +
+B^{-1} F_{r}^{(1)}(\eta) + B^{-2} F_{r}^{(2)}(\eta)
+\end{eqnarray*}
+
+40 values of the functions $F_{r}^{(n)}$ are tabulated.
+
+\item using a four-points continued-fraction interpolation method 
+(\Rind{GMOL4}) a table of $\eta_i^2$ is interpolated using
+the values of $r_1$ and $F$ tabulated in the previous step. 
+This is similar
+to the inversion of the distribution function, but instead of
+obtaining directly the random variable, we interpolate a table
+of its squares.
+This provides a better fit to the inverse function;
+
+\item the value of $\theta = \chi_{c} \sqrt{B \eta^2}$ is calculated;
+
+\item a random number $r_2$ is extracted, and the rejection function
+$g(\theta) = \sqrt{\sin\theta/\theta}$ is computed. If $r_2 > g(\theta)$
+resampling begins from step 2, otherwise the value is accepted.
+\end{enumerate}
+
+The Moli\`ere distribution gives the space scattering angle. A similar
+expression may be written for the lateral displacement of the
+scattered particles. However, the problem of joint angle lateral displacement
+in the Moli\`ere approximation has not been solved, and,  for small
+step size, lateral displacement is of second order and may be neglected.
+This introduces a problem when large step sizes are taken. The step
+size can be artificially limited via the use of the variable {\tt
+STEMAX}, which is an argument to the routine \Rind{GSTMED}. For more
+information on this point the user is invited to consult chapter
+{\tt [CONS200]}.
+
+\section{Path and step length}
+\subsection{Restrictions on the step length}
+Restrictions on the length of the step arise from:
+\begin{enumerate}
+\item the number of scatters
+$\Omega_0 \geq 20 $ to stay within the multiple scattering regime. When
+$\Omega_0 < 20$, an appropriate number of {\it single} scatterings is
+used. See routine \Rind{GMCOUL} {\tt [PHYS328]}.
+\item
+$\chi_c^2B \leq 1 $ i.e. the width of the Gaussian part of the distribution
+should be less than one radian. This
+condition induces a maximum step length for the multiple scattering called
+$t_{Bethe}$. In order to find this value we write the limiting condition
+as $\chi_c^2(t_{Bethe})B(t_{Bethe}) = 1 $, that is 
+$B(t_{Bethe}) = 1/\chi_c^2(t_{Bethe})$. Now using equation 
+(\ref{eq:phys325-2}) we take the exponential of both members 
+$B(t_{Bethe}) \Omega_0(t_{Bethe}) = \exp(1/\chi_c^2(t_{Bethe}))$. 
+Dividing the two last equalities we obtain:
+\begin{eqnarray*}
+\Omega_0(t_{Bethe}) = \frac{b_c Z_{inc}^2}{\beta^2} t_{Bethe} & = & 
+\chi_c^2 (t_{Bethe})\exp(1/\chi_c^2(t_{Bethe})) \\
+&  = & \frac{\chi_{cc}^2 Z_{inc}^2 t_{Bethe} 
+\exp{[(E^2\beta^4)/(\chi_{cc}^2 Z_{inc}^2 t_{Bethe})]}}
+{E^2\beta^4} \\
+\exp{[(E^2\beta^4)/(\chi_{cc}^2 Z_{inc}^2 t_{Bethe})]} & = & 
+\frac{b_c E^2 \beta^2}{\chi_{cc}^2} \\
+t_{Bethe} & = & \frac{E^2 \beta^4}{\chi_{cc}^2 \: Z_{inc}^2 \: \ln
+\left [b_c E^2 \beta^2/\chi_{cc}^2 \right]}
+\end{eqnarray*}
+ 
+For electrons and muons this constraint on the step-length is tabulated
+at initialisation time in the routine \Rind{GMULOF} {\tt [PHYS201]}.
+For hadrons this formula can be approximated as:
+\[
+t_{Gauss}
+\approx \left(\frac{1}{14.1 \: 10^{-3}} \: \frac{E^2 \beta}{Z_{inc}}
+\right )^2 X_0,
+\]
+where $E$ is in GeV and $X_0$ is the radiation length in centimeters and
+the formula has been taken from the Gaussian approximation to multiple
+scattering (see {\tt [PHYS320]}). This condition is more restrictive, 
+because it is equivalent to require that the width of the Gaussian
+part of the distribution be less than $0.5$, but it has been found that
+the two conditions are numerically equivalent;
+\item limitation due to the path length correction algorithm used (see
+below).
+\end{enumerate}
+\subsection{Path Length Correction}
+ 
+A path length correction may be applied in an approximate manner.
+We have from the Fermi-Eyges theory \cite{bib-EGS4}
+\begin{equation}
+\label{eq:phys325-3}
+t = S + \frac{1}{2}\int_{0}^{t}{\bar{\theta}^{2}\bar{(t)} \: dt}
+\end{equation}
+where
+\[
+\begin{array}{LL}
+\bar{\theta}^2\bar{(t)}  & \mbox{the mean square angle of scattering;} \\
+S                     & \mbox{step size along a straight line;} \\
+t                      & \mbox{actual path length.}
+\end{array}
+\]
+ 
+We have further:
+\begin{equation}
+\label{eq:phys325-4}
+\bar{\theta}^2\bar{(t)} = \left( 0.0212 \frac{Z_{inc}}{p\beta} \right)^2
+\frac{t}{X_0}
+\end{equation}
+$X_0$ is the radiation length. From (\ref{eq:phys325-3}) and 
+(\ref{eq:phys325-4}) we get
+\begin{equation}
+\label{eq:phys325-5}
+S = t - K t^2
+\makebox[4cm]{with}
+K = 1.12 \times 10^{-4} \: \frac{Z_{inc}^2}{p^2\beta^2X_0}
+\end{equation}
+Equation (\ref{eq:phys325-5}) 
+may be used to make the path length correction. Solving equation
+(\ref{eq:phys325-5}) with respect to $t$ implies that, in order to
+obtain real solutions:
+\begin{equation}
+\label{eq:phys325-6}
+S \leq \frac{1}{4K} \makebox[3cm]{i.e.} S \leq 2232 \:
+\frac{X_0 p^2 \beta^2}{Z_{inc}^2}
+\end{equation}
+This condition provides an additional constraint to the maximum step
+length for multiple scattering (variable {\tt TMXCOR} in routine \Rind{GMULOF}).
+The corrected step can be approximated as:
+\[
+t \approx S(1 + KS) = S ( 1 + \mbox{\tt CORR} )
+\]
+where {\tt CORR} $ \leq 0.25$ due to condition (\ref{eq:phys325-6}).
+@

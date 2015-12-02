@@ -1,0 +1,280 @@
+head     1.1;
+access   ;
+symbols  ;
+locks    goossens:1.1; strict;
+comment  @@;
+
+
+1.1
+date     94.04.25.09.23.44;  author goossens;  state Exp;
+branches ;
+next     ;
+
+
+desc
+@Initial Entry
+@
+
+
+
+1.1
+log
+@Initial revision
+@
+text
+@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%  GEANT manual in LaTeX form                                     %
+%                                                                 %
+%  Version 1.00                                                   %
+%                                                                 %
+%  Last Mod.  9 June 1993  19:30  MG                              %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\Origin{L.Urb\'{a}n}
+\Submitted{26.10.84} \Revised{16.12.93}
+\Version{Geant 3.16}\Routid{PHYS330}
+\Makehead{Ionisation processes induced by ${\rm e^{\pm}}$}
+
+\section{Subroutines}
+\Shubr{GDRELA}{}
+\Rind{GDRELA} initialises the ionisation energy loss tables for different
+materials for muons, electrons and positrons and other particles.
+The energy binning is set within the array
+{\tt ELOW} (common \FCind{/GCMULO/}) in the routine \Rind{GPHYSI}.
+The tables are filled with the quantity $dE/dx$ in GeV/cm (formula 
+(\ref{eq:phys330-3}) below)
+which is valid for an element as well as a mixture or a compound.
+In the tables the dE/dx due to ionisation is summed with the
+energy loss coming from bremsstrahlung.
+For energy loss of electrons and positrons, it calls \Rind{GDRELE}
+using the following pointers:
+
+\begin{tabular}{llr}
+ \mbox{\tt JMA = LQ(JMATE-I)} &  pointer to the I$^{th}$ material \\
+ \mbox{\tt JEL1 = LQ(JMA-1) } &  pointer for dE/dx for electrons  \\
+ \mbox{\tt JEL1+90          } &  pointer for dE/dx for positron \\
+\end{tabular}
+
+\Rind{GDRELA} is called at initialisation time by \Rind{GPHYSI}.
+\Shubr{GDRELE}{(EEL,CHARGE,JMA,DEDX)}
+\Rind{GDRELE} computes the ionisation energy loss ({\tt DEDX}) for electrons 
+({\tt CHARGE = -1}) and positrons ({\tt CHARGE = +1}) with kinetic
+energy {\tt EEL} in the material indicated by {\tt I} in  
+{\tt JMA = LQ(JMATE-I)}. It is called by the routine \Rind{GDRELA}.
+\Shubr{GDRSGA}{}
+{\tt CDRSGA} calculates the total cross-section in all materials for
+delta rays for M\"{o}ller (\Pem\Pem) and Bhabha (\Pem\Pep)
+scattering and for muons. 
+It tabulates the mean free path, $ \lambda = 1/\Sigma $ (in cm) 
+as a function of the medium and the energy.
+The energy binning is set within the array {\tt ELOW} (common
+\FCind{/GCMULO/})
+in the routine \Rind{GPHYSI}. The following
+pointers are used (see {\tt JMATE} data structure):
+ 
+\begin{tabular}{l@@{\hspace{3cm}}l}
+{\tt JMA = LQ(JMATE-I)}&pointer to the I$^{th}$ material \\
+{\tt JDRAY = LQ(JMA-11)}&pointer to $\delta$-ray cross-sections\\
+{\tt JDRAY}  &pointer for electrons                          \\
+{\tt JDRAY+90} &pointer for positrons                        \\
+{\tt JDRAY+180} &pointer for $\mu^+/\mu^-$.                    \\
+\end{tabular}
+
+The routine is called during initialisation by \Rind{GPHYSI}.
+
+\section{Method}
+Let: \[\frac{d\sigma(E,T)}{dT}\]
+be the differential cross-section
+for the ejection of an electron with kinetic energy $T$ by an incident
+${e^{\pm}}$ of total energy $E$ moving in a medium of density $\rho$.
+ 
+The variable {\tt DCUTE} in common \FCind{/GCCUTS/}
+is the kinetic energy cut-off for the generated $\delta$-rays. 
+Below this threshold the soft
+electrons ejected are simulated as continuous energy loss by the incident
+${\rm e^{\pm}}$, and above it they are explicitly generated.
+
+The mean value of the energy lost by the incident ${\rm e^{\pm}}$ to
+the soft $\delta$-rays is:
+\begin{equation}
+\label{eq:phys330-1}
+E_{soft}(E,\mbox{\tt DCUTE})
+= \int_{0}^{\mbox{\tt DCUTE}} \frac{d \sigma (E,T)}{dT} T \: dT
+\end{equation}
+whereas the total cross-section for the ejection of
+an electron of energy $ T > \mbox{\tt DCUTE} $ is:
+\begin{equation}
+\label{eq:phys330-2}
+\sigma (E,{\mbox{\tt DCUTE}})
+= \int_{\mbox{\tt DCUTE}}^{T_{Max}}\frac{d \sigma (E,T)} {dT} \: dT
+\end{equation}
+where $T_{Max}$ is the maximum energy transferable to the free electron:
+\begin{equation}
+T_{Max} = \left\{ \begin{array}{ll}
+             E-m & {\rm for \hspace{.2cm} }  \Pep  \\
+             (E-m)/2 & {\rm for \hspace{.2cm} }  \Pem , \\
+              \end{array} \right . 
+\end{equation}
+where $m$ is the electron mass.
+The method of calculation of the continuous energy loss
+and the total cross-section are
+explained below. {\tt [PHYS331]} deals with the explicit 
+simulation of the $\delta$-rays.
+
+\subsection{Continuous energy loss} 
+The integration of (\ref{eq:phys330-1}) leads to the Berger-Seltzer formulae 
+\notHTML{\cite{bib-BERG,bib-BETH,bib-BLOC,bib-EGS3,bib-STER,bib-MES1}}%
+\HTML{\cite{bib-BERG}, \cite{bib-BETH}, \cite{bib-BLOC}, 
+      \cite{bib-EGS3}, \cite{bib-STER}, \cite{bib-MES1}}:
+
+\begin{equation}
+\label{eq:phys330-3}
+\frac {dE}{dx} = \frac{2 \pi r_0^ 2 mn }{\beta^2}
+       \left [\ln \frac{2(\tau + 2)} {(I/m)^2}+ F^{\pm} (\tau , \Delta )
+- \delta \right ],
+\end{equation}
+ where
+
+\[
+\begin{array}{LL}
+\gamma           & \frac{E}{m}                           \\
+\beta^2          & 1-\frac{1}{\gamma^2}                  \\
+\tau             & \gamma-1                              \\
+\tau_c           & \frac{\mbox{\tt DCUTE}}{m}           \\
+\mbox{\tt DCUTE}   &  \mbox{energy cut for} \: e^{\pm}      \\
+\tau_{max}       & \mbox{maximum possible energy transfer in \Pem mass:
+  $\tau$ for \Pep, $\tau/2$ for \Pem}  \\
+\Delta           & \min(\tau_c,\tau_{max})              \\
+n                & \mbox{electron density of the medium}        \\
+I                & \mbox{average mean ionisation energy}        \\
+\delta           & \mbox{density effect correction}.
+\end{array}
+\]
+ 
+The functions $ F^{\pm}$  are given by
+\begin{eqnarray}
+F^+ (\tau,\Delta)& =& \ln(\tau\Delta ) -
+\frac{\Delta^2}{\tau}\left[\tau + 2 \Delta -
+\frac{3\Delta^2 y } {2} -\left(\Delta - \frac{\Delta^3 }{3} \right) y^2
+- \left (\frac{\Delta^2}{2} - \tau
+       \frac{\Delta^3}{3} + \frac{\Delta^4 } {4} \right)
+          y^3  \right]  \\
+F^- (\tau,\Delta )& =& -1 -\beta^2 +\ln \left [(\tau - \Delta)
+\Delta \right ] + \frac{\tau}{\tau -\Delta}+\frac{\left [
+\frac{\Delta^2}{2} + ( 2\tau +1) \ln
+\left (1- \frac{\Delta}{\tau} \right ) \right ]}{\gamma^2},
+\end{eqnarray}
+where $ y = 1/(\gamma+1) $.
+ 
+The density effect correction is calculated as in~\cite{bib-STER}:
+\begin{equation}
+\delta = \left\{\begin{array}{l@@{\hspace{2cm}}l}
+0                          & \mbox{if } x<x_0                        \\
+2\ln 10 + x+C+a(x_1-x)^m  & \mbox{\phantom{if }}x_0 \leq x\leq x_1  \\
+2\ln 10 + x+C             & \mbox{\phantom{if }}x_1<x,
+\end{array}\right .
+\end{equation}
+where $ x = \ln(\gamma^2-1) / (2\ln 10) $
+ The quantities n, I and the parameters of the density effect correction
+($x_0, x_1, C, a, m$) are computed in the routine \Rind{GPROBI},
+and we give the corresponding formulae here.
+The electron density of the medium, n, can be written as
+
+\begin{equation}
+n = \left\{ \begin{array}{LL}
+
+N_{Av} \rho \frac{Z}{A} & \mbox{for elements} \\ [.2cm]
+N_{Av} \rho \frac{\sum_{i} n_i Z_i }{\sum_{i} n_i A_i} & 
+\mbox{for compounds/mixtures, }
+\end{array} \right .
+\end{equation}
+
+where
+
+\begin{DLtt}{MMMMM}
+\item [$N$]     Avogadro's number;
+\item[$Z_i$]   atomic number;
+\item[$A_i$]   atomic weight;
+\item[$\rho$]    density of the material;
+\item[$n_i$]     proportion by number of the $i^{th}$ element in the
+        material (for a mixture 
+       $n_i  = W p_i/A_i$
+    where $p_i$ the proportion by weight and $W$ is the molecular
+    weight).
+\end{DLtt}
+
+The average mean ionisation energy can be calculated as~\cite{bib-BERG}
+\cite{bib-BETH} \cite{bib-BLOC} \cite{bib-EGS3}:
+
+\begin{equation}
+I (GeV) = \left\{ \begin{array}{LL}
+16 \cdot 10^{-9} \; Z^{0.9} & \mbox{for a chemical element} \\
+\exp \left [ \sum_{i} n_i Z_i \ln I(Z_i ) / \sum_i n_i Z _i \right ]
+& \mbox{for a compound or mixture}
+\end{array} \right .
+\end{equation}
+ 
+The density effect correction parameters can be computed (for
+condensed medium \cite{bib-STER}) as
+\begin{eqnarray*}
+C & = & 1 + 2\ln \frac{I}{28.8 \cdot 10^{-9} \sqrt{\rho} \sum n_i Z_i /
+              \sum n_i A_i }\\
+m       &=& 3                          \\
+x_a     &=& \frac{C} {2\ln 10}   \\
+a       &=& 2\ln 10 \frac{(x_a -x_0)}{(x_1 - x_0 )}^m \\
+\end{eqnarray*}
+ 
+\begin{center}
+$ \begin{array}{|c|c|c|c|}
+\hline
+I        &         C    &       x_0       &             x_1\\
+\hline
+<10^{-7} &        <3.681      &        0.2       &            2 \\
+ <10^{-7}&        \geq 3.681  &      -0.326C-1   &            2 \\
+\hline
+\geq10^{-7} &       5.215     &       0.2         &          3 \\
+\geq10^{-7} &      \geq 5.215 &       -0.326C-1.5 &         3 \\
+\hline
+\end{array}$\end{center}
+ 
+\subsection{Total cross-sections} 
+The integration of formula (\ref{eq:phys330-2}) gives the total cross-section 
+\cite{bib-EGS4}, \cite{bib-MESS} for M\"{o}ller scattering ($\Pem\Pem$):
+\begin{equation}
+\label{eq:phys330-9}
+\sigma ( Z,E,\mbox{\tt DCUTE} ) =\frac {2 \pi r_0^2 mZ}{\beta^2(E-m)}
+ \left[\frac{(\gamma-1)} {\gamma^2}\left(\frac{1}{x}-1\right)
+             +\frac{1}{x}-\frac{1}{1-x}-\frac{2\gamma-1}{\gamma^2}\ln
+\frac{1-x}{x}\right]
+\end{equation}
+and for Bhabha scattering ($\Pep \Pem $):
+\begin{equation}
+\label{eq:phys330-10}
+\sigma (Z,E,\mbox{\tt DCUTE}) =\frac{ 2 \pi r^2_0  mZ }
+      {(E-m)}\left [\frac {1 }{\beta^2}  \left(\frac{1}{x}-1\right)
+  + B_1 x + B_2 (1-x) -
+ \frac {B_3 } {2} ( 1-x^2 ) +\frac{B_4}{3}(1-x^3)\right]
+\end{equation}
+where
+ 
+\[
+\begin{array}{L@@{\hspace{3cm}}L}
+\gamma = \frac{E}{m}       & \beta^2 = 1-\frac{1}{\gamma^2} \\ [.2cm]
+ x     =\frac {\mbox{\tt DCUTE}}{E-m}  & \gamma=\frac{1}{\gamma + 1} \\ [.2cm]
+ B_1=2-y^2                 &  B_2=(1-2y)(3+y^2)              \\ [.2cm]
+B_3=(1-2y)^2+(1-2y)^3      &  B_4=(1-2y)^3
+\end{array}
+\]
+ 
+The formulae [\ref{eq:phys330-9}] and [\ref{eq:phys330-10}]
+give the total cross-section of the scattering
+above the threshold energies 
+
+\begin{equation}
+T_{\rm Moller}^{\rm thr} =2\mbox{\tt DCUTE} \mbox{\hspace{2cm}and\hspace{2cm}}
+T_{\rm Bhabha}^{\rm thr} = \mbox{\tt DCUTE}
+\end{equation}
+The interaction length for the production of $\delta$-rays is calculated
+during initialisation by routine \Rind{GDRSGA}.
+@

@@ -1,0 +1,168 @@
+<HEAD>
+<TITLE> The JZ91 Package-Principles</TITLE>
+</HEAD>
+<BODY><P>
+ <HR> <A NAME=tex2html18 HREF=chapter2_2.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/next_motif.gif"></A> <A NAME=tex2html16 HREF=ZEBJZ.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/up_motif.gif"></A> <A NAME=tex2html10 HREF=ZEBJZ.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/previous_motif.gif"></A>  <A NAME=tex2html20 HREF=tex2htmlindex2_5.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/index_motif.gif"></A><BR>
+<B> Next:</B> <A NAME=tex2html19 HREF=chapter2_2.html> Basic calling sequences</A>
+<B>Up:</B> <A NAME=tex2html17 HREF=ZEBJZ.html>No Title</A>
+<B> Previous:</B> <A NAME=tex2html11 HREF=ZEBJZ.html>No Title</A>
+<HR> <P>
+<H1><A NAME=SECTION0010000000000000000> The JZ91 Package-Principles</A></H1>
+<P>
+<H1><A NAME=SECTION0011000000000000000> Purpose</A></H1>
+<P>
+The MZ package of ZEBRA helps the user to organize his data.
+The purpose of the present JZ91 package is to assist him
+in structuring his program.
+It allows to formalize the concept of ``program module''
+beyond the mere subroutine
+and it provides the back-up service for these modules.
+<P>
+It is at the design stage of a program,
+rather than later,
+that the advantage of the JZ91 package will be most strongly felt,
+since it provides a frame-work for the design;
+again just like with the data structures of ZEBRA.
+<P>
+The program we are talking about will be designed as
+a collection of modules called ``processors''.
+The art consists in designing processors with interfaces
+as simple and logical as possible,
+and entirely documentable.
+<P>
+A given processor has a given task
+which formalizes into a transformation of the input data structure
+or rather sub-structure.
+The result may be a modification of the input structure,
+or a new output structure,
+or just printed output and the like.
+<P>
+The processor is controlled by what is essentially a parameter list.
+Normally this list contains pointers to the sub-structure
+the processor is to work with.
+Since links have to be held on relocatable memory
+the parameter list is passed in a special purpose bank,
+the ``call bank'',
+containing reference links and data words.
+This call bank is filled with the input parameters
+by the higher level code which calls the processor.
+The processor takes them from there and also places back
+into the same call bank any output parameters,
+in particular links to the output data structure,
+if any has been lifted.
+Clearly the content of the call bank is part of
+the specification of the processor.
+<P>
+A processor may call other processors.
+This is not to say that a good design should aim
+at having processors at several levels.
+On the contrary, the fewer levels one can do with
+the better, of course.
+Also, one should not write trivial processors
+where simple subroutines will do.
+<P>
+By convention, every processor is entitled to have
+the ZEBRA working space near the beginning of <tt>Q</tt>
+freely to itself.
+As a result a processor calling another processor
+looses at that moment the content of its working space.
+Its dimensions are saved by JZ91,
+and they are automatically restored when control
+comes back to the calling processor,
+ie. it does not have to call <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZWORK>MZWORK</A> again.
+As an extra facility, JZ91 may be asked to save and restore
+also the contents of the first so many links
+and of the first so many data words of the working space.
+<P>
+<H1><A NAME=SECTION0012000000000000000> JZ91 Services</A></H1>
+<P>
+JZ91 provides the following services
+to an application software organized into processors:
+<P>
+- handling of ``call banks'' serving to transmit parametric
+information of the link and data types
+between processors at levels <tt>n-1</tt>, <tt>n</tt>, and <tt>n+1</tt>.
+For the processor at call-depth <tt>n</tt> the ``up'' call-bank,
+pointed to by the system link <tt>LQUP</tt>,
+assures the communication with the higher level at
+call-depth <tt>n-1</tt>;
+and the ``down'' call-bank,
+pointed to by <tt>LQDW</tt>,
+communicates to the lower level at call-depth <tt>n+1</tt>.
+Call banks of equal size are pre-lifted,
+one for each level of a definite number of levels,
+they stay permanently in memory.
+<P>
+- handling of ``processor constants'',
+being part of the environmental data for each processor,
+fixed during the run.
+If a processor needs any constants at all,
+it may initialize them itself,
+this then being the default initialization.
+By using titles, loaded with routine <A HREF=../../zebra/ZEBTZ/chapter2_2.html#TZINIT>TZINIT</A>,
+this default can be over-ruled.
+The system link LQAN gives Access to these Numbers thus:
+<P>
+<PRE><TT>IQ(LQAN)   number of constants
+               Q(LQAN+1) first constant
+               . . .</TT></PRE>
+<P>
+- handling of ``processor conditions'' which may be signalled from
+any processor with  <tt>CALL <A HREF=../../zebra/ZEBJZ/chapter2_2.html#JZTELL>JZTELL</A> (J)</tt>,
+<tt>J</tt> being a small integer normally from 1 to 10.
+This provides for simple counters over the whole run
+grouped by processors.
+<P>
+- handling of statistics of processor usage,
+like number of times entered and time spent.
+The number of times entered is accessible to
+the processor in  <tt>IQ(LQSV+2)</tt>.
+<P>
+- saving the size of the working space,
+on special request also the contents,
+on down-call to the next processor
+and restoring it on up-return.
+<P>
+- handling of ``processor flags'' for test runs during
+program development.
+The flags may be used to drive debug operations of
+a processor without having to recompile it.
+The flags for a given processor are defined by the user
+on titles <tt>JZFL</tt> and they
+are copied on entry to the processor into the vector <tt>JQFLAG</tt>,
+ready for inspection by the code in the processor;
+non-initialized flags are set to zero.
+This is only available with the program-development
+version of JZ91;
+the production version presets all flags to zero
+and leaves them thus for the whole run.
+<P>
+This ``environment'' information is held in
+the bank of ``support variables'',
+one bank for each processor,
+which is permanently in store as part of the JZ91 data structure.
+<P>
+Communication between the processors and JZ91 is via:
+<PRE><TT>COMMON /JZUC/LQJZ,LQUP,LQDW,LQSV,LQAN, JQLEV,JQFLAG(10)</TT></PRE>
+JZ91 operates in and for one store only,
+which must be the user's main store,
+normally the primary store.
+Links in the call bank can point only into this store.
+<P>
+<H2><A NAME=SECTION0012100000000000000> Acknowledgements</A></H2>
+<P>
+This package is derived from the HYDRA package JQ81
+<P>
+A.Norton, J.Zoll, HYDRA Topical Manual, book JQ81, CERN Program Library
+<P>
+<HR> <A NAME=tex2html18 HREF=chapter2_2.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/next_motif.gif"></A> <A NAME=tex2html16 HREF=ZEBJZ.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/up_motif.gif"></A> <A NAME=tex2html10 HREF=ZEBJZ.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/previous_motif.gif"></A>  <A NAME=tex2html20 HREF=tex2htmlindex2_5.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/index_motif.gif"></A><BR>
+<B> Next:</B> <A NAME=tex2html19 HREF=chapter2_2.html> Basic calling sequences</A>
+<B>Up:</B> <A NAME=tex2html17 HREF=ZEBJZ.html>No Title</A>
+<B> Previous:</B> <A NAME=tex2html11 HREF=ZEBJZ.html>No Title</A>
+<HR> <P>
+<HR>
+
+</BODY>
+<P><ADDRESS>
+goossens@cern.ch
+</ADDRESS>

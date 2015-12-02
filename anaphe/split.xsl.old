@@ -1,0 +1,220 @@
+<xsl:stylesheet
+  xmlns:xsl="http://www.w3.org/XSL/Transform/1.0"
+  xmlns:date="http://www.jclark.com/xt/java/java.util.Date"
+  xmlns:xt="http://www.jclark.com/xt"
+  extension-element-prefixes="xt">
+
+<xsl:output method="html"/>
+<xsl:preserve-space elements="*"/>
+
+<xsl:variable name="MasterFile" select="bla"/>
+
+<!-- 
+  +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 
+  + Start of macro templates                                        +
+  +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 
+-->
+
+<xsl:template name="footer">
+ <hr /><address>
+  <xsl:choose>
+   <xsl:when test="extension-function-available('date:to-string') and extension-function-available('date:new')">
+ Last updated: mg <xsl:value-of select="date:to-string(date:new())"/>
+    </xsl:when>
+  <xsl:otherwise>
+ Last updated: mg 
+  </xsl:otherwise>
+  </xsl:choose>
+ <br />
+ </address>
+</xsl:template>
+
+<xsl:template name="header">
+   <xsl:choose>
+     <xsl:when test="ancestor::back">
+      <xsl:text>Appendix </xsl:text>
+      <xsl:number format="A.1" level="multiple" count="div|div1|div2|div3"/><xsl:text>. </xsl:text>
+     </xsl:when>
+     <xsl:otherwise>
+      <xsl:number level="multiple" count="div|div1|div2|div3"/><xsl:text>. </xsl:text>
+     </xsl:otherwise>
+   </xsl:choose>
+  <xsl:apply-templates mode="plain" select="head"/>
+</xsl:template>
+
+<!-- xref to previous and last articles -->
+<xsl:template name="xrefpanel">
+  <xsl:param name="home"/>
+    <table width="95%" align="center" rules="none">
+      <tr valign="top">
+        <th class="titlebar" width="75%" colspan="3">
+         <xsl:value-of select="//title"/>
+        </th>  
+      </tr>
+      <tr>
+        <td>
+<!--            <img src="images/back.gif" width=32 height=26 border=0 
+              align="left" alt="[Previous slide]">-->
+<xsl:if test="preceding-sibling::div1">
+  <a href="{concat($MasterFile,generate-id(preceding-sibling::div1[1]))}.html"><img src="left.gif" border="0" alt="PREVIOUS"/></a>
+</xsl:if>
+        </td>
+        <td align="center">
+  <a href="{concat($MasterFile,generate-id(//div1[1]))}.html"><img src="up.gif" border="0" alt="FIRST"/></a>
+  <a href="{concat($MasterFile,generate-id(//div1[last()]))}.html"><img src="down.gif" border="0"  alt="LAST"/></a>
+        </td>
+        <td align="right">
+<xsl:if test="following-sibling::div1">
+  <a href="{concat($MasterFile,generate-id(following-sibling::div1[1]))}.html"><img src="right.gif" border="0"  alt="NEXT"/></a>
+<!--            <img src="images/back.gif" width=32 height=26 border=0 
+              align="left" alt="[Previous slide]">-->
+</xsl:if>
+        </td>
+     </tr>
+    </table>
+</xsl:template>
+
+<!-- 
+  +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 
+  + Start of template matches                                       +
+  +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 
+-->
+
+<xsl:template match="/">
+ <html> 
+ <head>
+ <title><xsl:apply-templates select="//title/text()"/></title>
+ </head>
+  <h1><xsl:value-of select="//title"/></h1>
+ <xsl:for-each select="//div1">
+  <xsl:variable name="divname" select="concat($MasterFile,concat(generate-id()),'.html')"/>
+  <a href="{$divname}"><xsl:call-template name="header"/></a><br />
+ </xsl:for-each>
+ </html>
+ <xsl:apply-templates select="//div1"/>
+<!--
+  <xsl:variable name="file" select="concat($MasterFile,'toc.html')"/>
+  <xt:document method="html" href="{$file}">
+ <html> 
+ <head>
+ <title><xsl:apply-templates select="//title/text()"/></title>
+ </head>
+ <body>
+  <h1><xsl:value-of select="//title"/></h1>
+ <xsl:for-each select="//div1">
+ <xsl:variable name="divname" select="concat($MasterFile,concat(generate-id()),'.html')"/>
+  <a href="{$divname}"><xsl:call-template name="header"/></a><br />
+ </xsl:for-each>
+ <xsl:call-template name="footer"/>
+ </body>
+ </html>
+  </xt:document> 
+-->
+</xsl:template>
+
+<xsl:template match="xref">
+ <a>
+<xsl:attribute name="href"><xsl:value-of select="@url"/></xsl:attribute>
+ <tt><xsl:apply-templates/><xsl:value-of select="@url"/></tt>
+ </a>
+</xsl:template>
+
+<xsl:template match="//div1">
+  <xsl:variable name="file" select="concat($MasterFile,concat(generate-id()),'.html')"/>
+  <xt:document method="html" href="{$file}">
+	 <html> 
+	 <head>
+	 <title><xsl:apply-templates select="head//text()"/></title>
+         <link rel="stylesheet" type="text/css" href="teislides.css"/>
+	 </head>
+	 <body>
+        <xsl:call-template name="xrefpanel">
+         <xsl:with-param name="home" select="concat($MasterFile,'.html')"/>
+	</xsl:call-template>
+         <xsl:variable name="n" select="concat($MasterFile,generate-id())"/>
+         <div class="slide">
+	<a name="{$n}"></a><h2><xsl:call-template name="header"/></h2>
+         <xsl:apply-templates/>
+         </div>
+	<xsl:call-template name="footer"/>
+	</body>
+	</html>
+  </xt:document>
+</xsl:template>
+
+<!-- unqualified <head> -->
+<xsl:template match="head">
+ <xsl:variable name="parent" select="name(..)"/>
+ <xsl:if test="not(starts-with($parent,'div'))">
+  <xsl:apply-templates/>
+ </xsl:if>
+</xsl:template>
+
+<xsl:template mode="plain" match="head">
+     <xsl:if test="preceding-sibling::head">
+	<xsl:text> </xsl:text>
+     </xsl:if>
+   <xsl:apply-templates/>
+</xsl:template>
+
+<xsl:template match="xref/code">
+ <a>
+<xsl:attribute name="href"><xsl:apply-templates/></xsl:attribute>
+ <tt><xsl:apply-templates/></tt>
+ </a>
+</xsl:template>
+
+<xsl:template match="title">
+      <it><xsl:apply-templates/></it>
+</xsl:template>
+
+<xsl:template match="div2">
+ <xsl:variable name="n" select="generate-id()"/>
+ <h3><a name="{$n}">
+ <xsl:call-template name="header"/>
+ </a></h3>
+ <xsl:apply-templates/>
+</xsl:template>
+
+<xsl:template mode="xrefheader" match="div|div1|div2|div3">
+ <xsl:choose>
+ <xsl:when test="self::div1">
+    <xsl:variable name="n" select="concat($MasterFile,concat(generate-id()),'.html')"/>
+    <a href="{$n}"><xsl:call-template name="header"/></a>
+ </xsl:when>
+ <xsl:otherwise>
+  <xsl:variable name="file" select="concat($MasterFile,concat(generate-id(ancestor::div1)),'.html')"/>
+    <xsl:variable name="n" select="concat($file,concat('#',generate-id()))"/>
+    <a href="{$n}"><xsl:call-template name="header"/></a>
+ </xsl:otherwise>
+ </xsl:choose>
+</xsl:template>
+
+<xsl:template match="ref">
+ <a>
+ <xsl:attribute name="href">
+      <xsl:apply-templates mode="makeref" select="id(@target)"/>
+ </xsl:attribute>
+ <xsl:apply-templates/>
+ </a>
+</xsl:template>
+
+<xsl:template mode="makeref" match="*">
+ <xsl:choose>
+ <xsl:when test="ancestor::div1">
+  <xsl:variable name="file" select="concat($MasterFile,concat(generate-id(ancestor::div1)),'.html')"/>
+  <xsl:variable name="n" select="concat($file,concat('#',@id))"/>
+  <xsl:value-of select="$n"/>
+</xsl:when>
+<xsl:otherwise>
+  <xsl:variable name="n" select="concat($MasterFile,concat('.html#',@id))"/>
+  <xsl:value-of select="$n"/>
+</xsl:otherwise>
+</xsl:choose>
+</xsl:template>
+
+<xsl:template match="*">
+  <xsl:apply-templates/>
+</xsl:template>
+
+</xsl:stylesheet>

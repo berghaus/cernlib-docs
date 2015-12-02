@@ -1,0 +1,219 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%  GEANT manual in LaTeX form                                     %
+%                                                                 %
+%  Michel Goossens (for translation into LaTeX)                   %
+%  Version 1.00                                                   %
+%  Last Mod. Jan 24 1991  1300   MG + IB                          %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\Origin{T.Gabriel, C.Zeitnitz, K.Lassila-Perini}
+\Documentation{K.Lassila-Perini}
+\Submitted{17.12.93} \Revised{17.12.93}
+\Version{Geant 3.16}\Routid{PHYS530}
+\Makehead{The GEANT/MICAP interface}
+\section{Subroutines}
+
+\Shubr{GMORIN}{}
+\Rind{GMORIN} initialises the {\tt MICAP} variables and
+reads the cross-section file for the materials that have been
+defined. It is called from {\tt GFMDIS} when a neutron with
+kinetic energy below 20 MeV enters there first time.
+
+
+\Shubr{GFMDIS}{}
+\Rind{GFMDIS} computes the distance to the next interaction
+points. It calls the {\tt FLUKA} routines to compute the
+cross-sections for all particles except neutrons with
+kinetic energy below 20 MeV for which {\tt MICAP}
+function \Rind{SIGMOR} is called.
+\Rind{GFMDIS} is called from the user routine {\tt GUPHAD}
+where the hadronic package can be chosen.
+The only difference between \Rind{GFLDIS} (see {\tt [PHYS520]})
+and \Rind{GFMDIS}
+is that for the former, {\tt GHEISHA} hadronic package
+is called for the neutrons below 20 MeV, and for the latter,
+the low-energy neutrons are handled by {\tt MICAP}.
+
+\Shubr{GFMFIN}{}
+\Rind{GFMFIN} calls the {\tt FLUKA} routines to
+generate the hadronic interaction. For the neutrons
+with kinetic energy below 20 MeV \Rind{GMICAP}
+is called. 
+The only difference between \Rind{GFLFIN} (see {\tt [PHYS520]})
+and \Rind{GFMFIN}
+is that for the former, {\tt GHEISHA} hadronic package
+is called for the neutrons below 20 MeV, and for the latter,
+the low-energy neutrons are handled by {\tt MICAP}.
+\Rind{GFMFIN} is called from the user routine {\tt GUHADR}.
+
+\Shubr{GMICAP}{}
+\Rind{GMICAP} calls the {\tt MICAP} routines to
+handle the low-energy interaction of neutrons.
+It writes the eventual secondaries to the {\tt GEANT}
+stack. \Rind{GMICAP} is called from \Rind{GFMFIN}.
+
+\section{Method}
+{\tt MICAP} (A Monte Carlo Ionization Chamber Analysis Package)
+\cite{bib-MICA}, \cite{bib-MIC2} is a Monte Carlo
+system to analyze ionisation chamber responses.
+As a standalone program it contains the code for
+formatting the cross-section files, neutron and photon
+transport, the geometry definitions and the code for the
+chamber response. In {\tt GEANT}, only the sampling
+of the neutron interactions from the already prepared
+cross-section file is included.
+The interface between {\tt GEANT} and {\tt MICAP} has been extracted from
+{\tt GCALOR} package\cite{bib-ZEIT} by C.Zeitnitz and T.
+Gabriel. 
+
+When using {\tt GEANT-MICAP} interface the low-energy
+neutrons are handled in {\tt MICAP} routines. 
+Other hadrons and high-energy neutrons are
+passed to {\tt FLUKA} interaction routines.
+For low-energy neutrons,
+the total cross-section is given by {\tt MICAP}
+and if the neutron interaction is chosen by {\tt GEANT}
+tracking routine,
+{\tt GMICAP} reads the cross-section for neutron interactions
+processes,
+samples and generates the interaction and the returns the
+secondary particles (nucleons, heavy fragments, or
+photons) to {\tt GEANT}. Information on the recoil
+nucleus (atomic number {\tt AMED}, charge {\tt ZMED} and
+kinetic energy {\tt ERMED}) can be found in {\tt MCRECO}
+common block. The program flow is shown in figures
+\ref{fmufin} and \ref{fmdist}.
+
+\begin{figure}
+\normalsize{
+\begin{picture}(400,300)
+
+\put(140,290){\framebox(70,20)}
+\put(175,300){\makebox(0,0){GTNEUT}}
+\put(175,290){\vector(0,-1){20}}
+
+\put(140,250){\framebox(70,20)}
+\put(175,260){\makebox(0,0){GUPHAD}}
+\put(175,250){\vector(0,-1){30}}
+
+\put(0,80){\dashbox{3}(350,150)[tl]{\small{Interface routines}}}
+
+\put(140,200){\framebox(70,20)}
+\put(175,210){\makebox(0,0){GFMDIS}}
+\put(175,200){\line(0,-1){20}}
+\put(80,185){$n$, $E_{kin} <$ 20 MeV}
+\put(80,180){\line(1,0){190}}
+\put(80,180){\line(0,-1){20}}
+\put(270,180){\line(0,-1){20}}
+
+\put(35,165){\small{Only once}}
+\put(35,160){\line(1,0){90}}
+\put(35,160){\vector(0,-1){100}}
+\put(0,20){\framebox(70,40)}
+\put(35,50){\makebox(0,0){GMORIN}}
+\put(35,40){\makebox(0,0){\small{initialisation}}}
+\put(35,30){\makebox(0,0){\small{of MICAP}}}
+
+\put(125,160){\vector(0,-1){100}}
+\put(90,20){\framebox(70,40)}
+\put(125,50){\makebox(0,0){SIGMOR}}
+\put(125,40){\makebox(0,0){\small{cross sections}}}
+\put(125,30){\makebox(0,0){\small{from MICAP}}}
+
+\put(225,165){\small{Only once}}
+\put(225,160){\line(1,0){90}}
+\put(225,160){\vector(0,-1){40}}
+\put(190,100){\framebox(70,20)}
+\put(225,110){\makebox(0,0){FLINIT}}
+\put(225,100){\vector(0,-1){40}}
+\put(190,20){\dashbox{3}(70,40)}
+\put(225,50){\makebox(0,0){FLUKA}}
+\put(225,40){\makebox(0,0){\small{initialisation}}}
+\put(225,30){\makebox(0,0){\small{routines}}}
+
+\put(315,160){\vector(0,-1){100}}
+\put(280,20){\dashbox{3}(70,40)}
+\put(315,50){\makebox(0,0){FLUKA}}
+\put(315,40){\makebox(0,0){\small{cross sections}}}
+\put(315,30){\makebox(0,0){\small{routines}}}
+
+\end{picture}}
+\parbox{\textwidth}{
+\begin{minipage} [b]{\textwidth} {
+\caption{\label{fmdist}Program flow for calculation of the distance to
+the next interaction point}}
+\end{minipage}}
+
+\end{figure}
+
+\begin{figure}
+\normalsize{
+\begin{picture}(400,250)
+
+\put(155,220){\framebox(70,20)}
+\put(190,230){\makebox(0,0){GTNEUT}}
+\put(190,220){\vector(0,-1){20}}
+
+\put(155,180){\framebox(70,20)}
+\put(190,190){\makebox(0,0){GUHADR}}
+\put(190,180){\vector(0,-1){20}}
+
+\put(155,120){\framebox(70,40)}
+\put(190,150){\makebox(0,0){GFMFIN}}
+\put(190,140){\makebox(0,0){\small{Interface}}}
+\put(190,130){\makebox(0,0){\small{routine}}}
+\put(190,120){\line(0,-1){30}}
+
+\put(105,90){\line(1,0){170}}
+\put(105,95){$n$, $E_{kin} <$ 20 MeV}
+\put(105,90){\vector(0,-1){30}}
+\put( 65,20){\framebox(80,40)}
+\put(105,50){\makebox(0,0){GMICAP}}
+\put(105,40){\makebox(0,0){\small{low-energy neutron}}}
+\put(105,30){\makebox(0,0){\small{interactions}}}
+
+\put(275,90){\vector(0,-1){30}}
+\put(240,20){\dashbox{3}(70,40)}
+\put(275,50){\makebox(0,0){FLUKA}}
+\put(275,40){\makebox(0,0){\small{hadronic}}}
+\put(275,30){\makebox(0,0){\small{interactions}}}
+
+
+\end{picture}}
+\parbox{\textwidth}{
+\begin{minipage} [b]{\textwidth} {
+\vspace{.5cm}
+\caption{\label{fmufin}Program flow for generating secondary particles}}
+\end{minipage}}
+
+\end{figure}
+
+{\tt MICAP} uses pointwise cross-section data 
+(as a difference to so called group
+cross-sections where the data are averaged over certain
+energy intervals). This method has the advantage that
+the resonances are not smoothed by averaging the data.
+The neutron cross-section are available for the following
+isotopes:
+
+\begin{center}
+\begin{tabular}{l@{\hspace{2cm}}l@{\hspace{2cm}}l}
+Hydrogen (bound) & Sodium     & Copper         \\
+Hydrogen (free)  & Magnesium  & Molybdenum     \\
+Lithium (5)      & Aluminium  & Barium         \\
+Lithium (6)      & Silicon    & Tantalum       \\
+Boron (10)       & Chlorine   & Tungsten       \\
+Boron (11)       & Argon      & Lead           \\
+Carbon           & Calcium    & Uranium (235)  \\ 
+Nitrogen         & Chromium   & Uranium (238)  \\
+Oxygen           & Iron       &                \\
+Fluorine         & Nickel     &                \\
+\end{tabular}
+\end{center}
+
+If the cross-sections are not found for some of the
+defined materials, a warning is printed first at
+the initialisation time telling which cross-section
+are used (the closest Z available) instead. Then, an 
+additional warning is printed each tracking step.

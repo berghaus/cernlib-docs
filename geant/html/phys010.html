@@ -1,0 +1,1093 @@
+<PRE>
+
+
+
+
+ <H2>Geant  3.16  Routine  PHYS010</H2>
+
+
+ <PRE>
+
+
+ Origin:                                                            Submitted:  20.12.84
+ Revision:                                                            Revised:  26.07.93
+ Documentation:  M.  Maire,  F.Carminati
+
+
+ </PRE>  <HR>  <H2>Compute  the  occurrence  of  a
+ process</H2>
+
+
+ <PRE>
+
+
+ </PRE>
+
+
+ <H2>Principle</H2>
+
+
+ <PRE>
+
+
+ The  simulation  of  the  processes  which  accompany
+ the  propagation  of  a  particle  through  the
+ material  of  the  detector  (e.g.  bremsstrahlung,
+ delta         -rays  production,  Compton  scattering  and  so
+ on)  is  performed  by  GEANT  in  the  following  steps:
+
+
+1.      Fetch  a  new  particle  to  be  tracked  (often
+        called  track  or  history)  from  the  stack
+        supported  by  the  link  JSTAK  (see  [TRAK399]).
+        This  is  done  once  at  the  beginning  of  each  new
+        track.  The  number  of  interaction  lengths  that
+        the  particle  is  going  to  travel,  before
+        undergoing  each  one  of  the  possible  discrete
+        processes,  is  sampled  at  this  point.  These
+        operations  are  done  in  the  routine  GLTRAC.
+2.      Evaluate  the  distance  to  the  interaction
+        point.  This  is  done  by  the  individual  tracking
+        routines  (GTGAMA,  GTNEUT,  GTHADR,  GTNINO,
+        GTMUON,  GTHION  and  GTCKOV)  which  control  the
+        tracking  of  particular  particles.  The  number
+        of  interaction  lengths  remaining  to  travel
+        before  each  of  the  possible  processes  (often
+        called  tracking  mechanisms  or  simply
+        mechanisms)  is  multiplied  by  the  inverse  of  the
+        macroscopic  cross-section  for  that  process  in
+        the  current  material  (i.e.  the  interaction
+        length).  This  gives  the  distances  that  the
+        particle  has  to  travel  before  each  of  the
+        processes  occurs  in  the  current  medium.  The
+        minimum  among  these  numbers  is  the  step  over
+        which  the  particle  will  be  transported.  In
+        addition  to  the  physics  mechanisms,  four
+        pseudo-interactions  are  taken  into  account  in
+        the  calculation  of  the  step:
+            (a)        boundary  crossing.  The  crossing  of  a
+                       volume  boundary  is  treated  like  a
+                       discrete  process.  A  particle  never
+
+
+
+                       crosses  a  boundary  during  a  step  but
+                       rather  stops  there  (NEXT  mechanism);
+            (b)        maximum  step  limit.  For  each  tracking
+                       medium  a  value  for  the  maximum  step  can  be
+                       specified  by  the  user.  Process  SMAX;
+            (c)        maximum  fraction  of  continuum  energy
+                       loss,  maximum  angular  deviation  in
+                       magnetic  field  or  maximum  step  for  which
+                       the  Moliere  formula,  to  simulate  multiple
+                       scattering  is  valid.  These  are  continuous
+                       processes,  which  introduce  a  limitation
+                       on  the  tracking  step  expressed  by  a
+                       single  variable  (see  section  [PHYS325]  on
+                       GMULOF).
+            (d)        energy  and  time  cut.  Charged  particles  in
+                       matter  are  stopped  when  their  energy
+                       falls  below  their  energy  threshold  or
+                       when  their  time  of  flight  exceeds  the
+                       time  cut;
+        More  information  is  given  in  the  individual
+        sections  explaining  the  implementation  of  the
+        physical  processes.
+3.      Transport  the  particle  either  along  a  straight
+        line  (if  no  magnetic  field  or  for  a  neutral
+        particle)  or  along  a  helicoidal  path  (for
+        charged  particles  in  magnetic  field).
+4.      Update  the  energy  of  the  particle  if  continuous
+        energy  loss  was  in  effect  (charged  particles  in
+        matter).
+5.      If  a  physical  discrete  process  has  been
+        selected,  generate  the  final  state  of  the
+        interaction.
+6.      If  the  incident  particle  survives  the
+        interaction  (Compton,  delta         -rays  production,
+        bremsstrahlung,  direct  pair  production  by  mu
+        and  mu    -nucleus  interaction,  hadronic  elastic
+        scattering),  sample  again  the  number  of
+        interaction  lengths  to  travel  before  the  next
+        event  of  the  same  kind.  This  is  generally  done
+        by  specialised  routines:  GMUNU,  GCOMP,  GBREM,
+        etc.
+7.      Update  the  number  of  interaction  lengths  for
+        all  the  processes  and  go  back  to  (2)  till  the
+        particle  either  leaves  the  detector  or  falls
+        below  its  energy  threshold  or  beyond  its  time
+        cut  or  disappears  in  an  interaction.
+
+
+ </PRE>
+
+
+ <H2>Distance  evaluation</H2>
+
+
+ <PRE>
+
+
+ </PRE>
+
+
+ <H3>The  interaction  length</H3>
+
+
+
+<PRE>
+
+
+Let  sigma         (E, Z, A)  be  the  total  microscopic  cross
+section  for  a  given  interaction.  The  mean  free
+path,  lambda           ,  for  a  particle  to  interact  is  given
+by:
+                                     lambda            = ((1)/ (Sigma         ))                                            (1)
+
+
+
+where  Sigma           is  the  macroscopic  cross-section  in
+
+  -1
+cm      .  This  quantity  is  given  for  an  element  by:
+
+
+
+                    Sigma          = ((N      rho      sigma         (E, Z, A))/ (A))                                       (2)
+                                        Av
+
+
+
+and  for  a  compound  or  a  mixture  by:
+
+
+
+Sigma          = ((N      rho      sum        n   sigma         (E, Z   , A   ))/ (sum        n   A   )) = N      rho      sum     *
+ *  ((p   )/ (A   ))sig@
+                    Av                 i       i                     i     i           i       i   i        Av                 i   *
+ *     i       i       @
+
+
+                                                                                                                            (3)
+
+
+
+                                                           23
+    N                    Avogadro's  number  (6. 02486 x 10      )
+     Av
+
+
+    Z                    atomic  number
+
+
+
+    A                    atomic  weight
+
+
+
+    rho                  density
+
+
+
+    sigma                total  cross-section  for  the  reaction
+
+                                                           th
+    n                    proportion  by  number  of  the  i        element  in  the  material
+     i
+                                                                                            th
+    p                    = n   A   / sum       n   A   ,  proportion  by  weight  of  the  i        element  in  the  material
+     i                      i   i       j       j   j
+
+
+
+For  electromagnetic  processes  which  depend
+linearly  on  the  atomic  number  Z  we  can  write:
+
+
+
+Sigma         (E)             =         N      rho      sum       ((p   )/ (A   )) sigma         (E, Z   ) = N      rho      sum   *
+ *    ((p   )/ (A   )) @
+                                         Av                 i        i       i                        i       Av                 i *
+ *       i       i     @
+
+
+
+                              =         N      rho      f(E) sum       ((p   )/ (A   )) Z    = N      rho      f(E)Z
+                                         Av                     i         i       i      i      Av                  eff
+
+
+
+           Z                  =         sum       ((p   )/ (A   )) Z
+            eff                             i        i       i      i
+
+
+
+the  value  above  of  Z           is  calculated  by  GPROBI.
+                        eff
+
+This  mean  free  path  is  tabulated  at
+initialisation  time  as  a  function  of  the  kinetic
+energy  of  the  particle,  or,  for  hadronic
+interactions,  it  is  calculated  at  tracking  time.
+
+
+Cross  sections  are  tabulated  in  the  energy  range
+defined  as:  ELOW(1)             < =   E< =    ELOW(NEK1)                    in  NEK1  bins.
+These  values  can  be  redefined  by  the  data  record
+RANGE.  Default  values  are  ELOW(1)             = 10keV,
+ELOW(NEK1)                   = 10TeV  and  NEKBIN            = NEK1       - 1 = 90.  NEKBIN
+cannot  be  bigger  than  199.  The  array  ELOW  is  in
+the  common  /GCMULO/.
+
+
+Numerically,  if  we  measure  the  microscopic  cross
+
+                              -24        -2
+section  in  b  where  1b = 10         cm      ,  we  can  express
+the  macroscopic  cross  section  as:
+
+
+                 -1                                             23                  -3                                    -24
+Sigma         [cm      ]               =         ((6. 02486 x 10      rho      [g cm      ]sigma         (E, Z, A)[b] x 10         *
+ *)/ (A))              @
+
+
+
+                                                                           -3
+                                       =         0. 602486 ((rho      [g cm      ])/ (A)) sigma         (E, Z, A)[b]               *
+ *                     @
+
+
+
+which  is  the  formula  mostly  used  in  GEANT.
+
+
+</PRE>
+
+
+<H3>Determination  of  the  interaction  point</H3>
+
+
+<PRE>
+
+
+The  mean  free  path  of  a  particle  for  a  given
+process,  lambda           ,  depends  on  the  medium  and  cannot
+be  used  directly  to  sample  the  probability  of  an
+interaction  in  a  heterogeneous  detector.  The
+number  of  mean  free  paths  which  a  particle
+travels  is:
+
+                           N                  = R  ((dx)/ (lambda           (x)))
+                            lambda
+
+
+and  it  is  independent  of  the  material  traversed.
+If  N     is  a  random  variable  denoting  the  number  of
+     R
+
+
+
+mean  free  paths  from  a  given  point  until  the  point
+of  interaction,  it  can  be  shown  that  N     has  the
+                                             R
+
+distribution  function
+
+
+                                                               -N
+                              P(N   <N                 ) = 1- e  lambda
+                                 R    lambda
+
+
+The  total  number  of  mean  free  paths  the  particle
+travels  before  the  interaction  point,  N                 ,  is
+                                            lambda
+
+sampled  at  the  beginning  of  the  trajectory  as:
+
+
+                                         N                  =- log       (eta      )
+                                          lambda
+
+
+where  eta       is  a  random  number  uniformly
+distributed  in  the  range  (0, 1).  N                   is
+                                       lambda
+
+updated  after  each  step  Delta         x  according  the
+formula:
+
+
+          N'                  = N                 - ((Delta         x)/ (lambda           (x)))
+            lambda               lambda
+
+
+until  the  step  originating  from
+s(x) = N                 lambda           (x)  is  the  shortest  and  this
+        lambda
+
+triggers  the  specific  process.
+
+
+</PRE>
+
+
+<H2>Common  /GCPHYS/</H2>
+
+
+<PRE>
+
+
+The  variables  described  above  are  stored  in  the
+common  /GCPHYS/,  one  process  per  line:
+           COMMON/GCPHYS/IPAIR,SPAIR,SLPAIR,ZINTPA,STEPPA
+         +                       ,ICOMP,SCOMP,SLCOMP,ZINTCO,STEPCO
+         +                       ,IPHOT,SPHOT,SLPHOT,ZINTPH,STEPPH
+         +                       ,IPFIS,SPFIS,SLPFIS,ZINTPF,STEPPF
+         +                       ,IDRAY,SDRAY,SLDRAY,ZINTDR,STEPDR
+         +                       ,IANNI,SANNI,SLANNI,ZINTAN,STEPAN
+         +                       ,IBREM,SBREM,SLBREM,ZINTBR,STEPBR
+         +                       ,IHADR,SHADR,SLHADR,ZINTHA,STEPHA
+         +                       ,IMUNU,SMUNU,SLMUNU,ZINTMU,STEPMU
+         +                       ,IDCAY,SDCAY,SLIFE  ,SUMLIF,DPHYS1
+         +                       ,ILOSS,SLOSS,SOLOSS,STLOSS,DPHYS2
+         +                       ,IMULS,SMULS,SOMULS,STMULS,DPHYS3
+         +                       ,IRAYL,SRAYL,SLRAYL,ZINTRA,STEPRA
+           COMMON/GCPHLT/ILABS,SLABS,SLLABS,ZINTLA,STEPLA
+         +                       ,ISYNC
+         +                       ,ISTRA
+*
+
+
+
+The  first  9  processes  (from  PAIR  production  up  to
+MUon  NUclear  interaction)  and  the  RAYLeigh
+scattering  and  Light  ABSorbtion  have  the  same
+scheme.  Let's  take  as  an  example  the  first  one
+(for  a  complete  description  of  the  common  see
+[BASE030]):
+
+
+IPAIR            flag  for  secondaries:
+
+                 0=         the  process  is  turned  off;
+                 1=         generation  of  secondaries  enabled;
+                 2=         no  generation  of  secondaries.
+
+SPAIR            N                 lambda           (x)  =   remaining  track-length
+                  lambda
+
+                 before  interaction,  evaluated  at  the  last
+                 point  where  the  mechanism  was  active,  i.e.
+                 IPAIR6= 0.
+SLPAIR           track  length  at  the  time  when  the
+                 interaction  last  happened  for  the  current
+                 particle.  Only  SLPAIR  (direct  pair
+                 production  by  mu    ),  SLDRAY  (delta         -ray
+                 production),  SLBREM  (bremsstrahlung  for
+                 mu    ),  SLHADR  (hadronic  interactions),
+                 SLMUNU  (muon-nucleus  interactions)  and
+                 SLRAYL  (Rayleigh  effect)  are  used.  The
+                 variables  SOLOSS,  STLOSS,  SOMULS,  STMULS
+                 are  obsolete.  They  have  been  kept  for
+                 backward  compatibility,  but  their  value  is
+                 undefined  and  should  not  be  used.
+ZINTPA           N                   = remaining  number  of  interaction
+                  lambda
+
+                 lengths  (mean  free  paths)  evaluated  at  the
+                 last  point  where  the  mechanism  was  active,
+                 i.e.  IPAIR6= 0.
+STEPPA           lambda           (x)  = value  of  the  interaction  length
+                 at  the  last  point  where  the  mechanism  was
+                 active,  i.e.  IPAIR6= 0;
+
+
+The  evaluation  and  update  of  the  quantities  like
+STEPPA,  SPAIR  and  ZINTPA  are  turned  off  in  the
+media  where  the  mechanism  is  not  active
+(IPAIR          6= 0).  Turning  off  a  mechanism  in  one
+tracking  medium  may  give  incorrect  physics
+results  because  not  only  will  the  mechanism  not
+be  active,  but  the  interaction  probabilities  will
+not  be  updated,  as  if  that  medium  had  not  been
+traversed  at  all.  This  feature  of  the  tracking
+routines  is  used  mainly  in  the  vacuum,  (defined
+as  a  medium  with  atomic  number  Z  <1),  where  all  the
+mechanisms  but  DECAy  (and  SYNChrotron  radiation,
+if  activated)  are  inactive.
+
+
+The  DECAy  in  flight  is  simpler  since  the  mean  life
+time  of  the  particle,  tau     ,  is  not  material
+dependent  and  can  be  sampled  directly.
+
+
+
+SLIFE            not  used.
+SUMLIF           proper  time  left  before  the  decay.  At  the
+                 beginning  of  the  track
+                 SUMLIF            = - ctau      log       (eta      ).
+SDCAY            distance  left  to  decay  point  evaluated  at
+                 the  last  point  where  the  mechanism  was
+                 active,  i.e.  IDECA          6= 0.
+
+
+</PRE>
+
+
+<H2>Cross-section,  energy  loss  and  range
+tables</H2>
+
+
+<PRE>
+
+
+Cross-sections,  energy  loss  dE/ dx  and  range
+R(E         )  are  tabulated  for  all  materials  which
+   kin
+
+enter  in  the  definition  of  a  tracking  medium  by
+the  routine  GPHYSI.  The  values  of  the  energy  for
+which  the  tabulated  quantities  are  calculated  are
+stored  in  the  common  /GCMULO/  (see  [BASE030]).  To
+evaluate  one  of  the  tabulated  quantities  for  a
+particle  of  kinetic  energy  E   ,  a  linear
+                                0
+
+interpolation  is  used.  Let  i  be  such  that:
+
+
+                                                  E   <E   < =    E
+                                                   i    0          i+1
+
+
+The  integer  variable  IEKBIN  in  common  /GCTRACK/
+is  equal  to  i  during  tracking  and  its  value  is
+recomputed  by  the  routine  GEKBIN  when  the  energy
+of  the  particle  changes.  If  the  quantity  Y  has
+been  tabulated  so  that  Y    = Y(E   )  then  the  value
+                            i        i
+
+Y    = Y(E   )  is  calculated  as:
+ 0        0
+
+
+
+Y    = Y   +((E   - E   )/ (E         - E   ))(Y         - Y   ) = Y   (1- ((E   - E   )/ (E         - E   )))+Y         ((E   - E *
+ *  )/ (E         - E  @
+ 0      i      0     i       i+1         i      i+1         i       i         0     i       i+1         i       i+1         0     i*
+ *       i+1         i
+
+                                                                                                                            (6)
+
+
+Inside  the  code  the  following  quantities  are
+used:
+
+
+
+GEKRAT            = ((E   - E   )/ (E         - E   ))                                                             GEKRT1          *
+ *  = (1- ((E   - E   )@
+                       0     i       i+1         i                                                                                 *
+ *           0     i   @
+
+
+
+where  GEKRAT  is  in  common  /GCTRAK/  and  GEKRT1  is  a
+local  variable  recomputed  when  needed.
+
+
+</PRE>
+
+
+
+<H2>The  energy  loss  tables</H2>
+
+
+<PRE>
+
+
+Energy  loss  and  multiple  scattering  are
+continuous  processes  that  are  applied  at  every
+step  for  charged  particles  in  matter  (Z  > =   1).
+
+
+As  explained  in  [PHYS330]  and  [PHYS430],  energy
+loss  tables  are  calculated  at  initialisation  time
+(GPHYSI)  for  all  the  materials  which  enter  in  the
+definition  of  a  tracking  medium  (see  [CONS200]).
+These  tables  contain  NEK1  values  of  dE/ dx
+calculated  for  the  corresponding  values  of  energy
+in  ELOW.
+
+
+In  case  of  mixtures/compounds,  the  rule    is  to
+
+                                              -1        2
+combine  the  energy  loss  tables  in  GeV  g        cm
+according  to  the  proportion  by  weight  of  the
+elements,  that  is:
+
+
+
+((dE)/ (dx)) = rho      sum        ((p   )/ (rho         ))(((dE)/ (dx)))
+                            i         i               i                  i
+
+
+
+</PRE>
+
+
+<H2>Limitations  on  the  step  size</H2>
+
+
+<PRE>
+
+
+The  routine  GMULOF  called  by  GPHYSI  creates  and
+fills  a  table  of  NEK1  values  corresponding  to  the
+ELOW  values  containing  the  smaller  of  the  upper
+limits  for  the  step  imposed  by  the  three
+continuous  processes:  energy  loss,  multiple
+scattering  and  bending  of  the  track  induced  by
+the  magnetic  field.
+
+
+Continuous  energy  loss  can  introduce  an  upper
+limit  on  the  step  via  the  variable  DEEMAX,  an
+argument  to  the  GSTMED  routine.  During  tracking
+the  value  of  DEEMAX  for  the  current  medium  is
+stored  in  the  common  /GCMATE/.  DEEMAX  is  the
+maximum  fraction  of  kinetic  energy  which  a
+particle  can  lose  in  a  step  due  to  continuous
+ionisation  (0<DEEMAX           <1).  The  limitation  on  the
+step  size  coming  from  DEEMAX  is:
+
+
+                                step< =    ((DEEMAX           )/ (dE/ dx))
+
+
+
+Multiple  scattering  as  well  can  limit  the  step
+
+
+
+size,  see  [PHYS325].  The  limitation  is  given  as:
+
+                                  step< =    min      (T               , 10 X   )
+                                                        Bethe                0
+
+
+where  X     is  the  radiation  length  and  T                is  the
+        0                                      Bethe
+
+maximum  step  for  which  the  Moliere  approximation
+is  valid  (see  [PHYS325]).
+
+
+Another  upper  limit  on  the  step  size  comes  from
+the  magnetic  field.  The  bending  of  the  particle
+trajectory  in  the  magnetic  field  may  be  limited
+by  the  TMAXFD  argument  to  the  GSTMED  routine.
+During  tracking  the  value  of  TMAXFD  for  the
+current  medium  is  stored  in  the  common  /GCMATE/.
+
+
+A  lower  limitation  on  the  tracking  step  is  not
+generally  imposed.  There  is,  however,  a
+protection  against  the  step  being  reduced  to  a
+very  small  value  by  continuous  processes.  In
+particular  multiple  scattering  at  low  energies
+(<1  MeV)  can  impose  a  very  small  tracking  step
+with  serious  consequences  on  the  tracking  time.
+To  avoid  this,  a  lower  limit  on  the  step  imposed
+by  continuous  processes  is  introduced:  STMIN.  The
+meaning  of  STMIN  is  the  following:  below  1  MeV  the
+stopping  range  is  usually  small.  If  the  stopping
+range  becomes  smaller  than  STMIN,  the  constraint
+imposed  by  the  multiple  scattering  is  ignored  and
+the  minimum  is  taken  between  the  reduced  stopping
+range  (the  distance  the  particle  has  to  travel  to
+reach  its  threshold  energy)  and  STMIN  itself.  In
+this  sense  STMIN  is  no  more  than  a  tracking
+accelerator  for  stopping  particles.
+
+
+Another  limitation  on  the  step  size  which  is
+imposed  by  the  tracking  routines  during  transport
+is  the  STEMAX  parameter  of  GSTMED  which  sets  an
+absolute  upper  limit  to  the  size  of  a  step  for
+each  tracking  medium.
+
+
+</PRE>
+
+
+<H2>Automatic  calculation  of  parameters</H2>
+
+
+<PRE>
+
+
+The  definition  of  a  tracking  medium  requires  the
+specification  by  the  user  of  a  set  of  parameters
+(see  [CONS200])  which  can  critically  affect  the
+tracking  and  hence  the  physics  results  of  the
+GEANT  MonteCarlo.  To  help  the  user  to  find  the
+optimal  set  of  parameters,  by  default  GEANT
+overrides  the  values  of  STMIN,  DEEMAX,  STEMAX  and
+TMAXFD.  This  behaviour  is  controlled  by  the  AUTO
+data  record  and  interactive  command.  By  default
+
+
+
+AUTO=1  and  automatic  evaluation  of  the  parameters
+is  enforced  (see  below  for  the  partly  anomalous
+behaviour  of  TMAXFD).  When  AUTO= 0  then  only  those
+parameters  which  are  <0  are  recalculated  by
+GEANT,  while  for  the  others  the  user  input  is
+accepted  with  minimal  checking.
+
+
+When  the  automatic  calculation  of  parameters  is
+active,  the  following  applies:
+
+
+DEEMAX              The  formula  used  by  GEANT  is  the
+                    following:
+
+
+
+                                             0. 25                                                               if           ISVOL*
+ *         = 0         @
+                                                                                                                                   *
+ *                     @
+                                                              p  ======
+
+                    DEEMAX            = -    0. 25- ((0. 2)/ (   X     ))                                        if           ISVOL*
+ *         = 0         @
+                                                                  0                                                                *
+ *                     @
+                                                       p  ======
+
+                                             ((0. 2)/ (   X     ))                                               if           ISVOL*
+ *         6= 0
+                                                           0
+
+
+
+                    ISVOL         >0  defines  a  sensitive  detector,
+                    while  ISVOL         < =   0  is  a  non-sensitive
+                    detector  (see  [HITS]).
+STMIN               The  default  value  corresponds  to  a
+                    stopping  range  of  200  keV  above  CUTELE.
+
+                                                              o
+TMAXFD              The  default  value  corresponds  to  20       if
+
+                                                                         o
+                    the  input  value  to  GSTMED  is  < =   0  or  >20     ,
+                    otherwise  the  input  value  is  taken.
+
+                                               10
+STEMAX              The  default  value  is  10        (BIG  variable  in
+                    common  /GCONST/).
+
+
+These  values  have  been  tuned  empirically  on  a
+variety  of  setups  and  users  are  invited  to  start
+with  automatic  computation.  The  values  of  the
+parameters  can  be  checked  with  a  call  to
+GPRINT('TMED',0)  after  GPHYSI  has  been  called.
+Use  of  AUTO  mode  is  strongly  recommended  because
+it  makes  GEANT  a  predictive  tool.  In  this  way  all
+parameters  are  automatically  computed  by  the
+system  as  opposed  to  tuning  data  and  MonteCarlo
+via  the  tracking  parameters.
+
+
+</PRE>
+
+
+<H2>Energy  loss</H2>
+
+
+<PRE>
+
+
+
+</PRE>
+
+
+<H3>Energy  loss  tables</H3>
+
+
+<PRE>
+
+
+In  previous  versions  of  GEANT  (up  to  version
+3.13)  the  energy  lost  by  a  charged  particle
+travelling  through  matter  was  calculated  by  the
+formula:
+                                Delta         E = ((dE)/ (dx)) x step
+
+The  quantity  dE/ dx  was  calculated  and  tabulated
+
+
+for  e   ,  mu         and  protons  and  the  value  for  a
+particle  of  a  given  energy  E     was  calculated
+                                 0
+
+interpolating  linearly  the  tables:
+
+
+. ((dE)/ (dx))_                                          =         . ((dE)/ (dx))_            +((E   - E   )/ (E         - E   ))(.*
+ * ((dE)/ (dx))_       @
+               E=E                                                                E=E             0     i       i+1         i      *
+ *              E=E    @
+                  0                                                                  i                                             *
+ *                 i+1 @
+
+
+
+                                                         =         GEKRT1          x. ((dE)/ (dx))_            +GEKRAT           x.*
+ * ((dE)/ (dx))_       @
+                                                                                                   E=E                             *
+ *              E=E    @
+                                                                                                      i                            *
+ *                 i+1
+
+
+These  formula  work  of  course  on  the  assumption
+that  the  error  is  negligible.  But  the  error  on  the
+
+                              2
+linear  approximation  is  O(@   E/ @x @E)  which  is  far
+from  negligible  at  low  energy.  In  this  way  the
+energy  loss  at  low  energies  was  constantly
+underestimated  and  the  particles  could  travel  too
+far  before  stopping.
+
+
+</PRE>
+
+
+<H3>Stopping  range  tables</H3>
+
+
+<PRE>
+
+
+To  correct  for  this  problem,  a  different  approach
+was  introduced  in  GEANT  version  3.14.  The
+stopping  range  of  a  particle  is  defined  as  the
+distance  that  the  particle  will  travel  before
+stopping.  By  definition  the  stopping  range  for  a
+particle  of  energy  E     is  given  by:
+                       0
+
+
+
+                   0                                                 E
+            R = R        ((dx)/ (dE)) dE                        = R   0    - ((dx)/ (dE)) dE
+
+
+                   E
+                    0                                                0
+
+
+
+ Note  that  in  the  tables  the  positive  quantity
+ - dE/ dx  is  stored.  The  method  used  was  to  build  a
+ table  of  stopping  ranges  based  on  ELOW  by
+ integrating  the  inverse  of  the  dE/ dx  tables  in
+ GRANGI.  At  tracking  time  the  algorithm  was  the
+ following:
+
+
+1.      Evaluate  the  stopping  range  for  the  threshold
+        energy  (STOPC).  This  was  done  only  once  at  the
+        beginning  of  each  new  track.
+2.      From  the  energy  of  the  particle  derive  the
+        stopping  range  by  a  linear  interpolation  of  the
+        range  table:
+
+
+                                  R    = GEKRT1            x R    + GEKRAT           x R
+                                   0                          i                         i+1
+
+
+        where  E   <E   < =    E         .
+                i    0          i+1
+
+3.      Evaluate  the  stopping  range  for  the  particle
+        after  the  step:  R'    = R   - step.  If  this  is  less
+                             0      0
+
+        than  the  stopping  range  of  a  particle  with
+        threshold  energy,  the  particle  is  terminated
+        as  a  stopping  particle  below  the  energy  cut.
+        Otherwise  the  following  quantities  are
+        evaluated:
+
+
+        R   <R'   < =    R                                       GEK       = ((R'   - R   )/ (R         - R   ))                   *
+ *                      @
+         j     0          j+1                                                    0     j       j+1         j
+
+
+        and  the  final  energy  is  computed  as:
+
+
+                          E'    = GEK1        x ELOW(         j)   + GEK      x ELOW(         j+1)
+                            0
+
+
+4.      the  energy  loss  is  computed  as:
+
+
+                                                   Delta         E = E   - E'
+                                                                      0      0
+
+
+        This  value  is  then  corrected  to  take  into
+        account  the  energy  loss  fluctuations  (see
+        [PHYS332]).
+
+
+ This  method  has  two  main  disadvantages.  The  first
+ is  due  to  the  finite  precision  of  computers.  As
+ the  energy  loss  in  a  step  is  calculated  as  the
+ difference  of  two  numbers,  it  is  subject  to  large
+ relative  errors.  The  effect  can  be  particularly
+ serious  in  the  case  of  light  materials,  particles
+ near  the  minimum  ionisation  point  or  with  very
+ short  steps,  where  Delta         E = DESTEP             can  even  result
+ in  a  negative  quantity.  As  the  relative  precision
+
+                                        -6
+ of  a  32-bit  computer  is  around  10      ,  the  error  on
+
+
+
+the  energy  loss  of  a  100  GeV  track  can  be  as  large
+as  100  keV.
+
+
+The  second  problem  connected  with  this  method  can
+be  easily  shown  if  we  compute  dE/ dx  as:
+
+
+
+    ((dE)/ (dx))                          =         ((d)/ (dx))(E   - E'   )  =  ((d)/ (dx))(E   - GEK1        x ELOW(         j)  *
+ *- GEK      x ELOW(   @
+                                                                 0      0                     0
+
+
+
+                                          =         ((d)/ (dx))(E   - E   - ((R'   - R   )/ (R         - R   ))(E         - E   )) *
+ * = - ((d)/ (dx))((Del@
+                                                                 0     j        0     j       j+1         j      j+1         j     *
+ *                     @
+
+
+
+                                          =         - ((Delta         E   )/ (Delta         R   ))((dR'   )/ (dx))  =  ((Delta     *
+ *    E   )/ (Delta    @
+                                                                       j                     j         0                           *
+ *     j               @
+
+
+As  we  can  see,  the  reconstructed  dE/ dx  curve  due
+to  continuous  energy  loss  is  a  step  function  and
+constant  in  each  energy  bin.  Thus,  although  the
+results  obtained  with  GEANT  3.14  were  very
+satisfactory,  this  was  felt  to  be  an  undesirable
+feature.
+
+
+</PRE>
+
+
+<H3>Energy  loss  in  GEANT</H3>
+
+
+<PRE>
+
+
+The  two  problems  mentioned  above  have  been  solved
+in  GEANT  3.15.  As  far  as  the  precision  is
+concerned,  the  solution  was  to  revert  to  the
+algorithm  of  GEANT  3.13  every  time  the  relative
+energy  loss  in  the  step  (DESTEP/GEKIN)  is  smaller
+than  five  times  the  machine  precision.  This  has
+given  good  results  without  loosing  the
+substantial  improvements  obtained  in  GEANT  3.14
+with  the  introduction  of  the  stopping  range
+algorithm.  As  a  matter  of  fact,  the  above
+condition  happens  only  the  in  the  case  of  very
+small  steps  or  when  the  dE/ dx  curve  is  very  flat,
+and  in  both  cases  the  algorithm  based  on  the  dE/ dx
+tables  is  a  good  approximation.
+
+
+The  second  problem  has  been  solved  by  changing
+the  interpolation  algorithm,  going  from  a  linear
+to  a  quadratic  interpolation.  Instead  of  assuming
+a  linear  relation  between  energy  and  stopping
+range  in  every  energy  bin,  we  assume  a  quadratic
+relation  of  the  sort:
+
+
+                                                          2
+                                         E  =  f(R)  =  aR    + bR + c
+
+The  only  problem  now  is  the  determination  of  the
+coefficients  a,  b  and  c.  To  do  this  we  recall  that
+
+
+
+ the  general  formula  of  the  parabola  which  passes
+ through  the  points  (x   , y   ), (x   , y   ), (x   , y   )  is
+                         1     1       2     2       3     3
+
+ the  following:
+
+ y         =         (((x- x   )(x- x   ))/ ((x   - x   )(x   - x   )))y    + (((x- x   )(x- x   ))/ ((x   - x   )(x   - x   )))y  *
+ *  + (((x- x   )(x- x  @
+                            2        3         1     2     1     3      1            1        3         2     1     2     3      2 *
+ *           1        2 @
+
+
+
+                        2
+           =           x     (((y   )/ ((x   - x   )(x   - x   ))) + ((y   )/ ((x   - x   )(x   - x   ))) + ((y   )/ ((x   - x   )(*
+ *x   - x   ))))-
+                                 1        1     2     1     3           2        2     1     2     3           3        3     1    *
+ * 3     2
+
+
+
+                          x  (((y   (x    + x   ))/ ((x   - x   )(x   - x   ))) + ((y   (x    + x   ))/ ((x   - x   )(x   - x   )))*
+ * + ((y   (x    + x   )@
+                                 1    2      3         1     2     1     3           2    1      3         2     1     2     3     *
+ *      3    1      2   @
+
+
+
+                             (((y   x   x   )/ ((x   - x   )(x   - x   ))) + ((y   x   x   )/ ((x   - x   )(x   - x   ))) + ((y   x*
+ *   x   )/ ((x   - x   @
+                                 1   2   3        1     2     1     3           2   1   3        2     1     2     3           3   *
+ *1   2        3     1  @
+
+
+ This  allows  us  to  calculate  and  tabulate  the
+ coefficients  a,  b  and  c  just  by  replacing  y     by
+                                                    i
+
+ ELOW(I)  and  x     by  the  corresponding  stopping
+                i
+
+ range  ELOW(i).  In  the  routine  GRANGI  a  table  of
+ length  3 x (NEKBIN           - 1)  is  created:
+
+
+
+     Q(JINTRP+3*(I-1)                             +1)            =                                                                 *
+ *                      @
+                                                                                                                                   *
+ *                      @
+
+
+
+                                                  +2)            =         0. 5 ((b(R   , R         , R         , E   , E         ,*
+ * E                    @
+                                                                                     I     I+1         I+2         I     I+1       *
+ *  I+2                 @
+
+
+
+                                                  +3)            =                   ((c(R   , R         , R         , E   , E     *
+ *    , E               @
+                                                                                          I     I+1         I+2         I     I+1  *
+ *       I+2            @
+
+
+
+ where  E    = ELOW(I)              and  R    = R(ELOW(I))                  .  The
+         I                                I
+
+ calculation  of  the  energy  loss  is  now  done  in  the
+ following  steps:
+
+
+1.      Evaluate  the  stopping  range  for  the  threshold
+        energy  (STOPC),  only  once  at  the  beginning  of
+        each  new  particle  tracking.
+2.      From  the  energy  of  the  particle  derive  the
+        stopping  range  by  a  quadratic  interpolation  of
+        the  range  table:
+
+
+                                                 p  ===========================================================
+
+                                                          2
+          R    =- B     + ((A     )/ (_A     _))    B        - (C     - ((E   )/ (A     )))
+           0       I         I          I            I           I         0       I
+
+
+
+        The  value  of  I  is  chosen  according  to  the
+        following.  Let  i  be  such  that
+        ELOW(         i)  <E   < =    ELOW(         i + 1    )  :
+                            0
+
+
+
+                   max     (i- 1, 1)                                 if           ((E   - ELOW(         i)  )/ (ELOW(         i + 1*
+ *     )  - ELOW(       @
+                                                                                     0
+        I   = -                                                                                                                    *
+ *                      @
+
+                   min     (i, NEKBIN           - 1)                 if           ((E   - ELOW(         i)  )/ (ELOW(         i + 1*
+ *     )  - ELOW(       @
+                                                                                     0
+
+
+
+        The  value  of  0. 7  is  an  empirical  number  which
+        minimises  the  discontinuities  of  the
+        reconstructed  dE/ dx  curve.
+3.      Evaluate  the  stopping  range  for  the  particle
+        after  the  step:  R'    = R   - step.  If  this  is  less
+                             0      0
+
+        than  the  stopping  range  of  a  particle  of
+        threshold  energy,  the  particle  is  terminated
+        as  a  stopping  particle  below  the  energy  cut.
+        Otherwise,  the  final  energy  is  computed  as:
+
+
+                                    E'    = A     (C      + R'   (2B      + R'   ))
+                                      0      I      I         0     I         0
+
+
+4.      the  energy  loss  is  computed  as:
+
+
+                                                   Delta         E = E   - E'
+                                                                      0      0
+
+
+        This  value  is  then  corrected  to  take  into
+        account  the  energy  loss  fluctuations  (see
+        [PHYS332]).
+
+
+ This  method  results  in  a  dE/ dx  curve  which  is  a
+ set  of  connected  straight  lines  and  not  a  step
+ function.
+</PRE>

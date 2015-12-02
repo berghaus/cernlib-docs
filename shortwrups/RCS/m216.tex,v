@@ -1,0 +1,423 @@
+head     1.1;
+access   ;
+symbols  ;
+locks    goossens:1.1; strict;
+comment  @@;
+
+
+1.1
+date     94.04.02.16.46.55;  author goossens;  state Exp;
+branches ;
+next     ;
+
+
+desc
+@Initial entry
+@
+
+
+
+1.1
+log
+@Initial revision
+@
+text
+@\Version{GETWI}                    \Routid{M216}
+\Keywords{CDC NOS READ CONVERT TRANSLATE SCOPE}
+\Author{E. McIntosh, E. Perotto}      \Library{KERNLIB, IBM only}
+\Submitter{}                \Submitted{08.06.1989}
+\Language{Fortran and Assembler}              %\Revised{}
+\Cernhead {Read and Convert a CDC NOS/BE or Scope 2 W/I File}
+{\tt GETWI} reads a CDC tape file in W/I format (or an IBM disk image of
+such a file) and returns one CDC logical record on each call.
+Each 60-bit data item is converted to a 32-bit IBM integer or
+floating-point number and is stored in the ({\tt REAL}) array
+{\tt RESULT}.
+Note that if the input data contains mixed integers and floating-point
+numbers, so will {\tt RESULT}.
+\par
+The original CDC data, 60 bits right-justified in a 64 bit ({\tt DOUBLE
+PRECISION}) field, is also returned to the ({\tt DOUBLE PRECISION}) array
+{\tt ARRAY} in case the user wishes to make his own conversion (e.g.
+with {\tt CVT76A} (M216)).
+\par
+{\tt READWI} reads a CDC tape file in W/I format (or an IBM disk image
+of such a file) and returns one CDC logical record on each call. The
+record is stored in the ({\tt DOUBLE PRECISION}) array {\tt ARRAY},
+one CDC 60-bit word right-justified in each element.
+\par
+{\tt CONCDC} expects 60-bit CDC data stored right-justified in 64-bits
+(as for example data read by {\tt READWI}). Each 60-bit data item
+is converted to a 32-bit IBM integer or floating-point number
+and is stored in the ({\tt REAL}) array {\tt RESULT}. Note that if the
+input data contains mixed integers and floating-point numbers, so will
+{\tt RESULT}.
+\par
+{\tt CVT76A} expects 60-bit CDC data stored right-justified in 64 bits.
+Each 60-bit data item is converted either to one IBM double-precision
+floating-point number or a 32-bit IBM integer stored in the lower half
+of an IBM double-precision floating-point number. The input array is
+replaced by the converted values of its elements.
+\par
+The conversions will be done correctly (with loss of precision)
+providing all CDC integers are in the range $-2^{32}$ to $2^{32}-1$
+and there are no underflows (CDC floating-point numbers with a zero
+exponent). Suitable diagnostic messages are issued provided the error
+logging option is selected. If the modulus of the CDC floating-point
+numbers is less than about {\tt 0.6E-78} they are converted to {\tt 0.0}
+(as are underflows and indefinites) and if greater than {\tt 0.7E76}
+to approximately this value (as are infinities).
+\par
+The IBM file should be declared {\tt RECFM U}, {\tt BLKSIZE 3840}
+corresponding to the {\tt 512}-word block structure of CDC W/I files.
+\Structure
+{\tt SUBROUTINE} subprograms \\
+User Entry Names: \Rdef{GETWI}, \Rdef{CONCDC}, \Rdef{CVT76A},
+\Rdef{READWI}, \Rdef{CDCA4} \\
+Internal Entry Names: \Lit{ERRLOG}, \Lit{S\dollar{}XTO4} \\
+External References: \Rind{IOGET} (Z300) \\
+Files referenced:
+\parbox[t]{135mm}
+{{\tt IOFILEnn} where $\mathtt{LUN=nn}$ and, standard output stream
+(if $\mathtt{LERR=0}$) or {\tt FTmmF001} (if $\mathtt{LERR=mm}$) or none
+(if $\mathtt{ LERR < 0}$).}
+\newpage
+\Usage
+{\bf Subroutine GETWI:}
+\begin{verbatim}
+    CALL GETWI(LUN,ARRAY,MAXN,RESULT,IERR,N,LERR)
+\end{verbatim}
+\begin{DLtt}{12345678}
+\item[LUN] ({\tt INTEGER}) Stream number of input file ({\tt IOFILEnn}),
+$\mathtt{1 \leq LUN \leq 99}$.
+\item[ARRAY] ({\tt DOUBLE PRECISION}) Array of length $\mathtt{\geq MAXN}$
+for the input record (see above).
+\item[MAXN] ({\tt INTEGER}) Maximum logical record length.
+\item[RESULT] ({\tt REAL}) Array for the IBM 32-bit results.
+\item[IERR] ({\tt INTEGER}) Set non-zero if any errors occurred;
+it will be set to the {\tt READWI} or the {\tt CONCDC} error code
+(see {\bf Error Handling}).
+\item[N] ({\tt INTEGER}) Set to the actual logical record length in
+words; i.e. the number of (64/32 bit) results returned to
+{\tt ARRAY/RESULT}.
+\item[LERR] ({\tt INTEGER}) List flag.  \\
+$\mathtt{< 0:}$ No errors are listed. \\
+$\mathtt{= 0:}$ Errors are listed on standard output. \\
+$\mathtt{= mm > 0:}$ Errors are listed on {\tt FTmmF001}.
+\end{DLtt}
+\Method
+{\tt GETWI} first calls {\tt READWI} to read in a CDC Logical Record in
+unpacked format (60 bits right-justified in 64) to {\tt ARRAY}.
+{\tt CONCDC} is then called to convert and store the 32-bit results in
+{\tt RESULT}. See the write-ups of {\tt READWI} and {\tt CONCDC} below
+for more information.
+\Restrict
+Apart from the limitations on precision and range of the
+numbers to be converted as outlined above, only one input file
+({\tt LUN}) may be used by the calling program. Attempts to read from
+more than one input file will produce undefined results and spurious
+error messages.
+\Accuracy
+CDC floating point-numbers will be represented correctly to about 6
+decimal digits, but note that they can be converted to IBM double-
+precision format by {\tt CVT76A}.
+\Timing
+Approximately 1 CPU second (3090/7880) per Megabyte, i.e. 5
+normalised 168 units/Megabyte if there are few errors.
+\Errorh
+First note that the errors reported are detected by either {\tt READWI}
+or {\tt CONCDC}. The value returned is either the {\tt READWI} error
+code ($\mathtt{1-9}$) or the {\tt CONCDC} error code (${\tt 11-14}$).
+{\tt N} is always zero when any {\tt READWI} error is detected.
+The subroutine will attempt to continue successfully reading on calls
+subsequent to any error but data may be lost. No recovery is possible
+from errors like End-of-Data or bad stream number. Some {\tt READWI}
+errors correspond to {\tt IOPACK} errors and {\tt IOPACK} issues its
+own message.
+\par
+The errors reported by {\tt GETWI} from {\tt READWI} are: \\[2mm]
+\begin{tabular}{@@{\hspace*{10mm}}l@@{\qquad}l}
+{\tt IERR} & Meaning \\[2mm]
+1 & End of Data Set (End-of-File, {\tt IOPACK IOERR 2}) \\
+2 & End of CDC Partition \\
+3 & End of CDC Section  \\
+4 & End of Information ({\tt IOPACK IOERR 4}) \\
+5 & I/O error (e.g. parity, {\tt IOPACK IOERR 3}) \\
+6 & CDC W Control Word Error \\
+7 & I/O error (any other {\tt IOPACK} error) \\
+8 & (Block Sequence Error, listed but never returned to the caller) \\
+9 & CDC I Control Word Error
+\end{tabular} \\[2mm]
+No data ($\mathtt{N=0}$) is ever returned on these errors, and they are
+listed with additional diagnostic information if $\mathtt{LERR \geq 0}$.
+\par
+Data is always returned when a {\tt CONCDC} error is reported, and
+indeed the entire record is always converted, and only the last error
+returned in {\tt IERR}. All the errors are listed if $\mathtt{LERR \geq 0}$.
+\par
+The {\tt CONCDC} errors are: \\[2mm]
+\begin{tabular}{@@{\hspace*{10mm}}l@@{\qquad}l}
+{\tt IERR} & Meaning \\[2mm]
+11 & CDC overflow (zero-exponent) or integer too large \\
+12 & CDC infinite value (exponent of {\tt 3777} octal) \\
+13 & CDC indefinite value (exponent of {\tt 1777} octal) \\
+14 & CDC number outside IBM range ({\tt 0.6E-78 to 0.7E76}) \\
+\end{tabular} \\[2mm]
+\Examples
+The following VM job would read a CDC labelled W/I staged tape and
+create a (large) VM file ({\tt V} format) of 32-bit data items, if there
+were sufficient disk space available and line limit was not exceeded.
+\begin{verbatim}
+/*BATCH TIME 1 TAPES 1 */
+/*BATCH SEND 'TESTWI Ftn *' */
+TRACE C
+'VFORT TESTWI'
+'CERNLIB'
+'EXEC STAGE PRE IOFILE10 crnvsn SL DSN mydsn FSEQ 1 RECFM U BLK 3840'
+'FILEDEF FT11F001 DISK IBM DATA (RECFM V LRECL 16000'
+'LOAD TESTWI (START'
+\end{verbatim}
+where the file {\tt TESTWI FORTRAN} is the following program:
+\begin{verbatim}
+      PROGRAM TESTWI
+      DOUBLE PRECISION ARRAY(2000)
+      DIMENSION OUT(2000),IOUT(2000)
+      EQUIVALENCE (OUT(1),IOUT(1))
+      DATA N /100/
+C     number of records for testing
+      DO 1 I = 1,N
+      CALL GETWI(10,ARRAY,2000,OUT,IERR,NWORDS,0)
+C     read a logical record from IOFILE10, maximum 2000 words/record,
+C     store the record in ARRAY 60 bits in 64, rigth-justified;
+C     store the converted data in OUT, the record length in NWORDS,
+C     and list any errors on standard output.
+      IF(IERR .NE. 0 .OR. I .LE. 50) THEN
+C     Messages for any error or for the first 50 records anyway
+        WRITE (*,100) I,IERR,NWORDS,(ARRAY(J),J=1,10)
+C     Now the first 50 converted records anyway
+        WRITE(*,101) (IOUT(J),OUT(J),J=1,NWORDS)
+      ENDIF
+  100 FORMAT(/,1X,'RECNO',I10,'   ERRCODE',I5,'   LENGTH',I10//
+     1       1X,5Z20/1X,5Z20/)
+  101 FORMAT(4(I15,E17.7))
+      WRITE(11) (OUT(J),J=1,NWORDS)
+      IF(IERR .EQ. 1 .OR .IERR .EQ. 4) STOP
+    1 CONTINUE
+      END
+\end{verbatim}
+{\bf Subroutine READWI:}
+\begin{verbatim}
+    CALL READWI(LUN,ARRAY,MAXN,IERR,N,LERR)
+\end{verbatim}
+\begin{DLtt}{12345678}
+\item[LUN] ({\tt INTEGER}) Stream number of input file ({\tt IOFILEnn}),
+$\mathtt{1 \leq LUN \leq 99}$.
+\item[ARRAY] ({\tt DOUBLE PRECISION}) Array of length $\mathtt{\geq MAXN}$
+for the input record.
+\item[MAXN] ({\tt INTEGER}) Maximum logical record length.
+\item[IERR] ({\tt INTEGER}) Set non-zero if any errors occurred.
+(See {\bf Error Handling} for {\tt GETWI} above.)
+\item[N] ({\tt INTEGER}) Set to the actual logical record length in
+words; i.e. the number of 64 bit results returned to {\tt ARRAY}.
+\item[LERR] ({\tt INTEGER}) List flag. \\
+$\mathtt{< 0:}$ No errors are listed. \\
+$\mathtt{= 0:}$ Errors are listed on standard output. \\
+$\mathtt{= mm > 0:}$ Errors are listed on {\tt FTmmF001}.
+\end{DLtt}
+\Method
+The input data is read one block at a time from the input file. The
+I block control word is decoded and verified, irrespective of
+whether it conforms to NOS/BE or SCOPE 2 convention. The W
+record/segment control words are then used to deliver a complete
+logical record to the caller.
+\par
+Various consistency checks are performed, and are reported to the caller
+via the flag {\tt IERR}, and are listed by the internal routine
+{\tt ERRLOG} if this option is selected.
+\Restrict
+Only one input file {\tt (LUN)} may be used by the calling program.
+Attempts to read from more than one input file will produce undefined
+results and spurious error messages.
+\Timing
+Approximately 0.25 CPU second (3090/7880) per Megabyte, i.e.
+1.25 normalised 168 units/Mega- \\
+byte if there are few errors.
+\Errorh
+{\tt N} is always zero when any {\tt READWI} error is detected. The
+subroutine will attempt to continue successfully reading on calls
+subsequent to any error but data may be lost. No recovery is
+possible from errors like End-of-Data or bad stream number. Some
+{\tt READWI} errors correspond to {\tt IOPACK} errors and {\tt IOPACK}
+issues its own message.
+\Examples
+The following VM job would read a CDC labelled W/I staged tape:
+\begin{verbatim}
+/*BATCH TIME 1 TAPES 1 */
+/*BATCH SEND 'TESTWI Ftn *' */
+TRACE C
+'VFORT TESTWI'
+'CERNLIB'
+'EXEC STAGE PRE IOFILE10 crnvsn SL DSN mydsn FSEQ 1 RECFM U BLK 3840'
+'LOAD TESTWI (START'
+\end{verbatim}
+where the file {\tt TESTWI FORTRAN} is the following program:
+\begin{verbatim}
+      PROGRAM TESTWI
+      DOUBLE PRECISION ARRAY(2000)
+      DATA N /100/
+C     Number of records for testing
+      IEOF=0
+      DO 1 I = 1,N
+      CALL READWI(10,ARRAY,2000,IERR,NWORDS,0)
+C     Read a logical record from IOFILE10, maximum 2000 words/record
+C     store the record in ARRAY 60 bits in 64 right-justified, the
+C     record length in NWORDS, and list any errors on standard output.
+      IF(IERR .NE. 0 .OR. I .LE. 50) THEN
+C     Messages for any error or for the first 50 records anyway
+        WRITE(*,100) I,IERR,NWORDS,(ARRAY(J),J=1,10)
+      ENDIF
+  100 FORMAT(/1X,'RECNO',I10,'   ERRCODE',I5,'   LENGTH',I10//
+     1        1X,5Z20/1X,5Z20/)
+      IF(IERR .EQ. 1 .AND. IEOF .EQ. 1 .OR. IERR .EQ. 4) STOP
+      IEOF=IERR
+    1 CONTINUE
+      END
+\end{verbatim}
+{\bf Subroutine CONCDC:}
+\begin{verbatim}
+    CALL CONCDC(ARRAY,N,RESULT,IERR,LERR)
+\end{verbatim}
+\begin{DLtt}{12345678}
+\item[ARRAY] ({\tt DOUBLE PRECISION}) Array of length $\mathtt{\geq N}$
+for the input data.
+\item[N] ({\tt INTEGER)} Number of items to convert.
+\item[RESULT] ({\tt REAL}) Array for the IBM 32-bit results.
+\item[IERR] ({\tt INTEGER}) Set non-zero if any errors occurred.
+\item[LERR] ({\tt INTEGER}) List flag. \\
+$\mathtt{< 0:}$ No errors are listed. \\
+$\mathtt{= 0:}$ Errors are listed on standard output. \\
+$\mathtt{= mm > 0:}$ Errors are listed on {\tt FTmmF001}.
+\end{DLtt}
+\Method
+{\tt CONCDC} first checks the CDC sign bit and internally
+complements the data item if the sign bit is set. If the data is a
+CDC integer in the range $-2^{32}$ to $2^{32}-1$ an integer result
+is returned. Otherwise the data item is assumed to be floating-point.
+\par
+After special treatment of the CDC cases (infinite, indefinite, and
+underflow), {\tt CVT76A} is called to convert other data items. A single
+precision result is then returned.
+\Restrict
+The limitations on precision and range of the numbers to be converted as
+outlined above.
+\Accuracy
+CDC floating-point numbers will be represented correctly to about 6
+decimal digits, but note that they can be converted to IBM
+double-precision by {\tt CVT76A}.
+\Timing
+Approximately 6 micro-seconds (3090/7880) per item i.e. 30
+normalised 168 units for 1 million items if there are few errors.
+\Errorh
+Data is always returned when a {\tt CONCDC} error is reported, and
+indeed the entire record is always converted, and only the last error
+returned in {\tt IERR}. All the errors are listed if $\mathtt{LERR \geq 0}$.
+\par
+The {\tt CONCDC} errors are as listed above. The error message shows the
+CDC word interpreted as an integer, as a floating-point and as 10 CDC
+display code characters (display code can be converted to EBCDIC with
+{\tt CDC\$A4}).
+\Examples
+The following VM job would read a CDC labelled W/I staged tape and
+create a (large) VM file ({\tt V} format) of 32-bit data items, if there
+were sufficient disk space available and line limit was not exceeded.
+\begin{verbatim}
+/*BATCH TIME 1 TAPES 1 */
+/*BATCH SEND 'TESTWI Ftn *' */
+TRACE C
+'VFORT TESTWI'
+'CERNLIB'
+'EXEC STAGE PRE IOFILE10 crnvsn SL DSN mydsn FSEQ 1 RECFM U BLK 3840'
+'FILEDEF FT11F001 DISK IBM DATA (RECFM V LRECL 16000'
+'LOAD TESTWI (START'
+\end{verbatim}
+where the file {\tt TESTWI FORTRAN} is the following program:
+\begin{verbatim}
+       PROGRAM TESTWI
+       DOUBLE PRECISION ARRAY(2000)
+       DIMENSION OUT(2000),IOUT(2000)
+       EQUIVALENCE (OUT(1),IOUT(1))
+       DATA N /100/
+ C     Number of records for testing
+       IEOF=0
+       DO 1 I = 1,N
+       CALL READWI(10,ARRAY,2000,IERR,NWORDS,0)
+ C     Read a logical record from IOFILE10, maximum 2000 words/record,
+ C     store the record in ARRAY, 60 bits in 64 right-justified, the
+ C     record length in NWORDS, and list any errors on standard output.
+       IF(IERR .EQ. 0) CALL CONCDC (ARRAY,NWORDS,OUT,IERR,0)
+       IF(IERR .NE. 0 .OR. I .LE. 50) THEN
+ C     Messages for any error of for the first 50 records anyway
+         WRITE(*,100) I,IERR,NWORDS,(ARRAY(J),J=1,10)
+ C     Now list the first 50 converted records anyway
+         WRITE(*,101) (IOUT(J),OUT(J),J=1,NWORDS)
+       ENDIF
+  100  FORMAT(/1X,'RECNO',I10,'   ERRCODE',I5,'   LENGTH',I10//
+      1        1X,5Z20/1X,5Z20/)
+  101  FORMAT(4(I15,E17.7))
+       WRITE(11) (OUT(J),J=1,NWORDS)
+       IF(IERR .EQ. 1 .AND. IEOF .EQ. 1 .OR. IERR .EQ. 4) STOP
+       IEOF=IERR
+     1 CONTINUE
+       END
+\end{verbatim}
+{\bf Subroutine CVT76A:}
+\begin{verbatim}
+    CALL CVT76A(ARRAY,N)
+\end{verbatim}
+\begin{DLtt}{12345678}
+\item[ARRAY] ({\tt DOUBLE PRECISION}) Array of length $\mathtt{\geq N}$
+for the input data whose entries are replaced by the converted values.
+\item[N] ({\tt INTEGER}) Number of items to convert.
+\end{DLtt}
+\Method
+{\tt CVT76A} first checks on the CDC sign bit and internally complements
+the data item if its sign bit is set. If the data is a CDC integer in
+the range $-2^{48}$ to $2^{48}-1$ an integer result is assumed; otherwise
+the data item is assumed to be floating-point.
+\par
+Floating-point numbers are returned as IBM {\tt DOUBLE PRECISION}
+in the same elements of {\tt ARRAY}. Integers are put back as full word
+integers in the lower half of the {\tt DOUBLE PRECISION} element of
+{\tt ARRAY} with binary zero in the upper half. Integers outside the
+IBM range of $-2^{32}$ to $2^{32}-1$ are returned as the maximum IBM
+value
+with the correct sign bit set. \\[2mm]
+{\bf Subroutine CDC\$A4:}
+\begin{verbatim}
+    CALL CDC$A4(CDCBUF,IBMBUF,LEN,BYTWD,FILL)
+\end{verbatim}
+\begin{DLtt}{12345678}
+\item[CDCBUF] Array of 64-bit words containig a 60-bit CDC word
+right-justified (output of {\tt READWI}).
+\item[IBMBUF] Any memory space of at least {\tt LEN*BYTWD} bytes.
+\item[LEN] Number of CDC words to decode.
+\item[BYTWD] Number of characters taken from each CDC word (Optional,
+defaults to {\tt 4}).
+\item[FILL] Optional value to be stored in {\tt CDCBUF} (padded to 64
+bits on the left) to avoid {\tt Error 14} from {\tt CONCDC}.
+\end{DLtt}
+\Method
+This routine expects a 60-bit CDC data word stored right-justified
+in a 64-bit IBM double-word (as data read by {\tt READWI}).
+This CDC word contains 10 6-bit characters; they are translated
+from CDC 6-bit Display code to EBCDIC 8-bit code, and assembled
+contiguously into {\tt IBMBUF} (whose word boundaries are ignored). Only
+if $\mathtt{BYTWD=4}$  the CDC and IBM word counts are equal, with the loss
+of the 6 rightmost CDC characters (normally not used if the program
+was originally written for 32-bit machines). If $\mathtt{BYTWD > 10}$ blanks
+are inserted to the right of the 10 converted characters of each word.
+\Timing
+Approximately 0.51 seconds (3090) per million CDC words (records of
+512), i.e. 2.6 normalised 168 units.
+\\ $\bullet$
+@

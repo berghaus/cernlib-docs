@@ -1,0 +1,420 @@
+head     1.1;
+access   ;
+symbols  ;
+locks    goossens:1.1; strict;
+comment  @@;
+
+
+1.1
+date     93.11.15.20.37.18;  author goossens;  state Exp;
+branches ;
+next     ;
+
+
+desc
+@Initial entry
+@
+
+
+
+1.1
+log
+@Initial revision
+@
+text
+@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%   EPIO User Guide -- LaTeX Source                               %
+%                                                                 %
+%   Chapter 1                                                     %
+%                                                                 %
+%   The following external EPS files are referenced:              %
+%                                                                 %
+%   Editor: Michel Goossens / CN-AS                               %
+%   Last Mod.: 15 Nov 1993 20:15 mg                               %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ 
+\Filename{H1EPIO-Introduction}
+\chapter{Introduction}
+\label{sec:H1introduction}
+
+\Filename{H2EPIO-Introduction-Usage}
+\section{Usage}
+ 
+The package is designed as to make almost all features of the very
+flexible EP format (see section~\ref{sec:EPIOformat}) 
+available to the user. One can and
+should however, use it in as simple a way as possible. In the following,
+we give a series of applications ranging from the simplest use to the
+most complex one. It should be stressed that for the user wanting to use
+the package as a black box,
+
+\begin{UL}
+\item no knowledge of the actual format is required
+\item the only routines he has to use and understand are
+\end{UL}
+
+\begin{XMP}
+          EPINIT
+          EPREAD(EPFHDR,EPFRD)
+          EPOUTS
+          EPRWND
+          EPCLOS
+          EPEND
+\end{XMP}
+ 
+Obviously, the more advanced user will have to learn more.
+ 
+After the examples, we give a description of all routines in the
+package, and of the utility routines going with it (which are,
+however, independent of the package and are intended to fulfil the most
+common user needs).
+ 
+While it should not concern most users, the following overview of
+the format might help to clarify some problems. The basic "units"
+of information are 16-bit words. However, as of version 1.56, all
+information including the physical header, maybe given in 32-bit words.
+The header of each
+physical record or block is usually 12 words. The user's logical
+data (or events) can be specified by the user to be in "units" of 16 or
+32-bit words. Each logical record has a header (normally 4 units long)
+which specifies the record length and header length in "units" and other
+general identifiers. However, irrespective of the value of "unit" the user
+can treat the logical data part of the record as 16-bit, 32-bit
+or packed quantities, by specifying different "MODES" to \Rind{EPREAD} and
+\Rind{EPOUTS}, etc. 
+Packed quantities are applicable to other types of data,
+for example CDC 60-bit words or 24-bit Camac, but the user has to
+look after the unpacking himself. The complete description of the
+format can be found in Chapter 10.
+ 
+It should be stressed that the package does not perform automatic
+number format conversion, but only packs and unpacks (16 and 32-bit
+words). However, there are conversion routines from and to IBM floating
+and integer formats and from and to ASCII. To simplify the portability
+of data between different computer types, 32-bit headers are written
+in IBM format.
+ 
+Users are invited to study the examples carefully concerning
+initialisation, termination, and definition of buffer sizes.
+
+\Filename{H2EPIO-Introduction-Usage-UNIX}
+\section{Usage on UNIX}
+\label{sec:usageunix}
+
+The Unix version is restricted to fixed length blocks with full
+padding which is in any case the EPIO default.
+If a different blocksize than the EPIO default (1800 16-bit words)
+is required, it must be specified correctly in status word 1 by a
+call to EPSETW, e.g. for a blocksize of 1800 bytes on unit 1-
+\begin{XMP}
+ CALL EPSETW(11,1,900,IERR).
+\end{XMP}
+Unfortunately, this means that you can not give an arbitrarily large
+blocksize to allow your program to read files with different block
+sizes.
+Otherwise, existing applications should be portable to Unix
+workstations.
+ 
+%With Version 1.69 the capability to use C for the basic I/O was
+%added to the Unix version, allowing more functionality
+%which includes support for magnetic tapes.
+The choice of C or Fortran for the basic I/O
+\index{Input/Output}%
+\index{Fortran}%
+\index{C}%
+can be selected using the status word 33,
+which is set by the user as detailed in the table below.
+\begin{flushleft}
+\begin{tabular}{ccc}
+\bf Value & Type of I/O          & Default filename (\Lit{lun=nn})\\
+       0  & Fortran sequential   & \Lit{for0nn}                   \\          
+       1  & Fortran direct access& \Lit{for0nn}                   \\
+       2  & C using CFIO         & \Lit{epionn}
+\end{tabular}
+\end{flushleft}
+By default, status word 33 is set to 2.
+Although it is the old default, Value 0 is not portable and seems
+to give more problems.
+Values 1 and 2 give identical formats on most systems and are
+portable.
+ 
+The association with real filenames can be made in several ways:
+
+\begin{enumerate}
+\item Code the filename in the EPIO routine \Rind{EPDEFU} e.g.,
+\begin{XMP}
+ CALL EPDEFU(LUN,'epdata/test1',IERR)
+\end{XMP} 
+\item Use the UNIX \Lit{ln} command before execution, e.g.
+\begin{XMP}
+\Ucom{ln epdata/test epio01}
+\end{XMP}
+and follow it by:
+\begin{XMP}
+ CALL EPREAD(1,MODE,NW,IREC,IBUF,IERR)
+\end{XMP}
+\item Rename (\Lit{mv}) or copy (\Lit{cp}) the file to an EPIO name \Lit{epionn}.
+\end{enumerate}
+ 
+\subsection{Transferring files}
+ 
+EPIO files for use on or created on mainframes 
+should be with fixed length blocks.
+On VAX/VMS you can use the default settings.
+On CERNVM the user should issue a filedef specifying \Lit{RECFM F} 
+or \Lit{RECFM U}
+and the correct blocksize, which most applications are doing already.
+If not, a correct filedef is
+\begin{XMP}
+  FILEDEF IOFILE11 DISK MYEPIO TESTDATA A1 ( RECFM F BLOCK 3600
+\end{XMP}
+The files can then be transferred using FTP.
+The most convenient way is to use the ZFTP utility and a good
+\index{ZFTP}%
+description of a session is given in Computer Newsletter 200.
+This avoids the need to convert the data file or to modify the
+EPIO application.
+The actual transfer is performed by the command \Lit{putb}, e.g.-
+
+\begin{XMP}
+\Ucom{putb myepio.testdata test1 3600}
+\end{XMP}
+ 
+If ZFTP is not available on your system then you must use ftp
+directly specifying the qualifier ``binary''.
+Unfortunately, the data will be transferred as a byte stream
+which can be read in most Unix systems by EPIO by declaring
+the new status word 33 as 1 in a call to \Rind{EPSETW}, e.g.
+\begin{XMP}
+ CALL EPSETW(LUN,33,1,IERR)
+\end{XMP}
+For files created on a workstation for transfer to a mainframe
+it is essential to create them as a byte stream.
+Although it is clearly inefficient, conversion utilities between
+the two formats will be provided.
+ 
+A typical CERNVM ftp session would be
+\begin{XMP}
+\Ucom{tcpipibm ftp hostnm}
+ > \Ucom{hostname}
+ > \Ucom{password}
+ > \Ucom{cd wdir}
+ > \Ucom{binary fixed 3600}               for a blocksize of 3600 bytes
+ > \Ucom{put file.iofile for011}          or > get for011 file.iofile
+ > \Ucom{quit}
+\end{XMP} 
+ 
+On VAX, the session is similar except that the EPIO file names
+are of the form \Lit{FOR0nn.DAT}.
+
+\Filename{H2EPIO-Introduction-Usage-IBMVM}
+\section{Usage on VM/CMS}
+ 
+The VM version uses \Rind{IOPACK}, and both packages are available
+from the standard CERN program library PACKLIB, by using the command
+
+\begin{XMP}
+\Ucom{CERNLIB}
+\end{XMP}
+ 
+The \Lit{IOFILEnn} data sets read and written by EPIO must have filemode 4
+(i.e. OS simulation) with options \Lit{"RECFM U"} and an appropriate blocksize.
+ 
+For example, to access a disk data set \Lit{"RAWDATA DATA"} on logical
+unit 10 for reading or writing an appropriate FILEDEF might be:
+\begin{XMP} 
+ FILEDEF IOFILE10 DISK RAWDATA DATA A4 (RECFM U BLKSIZE 3600
+\end{XMP} 
+At present, concatenation of data sets is not supported under VM,
+but at CERN the FILEDEF option \Lit{"APPEND"} is available for disk files.
+
+\Filename{H2EPIO-Introduction-Usage-VAX}
+\section{Usage on VAX}
+
+\subsection{Disk files}
+
+The usage of disk files does not require any particular action,
+they are connected to logical units in the standard VMS way. If the
+logical name \Lit{FORnnn} is defined then its translation will be used as
+file name to connect, otherwise the file \Lit{FORnnn.DAT} will be used.
+However, the file name may also be changed at run-time via a call
+to the routine \Rind{EPDEFU}.
+ 
+Disk files which are sent to and from the VAX through CERNET should
+be of data type 3 (unformatted).
+Example: transport a EP format file from IBM to VAX:
+\begin{XMP}
+  XF  IBM  GETB
+/US:uuu/GR:gg/FN:name/LN:lname.DAT/DT:3
+GO
+EXIT
+\end{XMP}
+Corresponding action sending, with additional specification of
+the block and record size: \Lit{/BS:nnnn/RL:nnnn} in bytes.
+The byte swapping is done by the network.
+
+\subsection{Tapes files.}
+
+The current version of EPIO will recognize when it reads or
+writes a tape instead of disk, provided the device name is
+of the standard form \Lit{MTAn:}
+ 
+This limitation will disappear in a future version.
+Example: Suppose you want to mount a tape with blocks of length
+23040 bytes on unit 0, for the logical unit no. 1:
+
+\begin{XMP}
+MOUNT /FOR/BLOC=23040/REC=23040 MTAn: LABEL FOR001
+\end{XMP}
+
+where \Lit{LABEL} is just a place holder. For the case of unlabelled tapes.
+On the CENTRAL 8600 at CERN the command should read
+
+\begin{XMP}
+SETUP/BLOC=23040/REC=23040/NOLABEL XUTnnn XUTnnn FOR001
+\end{XMP}
+
+for a non labelled tape, where the second X\Lit{UTnnn} is again a place
+holder. Should the tape be labelled the qualifier
+\Lit{/LABEL=ASCII} or \Lit{/LABEL=EBCDIC} is required.
+If the tape is to be written the qualifier \Lit{/WRITE} must be
+inserted before the \Lit{/[NO]LABEL} qualifier.
+Byte swapping to/from tape may be done automatically when using EPIO,
+if this is allowed by the drivers' firmware/hardware.
+If the hardware feature is not available then status word 27 should
+be set to 1 by \Rind{EPSETW}, 
+which will cause byte order checking and automatic
+swapping by software when reading but not when writing.
+Tapes with EBCDIC labels should be positioned correctly using e.g.:
+
+\begin{XMP}
+SET MAGTAPE/SKIP=FILES:1 FOR001
+\end{XMP}
+
+Alternately label groups must be treated by the user by recovering
+from EPIO error 5. The file name may be changed at run-time via a call
+to the routine \Rind{EPDEFU}.
+
+\Filename{H2EPIO-Introduction-Usage-Apollo}
+\section{Usage on the Apollo/Domain}
+
+The Apollo version uses the stream I/O routines available in
+the system library. The files written by EPIO are of type \Lit{REC} (variable
+record length) but even \Lit{UASC} files can be handled provided the
+logical block length is fixed and the first status word is properly set.
+ 
+The default file name is \Lit{FORnnn.DAT} like on the VAX where nnn
+is the logical unit number. 
+This can be changed by calling \Rind{EPDEFU}.
+ 
+Disk files can be transferred across CERNET to and from IBM
+specifying type U. In transferring the file from the Apollo
+to the IBM the network software issues an error message at the end
+of the successful transfer that should be ignored. However, only files
+with fixed length blocks should be transferred and the exact block
+length indicated to EPIO via a call to \Rind{EPSETN} to set status word 1.
+ 
+Tapes are accessed via a magnetic tape descriptor file. The EPIO
+routines address the file which in turn redirect the I/O operation to
+the physical device. A magnetic tape descriptor file is created by
+the command:
+
+\begin{XMP}
+   edmtdesc for011.dat -c -s lab no reo no civ yes spos yes
+   edmtdesc for011.dat    -s f 1 rf u bl 3600 rl 3600 ascni no
+\end{XMP}
+ 
+This is the case for a standard EPIO unlabelled tape recorded with
+a blocksize of 3600 bytes. In case of label or of different blocksize
+the parameters should be changed accordingly. 
+Type \Ucom{Help EDMTDESC} for
+more details. The name of the Magnetic tape descriptor file can
+be different from \Lit{FORnnn.DAT} provided the user calls \Rind{EPDEFU}.
+ 
+\Filename{H2EPIO-Introduction-Usage-IBMMVS}
+\section{Usage on IBM (Wylbur MVS)}
+
+The IBM version of EPIO uses the input/output package \Rind{IOPACK}
+(Z300 in the CERN Program Library), and both are available simply
+through the standard procedures
+\begin{XMPt}
+    IFORTCLG   for   FORTRAN 4
+    JFORTCLG   for   FORTRAN 77
+\end{XMPt}
+
+Note that the FORTRAN 4 version was frozen in 1984 and that
+some of the examples will not work.
+ 
+As you will see from the example this means that DD names for
+the EPIO units are of the form
+\begin{XMPt} 
+      IOFILEnn    nn = 1 to 99
+\end{XMPt} 
+with  \Lit{DCB=(RECFM=U,BLKSIZE=iiii)}
+ 
+The default version of EPIO does not allow concatenation of data sets
+but this can easily be changed by setting status word 25 to non-zero;
+\begin{XMPt}
+     CALL EPSETW(LUN,25,1,IERR)
+\end{XMPt}
+\index{IBM}
+\index{Usage on IBM}
+\index{IFORTCLG}
+\index{JFORTCLG}
+\index{Concatenation of files on IBM}
+\index{IOFILE}
+\index{IOPACK}
+\index{UNIT=AFF}
+ 
+To access multiple logical units on the same physical unit
+using \Lit{"UNIT=AFF"} requires a \Lit{"CALL \Rind{EPRWND}"}
+in addition to \Rind{EPDROP}, so
+that the unit is properly closed. The details for reading multifile
+labelled tapes are in the description of \Rind{EPREAD}.
+
+
+\Filename{H2EPIO-Introduction-Usage-CDC}
+\section{Usage on CDC}
+
+The EPIO routines are available from the standard CERN Program
+libraries, and use FORTRAN BUFFER IN/OUT to perform the I/O.
+Note that the version FTN4 was frozen in 1984 and that
+some of the examples will not work.
+ 
+Magnetic tape files should be accessed specifying record type \Lit{RT=U}.
+EPIO disk file default format on NOSBE:
+\begin{XMP}
+    MFA,MFB      RT=S,BT=C
+\end{XMP}
+
+
+\Filename{H2EPIO-Introduction-other-considerations}
+\section{Other Considerations}
+
+\subsection{Recommended Block Sizes}
+
+For reasons of compatibility with different word lengths, the block size
+should be a multiple of 480 bits = 60 bytes. The default block size
+is 3600 bytes.
+ 
+In addition, there are restrictions on the recommended physical
+record sizes for certain devices. In adition,
+the ``standard Fortran'' version, on which the UNIX version
+is based, is restricted to block sizes in multiples of machine words.
+
+\subsection{Byte swapping}
+
+As of version 1.56, fully automatic byte
+swapping became the default by setting status word 27 to 1.
+This works of course only with the EP format as it requires
+two special control words in the physical header.
+ 
+To read EP files created in the \Lit{"OLD"} format (with a 6 word
+physical header) the user must call \Rind{EPSETW} to set status
+word 27 to 0.
+The user can force EPIO to read his data as new
+format by setting status word 27 to 2, avoiding peculiar side
+effects when there are parity errors for example.
+@

@@ -1,0 +1,388 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%   MINUIT User Guide -- LaTeX Source                             %
+%                                                                 %
+%   Chapter 1                                                     %
+%                                                                 %
+%   The following external EPS files are referenced:              %
+%                                                                 %
+%   Editor: Michel Goossens / CN-AS                               %
+%   Last Mod.: 17 Mar. 1992 10:00 mg                              %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ 
+\chapter{Minuit Basic Concepts}
+
+\section{The Organization of Minuit.}
+The Minuit package acts on a multiparameter Fortran function to which we
+give the generic name \Rind{FCN}, although the actual name may be chosen by the user.
+This function must be defined and supplied by the user (or by an intermediate
+program such as HBOOK\cite{bib-HBOOK} or PAW\cite{bib-PAW}, 
+in case Minuit is being used under the
+control of such an intermediate program).
+The value of \Rind{FCN} will in general depend on one or more variable parameters
+whose meaning is defined by the user (or by the intermediate program),
+but whose trial values are determined by Minuit according to what the user
+requests should be done to \Rind{FCN} (usually minimize it).
+ 
+To take a simple example, suppose the problem is to fit a polynomial through
+a set of data points.
+Then the user would write an \Rind{FCN} which calculates the chisquare between a
+polynomial and the data; the variable parameters of \Rind{FCN} would be the
+coefficients of the polynomials.  Using Minuit commands, the user would request
+Minuit to minimize \Rind{FCN} with respect to the parameters, that is, find those
+values of the coefficients which give the lowest value of chisquare.
+ 
+The user must therefore supply, in addition to the function to be analyzed,
+a set of commands to instruct Minuit what analysis is wanted.
+The commands may be given in several different forms:
+
+\begin{UL}
+\item As a data file, corresponding to the traditional ``data cards'', for
+      batch processing;
+\item Typed in at execution time at a terminal, for interactive running;
+\item Coded in Fortran in the calling program, which allows looping,
+      conditional execution, and all the other possibilities of Fortran, but not
+      interactivity, since it must be compiled before execution.
+      This is sometimes known as running Minuit in ``slave mode''.
+      HBOOK and PAW use Minuit in this way.
+\end{UL}
+
+It is also possible to mix any of the above forms, for example starting off
+a fit with a standard command file, then turning it over to the interactive
+user for the final command steps.
+
+\section{Internal and External Parameters.}
+
+\index{internal parameter}
+\index{external parameter}
+\index{parameters!external}
+\index{parameters!internal}
+Each of the parameters to \Rind{FCN} is defined by the user as belonging to
+one of the following types:
+
+\begin{DL}{Variable with limits:\ }
+\item[Freely variable:]      allowed to take on any value.
+\item[Variable with limits:] allowed to vary only between two limits specified by the user.
+\item[Fixed:]                originally defined as variable, but now taking on only the
+                             value the parameter had at the moment it was fixed, 
+                             or a value later assigned by the user.
+\item[Constant:]             taking on only one value as specified by the user.
+\item[Undefined:]            never defined by user.
+\end{DL}
+ 
+The user, in \Rind{FCN}, must of course be able to ``see'' all types of
+defined parameters,
+and he therefore has access to what we call the
+{\it external parameter list}, that is, the parameters as he
+defined them.
+On the other hand, the internal Minuit minimizing routines only want to ``see''
+variable parameters without limits, and so they have access only to the
+{\it internal parameter list} which is created from the external list
+by the following transformation:
+
+\begin{OL}
+\item Squeeze out all parameters that are not variable.
+\item Transform all variable parameters with limits, so that the transformed
+      parameter can vary without limits.
+      (See the next section for details concerning this transformation.)
+      Because this transformation is non-linear, it is recommended to avoid
+      putting limits on parameters where they are not needed.
+\end{OL}
+
+As an example, suppose that the user has defined the following parameters:
+\begin{UL}
+\item Parameter 1, constant.
+\item Parameter 3, freely variable.
+\item Parameter 10, variable with limits.
+\item Parameter 11, constant.
+\item Parameter 22, freely variable.
+\item All others undefined.
+\end{UL}
+Then the internal parameter list would be as follows:
+\begin{UL}
+\item Internal parameter 1 = external parameter 3.
+\item Internal parameter 2 = external parameter 10, transformed appropriately.
+\item Internal parameter 3 = external parameter 22.
+\end{UL}
+\index{internal parameter}
+\index{external parameter}
+\index{parameters!external}
+\index{parameters!internal}
+In the above example, Minuit considers that the number of external parameters
+is 22 (the highest external parameter number defined), and the number of
+internal parameters is 3.  The latter number is passed as \texttt{NPAR} to \Rind{FCN}.
+This is the number which determines, for example, the size of the error matrix
+of the parameters, since only variable parameters have errors.
+ 
+An important feature of Minuit is that parameters are allowed to change
+types during a Minuit run. Several Minuit commands are available to make
+variable parameters fixed and vice-versa; to impose, change, or remove limits
+from variable parameters; and even to define completely new parameters at any
+time during a run. In addition, some Minuit routines (notably the \Cind[MINOs]{MINOS} error
+analysis) cause one or more variable parameters to be temporarily fixed during
+the calculation.  Therefore, the correspondence between external and internal
+parameter lists is in general a dynamic one, and the value of \texttt{NPAR} is not
+necessarily constant.
+
+\subsection{The transformation for parameters with limits.}
+
+For variable parameters with limits, Minuit uses the following transformation:
+$$
+\begin{array}{l@{\hspace{3cm}}l}
+P_{\mathrm{int}} = \arcsin
+        \left( 2\: \frac{\Tstm P_{\mathrm{ext}}-a\Rule}{\Tstm b-a} - 1 \right)       &
+P_{\mathrm{ext}} = a + \frac{\Tstm b - a}{\Tstm 2}
+        \left( \sin P_{\mathrm{int}} + 1 \right)                  \\
+\end{array}
+$$
+so that the internal value $P_{\mathrm{int}}$ can take on any value, while
+the external value $P_{\mathrm{ext}}$ can take on values only between the lower
+limit $a$ and the upper limit $b$.
+Since the transformation is necessarily non-linear, it would transform a
+nice linear problem into a nasty non-linear one, which is the reason why
+limits should be avoided if not necessary. 
+In addition, the transformation
+does require some computer time, so it slows down the computation a little
+bit, and more importantly, it introduces additional numerical inaccuracy into
+the problem in addition to what is introduced in the numerical calculation
+of the \texttt{FCN} value.  
+The effects of non-linearity and numerical roundoff both
+become more important as the external value gets closer to one of the limits
+(expressed as the distance to nearest limit divided by distance between limits).
+The user must therefore be aware of the fact that, for example,
+if he puts limits of $(0,10^{10})$ on a parameter, then the values $0.0$ 
+and $1.0$ will be indistinguishable to the accuracy of most machines.
+
+The transformation also affects the parameter error matrix, of course,
+so Minuit does a transformation of the error matrix (and the 
+``parabolic'' parameter errors) when there are parameter limits.
+Users should however realize that the transformation is only a linear
+approximation, and that it cannot give a meaningful result if one or more
+parameters is very close to a limit, where
+$\partial P_{\mathrm{ext}} / \partial P_{\mathrm{int}} \approx 0$.
+Therefore, it is recommended that:
+\begin{UL}
+\item Limits on variable parameters should be used only when needed in order
+to prevent the parameter from taking on unphysical values.
+\item When a satisfactory minimum has been found using limits, the limits
+should then be removed if possible, in order to perform or re-perform the
+error analysis without limits.
+\end{UL}
+
+Further discussion of the effects of parameter limits may be
+found in the last chapter.
+
+\section{Minuit Strategy.}
+
+At many places in the analysis of the user function, Minuit must
+decide whether to be ``safe'' and waste a few function calls in order
+to know where it is, or to be ``fast'' and attempt to get the requested
+results with the fewest possible calls at a certain risk of not
+obtaining the precision desired by the user.
+In order to allow the user to influence these decisions, there is an
+internal Minuit parameter \texttt{ISTRAT} which can be set by the user
+through the command \Cind{SET STRategy}.  
+In the current release,
+this parameter can take on three integer values (0, 1, 2), and the
+default value is 1.  Value 0 indicates to Minuit that it should
+economize function calls; it is intended for cases where there are
+many variable parameters and/or the function takes a long time
+to calculate and/or the user is not interested in very precise
+values for parameter errors.  On the other hand, the value 2 indicates
+that Minuit is allowed to waste function calls in order to be sure
+that all values are precise; it is intended for cases where the function
+is evaluated in a very short time and/or where the parameter errors
+must be calculated reliably
+
+\section{Parameter Errors.}
+
+Minuit is usually used to find the ``best'' values of a set of parameters,
+where ``best'' is defined as those values which minimize a given function, \Rind{FCN}.
+The width of the function minimum, or more generally, the shape of the
+function in some neighbourhood of the minimum, gives information about
+the {\it uncertainty} in the best parameter values, often called by
+physicists the {\it parameter errors}.
+An important feature of Minuit is that it offers several tools to analyze
+the parameter errors.
+\subsection{FCN Normalization and the ERRor definition.}
+Whatever method is used to calculate the parameter errors, they will depend
+on the overall (multiplicative) normalization of \Rind{FCN}, in the sense that if
+the value of \Rind{FCN} is everywhere multiplied by a constant $\beta$, then the errors
+will be decreased by a factor $\sqrt{\beta}$.
+Additive constants do not change the parameter
+errors, but may imply a different goodness-of-fit confidence level.
+ 
+Assuming that the user knows what the normalization of his \Rind{FCN} means, and
+also that he is interested in parameter errors, the \Cind{SET ERRordef} command
+allows him to define what he means by one ``error'', in terms of the
+change in \Rind{FCN} value which should be caused by changing one parameter by
+one ``error''.  
+If the \Rind{FCN} is the usual chisquare function (defined below),
+then \Cind[SET ERRordef]{ERRordef} should be set to 1.0 
+(the default value anyway) if the user
+wants the usual one-standard-deviation errors.
+If \Rind{FCN} is a negative-log-likelihood
+function, then the one-standard-deviation value for 
+\Cind[SET ERRordef]{ERRORDEF} is 0.5.
+If \Rind{FCN} is a chisquare, but the user wants two-standard-deviation errors, then
+\Cind[SET ERRordef]{ERRORDEF} should be = 4.0, etc.
+ 
+Note that in the usual case where Minuit is being used to perform a fit to
+some experimental data, the parameter errors will be proportional to the
+uncertainty in the data, and therefore meaningful parameter errors cannot
+be obtained unless the measurement errors of the data are known.  In the common
+case of a least-squares fit, \Rind{FCN} is usually defined as a chisquare:
+
+\begin{equation}
+\chi^2 (\alpha) = \sum_{i=1}^{n} \frac{f(x_i,\alpha) - e_i)^2}{\sigma_i^2}
+\end{equation}
+
+where $\alpha$ is the vector of free parameters being fitted, and
+the $\sigma_i$ are the uncertainties in the individual measurements $e_i$.
+If these uncertainties are not known, and are simply left out of the calculation,
+then the fit may still have meaning, but not the quantitative values of the
+resulting parameter errors.
+(Only the relative errors of different parameters with
+respect to each other may be meaningful.)
+ 
+If the $\sigma_i$ are all overestimated by a factor $\beta$, then the resulting
+parameter errors from the fit will be overestimated by the same factor $\beta$.
+
+\subsection{The Error Matrix.}
+
+The Minuit processors \Cind[MIGrad]{MIGRAD} and \Cind[HESse]{HESSE} 
+normally produce an error matrix.
+This matrix is the inverse of the matrix of second derivatives of \Rind{FCN},
+transformed if necessary into external coordinate space%
+\footnote{The {\it internal error matrix} maintained by Minuit is transformed
+for the user into {\it external coordinates}, but the numbering
+of rows and columns is of course still according to internal parameter
+numbering, since one does not want rows and columns corresponding to
+parameters which are not variable. The transformation therefore
+affects only parameters with limits; if there are no limits, internal and
+external error matrices are the same.},
+and multiplied by the square root of \Cind[SET ERRordef]{ERRORDEF}.
+Therefore, errors based on the Minuit error matrix take account of all the
+parameter correlations, but not the non-linearities. That is, from the error
+matrix alone, two-standard-deviation errors are always exactly twice as big
+as one-standard-deviation errors.
+ 
+When the error matrix has been calculated (for example by the successful
+execution of a command \Cind{MIGrad} or \Cind{HESse}) then the parameter errors
+printed by Minuit are the square roots of the diagonal elements of this
+matrix. The commands \Cind{SHOw COVariance} and \Cind{SHOw CORrelations}
+allow the user to see the off-diagonal elements as well.
+The command \Cind{SHOw EIGenvalues} causes Minuit to calculate and print
+out the eigenvalues of the error matrix, which should all be
+positive if the matrix is positive-definite (see below on Migrad and
+positive-definiteness).
+ 
+The effect of correlations on the individual parameter errors can be
+seen as follows. When parameter \texttt{N} is \Cind{FIX}ed, 
+Minuit inverts the error
+matrix, removes the row and column corresponding to parameter \texttt{N}, and
+re-inverts the result. The effect on the errors of the other parameters
+will in general be to make them smaller, since the component due to
+the uncertainty in parameter \texttt{N} has now been removed. (In the limit
+that a given parameter is uncorrelated with parameter \texttt{N}, its error will
+not change when parameter \texttt{N} is fixed.)
+However the procedure is not reversible, since Minuit forgets the
+original error matrix, so if parameter \texttt{N} is then \Cind{RELease}d, 
+the error matrix is considered as unknown and has to be recalculated with
+appropriate commands.
+
+\subsection{MINOS Errors.}
+\index{errors}
+
+The Minuit processor \Cind[MINOs]{MINOS} was probably the first, and may still be the only,
+generally available program to calculate parameter errors taking into
+account both parameter correlations and non-linearities.
+The \Cind[MINOs]{MINOS} error intervals are in general assymmetric, and may be expensive
+to calculate, especially if there are a lot of free parameters and the
+problem is very non-linear.
+ 
+\Cind[MINOs]{MINOS} can only operate after a good minimum has already been found, and
+the error matrix has been calculated, so the \Cind[MINOs]{MINOS} command will
+normally follow a \Cind[MIGrad]{MIGRAD} command.
+The \Cind[MINOs]{MINOS} error for a given parameter is defined as the change in the
+value of that parameter which causes $F'$ to increase by the amount \texttt{UP},
+where $F'$ is the minimum of \Rind{FCN} with respect to all {\it other}
+free parameters, and \texttt{UP} is the ERRordef value specified by the
+user (default = 1.).
+ 
+The algorithm for finding the positive and negative \Cind[MINOs]{MINOS} errors for
+parameter \texttt{N} consists of varying parameter \texttt{N}, each time minimizing
+\Rind{FCN} with respect to all the other \texttt{NPAR-1} variable parameters,
+to find numerically the two values of parameter \texttt{N} for which the
+minimum of \Rind{FCN} takes on the values \texttt{FMIN+UP}, where \texttt{FMIN} is the
+minimum of \Rind{FCN} with respect to all \texttt{NPAR} parameters.
+In order to make the procedure as fast as possible, \Cind[MINOs]{MINOS} uses the
+error matrix to predict the values of all parameters at the
+various sub-minima which it will have to find in the course of the
+calculation, and in the limit that the problem is nearly linear,
+the predictions of \Cind[MINOs]{MINOS} will be nearly exact, requiring very
+few iterations.  On the other hand, when the problem is very
+non-linear (i.e., \Rind{FCN} is far from a quadratic function of its
+parameters), that is precisely the situation when \Cind[MINOs]{MINOS} is needed
+in order to indicate the correct parameter errors.
+
+\subsection{Contour Plotting}
+
+Minuit currently offers two very different procedures for finding
+\Rind{FCN} contours.  They will be identified by the corresponding
+command names: \Cind{CONtour} and \Cind{MNContour}.
+ 
+\subsubsection{CONtour}
+
+This procedure is designed for a lineprinter or alphanumeric
+terminal as output device, and gives a static picture of \Rind{FCN}
+as function of the two parameters specified by the user, that is,
+all the other variable parameters (if any) are considered as
+temporarily fixed at their current values.  First a range is
+chosen, by default two current standard deviations on either
+side of the current best value of each of the two parameters,
+and a grid size n is chosen, by default 25 by 25 positions
+for the full range of each parameter.  Contour zero is defined
+as the current best function value $\displaystyle F_{\mathrm{min}}$
+(presumably the minimum), and then the $\displaystyle i^{\mathrm{th}}$
+contour is defined as where \Rind{FCN} has the value
+$\displaystyle F_{\mathrm{min}} + i^2 * \mbox{\tt UP}$.
+The procedure then simply evaluates \Rind{FCN} at the four corners of
+each of the $n^2$ grid positions (which makes $(n+1)^2$ evaluations)
+to determine whether the $\displaystyle i^{\mathrm{th}}$ contour passes through
+it. The method, although not very efficient or precise,
+is very robust, and capable of revealing unexpected
+multiple valleys.
+ 
+\subsubsection{MNContour}
+
+The contour calculated by \Cind{MNContour} is dynamic, in the sense
+that it represents the minimum of \Rind{FCN} with respect to all the
+other \texttt{NPAR-2} parameters (if any). In statistical terms, this
+means that \Cind{MNContour} takes account of the correlations between
+the two parameters being plotted, and all the other variable
+parameters, using a procedure analogous to that of \Cind[MINOs]{MINOS}.
+(If this feature is not wanted, then the other
+parameters must be \Cind{FIX}ed before calling \Cind{MNContour}.)
+\Cind{MNContour} provides the actual coordinates of the points around
+the contour, suitable for plotting with a graphics routine or
+by hand. The points are given in counter-clockwise order
+around the contour.
+Only one contour is calculated per command (or Fortran call),
+and the level is $\displaystyle F_{\mathrm{min}} + \mbox{\tt UP}$.
+where \texttt{UP} is the
+\Cind[SET ERRordef]{ERRordef} specified by the user, or 1.0 by default.
+The number of points to be calculated is chosen by
+the user (Default is 20 for the data-driven mode.).
+As a by-product, \Cind{MNContour} provides the \Cind[MINOs]{MINOS} errors of the
+two parameters in question, since these are just the extreme
+points of the contour (Use \Cind{SHOw MINos} to see them).
+In command-driven mode, a rough (alphanumeric, not graphic)
+plot of the points is given 
+(if \Cind[SET PRIntout]{PRIntlevel$\geq0$}) 
+and the numerical values of the coordinates are printed 
+(if \Cind[SET PRIntout]{PRIntlevel$\geq1$}).
+In Fortran-callable mode, the user gets Fortran
+access to the vector of point coordinates through
+\Rind[MNCONT]{SUBROUTINE MNCONT}.

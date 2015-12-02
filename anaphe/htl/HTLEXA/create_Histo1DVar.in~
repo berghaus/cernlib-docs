@@ -1,0 +1,102 @@
+<![CDATA[/* create_Histo1DVar.cpp */
+#include <iostream.h>
+#include <iomanip.h> 		// Formatting output string.
+#include "HTL/PHistograms.h" 	// Computing statistics.
+class Histo_App : public HepDbApplication
+{
+public:
+	Histo_App( const char *a_db_name = 0 )
+	{ db_name_ = ( a_db_name == 0 ) ? "Default_DB" : a_db_name; }
+		// If no database name is provided then the default one is 
+		// "Default_DB".
+public:
+	void run();
+		// Create a 1D histo named "Histo 1D" and fill it.
+		// Print simple properties and global statistics.
+public:
+	void init();
+private:
+	ooHandle(ooDBObj) db_; // Handle on the database.
+	const char *db_name_; // Name of the database.
+};
+//
+// Implementation:
+//
+void Histo_App::init()
+{
+	Init();
+	startUpdate();
+	db_ = db(db_name_);
+}
+void Histo_App::run()
+{
+	const Size bin_count = 20;
+	const double x_min = 0.0;
+	const double x_max = 20.0;
+	// Create a Histo1DVar using Weighted_Bin and Uneven_Partition:
+	// (The type of the points is double.)
+	//
+	//
+	// 	1/ Declare and define the vector of points that compose the
+	// 	(uneven/variable) partition:
+	//
+	P_Points_Vector my_points(10);
+	my_points[0] = 0.0; my_points[1] = 1.0;
+	my_points[2] = 3.5; my_points[3] = 4.0;
+	my_points[4] = 5.5; my_points[5] = 9.0;
+	my_points[6] = 10.; my_points[7] = 15.;
+	my_points[8] = 19.; my_points[9] = 20.;
+	// 	2/ Now declare and define the Histo1DVar:
+	//
+	HepRef(PHisto1DVar) histo = new (db_) PHisto1DVar( "Histo1DVar", my_points );
+	// Let's fill the histo with 50000 points:
+	//
+	long i;
+	double x, w;
+	for( i=0; i<50000; i++ ) {
+		x = (i % 22) - 1;
+		w = (x-9.5)*(x-9.5)+3;
+		histo->fill(x,w);
+	}
+	// Now print some properties of the new histo:
+	//
+	cout << "Histo name: " << histo->name() << endl
+		<< "Bin count : " << histo->bin_count()
+		<< " from " << histo->partition().lower_point()
+		<< " to " << histo->partition().upper_point() << endl << endl;
+	// Now display some statistics:
+	//
+	long in_entries = HStat::in_range_entries_count(*histo);
+	long extra_entries = HStat::extra_entries_count(*histo);
+	cout << "Entries count: " << (in_entries + extra_entries)
+		<< " with IN_RANGE: " << in_entries
+		<< " EXTRA: " << extra_entries << endl;
+	//double mean = HStat::mean( *histo );
+	//cout << "MEAN (B.C.): " << mean << endl;
+	//cout << "RMS  (B.C.): " << HStat::rms(*histo, mean)
+	//	<< endl << endl;
+	cout << "MEAN (B.C.): " << histo->mean() << endl;
+	cout << "RMS  (B.C.): " << histo->rms() << endl;
+	// Print histo contents:
+	//
+	cout << ". UNDERFLOW: " << histo->extra_bin(H_UNDERFLOW).value();
+	for( i=0; i<histo->bin_count(); i++ ) {
+		cout << endl << ". " << setw(2) << i << ": "
+			<< setw(9) << histo->i_bin(i).value() << " +/- "
+			<< setw(4) << histo->i_bin(i).error();
+	}
+	cout << endl << ". OVERFLOW: " << histo->extra_bin(H_OVERFLOW).value();
+	cout << endl <<  "TOTAL IN_RANGE: " 
+		<< HInfo::in_range_value( *histo ) << endl << endl;
+	// Print histo with existing HPrinter class from the library:
+	//
+	HPrinter hp( cout );
+	hp.print( *histo );
+}
+int main( int argc, char **argv )
+{
+	Histo_App app;
+	app.init();
+	app.run();
+	app.commit();
+}]]>

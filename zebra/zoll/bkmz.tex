@@ -1,0 +1,4602 @@
+\Filename{H1-MZ-memory-management}
+\chapter{Memory management}
+\label{sec:H1-MZ-memory-management}
+
+The memory management package MZ of ZEBRA is fundamental
+to all other ZEBRA packages.
+
+The ZEBRA package MZ derives from its predecessors:
+
+\begin{itemize}
+\item the ZEBRA data structure derives from the HYDRA data structure~\cite{bib-HYDRAMZ};
+\item the multi-store strategy derives from ZBOOK~\cite{bib-ZBOOK}
+\end{itemize}
+
+\Filename{H2-MZ-ZEBRA-bank-format}
+\section{ZEBRA bank format}
+
+\begin{verbatim}
+    LQ(L-NL-NIO-1) IOcb/NOFF    IOcb: I/O control byte (16 bits)
+                                NOFF = NIO + NL + 12 (16 bits)
+
+    LQ(L-NL-NIO)   IOW (1)      first extra I/O descriptor word (if any)
+                   ...
+    LQ(L-NL-1)     IOW (NIO)    last  extra I/O descriptor word
+
+    LQ(L-NL)       link NL      last reference link
+                   ...
+    LQ(L-NS-1)     link NS+1    first reference link
+    LQ(L-NS)       link NS      last structural link
+                   ...
+    LQ(L-1)        link 1       first structural link
+
+    LQ(L)          next         adr of the next bank in the linear str.
+    LQ(L+1)        up           adr of the supporting bank
+    LQ(L+2)        origin       adr of the supporting link
+
+    IQ(L-5)        IDN          numeric   bank ID
+    IQ(L-4)        IDH          Hollerith bank ID  (4 characters)
+    IQ(L-3)        NL           number of links
+    IQ(L-2)        NS           number of structural links
+    IQ(L-1)        ND           number of data words
+
+    IQ(L)          status       bits  1-18 user
+                                     19-32 system   25: drop bit
+                                     19-22 NIO      26: mark bit
+    IQ(L+1)        first data word
+                   ...
+    IQ(L+ND)       last  data word
+
+            This layout requires:
+
+                  DIMENSION    LQ(999), IQ(999), Q(999)
+                  EQUIVALENCE (LQ(9),IQ(1),Q(1))
+
+
+ ---- Format of a short dead region ----
+
+    word 1:  bits  1-16: NW, # of words, with  0 < NW < 12
+                   17-24: NW again for redundancy
+                      25: drop-bit set
+                  26-end: zero
+     2->NW:  dead words, content irrelevant
+\end{verbatim} 
+
+\Filename{H2-MZEBRA-initialize-ZEBRA-system}
+\section{MZEBRA - initialize the ZEBRA system}
+
+To initialize the ZEBRA system Common blocks the user must call
+\Rind{MZEBRA}, before any other request to ZEBRA.
+
+In particular, the following COMMON variables of interest to
+the user are initialized:
+
+\begin{verbatim}
+logical unit numbers:
+      COMMON /ZUNIT/ IQREAD,IQPRNT,IQPR2,IQLOG,IQPNCH,IQTTIN,IQTYPE
+
+default logging level:
+      NQLOGD in /ZSTATE/
+
+where
+      IQREAD   lun for standard system input ('card reader')
+
+      IQPRNT   lun for standard  user print output
+      IQPR2    lun for secondary user print output
+               initialization: IQPRNT=IQPR2=IQLOG
+
+      IQLOG    lun for standard system output ('line printer')
+               this is used for all ZEBRA system printing
+
+      IQPNCH   standard system coded output to be read back by
+               program ('card punch')
+
+      IQTTIN   standard on-line terminal input  (zero if none)
+      IQTYPE   standard on-line terminal output (zero if none)
+
+      NQLOGD   system-wide default logging level, see next para.
+               standard default initialization to zero
+\end{verbatim} 
+
+On any particular machine ZEBRA knows the correct values for
+the logical unit numbers, for example it knows that 6 and 7
+are the right values for IQREAD and IQLOG on the IBM,
+similarly  L"INPUT" and L"OUTPUT"  on the CDC Cybers.
+It is of advantage to the user to direct all his print output
+through the unit numbers provided by ZEBRA in /ZUNIT/.
+After the call to MZEBRA he is free to change any particular
+value in /ZUNIT/, and with the call to MZEBRA he may also
+modify the initialization, in particular he may re-direct
+the standard print output to the on-line terminal.
+
+The parameter in the call to MZEBRA may select initialization
+options either with an integer constant or with a list:
+
+\ROUTA{CALL MZEBRA (LIST)}
+\begin{verbatim}
+ --- short form of options:
+
+   with  LIST = 0:  standard defaults
+               -1:  preset IQLOG = IQTYPE, ie. output to terminal
+               -2:  preset NQLOGD= -2,     ie. only error messages
+               -3:  preset NQLOGD= -2 and IQLOG=IQTYPE
+
+\end{verbatim}
+
+\begin{verbatim}
+ --- options specified by a list:
+
+   with  LIST(1)   N elements in the list to follow (excluding itself)
+                   if zero or -ve: standard options
+
+             (2)   -> NQLOGD, the system-wide default log level
+                              (see MZLOGL on the next page)
+
+                   for example: LIST(2)= -3: suppress all messages
+                   standard default: NQLOGD = 0
+
+             (3)   -> IQLOG,  lun for standard log printing
+                              unless absent or zero
+                              if = -1: set IQLOG = IQTYPE
+
+             (4)   -> IQPRNT, lun for standard output printing
+                              if absent/zero: set IQPRNT = IQLOG
+                              if = -1:        set IQPRNT = IQTYPE
+\end{verbatim} 
+\ROUTA{CALL MZVERS}
+ prints at logging level -1 or above an initialisation message
+on unit IQLOG, showing amongst other things,
+the version number of the current ZEBRA system.
+In IQUEST(1) it returns as an integer
+the Zebra MZ version number multiplied by 10000;
+thus version 3.66 /7 would give 36607.
+
+\ul{Examples}:
+\begin{verbatim}
+   set normal logging, set printer output to terminal:
+
+      CALL MZEBRA (-1)
+      CALL MZVERS
+
+   set monitor logging, set unit 4 as print file:
+
+      DIMENSION    LIST(3)
+      DATA  LIST   / 2,  2, 4 /
+      CALL MZEBRA (LIST)
+      CALL MZVERS
+\end{verbatim} 
+
+MZEBRA only initializes the general ZEBRA system commons,
+it does not initialize the dynamic store.
+Before any request to the ZEBRA system involving the store,
+the user must initialize it by calling MZSTOR.
+
+At the end of execution the user should
+\ROUTA{CALL MZEND}
+to obtain the statistics of usage of the dynamic store.
+
+\Filename{H2-MZLOGL-change-MZ-logging-level}
+\section{MZLOGL - change the MZ logging level}
+
+Various parts of the ZEBRA system write log messages
+to the standard system output,
+and occasionally also to the on-line terminal, if any.
+Examples of messages provided for are:
+\begin{verbatim}
+   a) messages for recoverable errors:
+      read errors, data errors
+
+   b) intialization messages for:
+      stores, divisions, link areas, files
+
+   c) termination messages giving statistics of usage of
+      various facilities like memory, files
+
+   d) operation messages:
+      change in program phase, end-of-file
+
+   e) watch messages for hopefully rare, expensive events:
+      garbage collection, MZPUSH with relocation
+
+   f) monitor messages to help the user debug his program
+\end{verbatim} 
+To control the amount of information thus provided to the user,
+a log level is defined and can be set and reset by the user
+at execution time.
+The default log level zero enables the messages which one would
+usually like to see for record in a production run.
+The user may reduce the log level to cut out most or all messages;
+he may increase the level to watch the running of his program,
+or even to debug his data or his input files.
+
+Separate ZEBRA entities, such as dynamic stores or files,
+each have their own attached log level,
+which may be changed by the user at any time.
+By default they inherit the global system-wide default log-level
+set by MZEBRA, whose own default is zero.
+
+A somewhat similar system has been used
+for the debugging of the ZEBRA system itself;
+the corresponding WRITE statements are still present in the code
+on the PAM files, although not on the object libraries,
+and could be activated after re-compilation
+by setting a special log level.
+
+(The code for generating the logging messages is conditional and can
+be de-selected at generation time of the ZEBRA binary library.
+This is controlled by PATCHY conditionals:
+\begin{verbatim}
+   +USE, QPRINT, T=INH.  deselects all messages
+   +USE, QDEBUG, T=INH.  deselects all messages at or above level 2
+   +USE, QDEVZE.         selects the messages for debugging Zebra. )
+\end{verbatim} 
+
+The log level attached to a particular dynamic store is initialized
+by MZSTOR, normally to the global default log level.
+The user may change and re-change it at any time with:
+
+\ROUTA{CALL MZLOGL (IXSTOR,LOGL)}
+\begin{verbatim}
+with
+      IXSTOR  index of the store,
+              zero for the primary store
+
+        LOGL  the desired log level, as shown in the following
+              table, which also shows which MZ routines print
+              at this (or higher level):
+
+     level  -3:  no log messages at all
+
+            -2:  error messages        ZFATAL, ZPHASE
+
+            -1:  terse logging         MZEBRA, MZSTOR, ZPHASE
+
+             0:  normal logging        MZDIV, MZLINK
+
+            +1:  log to watch          MZLINT, MZGARB, MZPUSH
+
+            +2:  log to monitor calls to ZEBRA
+                  MZLINT, MZWORK, MZBOOK, MZLIFT, MZDROP,
+                  MZPUSH, MZREPL, MZGARB, MZLOGL
+
+   ( Messages to debug the ZEBRA system itself:
+
+      giving  LOGL = 100+n  sets the log-level to MIN(n,2)
+                            and the debug print level to "n"
+
+                   this is not normally available !          )
+\end{verbatim} 
+
+\Filename{H2-MZSTOR-initialize-dynamic-store}
+\section{MZSTOR - initialize a dynamic store}
+
+A call to \Rind{MZSTOR} is required to initialize the dynamic store
+before any operation using this store.
+
+ZEBRA can handle up to 16 different dynamic stores. Each such store
+must reside in a Common block, not in a local vector.
+Each store must be intialized by calling MZSTOR once,
+and once only for this store.
+The first store initialized is the primary store,
+its store-index IXSTOR will be zero.
+Further secondary stores may be initialized,
+their IXSTOR will be allocated non-zero values by MZSTOR.
+
+In the call to MZSTOR the user specifies the first and the last
+word of his dynamic store, he indicates the number and kinds
+of permanent links contained at the beginning of the store,
+and he communicates the FORTRAN name of the common block he
+is using for this store for printing purposes.
+A "fence" region of at least one word must be reserved preceding
+the store to allow catching errors due to using L=0.
+
+MZSTOR initializes the store with 3 divisions:
+the forward "working space" division~1
+followed by the reverse division 2, which is the default division
+in many instances, and the reverse "system" division
+at the end of the store.
+
+For each secondary store, the system needs an area of
+about 400 words to hold the system tables for this store.
+This area is allocated by MZSTOR on the last words
+of the dynamic store itself.
+
+The use of several dynamic stores introduces an execution time
+overhead proportional to the number of times that ZEBRA has to
+operate in a store other than the "current" one.
+All ZEBRA routines check on the current store being the right one;
+if not, a call to MZSDIV changes the "environment".
+A normal application uses only one store, the primary store.
+Apart from allowing to point from any data to any other,
+this also saves having to carry the store index,
+which is simply zero.
+
+\lile{-4mm} %!!!
+
+A given dynamic store is initialized by
+
+\ROUTBM{ CALL MZSTOR (IXSTOR*,chNAME,chOPT,FENCE}
+       {+,            LQ(1),LQ(LR),LQ(LW),LQ(LIM2),LQ(LAST))}
+\begin{verbatim}
+with
+
+     IXSTOR*  returns the index of the store, to be used when specifying
+              this store in subsequent calls to the ZEBRA system.
+              The indices for the divisions 1 + 2 created by MZSTOR are:
+              for division 1:  IXDIV = IXSTOR + 1
+                           2:  IXDIV = IXSTOR + 2
+
+              IXSTOR will be set to zero for the primary store.
+
+      chNAME  name of the store for printing purposes,
+              8 characters maximum
+
+      chOPT  character string of options:
+
+            log:     set log level to the default set up by MZEBRA
+                   Q  quiet, set log level to -2
+
+       FENCE  safety area immediately in front of the store to
+              protect against illegal use of LQ(0), LQ(-1), etc.
+              The fence extends from FENCE(1) to LQ(0).
+
+       LQ(1)  first word of the dynamic store
+
+      LQ(LR)  first permanent reference link, if any
+
+      LQ(LW)  first word in the store after the permanent links,
+              this is the first word available to the working space,
+              or to division 1. The following words are allocated
+              as permanent user links, if any:
+
+                LQ(1)  to LQ(LR-1)  structural links, if any
+                LQ(LR) to LQ(LW-1)   reference links, if any
+
+    LQ(LIM2)  lowest position of the end of division 2,
+              to protect divisions 1 and 2 from being squeezed out
+              of existence by other divisions created later.
+
+    LQ(LAST)  last word of the dynamic store.
+
+Required:
+
+  -  the fence must have one word at least, but at most 1000 words.
+  -  the data region of the store (ie. the total store minus
+     the permanent links) must not be less than 2000 words.
+\end{verbatim} 
+
+The store is allocated by MZSTOR as follows:
+
+\begin{verbatim}
+ _________________________________________________________________ _ _ _ _
+|       |        permanent       | div |         | div | division |
+| fence | structural | reference |  1  | reserve |  2  |  system  |
+|       |          links         | --> |   area  | <-- |   <----  | [table]
+|_______|____________|___________|_____|_________|_____|__________|_ _ _ _
+|       |(1)         |(LR)       |(LW) |         |     |    (LAST)|
+ FENCE   LQ                                                       [or LAST]
+\end{verbatim} 
+
+The fence region is preset to contain IQNIL in every word,
+this must never be changed;
+the debug aids will check for over-writing.
+The permanent links are cleared to zero; the rest of the store is not
+touched.
+
+The use of division 1 is somewhat special as explained
+in para.~1.07 for MZWORK.
+
+\ul{Examples}:
+\begin{verbatim}
+for a normal primary store:
+
+      PARAMETER   (LIM2Q=40000)
+      PARAMETER   (NNQ=120000)
+      DIMENSION    LQ(NNQ), IQ(NNQ), Q(NNQ)
+      EQUIVALENCE (LSAFE,LQ(1)), (Q(1),IQ(1),LQ(9))
+
+      COMMON //    IXDIV1, ...            division indices
+     +,            FENCE(16),LSAFE(10)    ten unused links for safety
+     +,            LMAIN, ...             more structural links
+     +,            L1, ...                more reference  links
+     +,            DIV12(99)
+
+      CALL MZSTOR (0,'//','.',FENCE,LQ,L1,DIV12,Q(LIM2Q),Q(NNQ))
+
+for a secondary store without permanent links:
+
+      DIMENSION    LZ(40000), IZ(40000), Z(40000)
+      EQUIVALENCE (Z(1),IZ(1),LZ(9))
+
+      COMMON /ZDYN/IXSTZ,IXDV1,IXDV2,IXHIT
+     +,            FENDZ(16),LZ,LASTZ
+
+      CALL MZSTOR (IXSTZ,'/ZDYN/','.',FENDZ,LZ,LZ,LZ,LZ(30000),LASTZ)
+      IXDV1 = IXSTZ + 1
+      IXDV2 = IXSTZ + 2
+\end{verbatim} 
+{\bf Note:}  To ease the use of double-precision variables
+in the working space,
+the number of words in the fence,
+more generally: the number of words in the Common block
+preceding the dynamic store,
+as well as the number of permanent links,
+should be {\em even}.
+
+MZSTOR prints at log level -1 or above
+an initialization message on unit IQLOG,
+showing the whereabouts and the sizes of the store.
+
+\Filename{H2-MZDIV-create-new-division}
+\section{MZDIV  - create a new division}
+
+MZDIV may trigger relocation.
+
+A dynamic store is physically subdivided into 'divisions'.
+Up to 20 divisions are allowed, which permits 17 divisions
+created by the user with MZDIV, beyond the 3 divisions
+created initially by MZSTOR.
+
+Dividing the store into divisions is a device for keeping
+different data-structures in physically separate parts
+of the dynamic store.
+In principle the user does not need to care where and in what
+order his banks are kept physically in the store,
+since all logical relations are described by links,
+not by arrangement.
+The reason for using divisions in spite of this general principle
+is exclusively the possible gain in efficiency,
+when deleting a whole data-structure, for example,
+or with the output of a data-structure to tape or disk.
+This may be seen by comparing the operations necessary to output
+either a data-structure whose banks co-exist intermixed with
+the banks of other structures, or a data-structure which has
+the exclusive use of a division:
+the first case requires a logical walk through the data-structure
+to identify all the banks which belong to it,
+plus the construction of a table to indicate their where-abouts,
+and the write-out of the memory according to that table;
+in the second case a contiguous chunk of memory
+can be written out directly.
+
+Mode of a division:  depending on whether a division grows
+at its higher or at its lower end,
+a division is said to be of mode 'forward' or 'reverse'
+(MODE = 0 or 1).
+Reverse mode is selected by the R option in the call to MZDIV,
+else forward mode is assumed.
+By arranging a forward division to be followed by a reverse
+division (of the same kind),
+the 'reserve areas', ie. the reserved space for these divisions
+not currently allocated to banks,
+of the two divisions is contiguous and is hence available
+to either division,
+thereby reducing the total memory requirement in general.
+
+Kind of a division:  Depending on its usage,
+we distinguish three kinds of divisions (apart from the
+system division, which is used by the ZEBRA system itself):
+
+ -- a 'user short-range' division is a division which is
+wiped clean after every event;
+
+ -- a 'user long-range' division is a division which carries
+data living beyond several events,
+or many events,
+or until the termination phase;
+
+ -- a 'package' division is a division used by some service
+packages,
+and whose contents are not normally of any concern to the user.
+
+Links, including structural links,
+may in general point from one division to any other division
+of the same store,
+except that the link 'next-of-same' may not,
+ie. a linear stucture must be contained within one division.
+To reduce the load on relocation,
+the user has the possibility to indicate which division points
+to which other divisions,
+as explained in the para.~1.14 for MXREF.
+By default ZEBRA assumes that all user divisions may point
+to all other user divisions.
+
+User short-range divisions are allocated one after the other
+from left to right, starting with division 1;
+long-range and package divisions
+are allocated one before the other from right to left,
+starting with division 20, pushing the system division downwards.
+
+A given division in a particular store is identified by its 'index';
+thus if a bank is to be created in this division,
+its index has to be specified to MZLIFT.
+The division index carries the store-number and the division-number
+encoded onto a word of 32 bits;
+when a new division is created by a call to MZDIV the next free
+division-number is allocated to it,
+and the encoded division index is returned to the user as
+an output parameter.
+The store index, constructed by MZSTOR, is formally a division index
+for the (non-existing) division zero.
+The format of the division index permits the simultaneous selection
+of several divisions by a 'compound index',
+see para.~1.15 (MZIXCO) for the specifications.
+
+A division is created with:
+
+\ROUTA{CALL MZDIV  (IXSTOR,IXDIV*,chNAME,NW,NWMAX,chOPT)}
+
+\begin{verbatim}
+ with
+      IXSTOR  index of the store for creation,
+              zero for the primary store
+
+      IXDIV*  returns the index of the division created,
+              to be used when specifying this division
+              in subsequent calls to the ZEBRA system.
+
+      chNAME  name of the division for printing purposes,
+              8 characters maximum
+
+          NW  number of words to be allocated to the division initially,
+              during execution later the division may grow, but not beyond
+       NWMAX  maximum size of the division
+
+       chOPT  character string of options:
+
+             mode:     forward mode is default    (gives MODE = 0
+                     R  reverse division                  MODE = 1
+                     M  match the neighbour division      MODE = 0 or 1
+
+             kind:     user short-range is default       KIND = 1
+                     L  user long-range division          KIND = 2
+                     P  package division                  KIND = 3 )
+                        (P implies C, over-rules L)
+
+             xref:     by default all user divisions point to all other
+                                   user divisions (cf. para. 1.14)
+                     C  division contained, ie. no links point outside
+
+Required:     NW at least 100 words,  NWMAX at least NW words
+
+\end{verbatim}
+
+\ul{Examples}
+\begin{verbatim}
+      CALL MZDIV (0,IXHITS,'HITS',10000,20000,'.')
+
+           creates a user short-range division HITS in forward mode.
+
+      CALL MZDIV (0,IXCALI,'CALIB',8000,8000,'RL')
+
+           creates a user long-range division CALIB in reverse mode.
+\end{verbatim} 
+
+If the user creates several divisions it is economic to create
+pairs of forward/reverse divisions.
+With Zebra version 3.67 the mode option M has been introduced
+to request automatic pairing with the divisions already existing.
+
+\ul{Example}
+\begin{verbatim}
+      CALL MZSTOR (0, '//', ...
+      CALL MZDIV  (0, IXABC, 'ABC', NW3,  NWMAX3, 'M')
+      CALL MZDIV  (0, IXDEF, 'DEF', NW4,  NWMAX4, 'M')
+      CALL MZDIV  (0, IXXYZ, 'XYZ', NW20, NWMX20, 'LM')
+      CALL MZDIV  (0, IXUVW, 'UVW', NW19, NWMX19, 'LM')
+\end{verbatim} 
+
+This will give a primary store with this lay-out:
+
+\begin{verbatim}
+   | div 1      div 2 | div 3      div 4 |   div    | div 19      div 20 |
+   |                  |                  |  system  |                    |
+|  | ----->    <----- | ----->    <----- |     <--  | ------>    <------ |
+|__|__________________|__________________|__________|____________________|
+\end{verbatim} 
+
+The forward divisions 3 and 19 are followed by the reverse
+divisions 4 and 20.
+The divisions of each pair share the same memory region,
+originally of NW3+NW4 and NW19+NW20 words.
+Thus the occupied space of one division can be large
+(even larger than its own declared maximum) at a particular
+moment during execution,
+if the space occupied by the other division of the pair is small
+enough to keep the sum below the maximum.
+
+{\large\bf Remember}: the higher logical entity above the bank
+is the 'data-structure' and {\large\em not} the division;
+the division is a physical concept entirely different
+from the logical concept of the data-structure,
+and the two must not be confused.
+
+MZDIV prints at log level 0 or above
+an initialization message on unit IQLOG.
+
+\Filename{H2-MZLINK-MZLINT-initialize-link-area}
+\section{MZLINK / MZLINT - initialize a link area}
+
+MZLINK / MZLINT may trigger garbage collection.
+
+A link area is a vector of links outside any dynamic store,
+with all its links pointing to one particular store,
+consisting of NS structural links followed by NR reference links.
+Either NS or NR may be zero.
+
+We distinguish two kinds of link areas:
+
+\subsection*{Permanent link area}
+
+A permanent link area is initialized once at the steering level
+and stays alive for the whole program;
+it consists of just the vector of links.
+
+\subsection*{Temporary link area}
+
+A temporary link area is requested and de-activated
+by lower-level code any number of times.
+Each such area has two words pre-fixed to the link-vector
+for efficiency:
+
+\begin{DLtt}{123456}
+\item[word 1] is a flag indicating whether the area is active or not;
+              if this word is zero, the contents of the area will
+              not be updated in case of a memory move.
+              The user may reset this word to zero to de-activate the area.
+\item[word 2] is a key allowing the system to easily find the
+              where-abouts of this area in the system tables without searching.
+              This word must never be touched by the user.
+\end{DLtt}
+
+A link area must be in COMMON storage;
+if it is in local storage there is a danger that FORTRAN
+optimization causes a register to preserve the old value of a link
+across a relocation operation,
+for garbage collection,
+but also for simple updating with MZDROP, MZSHUNT, etc.
+
+As for links in banks, a structural link may only contain zero or the
+valid address of a bank; it must never contain garbage.
+
+To initialize a permanent link area, one calls once,
+and once only for this area:
+
+\ROUTA{CALL MZLINK (IXSTOR,chNAME,!LAREA,!LREF,!LREFL)}
+\begin{verbatim}
+with
+
+      IXSTOR  index of the store into which the links will point,
+              (IXDIV of any division in this store allowed)
+              zero for the primary store
+
+      chNAME  name of the FORTRAN Common in which the link area resides,
+              for printing purposes, 8 characters maximum
+
+      !LAREA  first word of the link area,
+              being also the first link of this area
+
+       !LREF  first reference link, if any;
+              last structural link, if no reference links
+
+      !LREFL  last reference link, if any,
+              if none: give LAREA in this parameter position
+\end{verbatim} 
+
+MZLINK will clear the links to zero.
+
+\ul{Examples}
+\begin{verbatim}
+mixed link area:
+
+      COMMON /LAMIX/ LS1,...,LSN, LR1,...,LRN
+
+      CALL MZLINK (0,'/LAMIX/',LS1,LR1,LRN)
+
+structural link area:
+
+      COMMON /LASTR/ LS1, ..., LSN
+
+      CALL MZLINK (0,'/LASTR/',LS1,LSN,LS1)
+
+reference link area:
+
+      COMMON /LAREF/ LR1, ..., LRN
+
+      CALL MZLINK (0,'/LAREF/',LR1,LR1,LRN)
+\end{verbatim} 
+Note that in a permanent link area with exactly one link
+this link cannot be a reference link.
+
+MZLINK prints at log level zero (or above) an initialization
+message on unit IQLOG.
+
+To activate a temporary link area, one calls with:
+
+\ROUTA{CALL MZLINT (IXSTOR,chNAME,LAREA,!LREF,!LREFL)}
+\begin{verbatim}
+with
+
+      IXSTOR  index of the store, as for MZLINK
+
+      chNAME  name of the link area, as for MZLINK
+
+       LAREA  first word of the link area,
+              with: LAREA(1) the user flag word
+                     LAREA(2) system word
+                     LAREA(3) the first link of the area
+
+       !LREF  first reference link, if any, as for MZLINK
+
+      !LREFL  last reference link, if any, as for MZLINK
+\end{verbatim} 
+
+MZLINT will clear the links to zero,
+set the flag-word LAREA(1) to be non-zero,
+and set the system-word LAREA(2) on first contact.
+
+To de-activate a temporary link-area the user sets LAREA(1)=0.
+From then on the links in this area are no longer relocated,
+and hence will be meaningless.
+To re-activate the area the user could set LAREA(1)=1,
+but he must then clear the contents of the links himself;
+it is safer to call MZLINT, which will do the necessary.
+
+\ul{Examples}
+\begin{verbatim}
+mixed link area:
+
+      COMMON /LAMIX/ LAMIX(2), LS1,...,LSN, LR1,...,LRN
+
+      CALL MZLINT (0,'/LAMIX/',LAMIX,LR1,LRN)
+
+structural link area:
+
+      COMMON /LASTR/ LASTR(2), LS1, ..., LSN
+
+      CALL MZLINT (0,'/LASTR/',LASTR,LSN,LASTR)
+
+reference link area:
+
+      COMMON /LAREF/ LAREF(2), LR1, ..., LRN
+
+      CALL MZLINT (0,'/LAREF/',LAREF,LR1,LRN)
+\end{verbatim} 
+MZLINT prints a log message at level 1 for initialization
+and at level 2 for re-initialization.
+
+\Filename{H2-MZWORK-allocate-working-space}
+\section{MZWORK - allocate working space}
+
+MZWORK may wipe division~1 and it may trigger garbage collection.
+
+The region at the beginning of the dynamic store just after
+the permanent links may be used as working space,
+consisting of a set of reference links followed by
+a set of data words.
+
+The user requests reservation of the working space with
+
+\ROUTA{CALL MZWORK (IXSTOR,DFIRST,DLAST,IFLAG)}
+\begin{verbatim}
+with  IXSTOR  index of the store or of any of its divisions,
+              zero for the primary store
+
+      DFIRST  first data word of the working space,
+              the preceding words are taken as reference links;
+              this parameter is ignored if IFLAG is =2 or =-1
+
+       DLAST  last data word,
+              this parameter is ignored if IFLAG is =-1 or =3 or =4
+
+       IFLAG  = 0  define a new working space,
+                   previous contents are not to be retained
+
+              = 1  vary the limits of the working space,
+                   keeping intact the links which are common to
+                   both the old and the new working space.
+
+              = 2  vary only the DLAST limit of the working space,
+                   keeping alive all links and the data words
+                   which are common to the old and the new working space.
+
+              = 3  keep the DLAST limit unchanged, keep division 1,
+                   re-define the DFIRST limit for new links,    
+                   ie. clear the links to zero.             
+
+              = 4  keep the DLAST limit unchanged, keep division 1,
+                   re-define the DFIRST limit keeping intact the links
+                   which are common to the old and the new working space.
+
+              =-1  reset the working space to null,
+                   ie. to zero links, zero data words
+\end{verbatim} 
+Staring with Zebra version 3.67, the links of the working space
+are cleared to zero by \\
+MZWORK;
+if IFLAG= 1 or 4 only the new links are cleared.
+
+
+A call to MZWORK with ${\tt IFLAG < 3}$ destroys division 1 of the store
+{\em without} a relocation pass to reset links pointing into division 1.
+This is done in this way for efficiency,
+hence normally only very temporary data should be kept in division 1,
+and only working space links should point to them.
+To say it differently: division 1 is logically part of the
+working space,
+its time of existence is the same as that of the working space,
+and it is good practice to maintain links into division 1
+only in the working space.
+If however it is necessary to hold such links elsewhere,
+one should either reset them explicitly or wipe the division with
+{\tt CALL~MZWIPE~(1)} before calling MZWORK
+[ or with {\tt CALL~MZWIPE~(IXSTOR+1)} for a secondary store ].
+
+\ul{Example}
+\begin{verbatim}
++CDE, Q.
+     +,         LR1, ...     working space reference links
+     +,         DFIRST, ...  working space data words
+     +,         DLAST
+
+      CALL MZWORK (0,DFIRST,DLAST,0)
+\end{verbatim} 
+will give this layout of the store:
+
+\begin{verbatim}
+    _____________________________________________________________
+   |           |       |             |               |           |
+   | permanent |  wsp  |   w. space  | div 1   div 2 | other     |
+   |   links   | links |     data    | --->     <--- | divisions |
+   |___________|_______|_____________|_______________|___________|
+   |LQ         |LR1    |DFIRST  DLAST|                           |
+\end{verbatim} 
+
+MZWORK prints a monitor log message at level 2.
+
+\Filename{H2-MZLIFT-MZBOOK-bank-creation}
+\section{MZLIFT / MZBOOK - bank creation}
+
+MZBOOK / MZLIFT may cause garbage collection.
+
+A bank may be lifted with either
+
+\ROUTBM{CALL MZBOOK (IXDIV,!L*,!LSUP,JB, chID,NL,NS,ND,IOD,NZERO)}
+       {CALL MZLIFT (IXDIV,!L*,!LSUP,JB, NAME, NZERO)}
+\begin{verbatim}
+with
+        IXDIV   index of the division in which the bank is to be lifted
+                 = 0       use default in   primary store
+                [= IXSTOR  use default in secondary store ]
+                see below for details
+
+          !L*   returns the address of the bank created
+
+        !LSUP   if JB < 0:  address of the supporting up bank
+                if JB = 0:  address of the supporting previous bank
+                if JB = 1:  supporting link*
+                if JB = 2:  LSUP not used
+
+           JB   if JB < 1:  link bias in the supporting bank
+                             (must be a structural link)
+                if JB = 1:  create top-level bank
+                if JB = 2:  create stand-alone bank
+
+         NAME   specifies the properties of the bank:
+
+ NAME(1) = ID:  4-character bank identifier, alphanumeric,
+                  MZBOOK: variable of type CHARACTER
+                  MZLIFT: Hollerith string of the form 4Hxxxx
+     (2) = NL:  total number of links, NL < 64k
+     (3) = NS:  number of structural links, NS <= NL
+                  (not counting the 3 links next, up, origin)
+     (4) = ND:  number of data words, ND < 1 Mwords
+
+     (5) = IOD:  I/O descriptor for the data words, which may be:
+                 - result from MZFORM, 1 word, I/O index
+                 - result from MZIOBK, 1 or more words, I/O characteristic
+                 - immediate, the whole bank is of the same type:
+                    IOD = 0  undefined, bank cannot be transported
+                          1  32-bit unsigned integer
+                          2  signed integer
+                          3  floating         4  double-precision
+                          5  Hollerith        7  self-descriptive
+                 - requests:
+                    IOD = 9  retrieve I/O characteristic by IDH,
+                             stored in the system by MZFORM
+                         11  take the I/O characteristic from any
+                             bank in the target linear structure,
+                             if this is empty act as for 9
+\end{verbatim}
+
+\begin{verbatim}
+        NZERO   controls whether and how much of the data-part
+                of the bank is preset to zero:
+                   N = -1:  no presetting
+                   N = 0:  the whole bank is cleared
+                   N > 0:  the first N words are cleared
+                The links of the bank are always cleared to zero.
+\end{verbatim} 
+In what follows we will need the parameter {\bf LNEXT},
+which is the address of the successor bank to the bank to be lifted;
+its address will be stored into link 0 of the new bank,
+ie. into its 'next' link.
+LNEXT is obtained as follows:
+\begin{verbatim}
+        if  JB < 1:   LNEXT = LQ(LSUP+JB)
+            JB = 1:   LNEXT = LSUP
+            JB = 2:   LNEXT = 0
+\end{verbatim} 
+The {\em division} [ and the store ] into which the bank
+is to be lifted is selected by the parameter IXDIV.
+If a definite division is specified, this is used,
+but it must be compatible with LNEXT;
+a linear structure must be contained within one and the same
+division !
+
+If 'default division' is specified,
+by giving zero [ or IXSTOR ] for IXDIV,
+the bank will be created in the division holding the logically
+nearest bank of the data structure into which the new bank
+will be inserted, in this order of priority:
+
+\in{4mm}
+\begin{verbatim}
+  -  if the bank is added to an existing, non-empty, linear structure,
+     i.e. if LNEXT is non-zero, or if JB=0,
+     use the division holding this linear structure;
+  -  if JB < 0 use the division holding the supporting up bank at LSUP;
+  -  use division 2.
+
+\end{verbatim} 
+\in{-4mm}
+The {\em numeric bank identifier} IDN serves to readily identify
+a particular bank within a linear structure for interactive work.
+Normally the Hollerith identifiers IDH in a linear structure are
+all identical;
+it is desirable that the IDN's are all different.
+In principle the user can set any positive integer into IQ(L-5) after
+the bank has been created, but MZLIFT/MZBOOK will store a default
+value in this order of priority:
+
+\in{4mm}
+\begin{verbatim}
+  -  if LNEXT is non-zero: use IDN+1 of the bank at LNEXT;
+
+  -  if JB = 0: use IDN+1 of the bank at LSUP;
+
+  -  if JB < 0: use the value IDN = -JB;
+
+  -  IDN = 1 will be set.
+\end{verbatim} 
+\in{-4mm}
+
+The bank being lifted is
+{\em inserted}
+into an existing data-structure according to LSUP
+under control of the parameter JB:
+
+\begin{verbatim}
+--- case 1: JB < 0       insert as dependent of the bank at LSUP
+                          ex.:  CALL MZLIFT (0,L,LSUP,-4,NAME,0)
+            _______
+           |       |
+         __|  SUP  |  <-------------------------.------ ...
+        |  |       |  <---------.               |
+  link  |  |_______|            |               |
+JB= -4  |                       |               |
+        |                       |               |
+        |                    up |            up |
+        |                  ________        ________
+        |                 |        |      |        |
+        `---------------> |  lift  | ---> |  NEXT  | --->  ...
+                          |________|      |________|
+
+  SUP   is the supporting bank whose address is LSUP
+  lift  is the new bank being lifted
+  NEXT  is the first bank of the linear structure in front of which
+        the bank 'lift' is inserted, ie. the initial content of
+        link JB in bank SUP was LNEXT = LQ(LSUP+JB).
+
+The up-link and the origin-link in the bank lifted are set as
+
+                  up-link  <--  LSUP
+              origin-link  <--  LSUP+JB
+
+
+--- case 2: JB = 0       insert inside a linear structure
+                          ex.:  CALL MZLIFT (0,L,LSUP,0,NAME,0)
+     ______
+    |      |
+  __|  UP  |  <------------------------------------------.---- ...
+ |  |      |  <------------.                             |
+ |  |______|               |                             |
+ |                         |<-------------.              |
+ |                         |              |              |
+ |                      up |           up |           up |
+ |      ____          ________       ________       ________
+ |     |    |        |        |     |        |     |        |
+ `---> |    | -...-> |  SUP   | --> |  lift  | --> |  NEXT  | --> ...
+       |____|        |________|     |________|     |________|
+
+
+The up-link and the origin-link in the bank lifted are set as
+
+                  up-link  <--  copy of the up-link in bank SUP
+              origin-link  <--  LSUP
+\end{verbatim} 
+SUP, lift, NEXT have the same significance as in case 1.
+UP is the bank pointed to by the up-link in bank SUP,
+which link might be zero.
+If bank NEXT does not exist, ie. if LNEXT = LQ(LSUP) is zero,
+the bank 'lift' is added at the end of the linear structure.
+
+\begin{verbatim}
+--- case 3: JB = +1      create new top-level bank
+                          ex.:  CALL MZLIFT (0,L,LSUP,1,NAME,0)
+
+              usually: zero  <------------------.
+                                                 |
+                                                 |
+                                  -------------->|
+                                 |               |
+                              up |            up |
+                            ________        ________
+                           |        |      |        |
+ result  LSUP and L  ----> |  lift  | ---> |  NEXT  | ---> ...
+                           |________| .--> |________|
+                                      |
+  input  LSUP  -----------------------^
+\end{verbatim} 
+For  JB=+1  the origin-link and the up-link are taken from
+the bank NEXT pointed to by LSUP on input;
+the first time round, when NEXT does not exist,
+ie. when LSUP=0,
+the up-link is set to zero and the origin-link is made to point
+to the location containing LSUP.
+
+The location pointed to by the origin-link is filled with the address
+of the bank created, unless the origin-link is zero.
+\begin{verbatim}
+
+--- case 4: JB = +2      no inserting at all
+                          ex.:  CALL MZLIFT (0,L,0,2,NAME,0)
+\end{verbatim} 
+For  JB=2  the bank is lifted without being linked into a structure;
+both the origin-link and the up-link in the bank are set to zero. \vspace{8mm}
+
+{\large\bf Note}: because structural links are used to connect banks as
+illustrated by these examples, and are hence manipulated by the system,
+they must never contain anything but valid bank addresses, or zero.
+
+MZLIFT and MZBOOK print a monitor log message at level 2.
+
+\Filename{H2-MZPUSH-alter-size-of-bank}
+\section{MZPUSH - alter the size of a bank}
+
+MZPUSH (increasing) may cause garbage collection.
+
+To increase or decrease the size of a bank, one may
+
+\ROUTA{CALL MZPUSH (IXDIV,*!L*,INCNL,INCND,chOPT)}
+\begin{verbatim}
+with
+
+       IXDIV  index of the division; zero [or IXSTOR] allowed,
+              in which case MZPUSH will find the division
+
+        *!L*  address of the bank to be pushed,
+              on return L contains the new address of the bank
+              (cannot be a link in a bank !)
+
+       INCNL  number of additional links,
+              zero for no change, negative for decrease.
+              Additional links will be given type 'reference',
+              unless the original bank has only structural links.
+
+       INCND  number of additional data words,
+              zero for no change, negative for decrease.
+
+       chOPT  character string of options:
+
+                 default: any link may point to the bank at L,
+
+              R  but not into the abandoned bank region
+                        (in case of bank reduction)
+
+              I  isolated: only the inherent structural links
+                           point to this bank
+\end{verbatim} 
+For 'isolated' the user is sure that no link other than the
+supporting structural link, and the link passed in the parameter L,
+and the reverse links in the first level dependents,
+point to this bank.
+
+The I/O descriptor of the old bank must also be valid for the
+new bank; if this would not be the case one should use MZREPL instead
+of MZPUSH.
+
+New link words and new data words acquired by the bank
+are cleared to zero.
+
+Except for special cases,
+increasing the size of a bank is an expensive operation,
+and should be avoided.
+The correct solutions to the problems of indefinite number of objects
+or of indefinite size are either the use of a linear structure
+or the lifting of a bank of maximum size,
+which is reduced to the final size once the contents are complete.
+
+The increase of a bank is handled in general as follows:
+a new bank is lifted with the new dimensions,
+the contents of the original bank are copied over,
+and the old bank is marked as dropped.
+Any link pointing to the original bank must be re-routed
+to the replacement bank by MZPUSH.
+In full generality this can only be done by a relocation pass
+over all memory (ie. all link areas and all divisions pointing
+to the division in which the bank resides.)
+
+The expensive part in this operation is the relocation pass,
+and this can be saved under special circumstances:
+
+ a) Increasing the data part of the last bank in a forward division,
+or the link part in a reverse division,
+can be done in situ without the lifting of a new bank.
+Hence any link pointing to the bank remains valid.
+(However note: this is not a good reason for creating an extra
+division, because the lifting of a maximum size bank is
+a better solution.)
+
+ b) If there are no links pointing to the bank (except the
+standard structural support links)
+there is no point to scan all links,
+because the relocation pass would have no effect.
+However, ZEBRA could not detect this situation without actually
+performing the relocation pass,
+but the user may know the situation a priori,
+in which case he can signal it to MZPUSH with the I option.
+
+Reducing the size of a bank is less onerous (if
+the R option is given).
+The parameters of the original bank are adjusted to the
+new dimension in situ and the abandoned memory is marked as dead.
+Links which point into the abandoned region, if any,
+can only be reference links and must be reset to zero.
+To have links pointing into a bank, rather than to the status-word,
+is relatively rare.
+Again, the relocation pass can be saved,
+and for reducing a bank this is the normal situation,
+if the user knows the situation a priori and signals it to
+MZPUSH with the R option (or I which is stronger).
+
+MZPUSH prints a monitor log message at level 2,
+but if the operation involves a relocation pass a log message
+will be given at level 1.
+
+MZPUSH accumulates statistics of the number of times that an
+expensive operation was performed;
+this is printed by MZEND.
+
+\Filename{H2-MZREPL-connect-replacement-banks}
+\section{MZREPL - connect replacement banks}
+
+If one wants to replace a given 'old' bank in a data-structure
+by a 'new' bank,
+and if there are links elsewhere in the data-structure(s)
+or in link-areas pointing to the old bank,
+this is a non-trivial operation because these links
+have to be relocated to point to the new bank.
+Normally this can be done with MZPUSH,
+but not if the I/O descriptor has to change.
+For these cases MZREPL is provided.
+
+The user is supposed to lift and fill the 'new' bank and also a
+tiny 'index' bank with 2 (structural) links and 1 data word,
+recording the address of the old bank in link 1 and the address
+of the new bank in link 2.
+This index bank is handed to MZREPL which will then execute
+the necessary relocation, using the data word as working storage.
+
+If several such operations are needed one should not loop
+over calls to MZREPL, but construct a linear structure of
+index banks for MZREPL, which will then do all the replacements
+with one single relocation pass.
+Because of this feature MZREPL can be more economical than
+MZPUSH for multiple replacements.
+
+Both the old and the new banks are required to be in one single
+division, but the index banks may be in a different division.
+
+\ROUTA{CALL CALL MZREPL (IXDIV, *!LIX*, chOPT)}
+\begin{verbatim}
+with
+       IXDIV  index of the division; zero [or IXSTOR] allowed,
+              in which case MZREPL will find the division
+
+      *!LIX*  the address of the linear structure of the index banks.
+
+       chOPT  character string of options:
+
+                 default: drop the old and the index banks
+
+              K  keep the old and the index banks
+
+              I  isolated, as for MZPUSH
+\end{verbatim} 
+
+If one needs to keep the old banks beyond the call to MZREPL,
+note this: really all links pointing to the 'old' banks are
+relocated, and therefore one would loose access to the old banks.
+To overcome this the K option selects a special processing:
+before going into the relocation the link pointing to the
+old bank is saved into the data-word of the index bank
+(this works because there is no garbage collection involved);
+just before returning to the user all index banks are changed
+to have only 1 structural link restored to support the old bank,
+and link 2 continues to point to the corresponding new bank,
+but now as a reference link.
+
+Each old bank is changed to have zero structural links,
+the 'next' link is reset to zero, and the bank is made to
+depend from its index bank.
+
+When one has finished with the old banks one can drop the
+structure of index banks, thereby also dropping the old banks.
+
+The linear structure of index banks is re-ordered by MZREPL for
+increasing address of the old banks;
+LIX returns the address of the new first bank.
+
+
+\ul{Example}
+\begin{verbatim}
+
+   Replace all the banks of a linear structure.
+
+   LIX, LOLD, LNEW  are temporary links,
+   either in the working space or in a link area.
+
+   IXDIVA is the division index of the banks;
+   IXDIVX is the index of some short range division to hold the
+          index banks, division 1 by preference.
+
+      LIX = 0    clear LIX to start (reference link allowed)
+
+      LOLD = get the adr of the first old bank
+
+   24 CALL MZBOOK (IXDIVX, L, LIX,1, 'IXIX',2,2,1,0, -1)
+      LQ(LIX-1) = LOLD
+
+      CALL MZLIFT (IXDIVA, LNEW, LIX,-2, ...
+
+          fill the new bank at LNEW
+               ie. links LQ(LNEW-NL) to LQ(LNEW-1)
+                    data IQ(LNEW+1)  to IQ(LNEW+ND)
+               but not 'next', 'up', 'origin'
+
+      LOLD = LQ(LOLD)
+      IF (LOLD.NE.0)         GO TO 24
+
+      CALL MZREPL (IXDIVA, LIX, '.')
+\end{verbatim} 
+
+MZREPL prints a monitor log message at level 2.
+
+\Filename{H2-MZDROP-drop-bank-and-dependents}
+\section{MZDROP - drop a bank and its dependents}
+
+With MZDROP one may either drop the bank at L or,
+if the L option is given, the linear structure at L.
+Dropping a bank implies dropping also the whole partial
+data-structure which depends on this bank downwards.
+
+Dropped banks stay in memory with the IQDROP status-bit set,
+links pointing to them continue to do so,
+except for the immediate structural link indicated via the
+origin-link of the bank at L, which is bridged or reset to zero,
+whichever is appropriate.
+
+To drop one gives
+
+\ROUTA{CALL MZDROP (IXSTOR, !L, chOPT)}
+\begin{verbatim}
+with
+
+      IXSTOR  index of the store or of any division in this store,
+              zero for the primary store
+
+          !L  the address of the bank or linear structure to be dropped
+
+       chOPT  character string of options:
+
+                  default: drop the bank at L only,
+                  ie. the 'next' link of this bank is not followed
+
+               L  drop the linear structure pointed to by L
+                  ie. the 'next' link of the bank at L is followed
+
+               V  drop only the partial data-structure
+                  dependent vertically downwards from the bank at L,
+                  but not the bank itself.
+\end{verbatim} 
+MZDROP prints a monitor log message at level 2.
+
+The parameter L in the call to MZDROP is not as such changed
+on return,
+but if it is the structural link supporting the d/s it will
+in fact be up-dated for the removal of the first bank
+in this structure.
+
+Suppose this artifical sequence of operations (with LS=0 initially):
+\begin{verbatim}
+      CALL MZLIFT (0,L,LS,1,...)          create bank '3'
+      CALL MZLIFT (0,L,LS,1,...)          create bank '2'
+                                  LS now points to bank 2
+
+      CALL MZLIFT (0,L,LS,1,...)          create bank '1'
+                                  LS now points to bank 1
+
+      CALL MZDROP (0,LS,'.')              drop bank 1
+                                  LS now points again to bank 2
+
+if however the dropping is done with
+
+      CALL MZDROP (0,L,'.')               drop bank 1
+
+         then LS will be made to point to bank 2,
+         but L will continue to point to the (dead) bank 1.
+\end{verbatim}
+Since the parameter L in the call to MZDROP is not changed,
+selective dropping of banks in a linear structure can be done
+with a loop like this:
+\begin{verbatim}
+      L = start adr of the linear structure
+   12 IF (L.NE.0)  THEN
+          IF (bank not wanted)  CALL MZDROP (0,L,'.')
+          L = LQ(L)
+          GO TO 12
+        ENDIF
+\end{verbatim}
+
+\Filename{H2-MZWIPE-reset-complete-divisions-empty}
+\section{MZWIPE - reset complete divisions to empty}
+
+MZWIPE causes relocation normally.
+
+By calling MZWIPE the user can delete the contents of
+whole divisions:
+
+\ROUTA{CALL MZWIPE (IXWIPE)}
+
+with the parameter IXWIPE indicating the divisions
+of a particular store to be wiped out.
+IXWIPE may be any of the three possible forms of a division index:
+\begin{verbatim}
+  a) specific division index, as returned by MZDIV
+
+  b) generic division index, [ IXSTOR + ] n, where
+
+        n = 21:  all user short range divisions
+            22:  all user long  range divisions
+            23:  all package divisions
+
+  c) compound division index, as created by MZIXCO, see there for details.
+\end{verbatim} 
+
+IXWIPE = 0  is taken to mean IXWIPE = 21,
+ie. all short range divisions in the primary store;
+similarily IXSTOR+21 can be used.
+
+Wiping divisions resets the divisions to be empty,
+but without reducing the space reserved for them,
+followed by a relocation pass to reset to zero all links
+pointing into the wiped divisions.
+Included into this pass are the links of all link areas,
+of the working space and of all divisions which are declared
+to point to the divisions in question
+(all of this for one particular store only, of course).
+
+If several divisions are to be wiped out,
+this must be done by {\em one} call to MZWIPE,
+and not by several calls in succession,
+to save the time of multiple relocation passes,
+each of which would take longer than the single pass.
+
+\ul{Examples} (for the primary store)
+\begin{verbatim}
+  1) Wipe the last 'event':      CALL MZWIPE (0)
+
+  2) Wipe division 1:            CALL MZWIPE (1)
+
+  3) Wipe all user's divisions:  IX = MZIXCO (21,22,0,0)
+                                  CALL MZWIPE (IX)
+
+  4) Wipe divisions IX1, IX2, IX3, IX4, and IX5:
+
+                   IX = MZIXCO (IX1,IX2,IX3,IX4)
+                   IX = MZIXCO (IX,IX5,0,0)
+                   CALL MZWIPE (IX)
+\end{verbatim} 
+
+MZWIPE operates by calling MZGARB, which will print a monitor
+log message at level 2.
+
+\Filename{H2-MZGARB-garbage-collection-requested-by-user}
+\section{MZGARB - garbage collection requested by the user}
+
+Garbage collection is triggered by the system if there is not
+enough space to satisfy an MZWORK or MZLIFT request
+(hopefully this does not normally occur).
+Thus the user does not have to worry about initiating
+garbage collection to win space in the dynamic store.
+To remove the last event from the store,
+the user calls MZWIPE which is much more efficient
+than dropping the banks of the event followed by garbage collection.
+
+He may however occasionally want to force a garbage collection
+to tidy up his data,
+particularly during the initialization phase of his program.
+Again, as in MZWIPE, if there are several divisions to be tidied up,
+this must be done by {\em one} call to MZGARB.
+Also,
+if one or several divisions are to be wiped out at the same moment,
+this should be included into the call to MZGARB;
+one and the same relocation pass can handle wiping
+and garbage collection simultaneously.
+
+The calling sequence is:
+
+\ROUTA{CALL MZGARB (IXGARB,IXWIPE)}
+\begin{verbatim}
+with
+
+      IXGARB  index of the divisions where garbage
+              is to be collected (none if =0)
+
+      IXWIPE  index of the divisions to be wiped out
+              = 0:  no divisions to be wiped
+\end{verbatim} 
+
+Both IXGARB or IXWIPE may be any of the three possible forms
+of a division index:
+\begin{verbatim}
+  a) specific division index, as returned by MZDIV
+
+  b) generic division index, [ IXSTOR + ] n, where
+
+        n = 21:  all user short range divisions
+            22:  all user long  range divisions
+            23:  all package divisions
+
+  c) compound division index, as created by MZIXCO, see there for details.
+\end{verbatim} 
+
+MZGARB prints a monitor log message at level 2,
+but if the operation involves a garbage collection
+a message is given at level 1.
+
+\Filename{H2-MZXREF-set-cross-reference-between-divisions}
+\section{MZXREF - set cross-reference between divisions}
+
+To save time when wiping a given division (or divisions),
+and also on garbage collection,
+ZEBRA will relocate the links of only those divisions
+which reference the division(s) being changed.
+To know which division may have links pointing
+to which other division,
+ZEBRA keeps internally a cross-reference matrix;
+the entry for a given division is intialized by MZDIV
+and this may be modified by the user calling MZXREF:
+
+\ROUTA{CALL MZXREF (IXFROM,IXTO,chOPT)}
+\begin{verbatim}
+with
+
+      IXFROM  index of the division which contains links pointing
+              to the divisions indicated by IXTO;
+              this must be the index of one particular division.
+
+        IXTO  index of the division(s) which are referenced
+
+       chOPT  character string of options:
+
+            none  set reference(s), ie. overwrite the previous
+                  content of the matrix entry
+               A  add reference(s), ie. add to the matrix entry,
+                  keeping what was there before
+               R  remove reference(s), ie. take the references
+                  out from the matrix entry, but keep the others
+                  (R over-rules A)
+               C  contained division, ie. clear the matrix entry
+                  (C over-rules A and R)
+
+      IXTO may be any of the three possible forms of a division index:
+
+        a) specific division index, as returned by MZDIV
+
+        b) generic division index, [ IXSTOR + ] n, where
+
+              n = 21:  all user short range divisions
+                  22:  all user long  range divisions
+                  23:  all package divisions
+                  24:  the system division
+
+        c) compound division index as created by MZIXCO.
+\end{verbatim} 
+
+MZDIV creates a division with its matrix row initialized
+(unless C option) as follows:
+\begin{verbatim}
+      user division:  references all other user divisions
+      package div.:  no references at all
+\end{verbatim} 
+
+Note: if division FR contains a bank which supports structurally
+banks in division TO,
+then the forward links point from division FR to division TO,
+but there are also the reverse links in the supported banks
+which point from division TO to division FR.
+As a result one would need both
+\begin{verbatim}
+          CALL MZXREF (IXFR,IXTO,'A')
+     and  CALL MZXREF (IXTO,IXFR,'A')
+
+\end{verbatim} 
+\ul{Examples} \hspace*{4mm} (for the primary store)
+
+\begin{verbatim}
+  1) User's division IXTHIS may reference all other user divisions:
+
+         nothing needs to be done, this is the default assumption
+
+  2) Division IXTHIS references only banks in division 2:
+
+                   CALL MZXREF (IXTHIS, 2, '.')
+
+  3) Division IXTHIS references only, but maybe all,
+     the short-range divisions:
+
+                   CALL MZXREF (IXTHIS, 21, '.')
+
+  4) Division IXTHIS references all short-range divisions
+     and also the long-range division IXLONG:
+
+                   CALL MZXREF (IXTHIS, 21, '.')
+                   CALL MZXREF (IXTHIS, IXLONG, 'A')
+
+  5) Division IXTHIS to reference all short-range divisions
+     except the division IXSH:
+
+                   CALL MZXREF (IXTHIS, 21, '.')
+                   CALL MZXREF (IXTHIS, IXSH, 'R')
+\end{verbatim} 
+\vspace{4mm}
+To print the matrix entry for one particular division,
+or the complete cross-reference matrix of a store, one may
+
+\ROUTA{CALL MZXRPR (IXDIV)}
+\begin{verbatim}
+with
+
+       IXDIV  1) index of the division to be shown
+              2) = IXSTOR, index of the store to be shown
+\end{verbatim} 
+
+\Filename{H2-MZIXCO-create-compound-division-index}
+\section{MZIXCO - create compound division index}
+
+A compound division index permits to indicate several divisions
+of the same store in one single word,
+as used with MZWIPE for example.
+
+MZIXCO joins up to four division indices into a compound:
+
+\ROUTA{IXCO = MZIXCO (IX1,IX2,IX3,IX4)}
+
+If less than 4 indices are to be joined trailing zeros
+should be given.
+If more than 4 indices are to be joined this is done by
+repeated calls.
+
+Any input parameter IXn may take any one of the three possible
+forms of a division index:
+\begin{verbatim}
+  a) specific division index, as returned by MZDIV
+
+  b) generic division index, [ IXSTOR + ] n, where
+
+        n = 21:  all user short range divisions
+            22:  all user long  range divisions
+            23:  all package divisions
+            24:  the system division
+
+  c) compound division index, created by a previous call to MZIXCO.
+
+\end{verbatim} 
+\ul{Examples} \hspace*{2mm}  (for the primary store)
+\begin{verbatim}
+  1) Compound to give divisions 1 and 2:
+
+                   IXCO = MZIXCO (1,2,0,0)
+
+  2) Compound to give divisions 1, 2, and IXHITS:
+
+                   IXCO = MZIXCO (1,2,IXHITS,0)
+
+  3) Compound to give all short-range divisions and IXCUMU:
+
+                   IXCO = MZIXCO (21,IXCUMU,0,0)
+
+[ 4) Compound to give all user divisions of the store
+     whose index is IXSTOR:
+
+                   IXCO = MZIXCO (IXSTOR+21,IXSTOR+22,0,0) ]
+\end{verbatim} 
+
+{\large\bf Format of the division index}
+\begin{verbatim}
+
+      bits 25, 26, 32    non-zero is illegal
+
+      bit 31  zero:     simple index
+              one:     compound index
+
+      bits 27-30 :     the number of the store,
+                         zero for the primary store
+
+Division JDIV is selected if
+
+     simple index:      the value of bits 1-24 is JDIV
+   compound index:      bit JDIV is present
+
+JDIV may be 1 to 20 for that particular division,
+         or it may be generic with:
+
+          JDIV = 21:  user's short range divisions
+                 22:  user's  long range divisions
+                 23:  package divisions
+                 24:  system division
+\end{verbatim} 
+
+\Filename{H2-MZFORM--handle-IO-characteristic}
+\section{MZFORM {\it et al.} - handle the I/O characteristic}
+
+MZFORM may cause garbage collection.
+
+The nature of the contents of any bank which is to be transported
+from one computer to another one has to be indicated to ZEBRA,
+such that it can do the necessary tranformations.
+In the simplest case that all the data words of a bank are
+of the same type, this is easily indicated in the parameters
+to MZLIFT or MZBOOK.
+For anything more complicated the user specifies the "format"
+of the bank by calling MZIOBK or MZFORM which encode the format
+into a variable number of words to be included into each bank
+in the system part as the "I/O characteristic".
+
+Thus the content description is carried by each bank;
+this avoids complicated logistics of finding bank descriptors
+elsewhere than in the bank itself.
+Complex bank contents require a relatively large number
+of extra system words.
+This could represent a substantial overhead on memory
+or file space occupation,
+which the user can avoid in the design of his bank contents.
+Anyway, the number of these extra descriptor words is limited to 16,
+and any descriptor which would need more is refused.
+Thus ZEBRA will not handle any arbitrary bank contents
+via this basic procedure,
+but by using the concept of the "self-describing" sector (see below)
+the user can indeed store any kind of information mix,
+decided at execution time, into a bank and have it travel
+from one computer to another one.
+
+{\large\bf Sectors}
+
+The basic element for setting up an I/O characteristic is the sector,
+which is a number of words consecutive in the bank which are
+all of the same type.
+A sector is described in the "format" parameter to MZFORM {\it et al.}
+as a combination of its word-count "c" and its type "t" as  "ct".
+For example:
+24F is a sector of 24 single-precision floating-point numbers,
+24D is a sector of 24 words holding 12 double-precision numbers,
+and  1I is a sector of one integer word.
+
+The possible values for "t" are:
+\begin{verbatim}
+      t =  B   bit string of 32 bits, right justified
+           I   integer
+           F   floating-point
+           D   double precision
+           H   4-character Hollerith
+           S   self-describing sector (see below)
+\end{verbatim} 
+A "static" sector is a sector of a fixed number of words,
+such as the 24F of the example above.
+
+An "indefinite-length" sector is a sector whose end is defined
+by the end of the bank.
+This is written as  --t, for example  --F  signals that the rest
+of the bank is all floating-point words.
+
+A "dynamic" sector is a sector which is preceded in the bank
+by a single positive integer word indicating the sector length;
+if this number is zero this means that the rest of
+the bank is currently unused.
+This is written as  *t, for example  *F  indicates
+a dynamic sector of type floating.
+
+
+Thus the word-count "c" in the sector specification is written as:
+\begin{verbatim}
+      c =  n   numeric, n words:       static length sector
+           -   all remaining words:    indefinite length sector
+           *   dynamic length sector
+\end{verbatim} 
+A "self-describing" sector is a dynamic sector whose type
+is also encoded into the one word preceding the sector as
+\begin{verbatim}
+   word 0  =  16*NW + IT
+
+      with  NW = length of the sector
+            IT = numeric representation of the type
+                 =  1  B bit string    2  I integer
+                    3  F floating      4  D double precision
+                    5  H Hollerith
+                    6  (reserve)       7  (special)
+\end{verbatim} 
+The form "nS" is meaningless;
+the form "*S" indicates one particular sector;
+the form "--S" is {\em special} in that it indicates
+that the rest of the bank is filled by self-describing sectors,
+as many as there may be.
+(Thus the forms, for example, '4I 5F / *S' and '4I 5F --S' are
+equivalent, but the second form is more economic;
+the user may give either, the internal result will be the
+second form.)
+
+\vspace{4mm}
+{\large\bf Complete Characteristics}
+
+Looking now at the bank as a whole,
+we divide it into a "leading part" and a "trailing part",
+either of which may be empty.
+
+The leading part consists of one region of maybe several sectors,
+occurring once at the beginning of the bank.
+This leading region may end with an indefinite-length sector,
+in which case the trailing part is empty.
+
+The trailing part of the bank may be empty or it may consist
+of an indefinite number of regions which
+{\em all have the same structure},
+such that the same format description is valid for all of them.
+
+The symbol "/" marks the break between the leading region
+and the trailing regions in the format parameter to MZFORM {\it et al.}
+
+\ul{Examples}
+\begin{verbatim}
+trailing part empty:
+
+      '-F'         the whole bank is floating
+      '3I -F'      the first 3 words are integer, the rest is F
+      '*I -F'      the first word n=IQ(L+1) is a positive integer,
+                   words 2 to n+1 are integers, the rest is F
+      '3B *I -F'   the first sector consists of 3 words bit-string,
+                   the second sector is dynamic of type integer,
+                   the rest of the bank is floating
+      '3I *F'      the first 3 words are integer, followed by a
+                   dynamic sector of type F, the rest (if any) of
+                   the bank is currently unused
+\end{verbatim} 
+
+\begin{verbatim}
+
+both parts present
+
+      '3B 7I / 2I 4F 16D'  the leading region has 3 B and 7 I words,
+                           each trailing region consists of 2 integer
+                           words, followed by 4 F words, followed
+                           by 16 D words, ie. 8 double-precision numbers
+      '4I / *H'    the bank starts with 4 integer words,
+                   the rest is filled with dynamic Hollerith sectors
+      '*I / 2I *F' the leading region is one dynamic I sector,
+                   each trailing region consists of 2 integers
+                   followed by a dynamic F sector
+                   (ie. 3 integers plus a number of floating words
+                    this number being indicated by the 3rd integer)
+
+leading part empty
+
+      '/ *H'       the bank is filled with dynamic Hollerith sectors
+      '/ 4I 29F'   4 integers and 29 floating numbers alternate
+\end{verbatim} 
+\cleardoublepage  % continue on next odd page
+\ul{Economic formats}
+
+It is in the interest of the user to design his bank contents
+such that the I/O characteristic is as simple as possible,
+because the number of system words in any bank increases
+with the complexity of the lay-out.
+"Simple" means: as few sectors to be described as possible.
+\begin{verbatim}
+For example:  '2B 2I 2B 2I 2B 2I -F' is much less simple then
+               '6B 6I -F'.
+\end{verbatim} 
+Moreover, if the integers described by this format are sure to
+be positive integers, then one can use the even simpler form
+{\tt '12B -F'}.
+
+In the following we give an exhaustive list of the most
+economic bank formats, those requiring zero or one extra system
+word in the banks.
+
+\ul{Zero extra I/O words}
+
+These bank formats can be described by the 16 bits of the
+I/O control-byte alone:
+\begin{verbatim}
+   (0)  '-t' or '*t'
+        'ct -t'           if c < 64   (c=* is represented as c=0,
+          or 'ct *t'                   hence  '*t -t'  is a sub-case)
+   (1)  '*t *t -t'
+   (2)  '*t *t *t'
+   (3)  'ct / *t'         if c < 64
+        '/ ct *t'         if c < 64
+        '/ ct'            this is useful only if c=*
+                          else the form '-t' is used
+   (4)  '*t / *t *t'
+        '*t *t / *t'
+   (5)  '/ *t *t *t'
+\end{verbatim} 
+\ul{One extra I/O word}
+
+These bank formats can be described by the 16 bits of the
+I/O control-byte plus the 32 bits of one extra I/O word:
+\begin{verbatim}
+   (1)  'ct -t'
+        'ct ct -t'        if c < 65536
+        'ct ct ct -t'     if c < 1024
+   (2)  'ct *t'
+        'ct ct *t'        if c < 65536
+        'ct ct ct *t'     if c < 1024
+   (4)  'ct / ct'         if c < 65536
+        'ct / ct ct'      if c < 1024
+        'ct / ct ct ct'   if c < 256
+        'ct ct / ct'      if c < 1024
+        'ct ct / ct ct'   if c < 256
+   (5)  '/ ct ct'         if c < 65536
+        '/ ct ct ct'      if c < 1024        (remember:
+        '/ ct ct ct ct'   if c < 256          c=0 means c=*)
+\end{verbatim} 
+
+
+Three routines are provided to mediate between the user
+specifying the bank format in a readable form
+and the highly encoded I/O characteristic
+to be included into any bank at creation time.
+
+{\large\bf MZIOCH}
+
+analyses the format chFORM to convert and pack it into
+the output vector IOWDS.
+This is the basic routine,
+but it is usually called by the user only to specify formats
+of objects other than banks, like the user header vector for FZOUT.
+
+To specify bank formats the following two routines serve more
+conveniently:
+
+{\large\bf MZIOBK}
+
+is provided for the context of MZLIFT;
+like MZIOCH it analyses the format chFORM,
+but it stores the result as part of the bank-description vector
+NAME for MZLIFT.
+
+{\large\bf MZFORM}
+
+again analyses the format chFORM,
+but it does not return the result to the user.
+Instead,
+it remembers the I/O characteristic in a system data-structure,
+returning to the user only the index to the characteristic
+in the system.
+The user may then either pass this index to MZBOOK (or MZLIFT)
+at bank creation time,
+or alternatively he may request MZBOOK (or MZLIFT) to search
+the system data-structure for the I/O characteristic
+associated to the Hollerith identifier IDH of the bank to be
+created.
+
+The first word of the I/O characteristic delivered by MZIOCH or
+MZIOBK has the following redundant format:
+\begin{verbatim}
+          |       16       |    5    |     5     | 6 bits|
+          |----------------------------------------------|
+          |  control-byte  |  NWXIO  |  NWXIO+1  |     1 |
+          |----------------|---------|-----------|-------|
+
+\end{verbatim}
+The I/O index delivered by MZFORM has the following format:
+\begin{verbatim}
+          |       16       |    5    |     5     | 6 bits|
+          |----------------------------------------------|
+          |      index     |    0    |  NWXIO+1  |     2 |
+          |----------------|---------|-----------|-------|
+\end{verbatim} 
+where NWXIO is the number of extra I/O words,
+ie. the total length of the characteristic is NWXIO+1.
+
+\ul{Typing rules for chFORM}
+
+The format should be typed giving the "ct" for each sector,
+in the order in which they occur in the bank, as shown in the
+examples.
+Leading, interspersed, and trailing blanks (also comma or dot)
+for aeration are allowed and ignored.
+
+Single-word sectors must be typed as '1t', 't' alone is illegal.
+
+The c for double-precision sectors gives the number of words,
+thus 14D specifies 7 double-precision numbers; 7D is illegal.
+
+\ROUTA{CALL MZIOCH (IOWDS*,NWIO,chFORM)}
+\begin{verbatim}
+with       IOWDS*  the I/O words to receive the result,
+                   a vector dimensioned to NWIO
+
+             NWIO  the maximum size of IOWDS, < 17
+
+           chFORM  the format as a CHARACTER string
+
+\end{verbatim} 
+\ROUTA{CALL MZIOBK (NAME*,NWMM,chFORM)}
+\begin{verbatim}
+with        NAME*  the bank description vector for MZLIFT,
+                   the resulting characteristic will be stored
+                   into the I/O words starting at NAME(5),
+                   the IDH contained in NAME(1) will be used
+                   if diagnostics are necessary,
+                   a vector dimensioned to NWMM
+
+             NWMM  the maximum size of NAME, < 21
+
+           chFORM  the format as a CHARACTER string
+
+\end{verbatim} 
+\ROUTA{CALL MZFORM (chIDH,chFORM,IXIO*)}
+\begin{verbatim}
+with        chIDH  the Hollerith IDH of the bank, type CHARACTER
+
+           chFORM  the format as a CHARACTER string
+
+            IXIO*  returns the index to the characteristic stored
+                   in a system data-structure,
+                   this can be passed to MZBOOK/MZLIFT,
+                   in which case it must not be modified
+\end{verbatim} 
+
+\ul{Examples}
+\begin{verbatim}
+      DIMENSION    IOHEAD(4), MMLIFT(8)
+
+      CALL MZIOCH (IOHEAD,4, '8I -F')             for an FZIN user header
+      CALL MZIOBK (MMLIFT,8, '2I / 2I 8F')        for MZLIFT
+      CALL MZFORM ('RCBC', '2I/2I 8F'), IORCBC)   for reference by index
+\end{verbatim} 
+
+People creating data outside Zebra,
+but destined to be read by FZ of Zebra,
+will have to know the representation of the I/O characteristic
+stored into any bank:
+
+The physically first word of any bank contains:
+
+\begin{verbatim}
+   right half:  NOFF = NIO + NL + 12
+   (bits 1-16)   where  NIO: the number of extra
+                              I/O descriptor words for the bank
+                        NL: the number of links in the bank
+
+
+   left half:   the I/O control byte, which controls the
+   (bits 17-32)  interpretation of the I/O characteristic
+\end{verbatim} 
+
+In the simplest cases the I/O control byte alone specifies
+the nature of the data in the bank, without needing extra
+descriptor words (in which case NIO is zero).
+We give here the translation of some of these cases:
+
+\begin{verbatim}
+       -B:  0001             *B:  0009
+       -I:  0002             *I:  000A
+       -F:  0003             *F:  000B
+       -D:  0004             *D:  000C
+       -S:  0007
+\end{verbatim} 
+
+For example: suppose one were to prepare a bank with
+two links and 4000 data words which are all un-signed
+32-bit integer (type B), a bank which is to travel
+in link-less mode such that all standard links are zero:
+
+\begin{verbatim}
+   word 1   0001 000E     -B | NOFF = 14
+        2   zero          link 2
+        3   zero               1
+        4   zero          link next
+        5   zero               up
+        6   zero               origin
+        7   IDN           numeric ID
+        8   IDH           Hollerith ID
+        9   2             number of links
+       10   1, say        number of structural links
+       11   4000          number of data words
+       12   zero          status word
+                          bits 19-22 give NIO, here zero
+       13   data word 1
+            ...
+     4012   data word 4000
+\end{verbatim} 
+
+Note that the status word contains NIO on bits 19--22
+to allow Zebra to reach the start-of-bank.
+
+It is impraticable to tabulate the translation of more
+complicated formats. There is a little program DIOCHAR
+to interactively take a format chFORM, translate it
+and display the result in hexadecimal.
+This is not yet properly installed on the CERN machines,
+but on the Apollo people at CERN can run it by giving
+the command {\em  /user/zoll/uty/diochar}
+
+\smark{MZIOTC}
+The subroutine MZIOTC is provided to convert an encoded
+IO characteristic back into printable form.
+One may hand to this routine the address of a bank and
+receive its IO characteristic in a {\tt CHARACTER} variable.
+Alternatively one may pass to it an integer array as delivered
+by MZIOCH for back-conversion to {\tt CHARACTER},
+for example the IO characteristic of a user-header vector
+read with FZIN.
+
+\ROUTBS{CALL MZIOTC (IXST, !L, NCHTR*, chIOTR*)}
+       {CALL MZIOTC (IOWDS, 0, NCHTR*, chIOTR*)}
+\begin{verbatim}
+with         IXST  the index of the store holding the bank,
+                          or of any of its divisions
+               !L  the address of the bank
+
+            IOWDS  the integer array with the encoded characteristic
+                   (L must be zero in this case)
+
+           NCHTR*  number of useful characters stored into chIOTR
+                   = 0 if trouble
+
+          chIOTR*  the CHARACTER variable to receive the characteristic
+\end{verbatim} 
+The routine returns zero in NCHTR if L is non-zero and not
+a valid bank address,
+or if chIOTR is not long enough.
+
+\Filename{H1-MZ-Data structure utilities}
+\chapter{Data structure utilities}
+\label{sec:H1-Data-structure-utilities}
+
+\Filename{H2-MZFLAG-logical-walk-through-data-structure}
+\section{MZFLAG {\it et al.} - logical walk through a data-structure}
+
+By following the structural links,
+MZFLAG sets the selected status-bit into the status words
+of all the banks of the data-structure supported
+by the down-links of the specified start bank.
+Optionally it can include into the marking
+also the banks of the linear structure supported
+by link 0 of the start bank and all their dependents.
+The start bank itself may or may not be marked.
+
+The request is
+
+\ROUTA{CALL MZFLAG (IXSTOR,!L,IBIT,chOPT)}
+\begin{verbatim}
+with
+      IXSTOR  index of the store or of any division in this store,
+              zero for the primary store
+
+          !L  address of the start bank supporting
+              the partial data-structure; no action if L=0.
+
+        IBIT  the bit-number of the status-bit to be set
+
+       chOPT  character string of options:
+
+         default  mark the bank at L (and its down dependents),
+                  the 'next' link of this bank is not followed,
+                  status-bit ITBIT is set to one
+
+               L  mark the linear structure pointed to by L
+                  ie. the 'next' link of the bank at L is followed
+
+               V  mark only the partial data-structure
+                  dependent vertically downwards from the bank at L,
+                  but not the bank itself
+
+               Z  set to zero bit IBIT in each bank to be marked
+\end{verbatim} 
+
+MZFLAG will store into the two words of the common /ZLIMIT/
+the addresses of the lowest and of the highest bank marked
+during the scan, ready for use by the table-building routines
+of FZOUT for example.
+
+MZFLAG is not a routine commonly called directly by the users;
+its main current use is as a service routine to MZDROP.
+
+Similarly, the routine MZMARK described below
+is not normally needed by the users except for a special problem
+mentioned there.
+MZMARK is also used as a service routine by FZOUT.
+
+The function MZVOLM walks through a data-structure to calculate
+the space occupied, returning the number of words as the function value.
+
+\ROUTA{NWORDS = MZVOLM (IXSTOR,!L,chOPT)}
+\begin{verbatim}
+with
+      IXSTOR  index of the store or of any division in this store,
+              zero for the primary store
+
+          !L  address of the start bank supporting
+              the partial data-structure; no action if L=0.
+
+       chOPT  character string of options:
+
+         default  the 'next' link of the bank at L is not followed
+
+               L  the 'next' link of the bank at L is followed
+
+
+\end{verbatim} 
+
+\ul{Example} for MZFLAG:
+
+\begin{verbatim}
+      CALL MZFLAG (0,LQMAIN,IQDROP,'L')
+\end{verbatim} 
+
+this will scan the banks of the data-structure supported by
+the bank at LQMAIN and its sisters (option L),
+setting the system bit IQDROP to be 'on' in each bank found.
+This is equivalent to CALL MZDROP (0,LQMAIN,'L'),
+except that it does not set the contents of the word LQMAIN to zero.
+
+\vspace*{5mm}
+\ul{Example} for MZMARK:
+
+\begin{verbatim}
+      PARAMETER  (NID=3)
+      DIMENSION  IDLIST(NID)
+      DATA       IDLIST  /  4HBGO , 4HTEC  , 4HMUC  /
+
+      CALL MZMARK (0,LQMAIN,'L-',NID,IDLIST)
+\end{verbatim} 
+this will scan the banks of the data-structure supported by
+the bank at LQMAIN and its sisters (option L),
+but exclude (option --) from the scan any lower level linear structure
+starting with a bank whose IDH is any of BGO, TEC, MUC
+(and its dependents),
+setting in each bank found system status bit IQMARK to be 'on'.
+
+The primary purpose of MZMARK is to give the user a possibility
+to select parts of a data-structure for output with FZOUT.
+The selection works on IDH, the Hollerith ID, of the first bank
+of each linear sub-structure of the full data-structure.
+For convenience,
+one may give to MZMARK either the list of the IDH's to be included
+into the scan, or the list of the IDH's to be excluded from the scan;
+hopefully one gets away with a short list by selecting the right
+mode.
+
+MZMARK is a modified version of MZFLAG, it is simpler in that
+the bit-number and the bit value are not parameterized:
+the bit is IQMARK and the value is 1, as needed by FZOUT;
+it is more complex in that linear structures can be selected
+or anti-selected.
+
+The request is
+
+\ROUTA{CALL MZMARK (IXSTOR,!L,chOPT,NID,IDLIST)}
+\begin{verbatim}
+with
+      IXSTOR  index of the store or of any division in this store,
+              zero for the primary store
+
+          !L  address of the start bank supporting
+              the data-structure; no action if L=0.
+
+       chOPT  character string of options:
+
+         default  mark the bank at L (and its down dependents),
+                  the 'next' link of this bank is not followed,
+                  lower level linear structures are accepted only
+                     if they start with a bank whose IDH appears in
+                     the list IDLIST (or if NID=0)
+
+               L  mark the linear structure pointed to by L
+                  ie. the 'next' link of the bank at L is followed
+
+               V  mark only the partial data-structure
+                  dependent vertically downwards from the bank at L,
+                  but not the bank itself
+
+               -  accept a lower level linear structure only if
+                  it starts with a bank whose IDH does
+                  n o t  appear in IDLIST
+
+      NID       number of elements in the list IDLIST,
+                if =zero all banks are accepted ('-' option ignored)
+
+      IDLIST    list of the Hollerith ID for selection
+\end{verbatim} 
+
+On return IQUEST(2) contains the total number of words
+occupied by all the banks marked (unless L is zero on entry).
+
+As for MZFLAG, the addresses of the lowest and the highest
+bank are stored into /ZLIMIT/, ready for FZOUT.
+
+\Filename{H2-LZHEAD-find-first-bank-of-linear-structure}
+\section{LZHEAD - find the first bank of a linear structure}
+
+This routine will try to find the first bank of the linear
+structure of which the bank at LGO is a member.
+It does this by following the path indicated by the "origin"
+link of the bank at LGO, and using its "up" link.
+
+
+\ROUTA{!LF = LZHEAD (IXSTOR,!LGO)}
+
+
+It returns the address of the first bank of the linear structure
+as the function value; or zero if there is trouble.
+
+If the linear structure is not a top-level structure,
+ie. if the up-link LUP is non-zero, the path of origin-links should
+end in the link region of the bank at LUP, at a word whose
+off-set JBIAS can then be calculated. This is returned:
+\begin{verbatim}
+      IQUEST(1) negative:  = JBIAS
+\end{verbatim}
+ie. LQ(LUP+JBIAS) contains the address of the first bank of the
+linear structure.
+
+If LUP is zero, the origin-path should end at a word outside
+the bank space of the store IXSTOR, which word
+should contain the address of the first bank of the linear structure.
+In this case LZHEAD returns:
+\begin{verbatim}
+      IQUEST(1) = 1: top-level structure
+      IQUEST(2) = LS, relative adr of the supporting link-area link,
+                      ie. LQ(LS) contains LF
+\end{verbatim}
+
+If LUP is zero, and if the origin-link in the last bank in the path
+is zero, this is a stand-alone structure, in which case LZHEAD returns:
+\begin{verbatim}
+      IQUEST(1) = 2: stand-alone structure
+\end{verbatim}
+
+If there is trouble, LZHEAD will return the function value zero,
+and set:
+\begin{verbatim}
+      IQUEST(3) = 1   if LGO is zero
+
+                  2   if LUP non-zero and the last origin-link
+                      points outside bank-space
+
+                  3   if LUP non-zero and LQ(LUP+JBIAS) does not
+                      point to the last bank in the origin-path
+
+                  4   if LUP zero, and LQ(LS) does not point to
+                      the last bank in the origin-path.
+\end{verbatim}
+
+\Filename{H2-ZSHUNT-change-structural-relation}
+\section{ZSHUNT - change structural relation}
+
+Unlike in HYDRA, and because of the reverse pointers,
+the operation of moving a bank by re-linking from one data-structure
+to another one is a non-trivial operation.
+The routine ZSHUNT is provided to execute such an operation.
+
+ZSHUNT may be used to extract either a single bank (IFLAG=0)
+or a whole linear structure (IFLAG=1) from the old context,
+for insertion into the new context as described by the parameters
+LSUP and JB, which have the same significance as in MZLIFT.
+
+\ROUTA{CALL ZSHUNT (IXSTOR,!LSH, !LSUP,JB,IFLAG)}
+\begin{verbatim}
+with
+      IXSTOR  index of the store, zero for the primary store;
+              IXDIV, the index of the division containing
+              the bank to be shunted, may be given instead
+
+        !LSH  address of the bank or of the linear structure
+
+       !LSUP  if JB < 1:  address of the new supporting bank
+              if JB = 1:  the new supporting link*
+
+          JB  if JB < 1:  link bias in the new supporting bank
+              if JB = 1:  LSUP is the new supporting link,
+                           the origin-link in the bank at LSH
+                           will be made to point to it
+              if JB = 2:  detach without insertion
+
+       IFLAG  if IFLAG = 0:  shunt the one single bank at LSH
+              if IFLAG = 1:  shunt the whole linear structure
+                              pointed to by LSH
+\end{verbatim} 
+If the bank or the structure to be re-linked is in fact inserted
+or added into an existing linear structure,
+both must be contained in the same division.
+
+\ul{Examples}
+
+Suppose we have the following data-structures to start with:
+
+\begin{verbatim}
+       ______
+      |      |                         up
+      |  UA  | <---.-------------.-------------.
+      |______|     |             |             |
+         |         |             |             |
+      -3 |         |             |             |
+         |       ______        ______        ______
+         |      |      |  <-- |      |  <-- |      |
+         `----> |  A1  | ---> |  A2  | ---> |  A3  |
+                |______|      |______|      |______|
+
+and
+       ______
+      |      |                              up
+      |  UN  | <---.-------------.-------------.
+      |______|     |             |             |
+         |         |             |             |
+      -7 |         |             |             |
+         |       ______        ______        ______
+         |      |      |  <-- |      |  <-- |      |
+         `----> |  N1  | ---> |  N2  | ---> |  N3  |
+                |______|      |______|      |______|
+
+
+and
+                    ______        ______        ______
+              <--- |      |  <-- |      |  <-- |      |
+      LQMAIN  ---> |  X1  | ---> |  X2  | ---> |  X3  |
+                   |______|      |______|      |______|
+\end{verbatim} 
+Any bank may support further dependent partial data-structures,
+the corresponding structural down-links are not changed
+by ZSHUNT.
+
+In what follows the notation  Lxx  is used to designate
+a link pointing to bank xx.
+
+\ul{Example 1} \hspace{12mm} CALL ZSHUNT (0,LA2,LUN,-7,0)   \hspace{5mm} gives:
+\begin{verbatim}
+       ______
+      |      |
+      |  UA  | <---.-------------.
+      |______|     |             |
+         |         |             |
+      -3 |         |             |
+         |       ______        ______
+         |      |      |  <-- |      |
+         `----> |  A1  | ---> |  A3  |
+                |______|      |______|
+and
+       ______
+      |      |
+      |  UN  | <---.-------------.-------------.-------------.
+      |______|     |             |             |             |
+         |         |             |             |             |
+      -7 |         |             |             |             |
+         |       ______        ______        ______        ______
+         |      |      |  <-- |      |  <-- |      |  <-- |      |
+         `----> |  A2  | ---> |  N1  | ---> |  N2  | ---> |  N3  |
+                |______|      |______|      |______|      |______|
+\end{verbatim} 
+
+This moves a single bank (with is dependents, if any) out of
+a linear structure, and inserts it at the head of the linear
+structure supported by link -7 of the bank UN.
+
+\vspace{4mm}
+\ul{Example 2} \hspace{12mm} CALL ZSHUNT (0,LA2,LUN,-7,1)   \hspace{5mm} gives:
+\begin{verbatim}
+       ______
+      |      |
+      |  UA  |
+      |______|
+         |
+      -3 |
+         |       ______
+         |      |      |
+         `----> |  A1  |
+                |______|
+and
+  ______
+ |      |
+ |  UN  |  <--.-------------.-------------.------------------.
+ |______|     |             |             |                  |
+    |         |             |             |                  |
+ -7 |         |             |             |                  |
+    |       ______        ______        ______             ______
+    |      |      |  <-- |      |  <-- |      |  <- ... - |      |
+    `----> |  A2  | ---> |  A3  | ---> |  N1  | -- ... -> |  N3  |
+           |______|      |______|      |______|           |______|
+\end{verbatim} 
+This is the same as example 1, except that the (partial) linear
+structure starting with bank A2 is re-linked.
+
+
+\ul{Example 3} \hspace{12mm} CALL ZSHUNT (0,LA2,LN2,0,0)    \hspace{5mm} gives:
+\begin{verbatim}
+       ______
+      |      |
+      |  UN  | <---.-------------.-------------.-------------.
+      |______|     |             |             |             |
+         |         |             |             |             |
+      -7 |         |             |             |             |
+         |       ______        ______        ______        ______
+         |      |      |  <-- |      |  <-- |      |  <-- |      |
+         `----> |  N1  | ---> |  N2  | ---> |  A2  | ---> |  N3  |
+                |______|      |______|      |______|      |______|
+\end{verbatim} 
+This is again like example 1, but the bank is inserted inside
+the linear structure, rather than ahead of it.
+
+\vspace{4mm}
+\ul{Example 4} \hspace{12mm} CALL ZSHUNT (0,LA2,LQMAIN,1,0) \hspace{5mm} gives:
+\begin{verbatim}
+                  0             0             0             0
+                  ^             ^             ^             ^
+                  |             |             |             |
+                 ______        ______        ______        ______
+         <----  |      |  <-- |      |  <-- |      |  <-- |      |
+  LQMAIN -----> |  A2  | ---> |  X1  | ---> |  X2  | ---> |  X3  |
+                |______|      |______|      |______|      |______|
+\end{verbatim} 
+
+This relinks bank A2 to be the first in the top-level linear
+structure supported by LQMAIN.
+
+\vspace{4mm}
+\ul{Example 5}
+\begin{verbatim}
+          L = LQMAIN
+          CALL ZSHUNT (0,LA2,L,1,0)
+\end{verbatim} 
+has exactly the same effect as Example 4 above because,
+LQMAIN not being zero initially,
+the origin-link of the bank pointed to by L
+(and the up-link, but this is zero)
+is used for the connection.
+
+
+\ul{Example 6} \hspace{12mm} CALL ZSHUNT (0,LA1,LHEAD,1,1)  \hspace{5mm} gives:
+\begin{verbatim}
+       ______
+      |      |
+      |  UA  |
+      |______|
+         |
+      -3 |
+         |
+          ----> zero
+
+and               0             0             0
+                  ^             ^             ^
+                  |             |             |
+                 ______        ______        ______
+         <----  |      |  <-- |      |  <-- |      |
+  LHEAD  -----> |  A1  | ---> |  A2  | ---> |  A3  |
+                |______|      |______|      |______|
+\end{verbatim} 
+
+supposing LHEAD=0 initially; this connects the linear structure
+to the (structural) link LHEAD, ie. the origin-link of the header bank A1
+points back to the location of LHEAD.
+
+\vspace{4mm}
+\ul{Example 7} \hspace{12mm} CALL ZSHUNT (0,LA1,LDUMMY,2,1) \hspace{5mm} gives:
+\begin{verbatim}
+       ______
+      |      |
+      |  UA  |
+      |______|
+         |
+      -3 |
+         |
+         `----> zero
+
+and               0             0             0
+                  ^             ^             ^
+                  |             |             |
+                 ______        ______        ______
+         0 <--  |      |  <-- |      |  <-- |      |
+  LA1    -----> |  A1  | ---> |  A2  | ---> |  A3  |
+                |______|      |______|      |______|
+\end{verbatim} 
+This detaches the linear structure from its old context
+without inserting it into a new one.
+This should only be temporary, one should insert the floating
+structure into a new context by a second call to ZSHUNT
+not too much later.
+
+\Filename{H2-ZSORT-utility-to-sort-banks-of-linear-structure}
+\section{ZSORT  - utility to sort the banks of a linear structure}
+
+These routines re-arrange the horizontal linking
+within a given linear structure such that the key-words contained in
+each bank increase monotonically when moving through the linear
+structure with L=LQ(L).
+For equal key-words the original order is preserved.
+
+Key-words may be either floating, integer or Hollerith.
+For Hollerith sorting a collating sequence
+inherent in the representation is used,
+thus the results will depend on the machine.
+
+Sorting may be done either for a single key-word in every bank
+or for a key vector in every bank:
+
+\begin{verbatim}
+ ________________________________________________________________________
+|                                                                        |
+|   CALL ZSORT  (IXSTOR,*!LLS*,JKEY)       single floating  key-words    |
+|   CALL ZSORTI (IXSTOR,*!LLS*,JKEY)       single integer   key-words    |
+|   CALL ZSORTH (IXSTOR,*!LLS*,JKEY)       single Hollerith key-words    |
+|   CALL ZSORV  (IXSTOR,*!LLS*,JKEY,NKEYS)        floating  key vectors  |
+|   CALL ZSORVI (IXSTOR,*!LLS*,JKEY,NKEYS)        integer   key vectors  |
+|   CALL ZSORVH (IXSTOR,*!LLS*,JKEY,NKEYS)        Hollerith key vectors  |
+|________________________________________________________________________|
+
+    with the parameters
+
+      IXSTOR  index of the store or of any division in this store,
+              zero for the primary store;
+
+      *!LLS*  the address of the first bank of the linear structure,
+              reset on return to point to the new first bank;
+
+        JKEY  in each bank at L, Q(L+JKEY) is the key word,
+                                 or the first word of the key vector;
+
+       NKEYS  the number of words in the key vector.
+\end{verbatim}
+
+The execution time taken by these routines is a function
+of the re-ordering which needs to be done.
+For perfect order the operation is a simple verification pass
+through the structure.
+The maximum time is taken if the banks are initially arranged with
+decreasing key words.
+
+Sorting re-links the banks such that the key-words are in
+increasing order.
+If one needs them in decreasing order on may use
+CALL ZTOPSY (IXSTOR,LLS)
+which reverses the order of the banks in the linear structure
+pointed to be LLS.
+
+\Filename{H2-ZTOPSY-utilities-to-operate-on-linear-structures}
+\section{ZTOPSY {\it et al.} - utilities to operate on linear structures}
+
+These routines perform service operations
+on linear structures.
+The parameter LLS is the address of the first bank
+of the linear structure.
+
+
+\ROUTA{CALL ZTOPSY (IXSTOR,*!LLS*)}
+
+reverses the order of the banks in the linear structure,
+ie. the first bank becomes the last, and the last the first,
+for walking through the structure with L=LQ(L).
+Starting with Zebra version 3.67, LLS is updated to point to
+the first bank of the inverted structure on return.
+
+\ROUTA{CALL ZPRESS (IXSTOR,!LLS)}
+
+removes by bridging dead banks still present
+in the linear structure pointed to by LLS.
+
+\Filename{H2-LZFIND-utilities-to-interrogate-linear-structures}
+\section{LZFIND {\it et al.} - utilities to interrogate linear structures}
+
+These routines perform service functions for linear structures.
+The parameter LLS is the address of the first bank
+of the linear structure.
+
+\ROUTA{!LF = LZLAST (IXSTOR,!LLS)}
+
+searches the linear structure pointed to by LLS for its end.
+It returns in LF the address of the last bank in the structure.
+LF = 0 is returned if the structure is empty.
+
+\ROUTA{!LF = LZFIND (IXSTOR,!LLS,IT,JW)}
+
+searches the linear structure pointed to by LLS
+for the first bank containing IT in word JW;
+it returns its address in LF.
+If none:  LF=0.
+
+\ROUTA{!LF = LZLONG (IXSTOR,!LLS,NW,ITV,JW)}
+
+has the same function as LZFIND,
+but ITV is a vector of NW words expected
+in words JW to JW+N--1 of the bank.
+
+\ROUTA{!LF = LZBYT  (IXSTOR,!LLS,IT,JBIT,NBITS)}
+
+has the same function as LZFIND,
+but it looks for a bank having IT in byte (JBIT,NBITS)
+of the status word.
+
+\ROUTA{!LF = LZFVAL (IXSTOR,!LLS,VAL,TOL,JW)}
+
+has the same function as LZFIND,
+but it looks for a bank having in word JW a floating point number
+which is equal to VAL within the tolerance TOL.
+
+\ROUTA{N  = NZBANK (IXSTOR,!LLS)}
+
+counts the number of banks in the linear
+structure pointed to by LLS.
+
+\ROUTA{N  = NZFIND (IXSTOR,!LLS,IT,JW)}
+
+searches like LZFIND, but for all banks.
+It returns the number of such banks in N
+and stores the addresses of the first 100 such banks into IQUEST,
+starting at IQUEST(1).
+
+\ROUTA{N  = NZLONG (IXSTOR,!LLS,NW,ITV,JW)}
+
+searches like LZLONG, but for all banks.
+It returns the number of such banks in N
+and stores the addresses of the first 100 such banks into IQUEST,
+starting at IQUEST(1).
+
+\Filename{H2-LZFID-utilities-to-find-bank-by-sequential-scan}
+\section{LZFID {\it et al.} - utilities to find a bank by sequential scan}
+
+Unlike the routines of the previous paragraphs which access
+banks by following the links of the structure,
+the routines of this paragraph perform a scan over the memory,
+looking at each bank in turn in the order in which they happen
+to be in the dynamic store,
+to find the bank wanted.
+For large memories with many banks this is likely to be an expensive
+operation and should not be used unless there is no other way.
+
+
+\ROUTA{!LF = LZFID (IXDIV, IDH,IDN, !LGO)}
+
+searches the division indicated by IXDIV, either starting
+at its beginning if LGO=0 or with the first bank after the bank
+at LGO, for the first bank with has the identifiers IDH and IDN.
+
+
+\ROUTA{!LF = LZFIDH (IXDIV, IDH, !LGO)}
+
+searches the division indicated by IXDIV, either starting
+at its beginning if LGO=0 or with the first bank after the bank
+at LGO, for the first bank with has the Hollerith identifier IDH.
+
+
+\ROUTA{!LF = LZSCAN (IXDIV, !LGO)}
+
+searches the division indicated by IXDIV, either starting
+at its beginning if LGO=0 or with the first bank after the bank
+at LGO, for the first bank.
+
+LZSCAN returns IQUEST(1) containing zero if the bank at LF is live,
+or one if the bank is dead.
+\chapter{Global operational aids}
+
+\Filename{H2-ZPHASE-set-program-phase}
+\section{ZPHASE - set program phase}
+
+Primarily to avoid recovery to 'next event' at the wrong moment,
+ZEBRA needs to know in which phase the user program is at any
+given moment.
+We distinguish three phases:
+\begin{verbatim}
+    a) during the initialization phase the user prepares the context for
+    b) the operation phase of his program;
+    c) during the termination phase accumulated results are output,
+       files are closed, etc.
+\end{verbatim} 
+The user may subdivide the operation phase for his own purpose.
+With the change to 'termination' one may request ZPHASE to take
+action of tidying up the primary store,
+to make room for end-processing routines (like output of histograms)
+which may need a large amount of working memory.
+
+\ROUTA{CALL ZPHASE (JPH)}
+
+signals to Zebra a change of phase, preset by MZEBRA to 'initialization'.
+
+\begin{verbatim}
+   Normal operation phase:  JPH .GE. 0
+
+   Termination phase:       JPH .LT. 0
+
+      JPH = -1:  reset the working space to be of zero length,
+                  but leave the store as it is;
+
+            -2:  reset the working space,
+                  wipe all user short-range divisions;
+
+            -3:  reset, wipe, and collapse upwards all short-range user
+                  divisions to be of zero length, giving their space to
+                  division 1 for use by termination routines; perform
+                  clean-up garbage collection in all other divisions.
+\end{verbatim} 
+
+The program phase is recorded on the variable NQPHAS of /ZSTATE/
+and has the following significance~:
+\begin{verbatim}
+   NQPHAS =   0  initialisation phase
+             >0  = MAX(JPH,1):  normal operation phase
+             <0  = JPH: termination phase
+\end{verbatim} 
+If the user whishes to subdivide the operation phase,
+he can pick up the current state from this variable.
+
+ZPHASE prints a log message at level --1 for major phase changes,
+and at level 2 for minor changes.
+
+\Filename{H2-ZEND-normal-program-end}
+\section{ZEND - normal program end}
+
+\ROUTA{user routine ZEND}
+is defined to be the entry-point for normal run termination.
+
+This routine, without parameters, is normally provided by the user
+to close files and print accumulated results.
+It is important that all closing down operations are
+done through this routine,
+if the user wants them to happen even in abnormal
+run termination.
+It would normally look like this:
+\begin{verbatim}
+       SUBROUTINE ZEND
+ +CDE, ZSTATE.
+
+       CALL ZPHASE (-3)           start termination
+       . . .                      any user termination code
+
+       CALL MZEND
+       IF (NQERR.NE.0)  CALL ABEND
+       STOP
+       END
+\end{verbatim} 
+
+MZEND is a little routine which prints statistics about
+the usage of all divisions.
+
+NQERR in /ZSTATE/ is zero for normal run termination,
+it is non-zero if ZEND has been reached via ZFATAL.
+On some machines the recovery system of the machine
+expects the user to re-enter it.
+The KernLib routine ABEND (Z 035) looks after this.
+
+The Zebra system contains a little default routine
+ZEND which is the above without any user termination.
+
+A user routine similar to ZEND is defined for taking over control
+of fatal error termination. It is called ZABEND and it is
+described in the next paragraph.
+This should perform in there any extra operations needed
+for fatal termination and then it should transfer
+to ZEND for closing down.
+
+\Filename{H2-ZABEND-abnormal-program-end-through-ZFATAL}
+\section{ZABEND - abnormal program end through ZFATAL}
+
+\ROUTA{CALL ZFATAL}
+is defined to be the entry point for fatal run termination.
+
+\ROUTA{CALL ZFATAM (chMESSAGE)}
+is identical to ZFATAL,
+except that it prints a message,
+given in the parameter as a character
+string of not more than 30 characters,
+terminated by the character '.'.
+
+These routines are supplied by the system;
+they are protected against recovery loops,
+and they must not be supplied by the user.
+They should only be called when the run cannot usefully continue.
+If the application program discovers such a fatal condition
+it too should call ZFATAL or ZFATAM,
+preceded with some diagnostic printing or
+with loading to IQUEST some clue to the trouble.
+
+\vspace{4mm}
+\ROUTA{SUBROUTINE ZABEND}
+receives control from ZFATAL to handle fatal run termination.
+This routine may be supplied by the user.
+
+The Zebra system contains the standard routine as follows:
+
+\begin{verbatim}
+       SUBROUTINE ZABEND
+ +CDE, ZSTATE.
+
+       CALL ZPOSTM ('TCWM.')
+       IF (NQPHAS.LE.0)  CALL ABEND
+       NQPHAS = -2
+       CALL ZEND
+       RETURN
+       END
+\end{verbatim} 
+
+This is not just a dummy,
+it causes a post-mortem dump,
+including a subroutine trace-back (if possible),
+followed by any normal user output programmed in ZEND.
+Transfer to ZEND takes place only if the break-down happened
+during normal operation,
+but not if the program is still in the initialisation phase
+or if it is already under ZEND control.
+
+The parameter to ZPOSTM is passed from there to DZSNAP
+to select the options for dumping the dynamic store,
+see   ...   for details.
+
+\Filename{H2-ZTELL-recover-trouble-through-ZTELL-ZTELUS}
+\section{ZTELL  - recover trouble through ZTELL-ZTELUS}
+
+During normal operation any request from the user for space
+with MZWORK, MZLIFT {\it et al.} is satisfied,
+after garbage collection if necessary and possible.
+If however the request cannot be satisfied,
+the normal course of the program must be broken.
+To deliver the user from the burden of checking for success
+after each space request,
+the garbage collector sends control to the user at the
+entry-point QNEXT (via ZTELL and the KERNLIB routine QNEXTE),
+where he can program the recovery of the problem.
+Normally this will be to skip the current event and to continue
+with processing the next one.
+
+Other Zebra packages, apart from MZ, and maybe the user himself,
+have similar problems.
+Therefore a general trouble control routine ZTELL has been
+included into Zebra.
+This is a switching routine with several modes of continuation,
+one of which is to send control to QNEXT.
+ZTELL can also be called by the user program, thus:
+
+\ROUTA{CALL ZTELL (ID,IFLAG)}
+
+\begin{verbatim}
+    ID     is an integer between 101 and 999,
+           ID's below 100 are reserved for system usage,
+           ID=99 for 'no memory left' from MZGARB.
+
+    IFLAG  is a flag indicating whether the calling code can
+           accept a RETURN from ZTELL:
+           = 0 ZTELL may return;
+           = 1 the calling code is not capable to accept a RETURN;
+           = 2 fatal error, the run must stop.
+\end{verbatim} 
+
+ZTELL prints a message,
+sets up a reasonable exit mode as a function of ID and IFLAG
+into the little labelled common /ZTELLC/
+and calls ZTELUS to give the user a chance to modify this mode.
+On the
+{\large\bf obligatory}
+return from ZTELUS it takes the selected exit as follows:
+
+\begin{verbatim}
+    COMMON /ZTELLC/ ID, MODE
+
+    ID     is a copy of the first parameter to ZTELL;
+    MODE   is the selected exit mode:
+           = 0 RETURN to let the calling routine continue;
+           = 1 CALL QNEXTE to enter QNEXT
+           = 2 CALL ZFATAL
+           = 3 CALL ZEND
+\end{verbatim} 
+
+The exit mode to QNEXT is enabled only if NQPHAS in /ZSTATE/
+is larger than zero, indicating that the program is
+in the normal operation phase.
+During the initialisation or the termination phase of the program
+transfer is to ZFATAL instead,
+to avoid a program crash to be 'recovered' into normal operation.
+
+The pre-loading of MODE is  MODE=IFLAG  for user calls {\tt (ID>100)};
+and for system calls {\tt (ID<100)} it is as shown
+in book DIA, entry ZTELL.
+
+Here is an example of a ZTELUS
+which is happy with the default modes,
+except that it wants to go to ZEND for ID=8:
+
+\begin{verbatim}
+      SUBROUTINE ZTELUS
+      COMMON /ZTELLC/ ID,MODE
+
+      IF (ID.EQ.8)  MODE=3
+      RETURN
+      END
+\end{verbatim} 
+The default subroutine ZTELUS on the library is a do-nothing dummy.
+The default subroutine QNEXT goes straight to ZFATAL.
+
+On most machines repeated recovery directly to QNEXT causes
+trouble with the FORTRAN trace-back and the subroutine stack.
+For this reason ZEBRA relies on the KERNLIB routine QNEXTE,
+which implies an organization for event processing as follows:
+
+\begin{verbatim}
+ _________________________
+|                         |          Program flow with QNEXT recovery
+|    MAIN program         |
+|                         |
+|    CALL MZEBRA (0)      |
+|    CALL MZSTOR (...)    |
+|                         |
+|    program              |                                _________
+|    initialization       |                               |         |
+|                         |                               |         |
+|    CALL ZPHASE (0)      | first entry           recover |         |
+|    CALL QNEXTE          | ------       _________       _|         |
+|_________________________|      `----> |         |     |           |
+                                        | routine |     |  routine  |
+          <---------------------------< | QNEXTE  | <-- |  ZTELL    |
+         |                              |_________|     |_          |
+ ________|________________                                |         |
+|                         |                               |         |
+|    subr QNEXT           |                               |         |
+|                         |                               |         |
+| 11 CALL MZWIPE (0)      |       requests                |         |
+|    read event           | ----------------------------> |  Zebra  |
+|    IF (end) CALL ZEND   |                               |  system |
+|    process event        | <---------------------------- |         |
+|    output event         |               normal RETURN's |         |
+|    GO TO 11             |                               |         |
+|_________________________|                               |         |
+         |                                                |         |
+ ________|________________        __________              |         |
+|                         |      |          |             |         |
+|    subr ZEND            | <--- |  subr    | <---        |         |
+|                         |      |  ZABEND  |     |      _|         |
+|    CALL ZPHASE (-3)     |      |__________|     |     |           |
+|                         |                       |     |  routine  |
+|    program              |                       `---< |  ZFATAL   |
+|    termination          |                             |_          |
+|_________________________|                               |_________|
+
+\end{verbatim} 
+The initialisation part prepares the program to be ready
+for execution and then calls itself QNEXTE for entry to QNEXT
+to process the 'next event',
+being the first event in this case.
+QNEXT loops internally to process all events.
+
+CALL's from the processing program to the Zebra system
+are normally satisfied,
+and control comes back to the user with normal RETURN.
+Abnormal returns are either via ZFATAL to ZEND,
+or straight to ZEND,
+or to QNEXT via QNEXTE.
+
+
+The Fortran version of QNEXTE is a simple CALL QNEXT
+followed by RETURN.
+If necessary on a given computer,
+QNEXTE is a machine-language or a C routine to unwind to itself
+the FORTRAN trace-back and the subroutine stack.
+So, if the user wishes at some point to abandon himself
+the curent event and to go to the next one,
+he should CALL QNEXTE and not QNEXT.
+
+QNEXT is a user routine to the KERNLIB routine QNEXTE and
+has thus the usual problem of user routines called
+from a library routine in that it must be loaded explicitely:
+\begin{verbatim}
+   either:  compile it together with the other material
+       or:  if it resides on a user library it must be
+             INCLUDEd explicitly, for example on the VAX with
+             $ LINK  ...   MYLIB/INC=QNEXT/LIB  ...
+\end{verbatim} 
+
+This flow-diagram is only an example for the most common case
+of actual usage of Zebra.
+If one's program is not of the event-processing type
+one has to look at QNEXTE/QNEXT from a different angle:
+program flow from MAIN has to go to QNEXTE to initialize
+for re-entry.
+Entry and all re-entries are then to QNEXT,
+which has to control the further program flow according
+to some flags,
+conveniently ID in /ZTELLC/ and NQPHAS in /ZSTATE/.
+ID is not initialized by MZEBRA,
+it is only changed by ZTELL which copies its first parameter to ID.
+This number is an integer in the range 1 to 99 for calls
+from the Zebra system.
+NQPHAS is initialized to zero by MZEBRA,
+it is then changed only by the user (or the default ZABEND)
+either directly or with ZPHASE.
+
+\Filename{H2-ZVERIF-check-logical-integrity-of-Zebra-stores}
+\section{ZVERIF - check logical integrity of Zebra stores}
+
+\ROUTA{CALL ZVERIF (IXDIV,IFLRTN,chTEXT)}
+
+\begin{verbatim}
+with   IXDIV  1) the index of a single division to be verified;
+              2) the index of the store to be verified;
+                 = -1: all stores
+                        (other negative values are reserved)
+
+      IFLRTN  return flag, see below;
+
+      chTEXT  identifying text to be printed if trouble.
+\end{verbatim} 
+
+This routine has two somewhat different modes of operation:
+
+Normally ZVERIF checks all the data in and relevant to a complete
+store, or even several stores. It goes to ZFATAL if it finds
+trouble.
+
+But if verification is for one single division only, only the banks
+of this division are checked and control is given back to the caller
+if the flag IFLRTN is non-zero, in which case the number of
+normally fatal conditions is delivered in IQUEST(1).
+This is intended to be used if one receives a data-structure
+in memory (with FZIN, say) which may be bad. Rather than letting
+the program run to crash one can realize the situation and
+wipe the division. This must be done with MZWIPE because this
+is the only way to get rid of the data without Zebra looking
+at them.
+
+This routine inspects all link areas and all banks in the stores
+selected, performing the following checks:
+
+\begin{verbatim}
+    (0)  process and store control tables intact;
+    (1)  bank chaining intact;
+    (2)  a non-zero structural link must point to a true bank address;
+    (3)  consistency of "up" and "origin" links;
+    (4)  a link in a bank in division A pointing to division B
+         is checked for consistency with the cross-reference matrix;
+    (5)  a non-zero reference link in a bank must not point
+         into a reserve area;
+\end{verbatim} 
+
+ZVERIF is used by the automatic verification procedure
+ZVAUTO, see next paragraph.
+
+\Filename{H2-ZVAUTO-running-with-automatic-verification}
+\section{ZVAUTO - running with automatic verification}
+
+The routines of this complex are provided as the {\it ultima ratio regis}
+for finding program errors which destroy data in a Zebra store
+by faulty handling of links; they consume a lot of CPU time.
+
+With automatic verification switched on calls to the Zebra system
+transfer to ZVAUTY,
+which handles the verification process:
+
+The "verify identifier" (VID) is constructed by counting the number
+of entries to ZVAUTY. The VID is a two-word object, because 32 bits
+may not be sufficient, it identifies every call to Zebra, it gives
+us a handle on where we are in the job, and it is available to the
+user via the common /ZVFAUT/ to be printed together with the event
+number, for example. ZVAUTY will remember separately the VID for the
+last garbage collection, for the last MZWIPE, and for the last FZIN,
+for printing on fatal error.
+
+In "active mode" ZVAUTY will call ZVERIF for the stores selected
+by the user initially, causing a transfer to ZFATAL in case of trouble,
+which in turn will transfer control to the user by calling ZABEND,
+where he may code any display wanted.
+
+In "dummy mode" the time-consuming calls to ZVERIF will not take place,
+but the VID is checked to see whether the "action threshold" defined
+by the user is reached. If so, the mode is switched to "active", and
+the log-level is set for all stores to be verified.
+From this point on one may get rather a lot of output, tracing the
+execution of the program step-by-step.
+
+Suppose now one has a particular run, "run A" say, of a lengthy
+production job which collapses with the memory destroyed.
+The reason for this will be somewhere in the past.
+One could re-submit the job switching on true automatic verification 
+right away, but this could be excessively time consuming and produce
+much too much output.
+If so, it is better to re-submit the job first with "dummy verification"
+switched on by inserting a call to ZVAUTO at the point where one wants
+to start verification, after the initialization phase for example,
+and with the connection routine ZVAUTX supplied,
+"run B" say.
+Dummy verification goes through the
+same motion as active verification, but it does not call ZVERIF
+and hence costs only little more time than run A. This run should also
+end up in ZFATAL, which will now print the VID's remembered for the last
+garbage collection, for the last wipe, for the last FZIN,
+and maybe other VID's entered by the user with ZVAUTU.
+
+One can now re-submit the job, "run C" say, having changed the call to
+ZVAUTO by giving the action threshold, thereby defining the moment
+when active verification will start.
+
+Automatic verification is initiated with
+
+\ROUTA{CALL ZVAUTO (MSTORE,IDVTH1,IDVTH2,LOGLEV)}
+
+\begin{verbatim}
+with  MSTORE  a bit-by-bit word indicating the stores to be verified,
+              store i = 0,1,2,... selected if bit (i+1) is set to one;
+              if MSTORE = 0: all stores
+
+    IDVTH1/2  the two-word VID at which true verification should start,
+              give both words zero if dummy verification only
+              ("run B" in the discussion above);
+              give 0,-1 if active verification is to start right away;
+
+      LOGLEV  set the log-level of the existing stores to be verified
+              to this value at the moment of changing to active mode,
+              give 2 for maximum logging.
+\end{verbatim} 
+
+
+To avoid loading the non-negligeable code of the ZVAUTO complex with
+normal production jobs, this trick is used: all relevant Zebra routines
+contain a conditional call to ZVAUTX (which does not take place if
+ZVAUTO has not been called), and the Zebra library contains a dummy
+routine ZVAUTX. But the true process is controlled by ZVAUTY, which
+is not normally loaded. The user makes the connection by supplying
+this routine:
+
+\begin{verbatim}
+      SUBROUTINE ZVAUTX
+      CALL ZVAUTY
+      END
+\end{verbatim} 
+as part of the material to be compiled and linked.
+
+In the list of "last VIDs remembered" there are 3 places for user
+triggered storage, which is done with
+
+\ROUTA{CALL ZVAUTU}
+                 
+this will push the VID in position 2 to position 3, and the one in
+position 1 to position 2, entering the current VID into position 1.
+Thus, if one were to call ZVAUTU at the start of each event,
+one would see the start points of the last 3 events in a dump
+from ZFATAL.
+
+The user has access to the verification parameters via this common:
+
+\begin{verbatim}
+      COMMON /ZVFAUT/IQVID(2),IQVSTA,IQVLOG,IQVTHR(2),IQVREM(2,6)
+
+           IQVID  the current VID
+
+          IQVSTA  the verification status:
+                    zero  automatic verifying not running
+                      -1  dummy verification
+                      +1  active verification
+
+          IQVLOG  the log level to be set at the activation threshold
+          IQVTHR  the threshold VID
+
+     IQVREM(2,J)  VID remembered in position J,
+                    J = 1  last garbage collection
+                        2  last call to MZWIPE
+                        3  last call to FZIN
+                        4  last call to ZVAUTU
+                        5  last-but-one call to ZVAUTU
+                        6  last-but-two call to ZVAUTU
+\end{verbatim} 
+
+
+\ul{Examples}
+\begin{verbatim}
+      Do not forget to supply the connection routine ZVAUTX !
+
+      CALL ZVAUTO (7,0,0,0)
+
+           to start a dummy verification run for store numbers 0, 1, 2;
+           "run B" of the discussion above.
+
+           Supposing that the ZFATAL output of this run tells us the
+           VID of the last-but-one event, by changing to
+ 
+      CALL ZVAUTO (7,0,123456,2)
+
+           we may start "run C" to give detailed logging for the
+           last two events.
+
+      CALL ZVAUTO (1,0,-1,0)
+
+           to start an active verification run for store number 0;
+           one might do this on a limited data sample before going
+           into production with a new program, just to verify that
+           the program is alright.
+\end{verbatim} 
+\chapter{MZ routines for special applications}
+
+\Filename{H2-MZCOPY-copy-data-structure}
+\section{MZCOPY - copy a data-structure}
+
+MZCOPY allows one to copy a data-structure from memory to memory.
+\begin{verbatim}
+The source memory may be
+
+  either (case 1) one or several divisions in some store F;
+
+      or (case 2) ordinary stand-alone memory,
+                  called 'flat memory' below.
+
+The target memory may be
+
+  either (case 3) one particular division in a store T, which may
+                  or may not be the same as store F;
+
+      or (case 4) ordinary stand-alone memory.
+\end{verbatim} 
+
+For case 1, the data-structure may be identified in the usual way
+as the collection of banks which depend structurally
+from the header bank.
+This (option D not selected) requires a logical walk through
+the structure,
+marking each bank which belongs to it by setting a system bit
+in the status word.
+A sequential scan over the memory between the first and the last bank
+involved constructs then the table of the material to be copied.
+(This way of identifying the d/s must not be used with
+a read-only store.)
+
+Alternatively, the d/s may be identified as the contents
+of one or several divisions,
+in which case the user has to be certain that the complete contents
+of this division(s) belong to one single d/s.
+This (option D selected) does not require the logical walk,
+and is by that much faster.
+Moreover, the copy may or may not be immediate (option I):
+if yes (option DI) dead banks present in the division(s) are
+also copied, if not (option D without I) a sequential scan
+over the division(s) concerned constructs a more detailed
+table of all the sectors of contiguous live banks in the division(s).
+Thus, if the user knows a priori that the amount of dead material
+is negligeable he should select option DI for speed,
+saving the sequential scan.
+However, if the amount of dead material is significant,
+he should select option D only,
+again for speed saving the time to copy the useless material.
+
+Cases 2 and 4 (flat memory) are intendend for use in communication
+between separate processes running on the same computer
+through shareable Common blocks:
+the sending process places a d/s into a flat memory area,
+the receiving process copies it from there into its Zebra store.
+Again, the data must all belong to one single d/s.
+
+If the No-link option is selected the copied result
+is a simple collection of banks,
+with all links except link 0 reset to zero,
+connected to be a linear structure;
+the entry address returned is the address of
+the physically first bank.
+
+
+\ul{\large Copy from and to Zebra storage:}
+
+\ROUTA{CALL MZCOPY (IXDVFR,!LENTRY, IXDVTO,*!LSUP*,JBIAS, chOPT)}
+\begin{verbatim}
+with
+     IXDVFR:  index of division(s) to be copied from
+               may be zero [or IXSTOR] if the D option is not selected
+               may be a compound index if the D option is selected
+
+    !LENTRY:  entry address of the d/s
+
+     IXDVTO:  index of the division to be copied to;
+               this must be the index of one particular division
+
+            The d/s copied is linked into a pre-existing d/s
+            as directed by LSUP and JBIAS, which have the same
+            significance as for MZLIFT:
+
+      !LSUP:  if JBIAS < 1: LSUP is the supporting bank,
+      JBIAS:                 connection to link LQ(LSUP-JBIAS)
+
+               if JBIAS = 1: LSUP is the supporting link,
+                              connection to LSUP (top-level d/s)
+                              LSUP* returns the entry adr to the d/s
+
+               if JBIAS = 2: stand-alone d/s, no connection
+                              LSUP* returns the entry adr to the d/s
+
+      chOPT:  character string,
+               individual characters select options:
+
+            d/s:    by default the d/s supported by the bank at
+                     LENTRY is copied (link 0 not followed)
+
+                   L copy the d/s supported by the linear structure
+                     at LENTRY (link 0 followed)
+
+                   M  copy the banks pre-marked by the user,
+                      see para. 2.01 for details
+                      (also: book FZ, para. 1.21, User marking ...)
+
+                   D  copy complete division(s)
+                      default: dead banks are squeezed out
+                               (slower but maybe more economic than DI)
+                   DI immediate dump of division(s),
+                      dead banks, if any, are also copied
+
+                   S copy the single bank at LENTRY
+
+                    see separate descriptions below for
+
+                   F   copy from flat memory
+                   T   copy   to flat memory
+\end{verbatim} 
+
+\begin{verbatim}
+
+         others:  N no links, ie. linkless handling,
+                     default: links are significant
+
+                   P permit error returns
+                     default: error exit is with CALL ZTELL (15,1)
+
+                   Z zero all links pointing outside the d/s
+                     (this is implied if store T is not store F)
+\end{verbatim} 
+
+\ul{\large Copy from flat memory:}
+
+\begin{verbatim}
+      IQUEST(1) = NWFR:    number of words
+      IQUEST(2) = JOFFFR:  link relocation off-set, usually zero
+\end{verbatim} 
+
+\ROUTA{CALL MZCOPY (MEMFR,!LENTRY, IXDVTO,*!LSUP*,JBIAS, chOPT)}
+\begin{verbatim}
+with
+      MEMFR:  the words MEMFR(1:NWFR) hold the d/s to be copied,
+               links in the d/s, if any, assume addressing such that
+               MEMFR(L) corresponds to LQ(L+JOFFFR)
+
+      In this case options L, D, I, S are irrelevant.
+\end{verbatim} 
+
+\ul{\large Copy to flat memory:}
+
+\begin{verbatim}
+      IQUEST(3) = NWMXTO:  maximum # of words, ie. capacity of MEMTO
+      IQUEST(4) = JOFFTO:  link relocation off-set, usually zero
+\end{verbatim} 
+
+\ROUTA{CALL MZCOPY (IXDVFR,!LENTRY, MEMTO*,LENTO*,NWTO*, chOPT)}
+
+\begin{verbatim}
+with
+     MEMTO*:  the words MEMTO(1:NWTO) receive the d/s copied,
+               NWTO is not allowed to exceed NWMXTO,
+               links in the d/s, if any, will be relocated such that
+               MEMTO(L) corresponds to LQ(L+JOFFTO)
+     !LENTO*   is the entry address into the copied d/s.
+\end{verbatim} 
+
+\ul{Error return}
+
+IQUEST(1/2) will signal on return the status of the copy:
+\begin{verbatim}
+        = 0:  all is well,  IQUEST(2) = number of words
+   and if option P given:
+        = 1:  LENTRY invalid
+        = 2:  bank chaining clobbered found in the input d/s
+        = 3:  not enough space to construct the relocation table
+        = 4:  d/s larger than the target space
+        = 5:  d/s to be copied is empty
+        = 6:  bank chaining clobbered found in the copied d/s
+\end{verbatim} 
+
+\Filename{H2-MZNEED-calculate-free-space-in-division}
+\section{MZNEED - calculate free space in division}
+
+This routine measures the free space available in a particular
+division, either the space available immediately
+or the space after garbage collection.
+
+\ROUTA{CALL MZNEED (IXDIV, NEED, chOPT)}
+
+\begin{verbatim}
+with
+      IXDIV     index of the division
+
+      NEED      number of words needed, trigger garbage collection
+                if G option selected and less than NEED words available
+
+      chOPT     character string of options:
+
+                G  execute garbage collection
+                   if less than NEED words available
+
+On return /QUEST/IQUEST(100) contains the following information
+about the division IXDIV:
+
+   IQUEST(11)   NEX, the number of free words beyond NEED,
+                negative if less than NEED words available,
+                ie. the total available is NEED+IQUEST(11);
+
+   IQUEST(12)   the space occupied by the banks, including dead banks
+                if any, of the division;
+
+   IQUEST(13)   the maximum space allowed for this division,
+                as given to MZDIV.
+\end{verbatim} 
+
+\ul{Example}
+
+Suppose IXDIV is a forward division, and the user wants to
+take all its space into one single maximum size bank,
+which will be filled by a variable amount of data, but less
+than NEED words; when the filling is complete the bank
+will be reduced to its true size:
+\begin{verbatim}
+      NEED = 8000
+      CALL MZNEED (IXDIV, NEED, 'G')
+      IF (IQUEST(11).LT.0)              GO TO no luck
+
+      ND = NEED + IQUEST(11) - 19       (7 links, 12 system words)
+      CALL MZBOOK (IXDIV,L,LSUP,JB, 'name',7,2,ND,2, -1)
+
+      fill words IQ(L+1) TO IQ(L+NU)
+
+      CALL MZPUSH (IXDIV,L,0, NU-ND, 'R')
+\end{verbatim}
+
+\Filename{H2-MZINQS-inquiry-to-get-parameters-of-store}
+\section{MZINQS - inquiry to get the parameters of a store}
+
+This routine returns the parameters of the selected store in IQUEST:
+
+\ROUTA{CALL MZINQS (IXSTOR)}
+
+\begin{verbatim}
+with     IXSTOR     index of the store
+
+On return /QUEST/IQUEST(100) contains the following information:
+
+    IQUEST(1):  opmode   operation mode of the store, = zero normally
+    IQUEST(2):  NQSTRU   number of structural permanent links
+    IQUEST(3):  NQREF    number of permanent links
+    IQUEST(4):  NQLINK   number of permanent + working space links
+    IQUEST(5):  LSTA1    first word after the working space
+    IQUEST(6):  LSTA21   first word after the store
+    IQUEST(7):  NQMINR   minimum size of the reserve area after div. 1
+    IQUEST(8):  LQ2END   minimum value of LQEND(2)
+    IQUEST(9):  JQDVLL   last low division
+   IQUEST(10):  JQDVSY   system division, also: first high division
+   IQUEST(11):  NQLOGL   current log level for this store
+   IQUEST(12):  NQSNAM   chars 1:4 of the printing name of the store
+   IQUEST(13):           chars 5:8
+   IQUEST(14):  lowORG   lowest  possible origin-adr for the store
+   IQUEST(15):  highORG  highest possible origin-adr for the store
+   IQUEST(16):  initalc  initial allocation to last division created
+   IQUEST(17):  toffset  offset of the system tables
+\end{verbatim} 
+The permanent links occupy  LQ(1) to LQ(NQREF).
+\begin{verbatim}
+The working space links go from LQ(NQREF+1)  to LQ(NQLINK),
+the working space data  go from LQ(NQLINK+1) to LQ(LSTA1-1).
+\end{verbatim} 
+Divsion 1 starts at LSTA1.
+
+Bank space goes from LQ(LSTA1) to LQ(LSTA21-1).
+
+There must always be a gap of at least NQMINR words between divisions 1 and 2.
+
+LQ2END is the lowest possible address for the end of division 2.
+
+The existing short range divisions have numbers 1 to JQDVLL.
+
+The system division has the number JQDVSY at the moment,
+this will change if MZDIV is called to create a new long-range division.
+If JQDVSY is less than 20 the user's long range divisions have numbers JQDVSY+1 TO 20.
+
+No 'origin link' may have a value less than lowORG or larger than highORG,
+both numbers could be negative; they depend on where the link-areas are
+physically in absolute memory, relative to the store.
+
+For a secondary store the system tables are at the end of
+the memory declared to MZSTOR, they start in LQ(toffset).
+For the primary store toffset=0 is returned.
+
+At log-level 2 the information returned is also printed by MZINQS.
+
+\Filename{H2-MZINQD-inquiry-to-get-parameters-of-division}
+\section{MZINQD - inquiry to get the parameters of a division}
+
+This routine returns the parameters of the selected division in IQUEST:
+
+\ROUTA{CALL MZINQD (IXDIV)}
+
+\begin{verbatim}
+with     IXDIV     index of the division
+
+On return /QUEST/IQUEST(100) contains the following information
+about the division IXDIV:
+
+    IQUEST(1):  mode = 0 forward, 1 reverse division
+    IQUEST(2):  kind = 1 short range, 2 long, 4 package, 8 system
+    IQUEST(3):  start adr LSTA
+    IQUEST(4):  end   adr LEND
+    IQUEST(5):  LEXTR highest or lowest possible value of LEND or LSTA
+    IQUEST(6):  initial size declared to MZDIV
+    IQUEST(7):  maximum size declared to MZDIV
+    IQUEST(8):  char 1:4 of the printing name of the division
+    IQUEST(9):  char 5:8
+   IQUEST(10):  JDVSH, if non-zero: sharing neighbour division
+
+This means:
+
+The memory actually occupied by the division goes
+from LQ(LSTA) to LQ(LEND-1), ie. LEND-LSTA words.
+
+The reserve space immediately available to the division would go
+   from  LQ(LEND)  to LQ(LEXTR-1) for a forward division,
+or from  LQ(LEXTR) to LQ(LSTA-1)  for a reverse division (mode=1).
+\end{verbatim} 
+
+If JDVSH is non-zero this division shares the reserve area with
+the division designated by IXDIV.
+
+At log-level 2 the information returned is also printed by MZINQD.
+
+\Filename{H2-MZDRED-reduce-space-reserved-to-division}
+\section{MZDRED - reduce the space reserved to a division}
+
+The situation can arise that one needs a lot of space in some
+long-range division during the initialization phase,
+which is then abandoned.
+Since divisions can only grow, but never shrink, this space
+could be blocked for the whole run.
+
+To reduce this space of a particular division
+to the initial allocation for for this division
+(or to its present occupation, whichever is larger),
+one should first CALL MZGARB (IXDIV), to collect dead banks,
+followed by
+
+\ROUTA{CALL MZDRED (IXDIV)}
+
+\begin{verbatim}
+with
+      IXDIV     index of the division
+
+\end{verbatim} 
+
+This will shift all divisions below division IXDIV upwards
+by the amount of space liberated.
+\chapter{Internal technical details for ZEBRA MZ}
+\smark{Chapter 5}
+
+\vspace{20mm}
+  \begin{itemize}
+     \in{30mm}
+     \item[5.1] Master tables
+     \item[5.2] Relocation tables
+     \item[5.3] MZFORM data structure
+  \end{itemize}
+
+\Filename{H2-MZ-Master-Tables}
+\section{Master Tables}
+
+\begin{flushright} \ul{\large in /MZCA/:  Master parameters of the process}
+\end{flushright}
+\begin{verbatim}
+NQSTOR       number of the latest store initialized
+             (NQSTOR = 0, 1, ..., 15)    set to -1 by MZEBRA
+
+NQOFFT(J+1)  table off-set KQT for store J, J=0,1,...,NQSTOR
+
+NQOFFS(J+1)  store off-set KQS for store J,  = LQSTOR - LQASTO
+
+NQALLO(J+1)  allocation status of store J:
+               = 0:  normal, this store belongs to the running
+                      process for exclusive use
+                -1:  store disconnected
+                -2:  read-only store attached by MZATTM
+                -3:  store attached by MZATTM
+
+NQIAM        process identifier, currently zero and unused
+
+LQATAB       = LOCF(IQTABV(0))
+             absolute adress-1 of the store control table
+             for the primary store
+
+LQASTO       = LOCF(LQ(0))
+             absolute adress-1 of the general store base
+
+LQBTIS       = LQATAB - LQASTO
+             off-set for the primary table to the store base
+
+LQWKTB       adr of the Zebra working area IQWKTB rel. to /ZEBQ/,
+                    ie. LQ(LQWKTB) is word IQWKTB(1)
+NQWKTB       size of IQWKTB available to MQ, NORMALLY = 2560
+                    may be reduced temporarily by FQ
+NQWKTT       total size of IQWKTB, = 2560
+LQWKFZ       adr of the FZ work area in IQWKTB rel. to /ZEBQ/
+
+MQKEYS(3)    check on MZEBRA initialization already done
+NQINIT       initialization status
+
+NQTSYS       size of each system table
+             = LOCF(IQDN2(21)) - LOCF(IQTABV(1))
+
+NQM99        unused
+NQPERM       = zero: normal, error exit to ZFATAL
+                = 1: permit error return
+                     (used at the moment only in NZNEED for MZGAR1)
+
+NQFATA       number of words to be printed from IQUEST on fatal
+             error termination; zero during normal operation
+
+NQCASE       fatal error case; zero during normal operation
+
+NQTRAC       number of active trace words
+MQTRAC(44)   ZEBRA internal trace words
+\end{verbatim} 
+
+\begin{flushright} \ul{\large in /MZCB/:  Current store / division}
+\end{flushright}
+
+When a particular store is selected by the user, and if it changes,
+these numbers are collected into here for easy access.
+Also, the parameters relevant for the division
+whose free reserve space has been calculated last,
+are kept in here.
+
+\begin{verbatim}
+JQSTOR       number of the current store
+KQT          table off-set for the current store
+KQS          store off-set for the current store
+
+JQDIVI       number of the current division
+
+JQDIVR       division whose free space has last been calculated
+JQKIND       = JBYT (IQKIND(JQDIVR),21,4)
+JQMODE       = JBIT (IQMODE(JQDIVR),1)
+JQDIVN       neighbour division of division JQDIVR at the moving end
+JQSHAR       = JQDIVN if the two divisions share the same reserve area
+             = zero otherwise
+JQSHR1       = forward division sharing the reserve area with JQDIVI
+JQSHR2       = reverse division sharing the reserve area with JQDIVI
+NQRESV       free space available to division JQDIVR
+
+IQCUR(1->12) this vector receives a copy of IQTABV(1->12),
+             see just below
+\end{verbatim} 
+\begin{flushright} \ul{\large IQTABV / IQCUR  vector}
+\end{flushright}
+\begin{verbatim}
+     primary   current  store
+     IQTABV    IQCUR
+
+ (1) LQPSTO    LQSTOR    = LOCF(LQ(@0)),  absolute adr-1 of store
+ (2) NQPFEN    NQFEND    number of fence words preceding the store
+
+ (3) NQPSTR    NQSTRU    number of structural permanent links
+ (4) NQPREF    NQREF     number of permanent links
+ (5) NQPLK     NQLINK    number of permanent + working space links
+
+ (6) NQPMIN    NQMINR    minimum size of the reserve area
+ (7) LQP2E     LQ2END    minimum value of LQEND(2)
+
+ (8) JQPDVL    JQDVLL    last low division
+ (9) JQPDVS    JQDVSY    system division, also: first high division
+
+(10) NQPLOG    NQLOGL    log level for this store
+
+(11) NQPNAM(2) NQSNAM(2) printing name of the store
+
+(13) IQTABV(13)  lowest  possible origin-adr for the store
+(14) IQTABV(14)  highest possible origin-adr for the store
+(15) IQTABV(15)  initial allocation to last division created
+(16) IQTABV(16)  table-offset J of the table, if contained in store
+                 ie. LQ(@J+1) is the first word of the table, unless
+                 J = 0: the table is not contained in the store
+\end{verbatim} 
+
+\begin{flushright} \ul{\large Store control table}
+\end{flushright}
+
+This table exists for each store in the 'system table'
+at the end of the space
+provided for the store by the user in the call to MZSTOR,
+except for the primary store when it is held in /MZCC/.
+
+For a particular store JQSTOR, acces to a particular number,
+say IQTABV(J), is via
+\begin{verbatim}
+            KQT  = NQOFFT(JQSTOR+1)
+            IVAL = IQTABV(KQT+J)
+\end{verbatim} 
+ie. by off-setting to the store control table for the primary store.
+In the following we give simply the structure of this primary
+store control table; exactly the same structure is repeated in every
+store control table.
+
+\begin{verbatim}
+IQTABV(16)   store parameters, see the separate IQTABV vector
+             description on the previous page
+
+LQSYSS(  )   store system links, see the separate LQSYS vector
+LQSYSR(  )   descriptions on the next page
+
+LQSTA(21)    start adr of division J, J=1,2,...20
+             LQSTA(21) is end-of-store+1
+LQEND(20)    end+1 adr of division J
+NQDMAX(20)   maximum size of division J
+
+IQMODE(20)   mode of the division J
+                bit 1 = 0 / 1  division forward / reverse
+
+IQKIND(20)   kind of the division J
+             JBYT(IQKIND(J),21,4)= 1  user short-range division
+                                   2  user long-range division
+                                   4  package division
+                                   8  system division
+             JBIT(IQKIND,J) = 1, other bits 1 to 20 are zero
+
+IQRCU(20)    division bits: 'references to' are active, globals unfolded
+IQRTO(20)    division bits: 'references to' are active
+IQRNO(20)    division bits: 'references to' are permitted (mask)
+NQDINI(20)   initial size of division J
+NQDWIP(20)   number of times 'wipe' executed
+NQDGAU(20)   number of times user garbage collection
+NQDGAF(20)   number of times forced garbage collection for no space
+NQDPSH(20)   number of times 'push' executed with relocation pass
+NQDRED(20)   number of times 'reduced'
+NQDSIZ(20)   maximum size of the division seen
+IQDN1(20)    chars  1:4
+IQND2(20)           5:8 of the printing name of the division
+
+Primary store only:
+KQFT         such that LQFSTA(1) is LQSTA(KQFT+1)  (=342 at present)
+LQFSTA(21)   used in MZCOPY
+\end{verbatim} 
+
+\begin{flushright} \ul{\large in /MZCC/:  LQSYS system link vectors}
+\end{flushright}
+
+The vectors LQSYSS and LQSYSR are the system link areas
+attached to each store.
+Their words are reserved as follows:
+
+\vspace{4mm}
+\ul{structural}: LQSYSS
+
+\begin{verbatim}
+   1     :  system bank holding the link area descriptions
+   2 LQMST:  working link for MQ
+   3 LQT :  TZ package support link
+   4 LQFS:  FZ package support link
+   5 LQFORM:  MZFORM format d/s support link
+   7 LQRS:  RZ package support link
+  10 LQZEP:  ZEP support link
+\end{verbatim} 
+
+\ul{reference}: LQSYSR
+
+\begin{verbatim}
+   1 + 2 :  2 working links for MZ
+   4 LQFF:  FZ, last control-bank retrieved
+   5 LQFI:  FZ, control-bank for current input unit
+   6 LQFX:  FZ, control-bank for current output unit
+   7 LQRRF:  RZ package working link
+\end{verbatim} 
+
+\begin{flushright} \ul{\large Table of Link Areas}
+\end{flushright}
+
+This table, one for each store,
+is held in a bank in the system division of the store;
+its address is  L = LQSYSS(KQT+1)
+
+The table contains one entry of 5 words for each link area
+as follows:
+
+\begin{verbatim}
+   word 1:  LLA   for  LQ(@LLA)    being the first word,
+        2:  LLAE  for  LQ(@LLAE-1) being the  last word of the area
+
+        3:  bits 1-15:  number of structural links
+             bit  31      = 0  if permanent link area
+                          = 1  if temporary link area
+
+        4:  characters 1:4
+        5:             5:8  of the printing name of the area
+\end{verbatim} 
+
+The first entry of the table describes the permanent links
+plus the working space links of the store;
+this area may be of length zero.
+The second entry describes the system links contained in
+the store control table for this store.
+Further entries appear in the order in which they have been
+created by either MZLINK or MZLINT.
+
+The table as a whole in the bank at L is as follows:
+
+\begin{verbatim}
+         IQ(L+1)   NWU  active size of the table of n entries,
+                        NWU = 5*n + 1
+   entry 1
+             +2)   LLA = 1
+             +3)   LLE = 1 + NQLINK
+             +4)   number of permanent structural links
+             +5)   4HQWSP
+             +6)   blank
+   entry 2
+             +7)   LLA = LOCF(LQSYSS(KQT+1)) - LQSTOR
+             +8)   LLE = LLA + number of system links
+             +9)   number of structural system links
+            +10)   4HQLAS
+            +11)   4HYST
+   entry 3
+            +12)   LLA = LOCF(first word) - LQSTOR
+             ...   ...
+   entry i
+
+      IQ(L+5i-3)   LLA                    for entry i
+             ...   ...
+\end{verbatim} 
+
+\Filename{H2-MZ-relocation-tables}
+\section{Relocation Tables}
+
+\begin{flushright} \ul{\large Memory Occupation Table}
+\end{flushright}
+
+The table has one entry of 8 words for each memory region
+taking part in global memory operations.
+Its bounds are given by LQMTA and LQMTE:
+
+\begin{verbatim}
+      LQMTA  start adr of the first entry
+      LQMTE  end+1 adr of the last  entry
+\end{verbatim} 
+
+A particular entry has this format:
+
+\begin{verbatim}
+   LQ(L+0)   division number
+             if zero: pseudo division
+
+   LQ(L+1)   activity flag:
+
+                -1  division is empty
+                 0  inactive
+                 1  relocation only
+                 2  active, eg. global shift, or MZPUSH, or MZREPL
+                 3  garbage collection
+                 4  wipe
+
+   LQ(L+2)   NWSH, global shift of this division by NWSH words
+
+               -ve  shift to low
+                 0  no shift
+               +ve  shift to high
+
+   LQ(L+3)   start adr of the first bank
+   LQ(L+4)   end+1 adr of the last  bank
+
+   LQ(L+5)   rel. adr of the first associated relocation entry
+             ie. LF = LQRTA + LQ(L+5), LQ(LF) is the first entry
+             in the link relocation table for this memory region
+
+   LQ(L+6)   rel. adr of the last+1 entry, (only if LQ(L+1)=3)
+             = -3 if division with garbage collection reset because
+                  of 'table full'
+
+   LQ(L+7)   NFREE, number of words collected or wiped
+\end{verbatim} 
+
+\begin{flushright} \ul{\large Link Relocation Table}
+\end{flushright}
+
+This table contains the prescription of how any link is to be
+updated.
+
+The table covers the 'total relocation interval'
+(LFIXLO,LFIXHI),
+links pointing outside this interval are not changed.
+
+The area covered by the relocation interval is considered as a
+series of alternating 'live' and 'dead' regions,
+described by the link relocation table.
+One entry in this table specifies a particular live region
+\ul{and}
+the dead region just behind it.
+Each region represents an integral number of live or dead banks,
+or alternatively a region of non-occupied store (reserve area).
+For the live region the table entry specifies the relocation
+constant, for the dead region it specifies whether a structural link
+pointing into this region should be bridged or not.
+
+The table is constructed in the largest gap of the ZEBRA stores,
+with the following structure:
+
+\begin{verbatim}
+  it starts at     LQ(LQTA-1)  holding LFIXLO
+  continues        LQ(LQTA)    first entry
+                   LQ(LQTA+4)  second entry
+           . . .
+                   LQ(LQTE-4)  last entry
+  and ends at      LQ(LQTE)    holding LFIXHI.
+
+\end{verbatim} 
+The format for entry i at  L = LQTA + 4*(i-1) is:
+
+\begin{verbatim}
+  LQ(L+0)    LAi:    start adr of the live area
+      +1)    LDi:    start adr of the adjacent dead area
+      +2)    NRELi:  relocation constant for the live area
+      +3)    IFLi:   bridging flag for the dead area
+                      zero: no, 1: yes, -1: link to remain unchanged
+\end{verbatim} 
+
+The store from LQ(@LAi) to LQ(@LDi-1) is occupied
+by live banks.
+The store from LQ(@LDi) to LQ(@LAj)-1 with j=i+1
+is a dead region,
+containing dead banks to be bridged only if  IFLi=1.
+
+The store from LQ(@LFIXLO) to LQ(@LA1)
+is a non-bridging dead region.
+
+It is in the nature of this table that the link relocation table
+represents at the same time the detailed instructions for
+the memory move, if any.
+
+\begin{flushright} \ul{\large relocation parameters in /MZCT/}
+\end{flushright}
+
+The parameters in /MZCT/ control the relocation process.
+
+\begin{verbatim}
+   IQFLIO      flag I/O, init to zero by MZTABM
+               flags special treatment for IO relocation
+               non-zero: relocation called from FZIN (also MZCOPY)
+               triggers actions in MZRELB:
+               1) links pointing outside <LQ(LQTA),LQ(LQTE> are
+                  simply reset to zero
+               2) do not go to ZFATAL for bank-chaining clobbered
+                  but return IQFLIO = -7 to signal bad input structure
+
+   IQGAP(5,4)  returns the parameters of the largest gaps found by MZFGAP
+               Entry 'J' in the table contains:
+                 IQGAP(1,J) = number of words available
+                 IQGAP(2,J) = abs. zebra adr of first word in the gap
+                 IQGAP(3,J) = division number
+                 IQGAP(4,J) = store number
+                 IQGAP(5,J)   user flag
+               Gaps J=1 and 2 are outside the moving region,
+                      3 and 4 could be inside the moving region
+
+   IQPART      partial garbage collection, init to zero by MZTABM
+               handle not enough space for the relocation tables
+               if = zero: no problem
+               set to =7  by MZTABH if not enough table space
+               set to =-7 by MZTABH if table moved into the forbidden gap
+               set to =1  by MZTABC if not enough space
+               set to =1  by MZTABR if not enough space
+
+   IQTBIT      status-bit for table building, init to IQDROP by MZTABM
+   IQTVAL      value of status-bit,           init to   zero by MZTABM
+               construct table for banks having IQTVAL in bit IQTBIT
+
+   IQTNMV      init to zero by MZTABM if JQSTMV < 0 on entry
+                set to zero by MZGAR1, MZDIV
+                set to   -7 by MZCOPY
+               used by MZTABH on first entry:
+               = 0: alright to move Mem.occ.table to forbidden gap
+                     return IQPART = 7 if no gap at all
+               < 0: alright to move Mem.occ.table to forbidden gap
+                     return IQPART = -7 if so done
+               > 0: Mem.occ.table may not go into a forbidden gap
+                     return IQPART = 7 if no allowed gap
+
+   JQGAPM      gap for Memory occupation table, init to zero by MZTABM
+               if non-zero: the Memory occupation table has been moved
+               to gap JQGAPM described by IQGAP(1/5,JQGAPM)
+
+   JQGAPR      gap for the Relocation table, init to zero by MZTABM
+               if non-zero: the Link Relocation table has been moved
+               to gap JQGAPR
+
+\end{verbatim}
+
+\begin{verbatim}
+   JQSTMV      moving store, -1 if none, controlling MZFGAP
+   JQDVM1      first moving division
+   JQDVM2      last  moving division
+   NQDVMV      move divisions JQDVM1/2 by that many words, -ve: left
+               JQDVM1, JQDVM2, NQDVMV init to zero
+               by MZTABM if JQSTMV < 0 on entry
+
+      Original meaning of JQSTMV,JQDVM1,JQDVM2,NQDVMV (cf. MZTABS):
+      unless JQSTMV<0, the divisions JQDVM1 to JQDVM2 inclusive
+      of the store JQSTMV may have to be shifted by NQDVMV words,
+      to the left if -ve, to the right if +ve.
+      NQDVMV=0 means to the left by a yet unknown amount.
+      It follows that the gaps after divisions JDIV are not available
+      for the relocation table because they may be over-written
+      by the memory move, with:
+         NQDVMV  0, -ve:  JDIV = <JQDVM1-1,JQDVM2-1>
+                    +ve:  JDIV = <JQDVM1,  JQDVM2  >
+
+      MZFGAP is also used for I/O to find a gap where to put the
+      relocation table on input. In this case there is just one
+      gap unavailable, namely the one which will receive the data.
+      This is the gap before a reverse division (JQMODE=1) or after
+      a forward division (JQMODE=0). To block this gap one can give
+      JQDVM1=JQDVM2=JDIV and NQDVMV=1-2*JQMODE, setting JQSTMV also.
+
+   LQMTE       end+1 adr of the Memory occupation table,
+                     init to LQWKTB+NQWKTB-1 by MZTABM
+   LQMTA       start adr of the Memory occupation table,
+                     init to LQMTE-160 by MZTABM
+   LQMTB       curr. adr of the Memory occupation table,
+                     init to LQMTA by MZTABM
+
+   LQMTLU      adr in the Mem.occ.table of the last division used
+               init by MZTABM to point to division 20
+               reset by MZTABX
+
+   LQMTBR      init to zero by MZTABM
+               set by MZTABR to point to the current entry into
+               the Memory occupation table when it runs out of
+               table space.
+               The code handling this is a remenant from an
+               earlier approach to handle "table space full"
+               and has been left in MZTABR for safety.
+               In fact, now MZGAR1 recalls MZTABM after the first
+               partial garbage collection.
+               (The code handling LQ(LQMTB+6) = -3 is also part
+               of this old approach)
+
+   LQRTA       start adr of the memory available to the Relocation table
+               init to LQWKTB by MZTABM
+   LQRTE       end+1 adr of the memory available to the Relocation table
+               init to LQMTA-10 by MZTABM
+               both are updated by MZTABH if the tables are moved
+
+   LQTA        start adr of the Link Relocation table,
+               init to LQRTA+1 by MZTABM
+   LQTE        end+1 adr of the Link relocation table,
+               init to LQRTE    by MZTABM
+
+\end{verbatim}
+
+\begin{verbatim}
+               parameters driving MZTABC, set by MZTABR
+   LQMTC1      start adr of first bank
+   LQMTC2      end+1 adr of  last bank
+   LQTC1       first table word available, init to LQRTA+1 by MZTABM
+   LQTC2       last  table word available, init to LQRTE   by MZTABM
+
+   MQDVGA      flag word indicating the divisions with garbage collection
+               bit j, j=1,2,...,20 for garbage collection in division j
+
+   MQDVWI      flag word indicating the divisions to be wiped
+               bit j, j=1,2,...,20 for wiping division j
+
+   MQDVAC      flag word indicating the active divisions
+               constructed from MQDVGA + MQDVWI by MZTABM
+               and updated by MZTABS and MZTABR
+               seems to be used only for printing
+
+   NQDVMV      move divisions JQDVM1/2 by that many words, -ve: left
+               init to zero by MZTABM if JQSTMV < 0 on entry
+
+   NQFREE      number of words to become free, init to zero by MZTABM
+   NQFRTC      number of words found free by MZTABC (per call)
+
+   NQGAPN      number of normal gaps available in IQGAP
+   NQGAP       number of all gaps, including forbidden, in IQGAP
+
+   NQLIVE      number of live banks found by MZTABC (per call)
+
+   NQNOOP      no-operation flag constructed by MZTABF
+               = zero normally
+               = -7 really no operation
+               = +7 only a memory shift with no garbage collection
+                    and no links pointing into the shifted region
+                    for example: left-shift empty division 2
+               usage in MZMOVE: if non-zero update the division tables
+                                 without execution of MOVE
+\end{verbatim} 
+
+\Filename{H2-MZFORM-data-structure}
+\section{MZFORM data structure}
+
+\begin{verbatim}
+                                 LID
+
+                                  |
+                                 / \
+                ______________         ______________
+               |              |       |              |
+LQFORM ---->   |     QID      |       |     QID      |  list of
+               | for +ve ID's |       | for -ve ID's |  identifiers
+            -- |______________|       |______________|
+           |
+           |      |                      |
+           | -2   | -1                   | -1
+           |    ______________         ______________
+           |   |              |       |              |
+           |   |     QIOX     |       |     QIOX     |  adr in QIOD
+           |   |     +ve      |       |     -ve      |  corresponding
+           |   |______________|       |______________|
+           |
+           |                     \ /
+           |                      |
+           |
+           |                     LIX
+          __________
+         |          |
+LIOD ->  |   QIOD   |   I/O characteristics
+         |__________|   stored
+\end{verbatim} 
+\begin{verbatim}
+
+  IQ(LID+1)  n = number of ID's stored
+         2   ji  of the last characteristic retrieved
+         3   IDH of the last characteristic retrieved
+         4   IDH  #1
+             ...
+       n+3   IDH  #n
+
+
+  IQ(LIX+1)  ji in QIOD for IDH #1
+         2   ji         for IDH #2
+             ...
+
+
+ IQ(LIOD+1)  n = number of words occupied;          j1 = 1
+      j1+1   start of 1st characteristic, n1 words, j2 = j1 + n1
+      j2+1            2nd                 n2 words, j3 = j2 + n2
+             ...
+
+    characteristic i is stored at ji in QIOD as NW+1 words:
+
+         word 1:   16 bits: control-byte |
+                    | 5 bits: NW | 5 bits: NW+1 | 6 bits: 1
+         word 2:   first extra I/O word (if any)
+                    ...
+      word NW+1:   last  extra I/O word
+\end{verbatim} 
+
+\Filename{H1-Summary-of-KERNLIB-routines}
+\chapter{Summary of KERNLIB routines}
+
+% N103  JX = IUWEED (AV,N)              locate floating-point exception in AV
+\spsmall
+
+\begin{verbatim}
+        The first letter indicates the mode of the variable according
+        to the Fortran convention, thus I -> N is INTEGER, else REAL,
+        and we add: small c  to designate CHARACTER
+                    small l  to designate LOGICAL
+     *  marks output variables
+     V  as last or last-but-one letter indicates a vector variable
+     W  as last or last-but-one letter indicates a matrix variable
+    sW  as last letters indicate a packed symmetric  matrix variable
+    tW  as last letters indicate a packed triangular matrix variable
+     M  as last letter means that the mode of the variable is immaterial
+    FL  stands for FORTRAN Library
+
+      COMMON /SLATE/ISL(40)  returns extra information
+
+. General
+---------
+
+Z035  CALL ABEND                      abnormal job-step termination
+Z007  CALL DATIME (IDATE*,ITIME*)     integer date / time, IDATE= yymmdd, ITIME= hhmm
+                                      ISL(1/6) = 19yy mm dd hh mm ss
+Z007  CALL DATIMH (IDTV*,ITMV*)       Hollerith date and time
+                                      IDT= 8Hyy/mm/dd, ITM= 8Hhh.mm.ss
+M220  CALL IE3FOD (DV,TV*,NDP,JBAD)   convert IEEE <- Double
+M220  CALL IE3FOS (SV,TV*,N,  JBAD)   convert IEEE <- Single
+M220  CALL IE3TOD (TV,DV*,NDP,JBAD)   convert IEEE -> Double
+M220  CALL IE3TOS (TV,SV*,N,  JBAD)   convert IEEE -> Single
+Z044  lo = INTRAC ()                  .true. if interactive running
+Y201  IX = IUBIN  (A,PAR,SPILL)       histogram bin,  PAR=NA,DA,ALOW
+Y201  IX = IUCHAN (A,ALOW,DA,NA)      histogram bin IX
+V304  JX = IUCOMP (IT,IAV,N)          find first IT in IA, JX=O if not found
+V304  JX = IUCOLA (IT,IAV,N)          find  last IT in IA, JX=O if not found
+V304  JX = IUFIND (IT,IAV,JL,JR)      find first IT in IA(JL/JR), JX=JR+1 if not found
+V304  JX = IUFILA (IT,IAV,JL,JR)      find  last IT in IA(JL/JR), JX=JR+1 if not found
+Y201  IX = IUHIST (A,PAR,SPILL)       histogram bin,  PAR=NA,1./DA,ALOW
+V304  JX = IUHUNT (IT,IAV,N,NA)       find IT in IA(1/N),every NA, JX=0 if not found
+V304  JX = IULAST (IT,IAV,N)          find last word in IA(1/N) not having IT
+                                                   JX=0 if all are IT
+M501  NX = IUSAME (IAV,JL,JR,MIN,JS*) search IA(JL/JR) for string of at
+                                      least MIN same elements,
+                                      if found: NX same elements, first is IA(JS)
+                                      else:     NX=0, JS=JR+1
+Z100  CALL JOBNAM (IDV*)              get name of job into 8 char. Hollerith
+Z042  IAD= JUMPAD (external)          get the target transfer adr
+Z042  CALL JUMPST (IAD)               set the target transfer adr
+Z042  CALL JUMPX0                     transfer with no parameters as set
+Z042  CALL JUMPX1 (p1)                transfer with  1 parameter
+Z042  CALL JUMPX2 (p1,p2)             transfer with  2 parameters
+Z043  CALL JUMPT0 (IAD)               transfer with no parameters to IAD
+Z043  CALL JUMPT1 (IAD,p1)            transfer with  1 parameter
+Z043  CALL JUMPT2 (IAD,p1,p2)         transfer with  2 parameters
+Z001  CALL KERNGT (LUN)               print current version of KERNLIB
+M432  NX = LNBLNK (cTEXT)             find last non-blank character in cTEXT
+N100  JX = LOCF   (A)                 absolute word adr of variable A
+N100  JX = LOCB   (A)                 absolute byte adr of variable A
+M215  FA = PSCALE (NX,NMAX,A,NDIG)    find power of ten to scale for printing
+Z041  CALL QNEXTE                     enter or re-enter into user routine QNEXT
+V104  X  = RNDM   ()                  simple random number
+V104  CALL RDMIN  (ISEED)             set the seed for RNDM
+V104  CALL RDMOUT (ISEED*)            get the seed for RNDM
+M107  CALL SORTI  (IXW*,NCOL,NROW,JEL)  sort rows of integer matrix on element JEL
+M107  CALL SORTR   (XW*,NCOL,NROW,JEL)  sort rows of    real matrix on element JEL
+M107  CALL SORTD  (DXW*,NCOL,NROW,JEL)  sort rows of  double matrix on element JEL
+N203  CALL TCDUMP (TITL,AVM,N,MODE)   MODE=3HFIH  floating,integer,hollerith
+\end{verbatim}
+
+\begin{verbatim}
+Z007  CALL TIMED  (T*)                T= seconds since last call to TIMED
+Z007  CALL TIMEL  (T*)                T= seconds left until time-limit
+Z007  CALL TIMET  (T*)                T= seconds of job ex. time used so far
+Z007  CALL TIMEST (TLIM)              init. for TIMEL on IBM
+N105  CALL TRACEQ (LUN,N)             print subroutine trace-back N levels deep
+V300  CALL UBLANK (IXV*,JL,JR)        IX(J)= 'blanks'           for J=JL,JR
+M409  CALL UBLOW  (IAm,  IA1*,  NCH)  copy Hollerith  Am to A1, NCH characters
+M409  CALL UBUNCH (IA1,  IAm*,  NCH)  copy Hollerith  A1 to Am
+M409  CALL UCTOH  (cHO,  IAn*,N,NCH)  copy Char/Holl  Am to An
+M409  CALL UCTOH1 (cHO,  IA1*,  NCH)  copy Char/Holl  Am to A1
+M409  CALL UHTOC  (IAn,N,cCH*,  NCH)  copy Hollerith  An to Character
+M409  CALL UH1TOC (IA1,  cCH*,  NCH)  copy Hollerith  A1 to Character
+V301  CALL UCOPY  (AVM,XVM*,N)        copy X(J) = A(J)          for J=1,N
+V301  CALL UCOPY2 (AMV,XVM*,N)        copy A to X, any overlap
+V301  CALL UCOPYN (IAV,IXV*,N)        copy -ve integer:   IX(J) = -IA(J)
+V301  CALL UCOPIV (AVM,XVM*,N)        copy inverted, eg. X(1)=A(N)
+V302  CALL UCOCOP (AVM,XVM*,IDO,N,NA,NX) copy IDO times N words, every NA,NX
+V302  CALL UDICOP (AVM,XVM*,IDO,N,NA,NX) copy IDO times N words, every NA,NX
+V300  CALL UFILL  (XVM*,JL,JR,AM)     X(J)= A                   for J=JL,JR
+M502  CALL UOPT   (IACT,IPOSS,IXV*,N) select options from poss., Hollerith
+M502  CALL UOPTC  (cACT,cPOSS,IXV*)   select options from possibilities
+V301  CALL USWOP  (XVM*,YVM*,N)       swop  X(J)=Y(J), Y(J)=X(J)
+V300  CALL UZERO  (IXVM*,JL,JR)       IX(J)= O                  for J=JL,JR
+F121  CALL VBLANK (IXV*,N)            IX(J)= hollerith BLANK    for J=1,N
+F121  CALL VFILL  (XVM*,N,AM)         X(J)= A                   for J=1,N
+F121  CALL VFIX   (AV,IXV*,N)         IX(J) =  A(J)             for J=1,N
+F121  CALL VFLOAT (IAV,XV*,N)          X(J) = IA(J)             for J=1,N
+F121  CALL VZERO  (IXVM*,N)           IX(J)= O                  for J=1,N
+J200  CALL VIZPRI (LUN,cTEXT)         print 1 line of large characters
+Z203  CALL XINB   (LUN,XV*,*NX*)      var.  length:   READ (LUN) NX,XV
+Z203  CALL XINBF  (LUN,XV*,*NX*)      fixed length:   READ (LUN) XV
+Z203  CALL XINBS  (LUN,XAV*,NA,XV*,*NX*)     split:   READ (LUN) NX,XAV,XV
+Z203  CALL XOUTB  (LUN,V,N)           var.  length:  WRITE (LUN) N,V
+Z203  CALL XOUTBF (LUN,V,N)           fixed length:  WRITE (LUN) V
+Z203  CALL XOUTBS (LUN,AV,NA,V,N)     split mode:    WRITE (LUN) N,AV,V
+\end{verbatim}
+
+\begin{verbatim}
+. Bitwise logical operations on full words
+-------------------------------------------------
+
+M441  IX = IAND   (IWD1,IWD2)    logical AND
+M441  IX = IEOR   (IWD1,IWD2)    logical exclusive OR
+M441  IX = IOR    (IWD1,IWD2)    logical OR
+M441  IW = NOT    (IWD)          logical NOT
+M441  IX = ISHFT  (IWD,NSH)     +ve:  logical  left shift by  NSH places
+                                -ve:  logical right shift by -NSH places
+M441  IX = ISHFTC (IWD,NSH,NBITS) left-circular shift by (+-)NSH places
+                                  of the right-most NBITS bits
+
+. Bit / byte handling, least significant bit is 1
+-------------------------------------------------
+
+  symbolic:  'byt' ==  IWD,J,NBITS  is byte at J of NBITS bits in IWD
+
+M421  IX = JBIT   (IWD,J)        get bit J
+M421  IX = JBYT   ( byt)         get byte at J of NBITS bits in IWD
+M421  IX = JBYTET (IA, byt)      get logical AND of IA and "byt"
+M421  IX = JBYTOR (IA, byt)      get logical  OR of IA and "byt"
+M421  IX = JRSBYT (IA, byt*)     get "byt" and reset it to IA
+
+M421  CALL  SBIT  (I,IWD*,J)     set in IWD   bit J to I
+M421  IX = MSBIT  (I,IWD, J)     get IWD with bit J set to I
+M421  CALL  SBIT0   (IWD*,J)     set in IWD   bit J to zero
+M421  IX = MSBIT0   (IWD, J)     get IWD with bit J set to zero
+M421  CALL  SBIT1   (IWD*,J)     set in IWD   bit J to 1
+M421  IX = MSBIT1   (IWD, J)     get IWD with bit J set to 1
+M421  CALL  SBYT  (I, byt*)      set in IWD   "byt" to I
+M421  IX = MSBYT  (I, byt)       get IWD with "byt" set to I
+M421  CALL SBYTOR (I, byt*)      set in IWD   "byt"     to  OR of "byt" and I
+M421  IX = MBYTOR (I, byt)       get IWD with "byt" set to  OR of "byt" and I
+M421  IX = MBYTET (I, byt)       get IWD with "byt" set to AND of "byt" and I
+M421  CALL  CBYT  (IWS,JS, byt*) copy byte at JS in IWS to "byt"
+M421  IX = MCBYT  (IWS,JS, byt)  get IWD with "byt" set to byte at JS of IWS
+
+M503  CALL UBITS  (IAV,NBITS,IXV*,NX*)  make list of bit-nos of non-zero bits
+M428  JX = LOCBYT (I,IAV,N,NEV,J,NBITS)  is IUHUNT for byte-content I
+
+. Handling packed byte vectors
+------------------------------
+
+  MPAK=NBITS,INWORD: bytes of NBITS bits packed r-to-l, INWORD of them per word
+       if NBITS = 0: assume NBITS=1 and INWORD = maximum
+
+M423  IX = INCBYT (INC,IPV*,J,MPAK)   increment packed byte
+M422  IX = JBYTPK (IPV,J,MPAK)        get packed byte
+M422  CALL SBYTPK (I,IPV*,J,MPAK)     set packed byte
+M422  CALL PKBYT  (IAV,IPV*,J,N,MPAK) pack byte-vector right-to-left
+M422  CALL UPKBYT (IPV,J,IAV*,N,MPAK) unpack byte-vector right-to-left
+
+  MPAR=NBITS,NCHAR,NZONE,IGNOR,NFILL   packing control, l-to-r
+
+M427  CALL PKCHAR (IAV,IPV*,N,MPAR)   pack integers left-to-right
+M427  CALL UPKCH  (IPV,IAV*,N,MPAR)   unpack byte-vector left-to-right
+
+. Bit / byte handling, least significant bit is 0
+-------------------------------------------------
+
+M441  IX = IBITS  (IWD,J,NBITS)  get byte at J of NBITS bits
+M441  lo = BTEST  (IWD,J)        true if bit J is 1
+M441  IX = IBSET  (IWD,J)        IX= IWD with bit J set to 1
+M441  IX = IBCLR  (IWD,J)        IX= IWD with bit J set to 0
+M441  CALL MVBITS (IA,JA,NBITS,IWD*,J)  store byte at JA of IA into byte at J in IWD
+\end{verbatim}
+
+\begin{verbatim}
+. Unix functions
+----------------
+
+      some use COMMON /SLATE/ND,DUMMY(39), and status IST=0 if good
+
+Z265  IST= CHDIRF (cNAME)             set current working directory
+Z265  CALL CTIMEF (ICLOCK,cTIME*)     decode time from STATF to TIME*24
+Z265  CALL GETENVF(cNAME,cVAL*)       get value of environment variable
+                                      ND = LNBLNK(cVAL)  =0 if not found
+Z265  CALL GETPIDF(IPID*)             get ID of the current process
+Z265  CALL GETWDF (cNAME*)            get current working directory
+                                      ND = LNBLNK(cNAME)
+Z265  CALL GMTIMEF(ICLOCK,ITM*)       decode time from STATF TO ITM(1-9)
+      CALL JMPSET (AREA*,external)    do "setjmp" and go to "external"
+      CALL JMPLONG(AREA,NUM)          do "longjmp"
+Z265  IST= KILLF  (IPID,ISGNAL)       send signal to process IPID
+Z265  CALL PERRORF(cTEXT)             print last Unix error tagged with cTEXT
+Z265  IST= RENAMEF(cFROM,cTO)         rename file cFROM --> cTO
+      IPR= SIGNALF(NUMSIG,ext,IFLAG)  establish signal handler
+Z265  CALL SLEEPF (NSECS)             suspend process for NSECS seconds
+Z265  IST= STATF  (cNAME,INF*)        get info about file cNAME to INF(1-12)
+Z265  IST= SYSTEMF(cCOMMAND)          submit shell command
+      CALL TMINIT (INIT*)             initialize TMPRO / TMREAD
+      CALL TMPRO  (cPROMPT)           display prompt on terminal
+      CALL TMREAD (MAXCH,cLINE*,NCH*,IST*)  read line from terminal
+                                      NCH characters read into LINE
+                                      IST -ve: EoF signal
+
+. Z310  C interface to read/write fixed-lenth records, CFIO
+-----------------------------------------------------------
+
+  symbolic  "lmr" == LUNDES,MEDIUM,NWREC
+
+            LUNDES: file-descriptor of C, output parameter of CFOPEN
+            MEDIUM: 0 disk, 1 tape, 2 user disk, 3 user tape
+            NWREC:   number of Fortran words per record
+            status return ISTAT is zero for success
+
+  CALL CFOPEN (LUNDES*,MEDIUM,NWREC,cMODE,0,cNAME,ISTAT*)   open the file cNAME
+                                          cMODE= r r+ w w+ a a+
+  CALL CFGET  ("lmr",*NB*,MBUF*,ISTAT*)   read next record into MXBUF
+                                             in: NB words to be tranfered
+                                            out: NB words transfered
+  CALL CFPUT  ("lmr",MBUF, ISTAT*)        write next record
+  CALL CFSEEK ("lmr",NREC, ISTAT*)        set current file position
+  CALL CFTELL ("lmr",NREC*,ISTAT*)        get current file position
+  CALL CFSIZE ("lmr",NREC*,ISTAT*)        seek file to end and get its size
+                                     NREC: so many records before the next
+  CALL CFREW  (LUNDES,MEDIUM)             rewind the file
+  CALL CFCLOS (LUNDES,MEDIUM)             close  the file
+\end{verbatim}
+
+\begin{verbatim}
+. Maths General
+---------------
+
+FL     X = ACOS   (A)                 arcus cosinus, 0 -> PI
+FL     X = ASIN   (A)                 arcus sinus, -PI/2 -> PI/2
+FL     X = ATAN   (A)                 arcus tangens, -PI/2 -> PI/2
+FL     X = ATAN2  (RSIN,RCOS)         arcus tangens, -PI -> PI
+B101   X = ATG    (RSIN,RCOS)         arcus tangens, 0 -> 2*PI
+F117  CALL CROSS  (AV,BV,XV*)         A CROSS B  into  X
+F116   X = DOTI   (AV,BV)             X = A(1)B(1) +...+ A(3)B(3) - A(4)B(4)
+C300   X = ERF    (A)                 error function, integral 0 -> A
+C300   X = ERFC   (A)                 compl. error function, A to infinity
+E104   X = FINT   (...)               interpolation routine
+C300   X = FREQ   (A)                 normal frequence function, -INF to A
+U101  CALL LOREN4 (AV,BV,XV*)         Lorentz transformation
+U102  CALL LORENB (EN,REFV,STV,XV*)   Lorentz transformation, backward
+U102  CALL LORENF (EN,REFV,STV,XV*)   Lorentz transformation, forward
+G100   X = PROB   (CHI2,N)            convert CHI-square to probability
+B102   X = PROXIM (ALPHA,REF)         X = ALPHA + 2N*PI  nearest to REF
+F118  CALL ROT    (AV,TH,XV*)         rotate around Z-axis
+FL     X = TAN    (A)                 tangens
+
+. Maths  F 121  Vector handling package, VECMAN
+-----------------------------------------------
+
+E103   X = AMAXMU (AV,IDO,NWD,NA)     largest ABS element in scattered vector
+F121  LX = LVMAX  (AV,N)              loc of biggest  A(J)      for J=1,N
+F121  LX = LVMAXA (AV,N)              loc of biggest  ABS(A(J))
+F121  LX = LVSMX  (AV,N,INC)          loc of biggest  A(J) every INC
+F121  LX = LVSDMX (DV,N,INC)          loc of biggest  D(J) every INC, double
+F121  LX = LVSIMX (IV,N,INC)          loc of biggest  I(J) every INC
+F121  LX = LVMIN  (AV,N)              loc of smallest A(J)
+F121  LX = LVMINA (AV,N)              loc of smallest ABS(A(J))
+F121  LX = LVSMI  (AV,N,INC)          loc of smallest A(J) every INC
+F121  LX = LVSDMI (DV,N,INC)          loc of smallest D(J) every INC, double
+F121  LX = LVSIMI (IV,N,INC)          loc of smallest I(J) every INC
+F121  CALL VADD   (AV,BV,XV*,N)       X(J) = A(J) + B(J)        for J=1,N
+F121   X = VASUM  (AV,N)              X = sum ABS(A(J))         for J=1,N
+F121  CALL VBIAS  (AV,C,XV*,N)        X(J) = A(J) + C           for J=1,N
+F121  CALL VCOPYN (AV,  XV*,N)        copy -ve:   X(J) = -A(J)  for J=1,N
+F121   X = VDIST  (AV,BV,N)           X = SQRT (VDIST2(A,B,N))
+F121   X = VDIST2 (AV,BV,N)           X = (A-B)*(A-B)
+F121   X = VDOT   (AV,BV,N)           X = A * B
+F121   X = VDOTN  (AV,BV,N)           X =  A*B / SQRT(A*A * B*B)
+F121   X = VDOTN2 (AV,BV,N)           X = (A*B)**2 / (A*A * B*B)
+F121  CALL VEXCUM (AV,XV*,N)          X=Minimum,Maximum,Sum -- cumulative
+F121  CALL VFILL  (XVM*,N,AM)         X(J) = A                  for J=1,N
+F121  CALL VFIX   (AV,IXV*,N)         IX(J)=  A(J)              for J=1,N
+F121  CALL VFLOAT (IAV,XV*,N)         X(J) = IA(J)              for J=1,N
+F121  CALL VLINCO (AV,S,BV,T,XV*,N)   X(J) = A(J)*S + B(J)*T    for J=1,N
+F121  CALL VMATL  (GW,CV,XV*,NI,NJ)   X = G * C
+F121  CALL VMATR  (AV,GW,YV*,NI,NJ)   Y = A * G
+F121   X = VMAX   (AV,N)              biggest  A(J)             for J=1,N
+F121   X = VMAXA  (AV,N)              biggest  ABS(A(J))        for J=1,N
+F121   X = VMIN   (AV,N)              smallest A(J)             for J=1,N
+F121   X = VMINA  (AV,N)              smallest ABS(A(J))        for J=1,N
+F121   X = VMOD   (AV,N)              X = SQRT ( VDOT(A,A,N) )
+F121  CALL VMUL   (AV,BV,XV*,N)       X(J) = A(J) * B(J)        for J=1,N
+F121  CALL VSCALE (AV,C, XV*,N)       X(J) = A(J) * C           for J=1,N
+F121  CALL VSUB   (AV,BV,XV*,N)       X(J) = A(J) - B(J)        for J=1,N
+F121   X = VSUM   (AV,N)              X = sum A(J)              for J=1,N
+F121  CALL VUNIT  (AV,XV*,N)          X(J) = A(J) / VMOD(A,N)   for J=1,N
+F121  CALL VZERO  (IXVM*,N)           IX(J)= O                  for J=1,N
+\end{verbatim}
+
+\begin{verbatim}
+. Maths  Householder fitting and triangular matrices
+----------------------------------------------------
+
+E230  CALL TLERR  (AW,XW*,AUX,IPIV)   error matrix after fit
+E230  CALL TLRES  (AW,XV*,AUX)        residuals after fit
+E230  CALL TLS    (AW,BW,AUX,IPIV,EPS,XW*)      unconstrained L.S.FIT
+E230  CALL TLSC   (AW,BW,AUX,IPIV,EPS,XW*)      constrained L.S.FIT
+
+F112  CALL TRAAT  (AW,XsW*,M,N)       rectang * rectang(T) X = A * AT
+F112  CALL TRAL   (AW,BtW,XW*,M,N)    rectang * triang     X = A * B
+F112  CALL TRALT  (AW,BtW,XW*,M,N)    rectang * triang     X = A * BT
+F112  CALL TRAS   (AW,BsW,XW*,M,N)    rectang * symm       X = A * B
+F112  CALL TRASAT (AW,BsW,XsW*,M,N)   transform symm       X = A * B * AT
+F112  CALL TRATA  (AW,XsW*,M,N)       rectang(T) * rectang X = AT* A
+F112  CALL TRATS  (AW,BsW,XW*,M,N)    rectang * symm       X = AT* B
+F112  CALL TRATSA (AW,BsW,XsW*,M,N)   transform symm       X = AT* B * A
+F112  CALL TRCHLU (AsW,XtW*,N)        Choleski decomposition A = X*XT
+F112  CALL TRCHUL (AsW,XtW*,N)        Choleski decomposition A = XT*X
+F112  CALL TRINV  (AtW,XtW*,N)        inversion of triangular matrix
+F112  CALL TRLA   (AtW,BW,XW*,M,N)    triang. * rectang.   X = A * B
+F112  CALL TRLTA  (AtW,BW,XW*,M,N)    triang. * rectang.   X = AT* B
+F112  CALL TRPCK  (AW,XsW*,N)         pack A into symmetric form
+F112  CALL TRQSQ  (AsW,BsW,XsW*,N)    transform symm       X = A * B * A
+F112  CALL TRSA   (AsW,BW,XW*,M,N)    symm * rectang       X = A * B
+F112  CALL TRSAT  (AsW,BW,XW*,M,N)    symm * rectang       X = A * BT
+F112  CALL TRSINV (AsW,XsW*,N)        inversion of symmetric matrix
+F112  CALL TRSMLU (AtW,XsW*,N)        product of triang matrices  X = A * AT
+F112  CALL TRSMUL (AtW,XsW*,N)        product of triang matrices  X = AT* A
+F112  CALL TRUPCK (AsW,XW*,N)         unpack symm. A into full  form
+\end{verbatim}
+
+\begin{verbatim}
+. M432  Utilities for Character string analysis, CHPACK
+--------------------------------------------------------
+
+  using  COMMON /SLATE/ND,NE,NF,NG,NUM(2),DUMMY(34) to return information
+                standard meaning:  ND: number of digits or characters seen
+                                   NE: COL(NE) is the terminating character
+
+         CHARACTER    LINE*(512), COL(512)*1
+         EQUIVALENCE (LINE,COL)
+
+  most routines have the 3 parameters  LINE,JL,JR  to designate the
+  field LINE(JL:JR) to be used, abbreviated to 'llr' if short of space.
+
+CALL CFILL  (cIT,LINE*,JL,JR) fill llr with as many copies of cIT*(*) as poss.
+CALL CKRACK (LINE,JL,JR)      krack numeric field; ND digits seen, NE term.
+                              NF= -ve bad, 0 blank, 1 B, 2 I, 3 F, 4 D seen
+                              NG= 0 good termination, NUM returns the number
+CALL CLEFT  (LINE*,JL,JR)     left-justify squeezing blanks,
+                              ND non-blanks, COL(NE) first blank
+CALL CRIGHT (LINE*,JL,JR)     right-justify squeezing blanks,
+                              ND non-blanks, COL(NE) last blank
+CALL CLTOU  (LINE(JL:JR)*)    convert low to up
+CALL CUTOL  (LINE(JL:JR)*)    convert  up to low
+CALL CSETDI (INT,LINE*,JL,JR) set decimal integer right-justified, ND digits
+                              COL(NE+1)  most significant digit set
+                              COL(NF+1)  most significant character set
+                              NG=0 good, else field too small
+CALL CSETHI (INT,LINE*,JL,JR) set hex integer right-justified,
+                              ND,NE,NF,NG as for CSETDI
+CALL CSQMBL (LINE*,JL,JR)     left-justify squeezing multiple blanks,
+                              ND retained, COL(NE) first after
+                              NE=JR+1 if no multiple blanks
+CALL CSQMCH (cSG,LINE*,JL,JR) left squeeze multiple occurrences of cSG*1
+                              ND,NE as for CSQMBL
+CALL CTRANS (cOLD,cNEW, llr*) replace each occurrence of cOLD*1 by cNEW*1
+IX = ICDECI (LINE,JL,JR)      read decimal integer, ND digits, COL(NE) term.
+                              NG=0 if terminated by blank or end-of-field
+JX = ICFIND (cSG,LINE,JL,JR)  find COL(JX) first occ. of cSG*1 or JX=JR+1
+                              NG=0 not found, else =JX
+JX = ICFILA (cSG,LINE,JL,JR)  find COL(JX) last occ. of cSG*1 or JX=JR+1
+                              NG=0 not found, else =JX
+JX = ICFMUL (cIT,LINE,JL,JR)  find COL(JX) first occ. of any cIT(j:j) or JX=JR+1
+                              ND=j, NG=0 not found, else =JX
+JX = ICFNBL (LINE,JL,JR)      find COL(JX) first non-blank, or JX=JR+1
+                              NG=0 all blank, else =JX
+IX = ICHEXI (LINE,JL,JR)      read hex integer, ND,NE,NG as for ICDECI
+JX = ICLOC  (cIT,NI, llr)     locate cIT(1:NI) as is in LINE(JL:JR)
+                              COL(JX) start, JX=0 if not found
+JX = ICLOCL (cIT,NI, llr)     as ICLOC case insensitive, cIT given as lower
+JX = ICLOCU (cIT,NI, llr)     as ICLOC case insensitive, cIT given as upper
+JX = ICLUNS (LINE,JL,JR)      COL(JX) first 'unseen', else JX=0
+JX = ICNEXT (LINE,JL,JR)      LINE(JX:NE-1) is next 'word' in llr
+                              ND chars in word; no next: JX=NE=JR+1 ND=0
+JX = ICNTH  (cACT,cPOSS,NPO)  cACT as is matches cPOSS(JX), else JX=0
+JX = ICNTHL (cACT,cPOSS,NPO)  as ICNTH case insensitive, cPOSS given as lower
+JX = ICNTHU (cACT,cPOSS,NPO)  as ICNTH case insensitive, cPOSS given as upper
+JX = ICNUM  (LINE,JL,JR)      find COL(JX) first non-numeric, non-blank
+                              JX=JR+1 NG=0 if none, ND digits before JX
+JX = ICNUMA (LINE,JL,JR)      COL(JX) first non-alphameric, non-blank
+                              JX=JR+1 if none, ND alphamerics chars.
+                              NG=0 all alphanumeric, else =JX
+                              COL(NE) first numeric, else NE=0
+                              COL(NF) first alpha,   else NF=0
+IX = ICTYPE (cSG)             cSG*1 of type IX = 0 unseen, 1 others,
+                                    2 numeric, 3 lower, 4 upper case
+NX = LNBLNK (LINE(JL:JR))     find last non-blank character
+\end{verbatim}

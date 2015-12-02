@@ -1,0 +1,80 @@
+<![CDATA[/* read_histo.cpp */
+#include <iostream.h>
+#include <iomanip.h>
+#include "HTL/PHistograms.h"
+class Histo_App : public HepDbApplication
+{
+public:
+  Histo_App( const char *a_db_name = 0 )
+  { db_name_ = ( a_db_name != 0 ) ? a_db_name : "Default_DB"; }
+  void create();
+  // Create 3 histograms.
+  void readHisto();
+  // Read back the 2nd histogram from the database.
+public:
+  void init();
+  private :
+  ooHandle(ooDBObj)  histoDb;
+  const char *db_name_;
+};
+void Histo_App::init()
+{    
+  Init();
+  startUpdate();
+  histoDb = db(db_name_);
+}
+void Histo_App::create()
+{
+  const int noOfBins=20;
+  // Create three histograms with different names:
+  HepRef(PHisto1D) h1 = new (histoDb) PHisto1D( "Histo-1", noOfBins, 0.0, 20.0);
+  HepRef(PHisto1D) h2 = new (histoDb) PHisto1D( "Histo-2", noOfBins, 0.0, 20.0);
+  HepRef(PHisto1D) h3 = new (histoDb) PHisto1D( "Histo-3", noOfBins, 0.0, 20.0);
+  // Fill histos with different weights:
+  double x;
+  for( int i = 0; i < 50000; i++) {   
+    x = (i % 22) - 1;          
+    h1->fill(x, (x-9.5)*(x-9.5)+3);
+    h2->fill(x, (x-9.5)*(x-9.5)+30);
+    h3->fill(x, (x-9.5)*(x-9.5)+300);      
+  }
+}
+void Histo_App::readHisto()
+{
+  ooItr(PHisto1D)  histo1D_itr;
+  // Iterator on 1D histo interface.
+  // Note:
+  // if the actual type of the histogram would not be known,
+  // an iterator for the interface type is needed:
+  // 	ooItr(P_I_Histo_1D)  histo1D_itr;
+  // Scan the database for the previous histo interface:
+  // (We could restrict our search to a container only)
+  histo1D_itr.scan( histoDb );
+  cout << endl << "Start scanning. Looking for Histo-2" << endl;
+  // Look for Histo 2:
+  //
+  for( int i = 1; histo1D_itr.next(); i++ ) { 
+    cout << "Found: " << histo1D_itr->name() << endl;
+    if( strcmp(histo1D_itr->name(), "Histo-2") == 0) {
+      // Let's print it:
+      cout << endl  << endl;
+      HPrinter hp(cout);
+      hp.print( *histo1D_itr);    
+      cout << endl;
+    }
+  }
+}
+int main( int argc, char **argv)
+{
+  // Read database name from command line if any:
+  const char *a_db_name = 0;
+  if( argc > 1 ) a_db_name = argv[1];
+  // Create application object:
+  Histo_App my_app( a_db_name );
+  my_app.init();
+  my_app.create();
+  my_app.commit();
+  my_app.startRead();
+  my_app.readHisto();
+  my_app.commit();
+}]]>

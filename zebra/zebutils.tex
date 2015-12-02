@@ -1,0 +1,577 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%   ZEBRA User Guide -- LaTeX Source                              %
+%                                                                 %
+%   Chapter Utilities                                             %
+%                                                                 %
+%   The following external EPS files are referenced:              %
+%   fshunt1, fshunt2, fshunt3, fshunt4, fshunt5, fshunt6, fshunt7 %
+%                                                                 %
+%   Editor: Michel Goossens / AS-MI                               %
+%   Last Mod.:  8 Dec. 1990   mg                                  %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{Utilities}
+\section{Operations on data structures}
+\subsection{Dropping a bank and its dependents}
+\par \Rind{MZDROP} allows one to drop either the {\bf bank}
+or the {\bf linear structure} at L ('L' option).
+Dropping a bank implies dropping also the whole partial
+data structure which depends on this bank downwards.
+\par Dropped banks stay in memory with the drop status bit set,
+links pointing to them continue to do so,
+except for the immediate structural link indicated via the
+origin link of the bank at L, which is bridged or reset to zero,
+whichever is appropriate.
+\Subr{CALL MZDROP (IXSTOR,L,CHOPT)}
+\index{bank!drop}
+\Idesc
+\begin{DL}{MMMMM}
+\item[IXSTOR]Index of the store containing the bank to be dropped
+\item[L]Address of the bank or linear structure to be dropped
+\item[CHOPT]Character variable specifying the action desired:
+\begin{DL}{MM}
+\item['']Default - Drop the bank at L and its vertical dependents
+i.e. the next link of this bank is not followed.
+\item['L']Drop the linear structure pointed to by L
+i.e. the next link of the bank at L is followed until
+all the banks in the linear structure and its dependents have been
+dropped.
+\item['V']Drop only the partial data structure
+dependent vertically on the bank at L, but not the the bank itself.
+\end{DL}
+\end{DL}
+\subsection{Set one of the status bits in the bank of a data structure}
+\par By following the structural links,
+\Rind{MZFLAG} sets the selected status bit into the status words
+of all the banks of the data structure supported
+by the vertical links of the specified start bank.
+Optionally it can include in the marking
+also the banks of the linear structure supported
+by link 0 of the start bank and all their dependents.
+The start bank itself may or may not be marked.
+\Subr{CALL MZFLAG (IXSTOR,L,IBIT,CHOPT)}
+\index{bank!status bit}
+\Idesc
+\begin{DL}{MMMM}
+\item[IXSTOR]Index of the store containing the bank to be flagged
+\item[L]Address of the start bank supporting the partial
+data structure.
+No action if {\tt L=0}.
+\item[IBIT]The bit number of the status bit to be set (using the convention that
+the least significant bit in a word is identified with the number 1).
+\item[CHOPT]Character variable specifying the action desired:
+\begin{DL}{MM}
+\item['']Default - Flag the bank at L (and its vertical dependents),
+but the next link of this bank is not followed.
+\item['L']Flag the linear structure pointed to by L,
+i.e. the next link of the bank at L is followed.
+\item['V']Flag only the the partial data structure dependent vertically
+on the bank at L, but not the bank itself.
+\item['Z']Set to zero the status bit IBIT in each bank to be marked.
+In the default case bit IBIT in the status word is set to one.
+\end{DL}
+\end{DL}
+\subsubsection{Example:}
+\begin{verbatim}
+      CALL MZFLAG (0,LQMAIN,IQDROP,'L')
+\end{verbatim}
+drops the complete 'Main' data structure, and is equivalent to
+\begin{verbatim}
+      CALL MZDROP (0,LQMAIN,'L'),
+\end{verbatim}
+except that it does not alter the contents of {\tt LQMAIN}.
+\subsection{Change structural relations}
+\par Because of the presence of the reverse pointers,
+the operation of moving a bank by relinking from one data structure
+to another one is a non trivial operation.
+The routine \Rind{ZSHUNT} is provided to execute such an operation.
+\par \Rind{ZSHUNT} may be used to modify the links associated with
+either a single bank ({\tt IFLAG=0})
+or a whole linear structure ({\tt IFLAG=1}), using information provided
+by the parameters
+{\tt LSUP} and {\tt JBIAS}, which have the same significance as in
+\Rind{MZLIFT}.
+\Subr{CALL ZSHUNT (IXSTOR,LSH,LSUP,JBIAS,IFLAG)}
+\index{data structure!change}
+\Idesc
+\begin{DL}{MMMM}
+\item[IXSTOR]Index of the store containing the bank to be shunted
+{\tt IXDIV}, the index of the division containing
+the bank to be shunted, may be given instead
+\item[LSH]The address of the data structure to be shunted
+\item[LSUP]if {\tt JBIAS < 0:}  the address of the new supporting up bank\\
+if {\tt JBIAS = 0:}  the address of the new supporting previous bank\\
+if {\tt JBIAS = 1:}  the new supporting link
+\item[JBIAS]if {\tt JBIAS < 1:}  the link bias in the new supporting bank\\
+if {\tt JBIAS = 1:} the origin link in bank {\tt LSH}
+will point to link {\tt LSUP}\\
+if {\tt JBIAS = 2:}  detach without insertion
+\item[IFLAG]if {\tt IFLAG = 0:}  shunt the one single bank at {\tt LSH}\\
+if {\tt IFLAG = 1:}  shunt the whole linear structure pointed to by {\tt LSH}
+\end{DL}
+\par If the bank or the structure to be relinked is in fact inserted
+or added into an existing linear structure,
+both must be contained in the same division.
+\subsubsection{Examples}
+\begin{figure}
+\epsffile{fshunt1.ps}
+\caption{ZSHUNT - The original data structures}
+\label{FSHUNT1}
+\end{figure}
+\par Originally we have the data structures shown in
+Figure~\ref{FSHUNT1}, where any bank may support further
+dependent partial data structures since
+the corresponding vertical structural links are not changed by \Rind{ZSHUNT}.
+\par In what follows the notation {\tt Lxx}is used to designate
+a link pointing to bank {\tt xx}.
+\par Each example below
+refers to the starting situation described in Figure~\ref{FSHUNT1}.
+\begin{figure}
+\epsffile{fshunt2.ps}
+\caption{ZSHUNT - Add bank (and dependents) to front of linear structure}
+\label{FSHUNT2}
+\end{figure}
+\begin{verbatim}
+      CALL ZSHUNT (0,LA2,LUN,-7,0)
+\end{verbatim}
+\par This moves a single bank (with is dependents, if any) out of
+a linear structure, and inserts it at the head of the linear
+structure supported by link -7 of the bank UN.
+\begin{figure}
+\epsffile{fshunt3.ps}
+\caption{ZSHUNT - Move part of linear structure in front of another one}
+\label{FSHUNT3}
+\end{figure}
+\begin{verbatim}
+      CALL ZSHUNT (0,LA2,LUN,-7,1)
+\end{verbatim}
+\par This is the same as in Figure~\ref{FSHUNT2},
+except that the (partial) linear
+structure starting with bank A2 is relinked.
+\begin{figure}
+\epsffile{fshunt4.ps}
+\caption{ZSHUNT - Move bank into a linear structure}
+\label{FSHUNT4}
+\end{figure}
+\begin{verbatim}
+      CALL ZSHUNT (0,LA2,LN2,0,0)
+\end{verbatim}
+\par This is again the same as in Figure~\ref{FSHUNT2},
+but the bank is inserted inside the linear structure,
+rather than at its front.
+\begin{figure}
+\epsffile{fshunt5.ps}
+\caption{ZSHUNT - Move a bank to a top level structure}
+\label{FSHUNT5}
+\end{figure}
+\begin{verbatim}
+      CALL ZSHUNT (0,LA2,LQMAIN,1,0)
+\end{verbatim}
+\par This re-links bank A2 to be the first in the top-level linear
+structure supported by {\tt LQMAIN}.
+\begin{figure}
+\epsffile{fshunt6.ps}
+\caption{ZSHUNT - Attach a linear structure to a top level link}
+\label{FSHUNT6}
+\end{figure}
+\begin{verbatim}
+      CALL ZSHUNT (0,LA1,LHEAD,1,1)
+\end{verbatim}
+\par Supposing {\tt LHEAD=0} initially; this connects the linear structure
+to the (structural) link {\tt LHEAD}, i.e.
+the origin link of the header bank A1
+points back to the location of {\tt LHEAD}.
+\begin{figure}
+\epsffile{fshunt7.ps}
+\caption{ZSHUNT - Detach a linear structure}
+\label{FSHUNT7}
+\end{figure}
+\begin{verbatim}
+      CALL ZSHUNT (0,LA1,0,2,1)
+\end{verbatim}
+\par This removes the linear structure from its old position
+without inserting it into a new one.
+This should only be temporary; one should insert the floating
+structure into a new position by a second call to \Rind{ZSHUNT}
+soon after.
+\section{Copy a data structure}
+\par A data structure can be copied from memory to memory by using
+routine \Rind{MZCOPY}. The data structure can be in one or more divisions
+in one store or in ``stand-alone'' memory and can be copied to a division
+in the same store, a different one or to ``stand-alone'' memory.
+\par The case of ``stand-alone'' or ``flat''
+memory copies is intended for communication
+between separate processes running on the same computer through sharable
+memory (formally FORTRAN common blocks). The information must belong to
+a single data structure
+(see the ZEBRA reference manual for more details).
+\Subr{CALL MZCOPY (IXDVFR,LENTRY,IXDVTO,*LSUP*,JBIAS,CHOPT)}
+\index{data structure!copy}
+\Idesc
+\begin{DL}{MMMM}
+\item[IXDVFR]Index of division(s) containing the data structure to be copied
+\item[LENTRY]Address of the data structure to be copied
+\item[IXDVTO]Index of the {\bf particular}
+division into which the data structure has to be copied.
+\item[*LSUP*]
+\item[JBIAS]{\tt JBIAS < 1: LSUP} is the supporting bank in the target division
+and JBIAS is the link bias specifying where the data structure has to be
+introduced into this bank, i.e. the data structure will be connected
+to LQ(LSUP+JBIAS).\\
+{\tt JBIAS = 1: LSUP} is the supporting link, i.e. the data structure
+is connected to {\tt LSUP} (top level data structure)\\
+{\tt JBIAS = 2:} Stand alone data structure, no connection.
+\item[CHOPT]Character variable specifying the selected options.
+\begin{DL}{MMMMMMM}
+\item[Data structure]
+\begin{DL}{MM}
+\item[' ']Copy the data structure at {\tt LENTRY} (the next link is not
+followed).
+\item['D']Copy complete division(s)\\
+default: Dropped banks are squeezed out\\
+\phantom{default:} (slower but maybe more economic than 'DI')
+\item['DI']Immediate dump of divisions with dropped banks included
+\item['L']Copy the data structure supported by the
+linear structure at {\tt LENTRY} (the next link of {\tt LENTRY} is followed)
+\item['S']Copy the single bank at {\tt LENTRY}.
+linear structure at {\tt LENTRY} (the next link of {\tt LENTRY} is followed)
+\end{DL}
+\item[others]
+\begin{DL}{MM}
+\item['N']No link, i.e. linkless handling
+By default link are significant
+\item['P']Permit error returns
+By default an error exit with a call to \Rind{ZTELL}{\tt (15,1)} is generated.
+\item['Z']Zero all links pointing outside the data structure.
+This is implied if origin and target stores are different.
+\end{DL}
+\end{DL}
+\end{DL}
+\Odesc
+\begin{DL}{MMMM}
+\item[*LSUP*]For JBIAS = 1 or 2, LSUP receives
+the entry address to the data structure
+\end{DL}
+\par For a discussion of the cases of ``stand alone' memory, the user is
+referred to the ZEBRA reference manual.
+\index{stand alone memory}
+\subsection{MZCOPY return codes}
+\index{QUEST!IQUEST}
+\begin{DL}{MMMMM}
+\item[IQUEST(1)]Error status
+\begin{DL}{M}
+\item[0]Normal completion
+\item[1]LENTRY invalid
+\item[2]Bank chaining clobbered in the input data structure
+\item[3]Not enough space for the input data structure
+\item[4]The data structure is larger than the target space
+\item[5]The data structure to be copied is empty
+\item[6]Bank chaining clobbered in the output data structure
+\end{DL}
+\end{DL}
+\subsection{Examples}
+\begin{verbatim}
+      CALL MZCOPY (0,LENTRY,IXDIV,LTOP,1,' ')
+\end{verbatim}
+copies the data structure at {\tt LENTRY} in the primary store into division
+{\tt IXDIV}. The copied data structure will be addressable via the
+top level link {\tt LTOP}.
+\begin{verbatim}
+      CALL MZCOPY (IXDVFR,LENTRY,IXDVTO,LSUP,-1,'D')
+\end{verbatim}
+copies the division identified by the identifier {\tt IXDVFR} to the division
+specified by {\tt IXDVTO} squeezing out unused space.
+The entry address into the
+data structure in division {\tt IXDVFR} is {\tt LENTRY}.
+In the target division
+with index {\tt IXDVTO} this data structure will be attached to link -1
+in bank {\tt LSUP} and be addressable as {\tt LCOPY = LQ2(LSUP-1)}
+\section{Sort the banks of a linear structure}
+\par The routines described below
+re-arrange the horizontal linking
+within a given linear structure such that the values of the
+keywords contained in
+each bank increase monotonically when moving through the linear
+structure with {\tt L=LQ(L)}.
+For equal keyword values the original order is preserved.
+\par Key-words may be either floating-point, integer or Hollerith.
+For Hollerith sorting a collating sequence
+inherent in the representation is used,
+thus the results will depend on the machine.
+\par Sorting may be done either for a
+{\bf single keyword} in every bank
+or for a {\bf key vector} in every bank:
+\index{linear structure!sort}
+\Subr{CALL ZSORT (IXSTOR,LLS,JKEY)}
+\par Sorts banks according to a single floating-point keyword
+\Subr{CALL ZSORTI (IXSTOR,LLS,JKEY)}
+\par Sorts banks according to a single integer keyword
+\Subr{CALL ZSORTH (IXSTOR,LLS,JKEY)}
+\par Sorts banks according to a single Hollerith keyword
+\par
+\Subr{CALL ZSORV (IXSTOR,LLS,JKEY,NKEYS)}
+\par Sorts banks according to a floating-point key vector
+\Subr{CALL ZSORVI (IXSTOR,LLS,JKEY,NKEYS)}
+\par Sorts banks according to an integer key vector
+\Subr{CALL ZSORVH (IXSTOR,LLS,JKEY,NKEYS)}
+\par Sorts banks according to a Hollerith key vector
+\Idesc
+\begin{DL}{MMMM}
+\item[IXSTOR]Store index.
+\item[JKEY]{\tt Q(L+JKEY)} - The key word or the first word of the key vector.
+\item[NKEYS]Number of words in the key vector.
+\item[LLS]Address of the first bank of the linear structure.
+\end{DL}
+\par The execution time taken by these routines is a function
+of the reordering which needs to be done.
+For perfect order the operation is a simple verification pass
+through the structure.
+The maximum time is taken if the banks are arranged with
+decreasing keywords.
+\par Sorting relinks the banks such that the keywords are in
+increasing order.
+If one needs them in decreasing order one can use routine \Rind{ZTOPSY}
+(see below).
+\section{Operations on linear structures}
+\par The routines described in this section perform service operations
+on linear structures.
+The parameter {\tt LLS} is the address of the first bank
+of the linear structure.
+\index{linear structure!reverse order}
+\Subr{CALL ZTOPSY (IXSTOR,LLS)}
+\par This routine reverses the order of the banks in the linear structure,
+i.e. the first bank becomes the last, and the last the first,
+for traversing the structure with {\tt L=LQ(L)}.
+\index{linear structure!bridging}
+\Subr{CALL ZPRESS (IXSTOR,LLS)}
+\par This routine removes, by bridging, dead banks still present
+in the linear structure pointed to by {\tt LLS}.
+\section{Interrogate a linear structure}
+\par These routines perform service functions for linear structures.
+The parameter {\tt LLS} is the address of the first bank
+of the linear structure.
+\index{linear structure!interrogate}
+\Func{LFCALL = LZLAST (IXSTOR,LLS)}
+\par This function ssearches the linear structure pointed to by {\tt LLS}
+for its end.
+It returns in {\tt LF} the address of the last bank in the structure.
+{\tt LF = 0} is returned if the structure is empty.
+\Func{LFCALL = LZFIND (IXSTOR,LLS,IT,JW)}
+\par This function searches the linear structure pointed to by {\tt LLS}
+for the first bank containing {\tt IT} in word {\tt JW};
+it returns its address in {\tt LF}. If none: {\tt LF=0}.
+\Func{LFCALL = LZLONG (IXSTOR,LLS,N,IT,JW)}
+\par Same functionality as function {\tt LZFIND},
+but {\tt IT} is a vector of {\tt N} words expected
+in words {\tt JW} to {\tt JW+N-1} of the bank.
+\Func{LFCALL = LZBYT (IXSTOR,LLS,IT,JBIT,NBITS)}
+\par Similar to function \Rind{LZFIND},
+but it looks for a bank having IT in the byte of the status word
+starting at {\tt JBIT} and with a width of {\tt NBITS} bits.
+\Func{LFCALL = LZFVAL (IXSTOR,LLS,VAL,TOL,JW)}
+\par Same functionality as function \Rind{LZFIND},
+but it looks for a bank having in word {\tt JW} a floating point number
+which is equal to VAL within the tolerance {\tt TOL}.
+\Func{NCALL = NZBANK (IXSTOR,LLS)}
+\par Function which counts the number of banks in the linear
+structure pointed to by {\tt LLS}.
+\Func{NCALL = NZFIND (IXSTOR,LLS,IT,JW)}
+\par Function similar to \Rind{LZFIND} but for all banks.
+It returns the number of such banks in {\tt N}
+and stores the addresses of the first 100 such banks into {\tt IQUEST},
+starting at {\tt IQUEST(1)} in common {\tt /QUEST/}.
+\index{QUEST!IQUEST}
+\Func{NCALL = NZLONG (IXSTOR,LLS,N,IT,JW)}
+\par Function similar to \Rind{LZLONG} but for all banks.
+It returns the number of such banks in {\tt N}
+and stores the addresses of the first 100 such banks into {\tt IQUEST},
+starting at {\tt IQUEST(1)} in common {\tt /QUEST/}.
+\index{QUEST!IQUEST}
+\section{Locate a bank in a division}
+\par
+The routines of this section do not operate on data structures as such,
+but they perform a sequential search on the banks in a division.
+\subsection{Sequential scan by Hollerith identifier}
+\par
+Function \Rind{LZFIDH} performs a sequential scan over the banks of a specified
+division, starting with the bank following the specified bank,
+and returns
+the address of the first bank with the specified Hollerith identifier.
+\Func{LFCALL = LZFIDH (IXDIV,IDH,LGO)}
+\index{division!scan}
+\Idesc
+\begin{DL}{MMM}
+\item[IXDIV]The index of the division to be scanned
+\item[IDH]The 4 character {\bf\it Hollerith} identifier (NOT a CHARACTER
+variable).
+\item[LGO]The address of the bank {\bf after} which the scan has to start.\\
+{\tt LGO = 0} means start with the first bank in the division.
+\end{DL}
+\subsection{Sequential scan by Hollerith and numeric identifier}
+\par
+Function \Rind{LZFID} performs a sequential scan over the banks of a specified
+division, starting with the bank following the specified bank and returns
+the address of the first bank with the specified Hollerith/numeric
+identifier pair.
+\Func{LFCALL = LZFID (IXDIV,IDH,IDN,LGO)}
+\index{division!scan}
+\Idesc
+\begin{DL}{MMM}
+\item[IXDIV]The index of the division to be scanned
+\item[IDH]The 4 character {\bf\it Hollerith} identifier (NOT a CHARACTER
+variable).
+\item[IDN]The numeric identifier
+\item[LGO]The address of the bank {\bf after} which the scan has to start.
+{\tt LGO = 0} means start with the first bank in the division.
+\end{DL}
+\subsection{Division scan by bank identifier}
+\par Starting at the first bank in the specified division,
+function \Rind{LZLOC} performs a sequential scan through the
+division, and returns
+the address of the {\bf first bank} with the specified
+Hollerith/numeric bank identifier pair.
+\Func{LFCALL = LZLOC (IXDIV,CHIDH,IDN)}
+\index{division!scan}
+\Idesc
+\begin{DL}{MMM}
+\item[IXDIV]The index of the division to be scanned
+\item[CHIDH]Character variable containing the Hollerith identifier
+\item[IDN]The numeric identifier
+\end{DL}
+\subsection{Number of words available in a division}
+\par The number of words available in a division can be obtained
+by issueing a call to MZNEED.
+If desired (option 'G') a garbage collection can be preformed to
+get the needed number of words.
+\Subr{CALL MZNEED (IXDIV,NWNEED,CHOPT)}
+\Idesc
+\begin{DL}{MMMM}
+\item[IXDIV]The index of the division where the free space is needed
+\item[NWNEED]The number of words needed in the division
+\item[CHOPT]Character variable specifying the desired option
+\begin{DL}{MM}
+\item[' ']Do not garbage collect the division to free space
+\item['G']Garbage collect the division to increase the space
+\end{DL}
+\end{DL}
+\subsection{Note}
+\index{QUEST!IQUEST}
+\par Variable {\tt IQUEST(11)} in common {\tt QUEST} contains the space
+available with the words needed already substracted,
+i.e. a negative value in {\tt IQUEST(11)} signals that there are
+no {\tt NWNEED} words available in the given division.
+\section{Global operation aids}
+\subsection{Set the program phase}
+\par Primarily to avoid recovery to ``next event'' at the wrong moment,
+ZEBRA needs to know in which phase the user program is at any
+given moment. This is accomplished with the routine \Rind{ZPHASE},
+described in the ZEBRA reference manual.
+\label{SR_ZPHASE}% Special treatment for not described routine
+\index{program!phase}
+\subsection{\protect\label{ZEND}Normal program termination}
+\Subr{CALL ZEND}
+\par The routine
+\Rind{ZEND} is defined to be the entry-point for normal run
+termination. This routine is normally {\bf provided by the user}
+to close files and print accumulated results.
+It is important that all termination operations are
+done through this routine,
+if the user wants them to happen even in abnormal run termination.
+\par It would normally look like this:
+\index{program!termination!normal}
+\begin{verbatim}
+       SUBROUTINE ZEND
+ 
+       CALL ZPHASE (-3)           ! start termination
+       . . .                      ! any user termination code
+       CALL MZEND
+       STOP
+       END
+\end{verbatim}
+\subsection{CALL MZEND}
+\par \Rind{MZEND} is a ZEBRA routine which prints statistics about
+the usage of all divisions.
+\par A user routine similar to \Rind{ZEND} is defined for taking over control
+of fatal error termination. Its name is \Rind{ZABEND} and it is
+described in the next paragraph.
+This should perform any extra operations needed
+for fatal termination and then it should transfer
+to \Rind{ZEND} for termination.
+\subsection{Abnormal program termination}
+\par To cope with situations where the program ends abnormally,
+an entry point \Rind{ZFATAL} is defined.
+\index{program!termination!abnormal}
+\par A second routine \Rind{ZFATAM} is identical to \Rind{ZFATAL},
+except that it prints a message,
+given as a character string to the routine.
+\par The routines \Rind{ZFATAL} and \Rind{ZFATAM} are {\bf supplied by the
+system}. They are protected against recovery loops, and they must
+{\bf not} be supplied by the user.
+They should be called only when the run cannot usefully continue.
+If the application program discovers such a fatal condition,
+it too should call \Rind{ZFATAL} or \Rind{ZFATAM},
+preceded with some diagnostic printing or
+with loading to {\tt IQUEST} in common {\tt /QUEST/} some clue to the trouble.
+\label{SR_ZFATAL}% Special treatment for not described routine
+\label{SR_ZFATAM}% Special treatment for not described routine
+\index{QUEST!IQUEST}
+\par The calling sequences are, for example:
+\begin{verbatim}
+      CALL ZFATAL                         or
+      CALL ZFATAM ('MY ERROR MESSAGE')
+\end{verbatim}
+\par Routine \Rind{ZABEND}
+\label{SR_ZABEND}% Special treatment for not described routine
+receives control from \Rind{ZFATAL} to handle fatal run termination.
+This routine may be supplied by the user.
+\par The ZEBRA system contains the standard routine as follows:
+\begin{verbatim}
+      SUBROUTINE ZABEND
++CDE,ZSTATE                   ! Specifies NQPHAS, the program phase
+ 
+      CALL ZPOSTM('TCWM')     ! Print a DZSNAP in 'TCWM' mode
+                              !   for the faulty store
+      IF (NQPHAS.LT.0) STOP   ! Immediate stop if 'initialization'
+                              !   or 'termination' phase
+      NQPHAS = -2             ! Set 'termination' phase
+      CALL ZEND
+      END
+\end{verbatim}
+\par This \Rind{ZABEND} routine is not just a dummy; it generates
+an optimal post-mortem
+dump, including a subroutine trace-back, followed by any normal
+user output programmed in \Rind{ZEND}. Transfer to \Rind{ZEND} takes place if
+the break-down happened during normal operation, but not if the
+program is still in the initialization phase or if it is already under
+\Rind{ZEND} control.
+\par The parameter to \Rind{ZPOSTM} is passed from there to \Rind{DZSNAP}
+\label{SR_ZPOSTM}% Special treatment for not described routine
+to select the options for dumping the dynamic store
+(see page~\pageref{SR_DZSNAP} for details).
+\subsection{Recovery through \Rind{ZTELL}-\Rind{ZTELUS}}
+\label{SR_ZTELL}% Special treatment for not described routine
+\par During normal operation any request from the user for space
+with \Rind{MZWORK}, \Rind{MZBOOK}/\Rind{MZLIFT},
+\Rind{MZDIV} and \Rind{MZPUSH} is satisfied,
+after garbage collection if that is necessary and possible.
+If, however, the request cannot be satisfied,
+the normal course of the program must be changed.
+To relieve the user of the burden of checking for success
+after each space request,
+the garbage collector will normally send control to the user at the
+entry-point \Rind{QNEXT} (via \Rind{ZTELL} and the KERNLIB routine
+\Rind{QNEXTE)}, to skip the current event and to continue
+by processing the next one.
+\index{KERNLIB}
+\par Other ZEBRA packages, apart from MZ, and the user code, may
+have similar problems.
+Therefore a general trouble-control routine \Rind{ZTELL} has been
+included in ZEBRA.
+This is a switching routine with several modes of continuation
+controlled by the user routine \Rind{ZTELUS},
+one of which is to send control to \Rind{QNEXT}.
+\index{program!recovery}
+\par For more details about the recovery facilities in ZEBRA, the user
+is referred to the ZEBRA reference manual.
+ 

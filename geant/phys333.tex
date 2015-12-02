@@ -1,0 +1,332 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%  GEANT manual in LaTeX form                                     %
+%                                                                 %
+%  Michel Goossens (for translation into LaTeX)                   %
+%  Version 1.00                                                   %
+%  Last Mod. Jan 24 1991  1300   MG + IB                          %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\Origin{M.Maire}
+\Revision{F.Carminati}
+\Version{Geant 3.16}\Routid{PHYS333}
+\Submitted {30.05.86}\Revised{16.12.93}
+\Makehead {Information about energy loss fluctuations}
+\section{Subroutines}
+\Shubr{GDRPRT}{(IPART,IMATE,STEP,NPOINT)}
+\begin{DLtt}{MMMMMMMMMM}
+\item[IPART] ({\tt INTEGER}) {\tt GEANT} particle number;
+\item[IMATE] ({\tt INTEGER}) {\tt GEANT} material number;
+\item[STEP]  ({\tt REAL}) step in cm;
+\item[NPOINT] ({\tt INTEGER}) number of logarithmically spaced energy points
+between {\tt EKMIN} (default 10 keV) and {\tt EKMAX} (default 10 TeV). See
+{\tt [BASE040]} for more information on these value and how to change them
+with the {\tt ERAN} input record;
+\end{DLtt}
+
+This routine calculates and prints the relevant parameters
+relative to the simulation of energy loss fluctuations due to ionisation and
+$\delta$-ray production in {\tt STEP} cm:
+\begin{DLtt}{MMMMMMMM}
+\item[N d-rays] average number of $\delta$-rays produced;
+\item[dE/I] average energy loss divided by the
+average ionisation potential;
+\item[xi/I] variable $\xi/I$ of the Landau/Vavilov
+theory;
+\item[xi/Emax] variable $\xi/E_{Max}$ of the Landau/Vavilov
+theory;
+\item[regime] valid model to simulate energy loss fluctuations.
+Possible values are:
+\begin{DLtt}{MMMMMMMM}
+\item[Gauss] Gauss distribution;
+\item[Vavilov] Vavilov distribution;
+\item[Landau] Landau distribution;
+\item[Urb\'{a}n] \Rind{GLANDZ} routine of Urban (see {\tt [PHYS332]});
+\item[ASHO] atomic harmonic oscillator approximation (see {\tt [PHYS334]});
+\item[PAI]  Photo-Absorption Ionisation model (see {\tt [PHYS334]});
+\end{DLtt}
+\end{DLtt}
+
+This routine has no action on the {\tt GEANT} 
+system. It is intended as a help to users understanding the
+model which {\tt GEANT} may be asked to use, 
+for instance via the routine \Rind{GSTPAR} {\tt [CONS210]}.
+
+\section{Method}
+When a charged particle traverses a portion of matter, 
+it interacts with the electrons
+and the nuclei of the atoms. Most of 
+these interactions are
+electromagnetic (quasi-)
+elastic collisions in which the incoming particle loses energy in the
+laboratory reference frame. The amount of energy loss in a thickness of 
+material
+$t$ is subject to two sources of fluctuations. The {\it number} of
+collisions can fluctuate, and at the same time the {\it energy} lost in each
+collision varies statistically. Both distributions are characterised
+by a Poissonian-like behaviour. We can distinguish between collisions
+where the energy transferred to the atomic electrons is enough to 
+extract them from the atoms (ionisation with production of $\delta$-rays)
+and collisions where the atomic structure is excited, without a complete
+ionisation (excitation). It has to be noted that the energy
+transferred to the nuclei is usually negligible. Momentum conservation
+considerations show that the ratio of the energy transferred to 
+electrons to the energy transferred to nucleus in Coulomb interactions
+is of the order of $m_{e}Z A^{-1}m_{p}^{-1}$.
+
+Several theories have been proposed to describe
+this important mechanism in the transport of charged particles.
+The main difference of these theories is in the greater or lesser
+detail with which the scattering centres are described. 
+The detail of these theories as they are implemented in {\tt GEANT} can
+be found in {\tt [PHYS332]}, {\tt [PHYS334]} for energy loss fluctuations
+and in {\tt [PHYS430]}, {\tt [PHYS431]} for energy loss.
+
+In general, the greater the thickness of the layer traversed
+in terms of the number of atoms encountered, the larger
+is the number of collisions. In this case a detailed description of
+the atomic structure may be irrelevant to account for the form of the
+fluctuation. Landau and Vavilov have proposed theories in this region
+and these are implemented in {\tt GEANT}. 
+
+When the thickness of the material is such that the number of collisions
+becomes smaller, the detailed nature of the atomic structure becomes 
+important in determining the fluctuations of the energy loss. In this
+case the coupling of the various atomic energy levels to the to the
+Coulomb field must be taken into account.
+
+When simulating the energy loss by ionisation, the average path-length
+between collisions is a function of the cross section $\sigma(E)$.
+This cross section becomes very large
+when $E \rightarrow 0$, so that it is necessary
+to establish a threshold energy below which the process is described in a
+{\it condensed} way. Above this threshold, ionisations are
+described in a detailed way, with the production of $\delta$-rays.
+Thus, when a charged particle is moving in a medium, there are
+in general two ways to simulate the energy loss by ionisation:
+\begin{enumerate}
+\item calculate the average value the energy loss 
+via the full Bethe-Bloch equation. This takes into account
+$\delta$-rays generation. The fluctuations are then explicitly
+introduced via an appropriate distribution.
+In {\tt GEANT} 
+this method is selected by the value {\tt ILOSS = 2} which is
+controlled by the {\tt LOSS} data record.
+\item explicitly generate the $\delta$-rays {\it above} a given 
+threshold ({\tt DCUTE} for electrons, {\tt DCUTM} for others particle).
+In this case the average energy
+loss is computed from a restricted formula and
+both the value of the energy loss
+and the number of $\delta$-rays
+produced are function of the threshold cut (hereafter {\tt DRCUT}).
+In {\tt GEANT} this method is selected by the value {\tt ILOSS = 1} which is
+controlled by the {\tt LOSS} data record.
+\end{enumerate}
+
+\subsection{Validity ranges for the different models}
+The limits of the validity for
+the various models are somewhat arbitrary
+within a certain range of material densities and particle energies.
+To help determine these limits, some characteristic parameters are used:
+
+\begin{DLtt}{MMMMMMMMMMMMM}
+\item[$\xi$] typical energy loss of
+a particle in a given layer of material. Its value is:
+
+\[
+\xi = 2 \pi r_{e}^{2} m_{e} c^{2} N_{Av} \left ( \frac{Z_{inc}}
+{\beta} \right )^{2} \frac{Z \rho t}{A} = 0.1535 \left ( \frac{Z_{inc}}
+{\beta} \right )^{2} \frac{Z \rho t}{A} \: (MeV)
+\]
+
+\item[$E_{Max}$] maximum transferable energy in a single collision:
+
+\[
+E_{Max} = \frac{2 m_{e} \beta^{2} \gamma^{2}}{1 +2 \gamma \frac{m_{e}}
+{M} +\left ( \frac{m_{e}}{M} \right ) ^{2}}
+\]
+
+where $M$ is the mass of the incoming particle. Note that for incoming
+electrons this value has to be divided by 2 due to the impossibility
+distinguishing the two electrons in the final state.
+
+\item[$I$] typical electron binding energy. This is a value which 
+characterises the average energy levels of the atomic electrons. In
+{\tt GEANT} it is parametrised as:
+
+\[
+I = 16 Z^{0.9} \: (eV)
+\]
+
+\item[$\displaystyle \frac{dE}{dx} \: t$] 
+average energy loss by the particle in a
+layer of thickness $t$ according to the {\tt GEANT} energy loss tables.
+
+\item[$\xi/E_{Max}$] (hereafter $\kappa$) 
+relative importance of high energy transfer collisions 
+in the ionisation process
+
+\item[$\min \left ( \frac{dE}{dx} \: t,\xi \right )/I$] 
+(hereafter $\Delta$) estimation of the number of collisions
+with energy close to the ionisation energy.
+\end{DLtt}
+
+In {\tt GEANT} two variables control the model used to describe the
+energy loss fluctuations: 
+\begin{DLtt}{MMMMMMMMMM}
+\item[ILOSS] fluctuation model:
+\begin{DLtt}{MMMMM}
+\item[0] no energy loss;
+\item[1] $\delta$-rays are produced above the threshold,
+{\it reduced}
+fluctuations from $\delta$-rays below the threshold are added to the
+energy loss;
+\item[2] no $\delta$-rays are produced, complete fluctuations are calculated;
+\item[3] same as {\tt 1};
+\item[4] no fluctuations;
+\end{DLtt}
+\item[ISTRA] energy loss model for {\it thin} layer (see below):
+\begin{DLtt}{MMMMM}
+\item[0] Urb\'{a}n model;
+\item[1] PAI model;
+\item[2] ASHO model for $1 < \Delta \leq 30$,(not yet available) 
+PAI model otherwise;
+\end{DLtt}
+\end{DLtt}
+The validity limits of the different models are estimated
+as follows:
+\begin{enumerate}
+\item {\bf large number of low-energy collisions: $\Delta \geq 50$}
+
+if $\delta$-rays generation is requested ({\tt ILOSS = 1} or {\tt 3} and 
+{\tt IDRAY = 1}) the Urb\'{a}n model is used. If $\delta$-rays are not
+produced ({\tt ILOSS = 2} and {\tt IDRAY = 0}) we distinguish three regions:
+\begin{enumerate}
+\item {\bf very few energy transfers close to the 
+maximum: $\kappa \leq 10^{-2}$}
+
+the Landau distribution is used;
+
+\item {\bf few energy transfers close to the 
+maximum: $10^{-2} < \kappa \leq 10$}
+
+the Vavilov distribution is used;
+
+\item {\bf many energy transfers close to the 
+maximum: $\kappa > 10$}
+
+the Gauss distribution is used;
+
+\end{enumerate}
+
+\item {\bf small number of low-energy collisions: $ \Delta < 50$}
+
+in this region the same model is used for $1 \leq \mbox{\tt ILOSS}
+\leq 3$ irrespective of the value of {\tt IDRAY}.
+The model used depends on the value of {\tt ISTRA}.
+
+\begin{enumerate}
+\item {\bf $ 30 < \Delta \leq 50$}
+
+Urb\'{a}n model if {\tt ISTRA} $= 0$, PAI model otherwise.
+
+\item {\bf $ 1 < \Delta \leq 30$}
+
+Urb\'{a}n model if {\tt ISTRA} $= 0$, PAI model if {\tt ISTRA}
+$=1$ and ASHO model if {\tt ISTRA} $=2$.
+
+\item {\bf $ 0.01 < \Delta \leq 1$}
+
+Urb\'{a}n model if {\tt ISTRA} $= 0$, PAI model otherwise.
+
+\item {\bf $ \Delta \leq 0.01$}
+
+Urb\'{a}n model if {\tt ISTRA} $=0$, PAI model otherwise.
+
+\end{enumerate}
+\end{enumerate}
+
+\subsection{Recommendations}
+The full energy loss fluctuations or the restricted fluctuations
+complemented by the production of $\delta$-rays give equivalent
+results if the number of $\delta$-rays generated 
+is sufficient, e.g. a few tens along
+the full trajectory of the particle in the medium.
+ 
+For a relativistic particle, the number of delta-rays
+produced per cm can be estimated integrating the
+cross section provided in~\cite{bib-PDGB}:
+\begin{equation}
+\frac{dN}{dx} \approx \frac{D}{2} \frac{\rho Z}{A} 
+\frac{Z_{inc}^2}{\mbox{\tt DRCUT}}
+\end{equation}
+where
+\begin{DLtt}{MMMMMMM}
+\item[$D$] 0.307 MeV cm$^2$ g$^{-1}$;
+\item[$\rho$] density of the medium;
+\item[$Z,A$] atomic number and atomic weight of the medium;
+\item[$Z_{inc}$] charge of the particle;
+\item[DRCUT] energy threshold for emitted delta-rays.
+\end{DLtt}
+This formula holds for electrons/positrons as well as for other particles.
+The number of $\delta$-rays must be sufficient 
+to reproduce the statistical fluctuations in the energy loss,
+but not too large, as in this case
+a large amount of time could be spent in 
+tracking them
+without a corresponding improvement of the energy loss distribution.
+
+On the other hand, the distribution of the
+energy {\it lost} by a particle does not necessarily correspond to the
+distribution of the energy {\it deposited} by the same particle in the
+medium traversed. This is particularly true for light or {\it thin}
+materials where $\delta$-rays can escape into the
+next material.
+
+It is the responsibility of the user to estimate the number of $\delta$-rays 
+per cm that are needed, according to the considerations above. Then the 
+correct value for {\tt DRCUT} should be set with the help of \Rind{GDRPRT}. 
+It is recommended to use the same value for {\tt DCUTE} and {\tt DCUTM}.
+As the {\tt GEANT} tables for cross-sections are not generated below 
+{\tt EKMIN}, {\tt DRCUT} cannot be smaller than {\tt EKMIN}. The value of 
+{\tt EKMIN} can be changed via the {\tt ERAN} data record, and its default
+value is $10$ keV.
+
+In a {\it light} material like gas, the number of emitted $\delta$-rays for
+{\tt DRCUT} $=10$ keV may not be sufficient to ensure a correct energy loss 
+distribution. If the user is mainly interested in the energy lost by the 
+particle, no discrete $\delta$-ray should be produced setting {\tt ILOSS} 
+$=2$ (see {\tt [PHYS332]}).
+
+In case the user is more interested in a precise simulation of the energy 
+deposited, then the explicit $\delta$-ray generation should be tried.
+
+As far as {\it thin} materials are concerned ($\Delta < 50$), the default
+in {\tt GEANT} is to use the Urb\'{a}n model. Comparison with experimental
+data have shown that this model gives very good results, and it is
+considerably faster than both the ASHO and the PAI models. Users should
+understand well their setup and their results before they try with
+different models, which, in principle, should give very similar results.
+
+\subsection{Default values in {\tt GEANT}}
+ 
+In order to avoid double counting, there is an automatic protection in
+the code:
+{\it if {\tt ILOSS=2}, {\tt IDRAY} is set to 0 and the generation of 
+$\delta$-rays is disabled}.
+ 
+The following table summarises the different cases:
+\begin{center}
+\begin{tabular}{|c|c|c|}\hline
+                    &\tt LOSS=2          &\tt LOSS=1     \\
+                    &(default)            &               \\
+                    \cline{2-3}
+     \tt IDRAY      & 0                   &     1          \\
+     \tt DCUTE      &  $10^4$ GeV         & \tt CUTELE     \\
+     \tt DCUTM      &  $10^4$ GeV         & \tt CUTELE     \\
+\hline
+\end{tabular}
+\end{center}
+Where {\tt LOSS}$=1$ means that the restricted fluctuation is 
+activated and {\tt LOSS}$=2$ means that the complete Landau/Vavilov/Gauss
+fluctuations are used in the region $\Delta \geq 50$. 

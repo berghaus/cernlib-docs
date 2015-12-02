@@ -1,0 +1,205 @@
+\def\filedate{1996/07/22}
+\def\docdate {1995/04/14}
+\def\fileversion{2.5}
+%
+% \iffalse
+% File: nameref.dtx Copyright (C) 1995 Sebastian Rahtz
+% 
+%  This package is distributed in the hope that it will be useful,
+%  but WITHOUT ANY WARRANTY; without even the implied warranty of
+%  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+%
+%<*driver>
+\documentclass{ltxdoc}
+\begin{document}
+ \title{Section name references in \LaTeX\thanks{This file
+        has version number \fileversion, last
+        revised \filedate.}}
+ \author{Sebastian Rahtz}
+ \date{\filedate}
+ \maketitle
+ \tableofcontents
+ \DocInput{nameref.dtx}
+\end{document}
+%</driver>
+% \fi
+% \CheckSum{721}
+% \section{Introduction}
+% Cross-referencing to include the \emph{name} of the section, rather than
+% just the number or page. This works by redefining some of the inside
+% \LaTeX\ macros, so it is vulnerable to future changes.
+% \section{History}
+% Sebastian Rahtz, for Lou Burnard, March 15th 1994
+% SPQR CERN July 1994
+% Last mod. Sept. 3th MG, 
+% Sept. 19th SPQR
+% April 11th 1995 SPQR (added section formatting hook)
+% April 14th 1995 SPQR (compatibility with hyperref)
+% June 22 1995 SPQR (removed typeout from Sectionformat)
+%    \begin{macrocode}
+%<*package>
+\ProvidesPackage{nameref}[\filedate\space Cross-referencing by name of section]
+\RequirePackage{ifthen}
+%    \end{macrocode}
+%
+% We redefine |\label| so that it also writes the name of the 
+% current section to the .aux file; if the name ends in a dot, 
+% we zap it. To allow for the hyperref package, also write
+% a fourth field (empty by default).
+%    \begin{macrocode}
+\def\strip@period#1.\relax#2\@@@{#1}
+\def\label#1{%
+  \@bsphack
+  \bgroup
+  \let\label\@gobble
+  \def\ref{\protect\ref}%
+  \edef\@currentlabstr{\expandafter\strip@prefix\meaning\@currentlabelname}%
+  \protected@write\@auxout{}%
+         {\string\newlabel{#1}{%
+            {\@currentlabel}%
+            {\thepage}%
+            {\expandafter\strip@period\@currentlabstr\relax.\relax\@@@}%
+            {\@currentHref}%
+          }}%
+  \egroup
+  \@esphack
+}
+\let\ltx@label\label
+%    \end{macrocode}
+% Needed for the \emph{subeqnarray} package.
+%    \begin{macrocode}
+\@ifundefined{slabel}{}{%
+\def\slabel#1{%
+  \@bsphack
+  \if@filesw
+    {\let\label\@gobble
+     \def\ref{\protect\ref}%
+     \edef\@currentlabstr{\expandafter\strip@prefix\meaning\@currentlabelname}%
+     \let\thepage\relax
+     \def\protect{\noexpand\noexpand\noexpand}%
+     \edef\@tempa{\write\@auxout{\string
+        \newlabel{#1}{%
+            {\thesubequation}%
+            {\thepage}%
+            {\expandafter\strip@period\@currentlabstr\relax.\relax\@@@}%
+            {\@currentHref}%
+            }}}%
+     \expandafter}\@tempa
+     \if@nobreak \ifvmode\nobreak\fi\fi
+  \fi\@esphack}}
+%    \end{macrocode}
+% Overload an AMS \LaTeX\ command, which uses |\newlabel|. Sigh!
+%    \begin{macrocode}
+\def\@writetocindents{%
+  \begingroup
+  \@for\@tempa:=-1,0,1,2,3\do{%
+    \immediate\write\@auxout{%
+      \string\newlabel{tocindent\@tempa}{%
+        \csname r@tocindent\@tempa\endcsname}{}{}}%
+  }%
+  \endgroup}
+%    \end{macrocode}
+% Add to the underlying section heading macros so that they
+% note the section name for use by label. 
+%
+% If a section heading or the like has a |\label| in it,
+% we need to extract it, or subsequent processing breaks.
+% This is done by the label-writing routine.
+%    
+% First the numbered sections. While we are about it, put in
+% a useful section formatting macro.
+%    \begin{macrocode}
+\let\old@sect\@sect
+\def\@sect#1#2#3#4#5#6[#7]#8{%
+ \def\@currentlabelname{#7}%
+ \old@sect{#1}{#2}{#3}{#4}{#5}{#6}[{#7}]{\Sectionformat{#8}{#2}}%
+}
+%    \end{macrocode}
+% and now the unnumbered ones
+%    \begin{macrocode}
+\let\old@ssect\@ssect
+\def\@ssect#1#2#3#4#5{%
+ \def\@currentlabelname{#5}%
+ \old@ssect{#1}{#2}{#3}{#4}{\Sectionformat{#5}{#1}}%
+}
+%    \end{macrocode}
+%
+% Parts and chapters are treated differently. sigh.
+%
+%    \begin{macrocode}
+\let\old@part\@part
+\def\@part[#1]#2{%
+  \def\@currentlabelname{#1}%
+  \old@part[{#1}]{#2}%
+}
+\let\old@chapter\@chapter
+\def\@chapter[#1]#2{%
+  \def\@currentlabelname{#1}%
+  \old@chapter[{#1}]{#2}%
+}
+\let\old@schapter\@schapter
+\def\@schapter#1{%
+  \def\@currentlabelname{#1}%
+  \old@schapter{#1}%
+}
+%    \end{macrocode}
+% We default the label and hypertext reference to be empty.
+%    \begin{macrocode}
+\def\@currentlabelname{}
+\def\@currentHref{}
+%    \end{macrocode}
+% Since the second part of the preserved reference now has four parts
+% (number, page, name and hypertext reference), we need extra utility
+% macros:
+%    \begin{macrocode}
+\long\def\@firstoffour#1#2#3#4{#1}
+\long\def\@secondoffour#1#2#3#4{#2}
+\long\def\@thirdoffour#1#2#3#4{#3}
+\long\def\@fourthoffour#1#2#3#4{#4}
+%    \end{macrocode}
+% We have to redefine |\ref| and |\pageref| to know about extra
+% reference elements. Make them robust.
+%    \begin{macrocode}
+\def\T@ref#1{\expandafter\@setref\csname r@#1\endcsname\@firstoffour{#1}}
+\def\T@pageref#1{\expandafter\@setref\csname r@#1\endcsname
+                                     \@secondoffour{#1}}
+\def\ref{\protect\T@ref}
+\def\pageref{\protect\T@pageref}
+%    \end{macrocode}
+% \section{Usage and frontend}
+% Access the (third) name part with |\nameref|;
+%    \begin{macrocode}
+\def\T@nameref#1{\expandafter\@setref\csname r@#1\endcsname 
+ \@thirdoffour{#1}}
+\def\nameref{\protect\T@nameref}
+%    \end{macrocode}
+% An extended form which gives title and page number.
+%    \begin{macrocode}
+\def\Nameref#1{`\nameref{#1}' on page~\pageref{#1}}
+%    \end{macrocode}
+%
+% The default for |\Sectionformat|
+%    \begin{macrocode}
+\def\Sectionformat#1#2{#1}
+%    \end{macrocode}
+% an example alternative for BNC book for Lou Burnard:
+%    \begin{macrocode}
+\def\LouSectionformat#1#2{%
+   \ifnum#2=1
+     \if@twoside
+       \ifthenelse{\isodd{\thepage}}%
+         {\raggedright}%
+         {\raggedleft}%
+     \else
+      \raggedleft 
+     \fi
+     #1 \\[2pt]\rule{\columnwidth}{1.5pt}
+   \else
+    #1
+   \fi
+}
+%</package>
+%    \end{macrocode}
+%
+% \Finale
+

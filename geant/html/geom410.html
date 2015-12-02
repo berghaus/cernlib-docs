@@ -1,0 +1,285 @@
+<PRE>
+
+
+
+
+<H2>Geant  3.16  Routine  GEOM410</H2>
+
+
+<PRE>
+
+
+Origin:  F.Bruyant,  A.C.McPherson                Submitted:
+                                                       16.12.83
+Revision:                                                            Revised:  14.12.93
+Documentation:  F.Carminati,  M.Lefebvre
+
+
+</PRE>  <HR>  <H2>Ordering  the  contents  of  a
+volume</H2>
+
+
+<PRE>
+
+
+In  the  case  of  a  mother  volume  containing  a  large
+number  of  daughters,  tracking  can  be  rather  slow.
+This  is  due  to  the  fact  that  each  time  GEANT
+requires  to  know  in  which  daughter  it  is  or  will
+be  tracking,  it  search  through  the  whole  list  of
+daughter  volumes.  This  is  done  by  GEANT  creating
+for  every  daughter  volume  a  list  which  contain
+pointers  to  all  the  daughters  of  the  same  mother.
+
+
+Clearly  this  may  be  avoided,  because  at  any  step
+of  tracking,  the  coordinates  and  direction
+cosines  of  the  current  step  are  known.  From  this
+and  the  knowledge  of  the  geometry,  a  restricted
+list  of  daughter  volumes  to  be  searched  can  be
+built.  This  can  be  accomplished  in  GEANT  in  two
+ways,  which  are  described  in  this  chapter.
+
+
+Note:  the  user  must  be  aware  that  the  following
+routines  alter  the  default  search  list  of
+daughters  of  a  given  mother.  A  user  mistake  can
+cause  wrong  transport  because  GEANT  does  not  make
+any  check  on  the  correctness  of  the  list  of
+neighbours  provided  by  the  user.
+
+
+</PRE>
+
+
+<H2>*</H2>
+
+
+<PRE>
+
+
+Static  ordering
+
+
+
+       CALL  GSNEXT                         (CHMOTH,IN,NLIST,LIST)
+
+
+
+CHMOTH                    (CHARACTER*4)  name  of  the  mother  volume
+                          to  be  ordered;
+IN                        (INTEGER)  number  of  the  content  for
+                          which  a  list  is  established;
+
+
+
+NLIST                     (INTEGER)  number  of  neighbours  to  be
+                          considered  during  tracking;
+LIST                      (INTEGER)  list  of  neighbours  to  volume
+                          IN.
+
+
+This  routine  stores  a  given  ordered  LIST  of  NLIST
+
+                                                     th
+daughter  volumes  to  search  when  leaving  the  IN
+daughter  of  the  mother  volume  CHMOTH.
+
+
+If  IN=0,  for  each  content,  GSNEXT  builds  a  list
+limited  to  the  contents  IN+1  (if  it  exists),  IN-1
+(if  it  exists)  and  IN  itself.
+
+
+
+       CALL  GSNEAR                         (CHMOTH,IN,NLIST,LIST)
+
+
+
+CHMOTH                    (CHARACTER*4)  name  of  the  mother  volume
+                          to  be  ordered;
+IN                        (INTEGER)  number  of  the  content  for
+                          which  a  list  is  established;
+NLIST                     (INTEGER)  number  of  neighbours  to  be
+                          considered  during  tracking;
+LIST                      (INTEGER)  list  of  neighbours  to  volume
+                          IN.
+
+
+This  routine  stores  a  given  ordered  LIST  of  NLIST
+
+                                                     th
+daughter  volumes  to  search  when  leaving  the  IN
+daughter  of  the  mother  volume  CHMOTH.
+
+
+If  LIST(1)=0  the  particle  is  back  into  the  mother
+
+                      th
+when  leaving  the  IN        daughter.  This  means  that
+
+       th
+the  IN        is  not  contiguous  to  any  other  daughter
+or  to  the  boundary  of  the  mother.
+
+
+If  IN=-1,  the  mother  does  not  have  contents
+contiguous  to  its  boundaries  (status  bit  4  set  in
+mother  volume  bank  for  action  in  GGCLOS).
+
+
+If  IN=0  for  each  content  GSNEAR  sets  LIST(1)=0.
+
+
+GSNEAR  must  be  called  after  all  contents  have
+been  position  (  except  when  IN=-1)
+
+
+</PRE>
+
+
+<H2>*</H2>
+
+
+<PRE>
+
+
+
+Dynamic  ordering
+
+
+The  list  of  neighbours  to  search  when  exiting
+
+             th
+from  the  IN        content  may  depend  also  on  the
+direction  and  position  of  the  particle.  In  case
+where  it  is  necessary,  for  performance  reasons,
+to  exploit  also  this  information,  GEANT  offers
+the  possibility  to  the  user  to  build  a  dynamic
+search  list.
+
+
+
+       CALL  GSUNEA                         (CHNAME,ISEARC)
+
+
+
+CHNAME                    (CHARACTER*4)  name  of  the  volume  where
+                          the  user  search  has  to  be  activated;
+ISEARCH                   (INTEGER)  specifies  the  kind  of  search
+                          list  to  be  used:  a  positive  value  must
+                          be  specified  with  this  routine  to
+                          activate  user  search  lists.
+
+
+This  routine  should  be  called  once  for  every
+volume  where  user  volume  search  is  activated.
+
+
+
+       CALL  GUNEAR                         (ISEARC,ICALL,XC,JNEAR)
+
+
+
+ISEARCH                   (INTEGER)  number  associated  to  the
+                          volume  in  which  the  user  search  is  used,
+                          it  is  the  same  number  set  by  the  user
+                          with  GSUNEA;
+ICALL                     (INTEGER)  type  of  question  that  the  list
+                          of  volumes  must  answer:
+
+                          1             GMEDIA-like  call,  where  am  I?
+                          2             GTNEXT-like  call,  where  can  I  go?
+
+XC                        (REAL)  array  of  6  containing  the
+                          position  and  the  direction  cosines  of
+                          the  particle  (x,  y,  z,  p   / p,  p   / p,
+                                                       x         y
+
+                          p   / p);
+                           x
+
+JNEAR                     (INTEGER)  pointer  to  the  volume  list
+                          bank  which  has  to  be  filled  by  the  user;
+
+
+The  list  of  volumes  where  GEANT  has  to  search  to
+answer  the  question  specified  by  ICALL  is
+returned  by  the  user  starting  at  Q(JNEAR+1.  GEANT
+will  only  look  at  the  volumes  specified  by  the
+user  and  in  the  order  in  which  they  appear  in  the
+
+
+
+list.  Daughters  are  numbered  from  1  to  N
+according  to  the  order  with  which  they  have  been
+positioned  in  the  mother.  The  list  should  be
+filled  in  the  following  way:
+
+
+
+    IQ(JNEAR+1)                                =         N,  number  of  volumes  in  the  list
+
+
+
+    IQ(JNEAR+1+1)                              =         number  of  the  first  daughter  to  search
+
+
+
+    IQ(JNEAR+1+2)                              =         number  of  the  second  daughter  to  search
+
+
+
+    .
+
+
+
+    .
+
+
+
+    .
+
+                                                                           th
+    IQ(JNEAR+1+N)                              =         number  of  the  N        daughter  to  search
+
+
+
+The  user  should  be  aware  that  this  routine  is
+called  very  often,  almost  at  every  tracking  step,
+so  it  should  be  coded  with  the  maximum  efficiency
+in  mind.  An  example  of  GUNEAR  could  be  the
+following:
+           SUBROUTINE  GUNEAR(ISEARC,ICALL,XC,JNEAR)
+*---                         Make  sure  to  add  GEANT  main  store
++SEQ,  GCBANK.
+           DIMENSION  XC(6),  MYLIST(100)
+*---                         Executable  code
+           IF(ISEARC.EQ.1)  THEN
+*---                         Build  a  list  using  XC  and  ISEARC  for  a  GMEDIA  type  call
+*---                         Put  all  the  daughters  where  the  particle  may  be  in
+                MYLIST(1)  =  ....
+                .
+                .
+                .
+                MYLIST(N)  =  ....
+           ELSE
+*---                         Build  a  list  using  XC  and  ISEARC  for  a  GTNEXT  type  call
+*---                         Put  all  the  daughters  where  the  particle  may  be  going
+                MYLIST(1)  =  ....
+                .
+                .
+                .
+                MYLIST(N)  =  ....
+           ENDIF
+*---                         Return  the  information  to  GEANT
+           DO  10  I=1,N
+                IQ(JNEAR+1+I)  =  MYLIST(I)
+    10    CONTINUE
+           IQ(JNEAR+1)  =  N
+*---                         End  of  GUNEAR
+
+
+
+END
+</PRE>

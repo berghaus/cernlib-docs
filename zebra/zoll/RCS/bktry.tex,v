@@ -1,0 +1,1017 @@
+head     1.1;
+access   ;
+symbols  ;
+locks    goossens:1.1; strict;
+comment  @@;
+
+
+1.1
+date     93.08.03.09.01.09;  author goossens;  state Exp;
+branches ;
+next     ;
+
+
+desc
+@initial version
+@
+
+
+
+1.1
+log
+@Initial revision
+@
+text
+@% file : bkjz91.tex   26 July  9.30
+\thispagestyle{empty}     % empty head
+\markboth{}{26 July 91}   % empty foot
+\begin{center} {\large\bf Zebra Reference Manual} \vspace{8mm} \end{center}
+\begin{center} {\LARGE\bf book JZ91} \vspace{2mm} \end{center}
+\begin{center} {\Large\bf Processor support} \vspace{4mm} \end{center}
+\begin{center}
+  {\large\bf Zebra version 3.67 \vspace{2mm} \\
+             July 1991          \vspace{2mm} \\
+             J. Zoll}
+\end{center}
+\vspace*{20pt}
+\begin{description}
+  \in{30mm}
+  \item[Chapter 1] Basic calling sequences
+  \begin{itemize}
+     \in{30mm}
+     \item[1.1] JZIN/JZOUT - simplest use
+     \item[1.2] JZIN   - processor entry, general use
+     \item[1.3] JZINIT - initialize the JZ91 package
+     \item[1.4] JZTELL - count processor conditions
+     \item[1.5] JZZERO - zero the down call bank
+     \item[1.6] JZROOT - reset to processor level zero
+     \item[1.7] JZEND  - print processor usage statistics
+     \item[1.8] Titles JZAN - processor constants
+     \item[1.9] Titles JZFL - processor flags
+  \end{itemize}
+  \item[Chapter 2] Extra features
+  \begin{itemize}
+     \in{30mm}
+     \item[2.1] JZIN   - extra features
+     \item[2.2] JZINIT - extra features
+     \item[2.3] JZSETF - set processor flag by program
+     \item[2.4] JZLOG - processor logging
+     \item[2.5] JZWIND - unwind the processor stack
+     \item[2.6] JZTRAC - print processor trace-back
+     \item[2.7] Receiving the working space
+     \item[2.8] Note on processor timing
+     \item[2.9] Off-line initialization of a processor
+  \end{itemize}
+  \item[Appendix] JZ91 data structure and bank descriptions
+\end{description}
+\newpage
+\vspace*{40pt}
+{\large\bf Acknowledgement}
+
+This package is derived from the HYDRA package JQ81
+
+A.Norton, J.Zoll, HYDRA Topical Manual, book JQ81, CERN Program Library
+\cleardoublepage  % continue on next odd page
+\markboth{Principles}{Principles}
+\vspace*{20pt}
+\lile{8mm}
+\begin{center}
+  {\large\bf{Principles}}\\
+\end{center}
+% \smark{Principles}
+\lspa
+
+\vspace*{2pt}
+{\large\bf Purpose}
+
+The MZ package of ZEBRA helps the user to organize his data.
+The purpose of the present JZ package is to assist him
+in structuring his program.
+It allows to formalize the concept of 'program module'
+beyond the mere subroutine
+and it provides the back-up service for these modules.
+
+It is at the design stage of a program,
+rather than later,
+that the advantage of the JZ package will be most strongly felt,
+since it provides a frame-work for the design;
+again just like with the data structures of ZEBRA.
+
+The program we are talking about will be designed as
+a collection of modules called 'processors'.
+The art consists in designing processors with interfaces
+as simple and logical as possible,
+and entirely documentable.
+
+A given processor has a given task
+which formalizes into a transformation of the input data structure
+or rather sub-structure.
+The result may be a modification of the input structure,
+or a new output structure,
+or just printed output and the like.
+
+The processor is controlled by what is essentially a parameter list.
+Normally this list contains pointers to the sub-structure
+the processor is to work with.
+Since links have to be held on relocatable memory
+the parameter list is passed in a special purpose bank,
+the 'call bank',
+containing reference links and data words.
+This call bank is filled with the input parameters
+by the higher level code which calls the processor.
+The processor takes them from there and also places back
+into the same call bank any output parameters,
+in particular links to the output data structure,
+if any has been lifted.
+Clearly the content of the call bank is part of
+the specification of the processor.
+
+A processor may call other processors.
+This is not to say that a good design should aim
+at having processors at several levels.
+On the contrary, the fewer levels one can do with
+the better, of course.
+Also, one should not write trivial processors
+where simple subroutines will do.
+
+By convention, every processor is entitled to have
+the ZEBRA working space near the beginning of Q
+freely to itself.
+As a result a processor calling another processor
+looses at that moment the content of its working space.
+Its dimensions are saved by JZ,
+and they are automatically restored when control
+comes back to the calling processor,
+ie. it does not have to call MZWORK again.
+As an extra facility, JZ91 may be asked to save and restore
+also the contents of the first so many links
+and of the first so many data words of the working space.
+\newpage
+{\large\bf JZ91 Services}
+
+JZ91 provides the following services
+to an application software organized into processors:
+
+--- handling of 'call banks' serving to transmit parametric
+information of the link and data types
+between processors at levels n-1, n, and n+1.
+For the processor at call-depth n the 'up' call-bank,
+pointed to by the system link LQUP,
+assures the communication with the higher level at
+call-depth n-1;
+and the 'down' call-bank,
+pointed to by LQDW,
+communicates to the lower level at call-depth n+1.
+Call banks of equal size are pre-lifted,
+one for each level of a definite number of levels,
+they stay permanently in memory.
+
+--- handling of 'processor constants',
+being part of the environmental data for each processor,
+fixed during the run.
+If a processor needs any constants at all,
+it may initialize them itself,
+this then being the default initialization.
+By using titles, loaded with TZINIT described in book TZ,
+this default can be over-ruled.
+The system link LQAN gives Access to these Numbers thus :
+\bva
+              IQ(LQAN)   number of constants
+               Q(LQAN+1) first constant
+               . . .
+\end{verbatim}
+
+--- handling of 'processor conditions' which may be signalled from
+any processor with  CALL JZTELL (J),
+J being a small integer normally from 1 to 10.
+This provides for simple counters over the whole run
+grouped by processors.
+
+--- handling of statistics of processor usage,
+like number of times entered and time spent.
+The number of times entered is accessible to
+the processor in  IQ(LQSV+2).
+
+--- saving the size of the working space,
+on special request also the contents,
+on down-call to the next processor
+and restoring it on up-return.
+
+--- handling of 'processor flags' for test runs during
+program development.
+The flags may be used to drive debug operations of
+a processor without having to recompile it.
+The flags for a given processor are defined by the user
+on titles JZFL and they
+are copied on entry to the processor into the vector JQFLAG,
+ready for inspection by the code in the processor;
+non-initialized flags are set to zero.
+This is only available with the program-development
+version of JZ91;
+the production version presets all flags to zero
+and leaves them thus for the whole run.
+
+This 'environment' information is held in
+the bank of 'support variables',
+one bank for each processor,
+which is permanently in store as part of the JZ91 data structure.
+
+Communication between the processors and JZ91 is via :
+\bva
+            COMMON /JZUC/LQJZ,LQUP,LQDW,LQSV,LQAN, JQLEV,JQFLAG(10)
+\end{verbatim}
+JZ91 operates in and for one store only,
+which must be the user's main store,
+normally the primary store.
+Links in the call bank can point only into this store.
+
+\lile{-8mm}
+\chapter{Basic calling sequences}
+
+\section{JZIN/JZOUT - simplest use}
+\smark{JZIN/JZOUT - basic}
+
+Processor AA transfers control to processor BB with
+a simple Fortran
+\hspace{.2mm}
+CALL BB,
+having readied the contents of its down call-bank
+at LQDW:
+\bvb
+          . . .
+          LQ(LQDW-1) =     load parameters of the link type
+          LQ(LQDW-2) =
+          . . .
+          IQ(LQDW+1) =     load parameters of the data type
+          IQ(LQDW+2) =
+          . . .
+          CALL BB          transfer control
+          . . .
+\end{verbatim}
+\lspa
+In the simplest case the processor BB does
+not call itself another processor,
+does not have processor constants,
+and does not use processor flags.
+It would then look like this :
+\bvb
+          SUBROUTINE BB
+
+    +CDE, Q.       this is supposed to declare the store and also /JZUC/
+         +,   links, data, last
+
+          CALL JZIN ('BB  ',0,0,0)
+          CALL MZWORK (0,data(1),last,0)
+
+              processor body
+
+          CALL JZOUT ('BB  ')
+          RETURN
+          END
+\end{verbatim} \lspa
+By calling JZIN the processor causes switching of the environment,
+gaining access to its own data,
+in particular to its call-bank via the system link LQUP,
+thus LQ(LQUP-1) is its first link parameter.
+
+The inverse switching is done by JZOUT.
+The processor name has to be given to JZOUT explicitely.
+This handshake is a check against forgotten calls.
+
+The call to MZWORK must come after the call to JZIN
+because JZIN saves the working space parameters of AA,
+and hence they must still be intact.
+
+For efficiency, JZIN and JZOUT, and also other routines,
+expect to receive the processor name IAM with 4 characters exactly,
+with blank-fill if necessary.
+\newpage
+\section{JZIN - processor entry, general use}
+\smark{JZIN - general}
+
+Processor AA transfers control to processor BB with
+a simple Fortran
+\hspace{.2mm}
+CALL BB,
+having readied the contents of its down call-bank
+at LQDW.
+To trigger swopping of the processor environment,
+the first executable statement in the processor BB should be
+
+\Subr{CALL JZIN (IAM, IFDOWN, NAN, 0)}
+\bvb
+with    IAM  processor ID, a text string of 4 characters exactly
+                           of type CHARACTER*4
+
+     IFDOWN  flag indicating whether this processor does or does not
+             call other processors :  = 0 no  / = 1 yes
+
+        NAN  number of processor constants used
+
+          0  zero; non-zero gives access to the extra features
+                   described in para. 2.1
+\end{verbatim}
+\lspa
+JZIN saves the environment of the upper processor
+and then sets up the environment of the
+new processor.
+If this does not yet exist,
+it calls the internal service routine JZLIFT to create
+the bank of support variables,
+digesting the titles for this processor, if any.
+JZIN returns the initialisation status thus :
+\bvb
+   IQUEST(1) =  -ve : just initialized without JZAN title
+                  0 : just initialized with    JZAN title
+                +ve : normal running
+\end{verbatim}
+\lspa
+Thus a processor using processor constants can check
+this condition like in this {\bf example} :
+
+\bvc
+      SUBROUTINE BB
+
++CDE, Q.                     declaring the store and /JZUC/
+
+      CHARACTER    IAM*4
+      PARAMETER   (IAM = 'BB  ')
+
+      CALL JZIN (IAM,0,3,0)
+      IF (IQUEST(1))         11, 17, 21
+
+C--       Initialize constants if and only if not set from title
+   11 Q(LQAN+1) = .0025
+      Q(LQAN+2) = .3
+
+C--       Complete initialization calculating derived constants
+   17 Q(LQAN+3) = .5 * SIN (Q(LQAN+2))
+
+   21 CALL MZWORK (...)
+
+          ...    processor body
+
+      CALL JZOUT (IAM)
+      RETURN
+      END
+\end{verbatim}
+\lspa
+The 3rd and the 4th parameter to JZIN are looked at only on first
+contact for each processor.
+\newpage
+Note that over-ruling with the JZAN title only works
+if the processor is programmed to handle it.
+This is done in this example where statement 11
+is reached only if there is no title.
+
+JZIN readies for the new processor these links :
+\bvb
+      COMMON /JZUC/LQJZ,LQUP,LQDW,LQSV,LQAN, JQLEV,JQFLAG(10)
+
+          LQJZ  the header bank supporting the JZ91 data-structure
+
+          LQUP  the upper call bank
+
+          LQDW  the  down call bank, if needed, else = zero.
+
+          LQSV  the bank of support variables;
+                IQ(LQSV+1) contains system information,
+                IQ(LQSV+2) is 1 for first entry, 2 for second, etc.
+
+          LQAN  the processor constants inside the SV bank :
+                IQ(LQAN)   number of constants
+                 Q(LQAN+1)  first constant
+                 Q(LQAN+2) second constant
+                        . . .
+      and also :
+
+          JQLEV       is the current call depth level, = zero for the root
+
+          JQFLAG(10)  receives a copy of the flags for this processor.
+\end{verbatim}
+\lspa
+Note that the data in this common /JZUC/ must not be changed
+by the user, JQFLAG excepted.
+
+JZIN goes to ZFATAL if IFDOWN is non-zero and
+the lowest possible call-depth has been reached.
+
+There are always 10 flag words.
+Words not explicitely initialized with a JZFL title
+for a given processor are always zero.
+This feature is only available with the program development version,
+in the production version of ZEBRA the flags are
+all initialized to zero and never change,
+JZFL titles are dropped by JZINIT and are otherwise ignored.
+
+If you need the working space also in the initialization
+part of the processor, look out :
+you cannot place the CALL MZWORK before the
+CALL JZIN,
+nor immediately after, because MZWORK destroys IQUEST.
+
+\newpage
+\section{JZINIT - initialize the JZ91 package}
+\smark{JZINIT}
+
+The highest processor level,
+at call depth zero, is called the 'root'.
+The MAIN program is necessarily at this level.
+The root level is handled as a processor,
+with the ID given in IAMR to JZINIT.
+This is used to associate the titles JZAN and JZFL, if any.
+The root gets 10 processor constants and 10 JZTELL counters,
+unless the extra features of para.~2.2 are used.
+
+Before using the JZ91 package one has to initialize it with
+
+\Subr{CALL JZINIT (IXSTOR, CHIAMR, CHOPT, MAXLEV, NLCALL, NDCALL, 0)}
+\bvb
+     IXSTOR  the index of the processing store,
+             (or the index of any division in this store)
+             may be zero if the primary store is used
+
+     CHIAMR  the processor ID of the root,
+             type CHARACTER*4, string of 4 characters
+
+      CHOPT  character string of options :
+
+                T  timing selected
+                Q  quiet, no log output
+                E  error messages only
+
+     MAXLEV  maximum call-depth number,
+             eg. =1 if only the root calls processors
+
+     NLCALL  maximum number of links in all call banks
+
+     NDCALL  maximum number of data words in all call banks
+
+          0  zero; non-zero gives access to the extra features
+                   described in para. 2.2
+\end{verbatim}
+\lspa
+
+JZINIT will create the long-range division JZ91 in the store
+signalled by IXSTOR for holding the JZ91 data structure,
+which contains all JZ data, like the call banks, the SV banks, etc.
+This store must be the store where the user does his processing;
+the links LQJZ,LQUP,... will be declared by JZINIT to be a link-area
+for this store.
+Links in call banks can only point into this store.
+
+Titles JZAN and JZFL, if any, must have been read into the
+title-structure of this same store before JZINIT is called,
+because it will re-format or re-link them for use.
+
+All call banks are pre-lifted by JZINIT,
+all of the same maximum size as specified by NLCALL and NDCALL,
+one call bank for each of the MAXLEV levels.
+They are permanent banks,
+being continously re-used.
+
+Accounting the execution time of the processors individually
+is an option which could be expensive in real time
+on some computers.
+
+JZINIT returns IQUEST(1) just like JZIN.
+
+\newpage
+\section{JZTELL - count processor conditions}
+\smark{JZTELL}
+
+To signal condition J in the current processor one may
+\Subr{CALL JZTELL (J)}
+
+which bumps the counter J=1,2,...,NCD contained
+in the support variables.
+The first or the last counter are bumped for
+underflow or overflow in J.
+
+NCD, the number of counters available in the SV bank,
+is normally 10.
+If more are needed the extra features of JZIN have
+to be used,
+as explained in para.~2.1.
+
+\section{JZZERO - zero the down call bank}
+\smark{JZZERO}
+
+When filling the down call bank for the next processor to be
+called it is safer to clear the unused part of this bank to zero,
+with
+
+\Subr{CALL JZZERO (NL, ND)}
+\bvb
+with     NL  leave the links 1 to NL untouched and reset links
+             NL+1 to the end to zero;
+         ND  same for the data words, words 1 to ND untouched.
+\end{verbatim}
+\lspa
+Note that JZIN does already clear the new down call bank to zero.
+
+\section{JZROOT - reset processor level to root}
+\smark{JZROOT}
+
+If recovery to 'next event' is done with transfer to QNEXT
+(see book MZ, para.~3.04),
+QNEXT should reset the processor level to 'root' with :
+
+\Subr{CALL JZROOT}
+
+No harm is done by calling JZROOT on first entry to QNEXT,
+when the level is already zero.
+
+\section{JZEND - print processor usage statistics}
+\smark{JZEND}
+
+To get this printed on the log file, one calls from ZEND :
+
+\Subr{CALL JZEND}
+
+The  apparent number of calls to the root reflects the
+number of times that JZROOT did actually have to unwind
+the processor stack,
+except for the initial entry with JZINIT.
+\newpage
+\section{Titles JZAN - processor constants}
+\smark{Titles JZAN constants}
+
+See TZINIT in book TZ for input of titles into
+the dynamic store.
+
+For each processor whose constants are to be initialized
+via the titles,
+thus over-ruling the default in the processor itself,
+one title should be given :
+
+\bvb
+   word 1  processor ID in A4 format
+
+        2  constant 1
+        3  constant 2
+      ...  ...
+      n+1  constant n
+\end{verbatim}
+\lspa
+
+The number constants given should agree with
+the number given as NAN to JZIN.
+A discrepancy causes a diagnostic message.
+If some constants are derived by the processor from other
+constants,
+as in the example of para.~1.2,
+their places have to be kept open by giving dummy zeros.
+
+If several titles are given for the same processor,
+the first title coming in the title input stream is taken,
+later ones are dropped.
+
+\bvc
+Example :
+
+      *DO  JZAN  -E11 -C21/72    #. Constants for central detector decoding
+       MAIN               :CDRC
+       GLOBAL T0             0.
+       DE/DX SCALE           4.
+       MAX BASE              15.
+       S-SAMPL LENGTH        8.
+       A-COEFF               0.89
+       MIN P-LENGTH          2.
+       T-SLEW CONSTANT       1000.
+       AV INV RAW E1         0.00585
+       DEDXOFFSET             68.0
+       T-COR FOR S/W         -35.0
+
+      *DO  JZAN  -C11/72
+                :V0FI
+       DPPMAX        30.0    #.  maximum DELTA P / P
+       Y2TMAX         6.0
+       ETAMAX        99.0
+       AMBFLG         1.0    #.  do not remove ambiguities
+       DISVMN         0.0
+       DISZMX         0.3
+       STDIMP         1.0
+       PENALT         0.1
+
+      *DO  JZAN  -E11 -C21/72
+                          :SERC
+       DUMMY (RUN NO.)         0.
+       TBIN TRAK+BGR           2.
+       CDIN TRAK+DIGIT+BGR     3.
+       FDIN NOT CALLED         0.
+       DUMMY                   6* 0.
+\end{verbatim}
+\lspa
+\newpage
+\section{Titles JZFL - processor flags}
+\smark{Titles JZFL flags}
+
+Zero, one or several titles may be given,
+each containing flags for one or several processors,
+given as one data group for one processor which looks thus :
+
+\bvb
+    word  a  processor ID in A4 format
+        a+1  flag word 1
+        a+2  flag word 2
+          . . .                 (n=0 is possible,
+                                     it blocks later settings)
+        a+n  flag word n
+      a+n+1  END     - the termination literal,
+                       may be omitted for the last group.
+
+
+Any JZFL title looks then like this :
+
+    word  1  first word of first group of n1 words
+                           ie. n1-2 flags
+       n1+1  first word of second group
+          . . .
+\end{verbatim}
+\lspa
+
+If several flag settings are given for the same processor,
+the first one is taken and further are dropped.
+\bvb
+Examples :
+
+*DO  JZFL
+    :IMRE   0   0   0   0   0   1   0   0   :END
+    :VEFI  99   5   0   0   0   1   1   0   :END
+    :V0FI   0   0   0   0   0   0   0   0   :END
+    :TMER   0   0   0   0   0   0   0       :END
+    :VEMO   0   0   0   0   0   1           :END
+    :XCAL   0             :END
+    :TFIT   #B1110110001  :END
+
+      For single-group titles it is more economic to omit
+      the end terminator (no re-formatting needed) :
+
+*DO  JZFL
+    :VEMO   0   0   0   0   0   1
+*DO  JZFL
+    :XCAL   0
+*DO  JZFL
+    :TFIT   #B1110110001
+
+\end{verbatim}
+\lspa
+\chapter{Extra features}
+
+\section{JZIN - extra features}
+\smark{JZIN - extra features}
+
+These are requested by giving a LIST as the fourth parameter
+to JZIN rather than zero.
+The first word of LIST must indicate the length of the list.
+Each further word selects the features described:
+
+\bvb
+  LIST(2)  = NCD the number of JZTELL counters to be provided for the processor
+                 (the default is 10)
+
+  LIST(3)  = NLS the number of working space links and
+  LIST(4)  = NDS the number of working space data to be saved
+                 (the defaults are 0)
+\end{verbatim}
+\lspa
+When processor AA calls BB it looses the working space
+since BB has the right to use it freely,
+only the size of the working space is saved by JZIN and
+restored by JZOUT.
+With these 2 options JZIN is requested to save links 1,...,NLS
+and/or data words 1,...,NDS into the bank of support variables
+on down-call.
+JZOUT will restore them on up-return.
+
+Saving working space data is intended to be used with
+{\bf small} amounts of data only,
+otherwise this costs time and also memory.
+\bvb
+Examples :
+
+      DIMENSION LIST(2)
+      DATA LIST /1,24/    selects NCD=24; NLS and NDS remain zero
+
+      DIMENSION LIST(3)
+      DATA LIST /2,4,3/   selects NCD=4 and NLS=3; NDS remains zero
+\end{verbatim}
+\lspa
+\section{JZINIT - extra features}
+\smark{JZINIT - extra features}
+
+This is handled in analogy with the extra features of JZIN :
+\bvb
+  LIST(2)  = NANR the number of processor constants for the root (default is 10)
+  LIST(3)  = NCD the number of JZTELL counters for the root (default is 10)
+  LIST(4)  = NLSR the number of working space links and
+  LIST(5)  = NDSR the number of working space data to be saved (defaults are 0)
+  LIST(6)  = NACCE extra system accounting words in all SV banks,
+             this is for monitoring to be used only by experts (default is 0)
+\end{verbatim}
+\lspa
+\newpage
+\section{JZSETF - set processor flag by program}
+\smark{JZSETF - set flag}
+
+To change the value of flag JFL in processor CHID one can call:
+
+\Subr{CALL JZSETF (CHID, JFL, VALUE)}
+
+This routine acts only if the flag JFL actually exists
+in the processor CHID,
+ie. if a title JZFL of at least JFL flags has been given.
+In case of do-nothing it returns IQUEST(1)=0.
+
+In case of succesful operation it returns 3 values in
+IQUEST(1/3) in this order:
+\bvb
+  1  LFL  adr of the flag JFL is IQ(LFL+JFL)
+  2  NFL  length of the flag vector
+  3  OLD  previous content of the changed flag
+\end{verbatim}
+\lspa
+
+\section{JZLOG - processor logging}
+\smark{JZLOG - logging}
+
+This gives control over the amount of information printed
+about the operation of the processors~:
+
+\Subr{CALL JZLOG (CHOPT)}
+
+CHOPT is a CHARACTER string whose individual letters select
+particular outputs :
+\bvb
+      Q :  suppress all messages
+      E :  print error messages only
+      N :  reset to normal logging
+
+      T :  monitor each call to JZTELL
+
+      A :  monitor each call to JZIN
+      B :          and dump the call bank
+      C :          and dump the parameters
+
+      X :  monitor each call to JZOUT
+      Y :          and dump the call bank
+\end{verbatim}
+Options B and C imply A, option Y implies X.
+
+The implementation of the effect of options B, C, Y, is waiting
+for other new code in Zebra.
+\bvb
+Examples :
+
+          CALL JZLOG ('E')
+
+          CALL JZLOG ('TBCY')      maximum logging
+
+          CALL JZLOG ('A')         log only entries
+
+          CALL JZLOG ('N')         back to normal
+\end{verbatim}
+\lspa
+\newpage
+\section{JZWIND - unwind the processor stack}
+\smark{JZWIND}
+
+If one uses setjmp/longjmp to abnormally quit from some low level
+processor to some higher level processor (other than the root)
+the processor receiving the longjmp has to unwind the JZ91 stack
+to itself by calling JZWIND giving its name IAM :
+
+\Subr{CALL JZWIND (IAM)}
+
+\section{JZTRAC - print processor trace-back}
+\smark{JZTRAC}
+
+This routine is called from ZPOSTM during error termination.
+
+\Subr{CALL JZTRAC (MODE)}
+
+It prints the processor names and the call-bank addresses,
+it also optionally marks some banks as 'critical'
+to get a full dump of these banks in DZSNAP.
+Marking 'critical' depends on single bits in MODE :
+\bvb
+    bit 1  all SV banks in the chain
+        2  all call banks in the chain
+        3  all banks pointed to from the links
+           in the current call banks at LQUP and LQDW.
+\end{verbatim}
+\lspa
+
+\section{Receiving the working space}
+\smark{Notes}
+
+Sometimes the situation arises when the calling processor
+wants to receive the working space of the called processor
+intact;
+it may for instance contain a large error matrix
+which one does not want to be copied into a bank
+just in case it may be needed.
+This request is done in the calling processor
+by setting status-bit 15 into the down call bank,
+ie. CALL SBIT1 (IQ(LQDW),15).
+JZOUT will see this flag,
+it will reset it to zero,
+and it will leave the working space unchanged.
+\section{Note on processor timing}
+\smark{Notes}
+
+JZ91 uses the KERNLIB routine TIMED (Z 007)
+for measuring the time spent in each processor.
+TIMED is called every time the processor level changes
+and the value returned is added into the right Q(LQSV+5).
+
+If the user also wants to use TIMED to time a section
+of his code inside (!) a processor,
+he can do this.
+But unless he follows the recomendation below,
+he will invalidate the timing figures for the particular
+processor.
+To keep things right, he should do this :
+\bvb
+       CALL TIMED (T)
+       Q(LQSV+5)=Q(LQSV+5) + T
+          user code to be timed
+       CALL TIMED (T)
+       Q(LQSV+5)=Q(LQSV+5) + T
+\end{verbatim}
+\lspa
+The first call marks the start time of the user code;
+the time spent in the processor till this moment
+is cumulated into the SV bank.
+The second call brings the time interval of the user
+code,
+it too is cumulated.
+Note that you cannot so measure an interval
+across a processor call.
+\newpage
+\section{Off-line initialization of a processor}
+\smark{Notes}
+
+In case the initialization part of a processor is bulky
+it may be convenient to split it off from the processor proper
+into a separate subroutine to be called just once from the root,
+so as to have it executed and then out of the way.
+Suppose we have the processor BB,
+and we split the initialization off into subroutine BBIN.
+This might then look as follows :
+
+\bvb
+      SUBROUTINE BBIN
+
++CDE, Q.
+
+      CALL JZIN ('BB  ',0,36,0)
+      IF (IQUEST(1))         11, 17, 99
+
+C--       Initialize constants if and only if not set from title
+   11 Q(LQAN+1) = .0025
+      Q(LQAN+2) = .3
+
+C--       Complete initialization calculating derived constants
+   17 Q(LQAN+3) = .5 * SIN (Q(LQAN+2))
+
+      IQ(LQSV+2) = 0       to reset the entry count from 1 to zero
+   99 CALL JZOUT ('BB  ')
+      RETURN
+      END
+C=====================================================
+
+      SUBROUTINE BB
+
++CDE, Q.
+
+      CALL JZIN ('BB  ',0,0,0)
+      IF (IQUEST(1).LE.0)  CALL ZFATAM ('BB, NOT INITIALIZED.')
+      CALL MZWORK (...)
+
+         processor body
+
+      CALL JZOUT ('BB  ')
+      RETURN
+      END
+C=====================================================
+
+Note that in subroutine BB it is still wise to check on IQUEST(1)
+in case the explicit  CALL BBIN from the main program has been lost.
+\end{verbatim}
+\lspa
+\newpage
+\markboth{appendix: bank JZ91}{appendix: bank JZ91}
+\vspace*{4mm}
+{\Large\bf Appendix: JZ91 data structure and bank descriptions}
+
+\vspace*{4mm}
+{\large\bf JZ91 - header bank}
+
+address : LQJZ system link in /JZUC/
+
+\bvb
+    - 2*JQMLEV+6  current SV bank for depth JQMLEV
+             ...  ...
+              +7                            1
+      - JQMLEV+6  current SV bank for depth 0  (root)
+
+      - JQMLEV+5  down call bank for depth JQMLEV-1
+             ...  ...
+             - 7                           1
+             - 6  down call bank for depth 0  (root)
+             - 5  zero  (= LQUP for the root)
+
+             - 4  fan-out bank for immediate access to SV banks
+             - 3  linear chain of SV banks
+             - 2  linear chain of pending JZFL derived title banks
+links :      - 1  linear chain of pending JZAN title banks
+
+data :         1  guard word
+               2  NQLINK   working space parameters
+               3  NDATA    at level 0 (= root)
+
+               4  NQLINK
+               5  NDATA    at level 1 (= 1 below the root)
+             ...  ...
+
+      2*JQMLEV+1  NDATA    at level JQMLEV-1
+      2*JQMLEV+2  guard word
+
+        JQMLEV is MAXLEV of JZINIT, the maximum call depth
+\end{verbatim}
+\lspa
+
+{\large\bf Fan-out bank}
+
+address : LQ(LQJZ-4)
+
+\bvb
+        link  -J  address of SV bank J
+
+        data   1  N = length of the list,  J=1,...,N
+
+             J+1  ID of SV bank J
+\end{verbatim}
+\lspa
+\newpage
+\markboth{appendix: bank JZSV}{appendix: bank JZSV}
+{\large\bf JZSV - bank of support variables}
+
+One such bank for each processor initialized
+
+\bvb
+links :
+      -(NLSV+3)  saved working space link 1
+            ...  ...
+            - 4  saved working space link NLSV
+            - 3  two links reserved for the user
+            - 2
+            - 1  reserved
+
+data :
+     LQSV   + 0  status word
+                 bits  1/8 = LV, the processor has been init. for this level
+                 bits 9/16 = JQNACC-9, extra account words, normally zero
+                 bit 17 set : constants are title initialized
+            + 1  processor ID in A4 format
+            + 2  number of calls to this processor
+            + 3  NLSV working space links to be saved
+            + 4  NDSV working space data words to be saved
+            + 5  cumulate time for current call
+            + 6  longest time interval for this processor
+            + 7  cumulated execution time for this processor
+            + 8  intermediate time cumulator (to improve precision)
+      [ + 9 ...  possibly extra accounting words ]
+
+                 LCD = LQSV + JQNACC    (constant in /JQC/)
+
+     LCD    + 0  NCD = number of conditions to be recorded
+              1  count condition 1 and lower
+              2  count condition 2
+            ...  ...
+            NCD  count condition NCD and higher
+
+                 LAN = LCD + NCD + 1     --> LQAN
+
+     LAN    + 0  NAN = number of processor constants
+              1  constant 1
+            ...  ...
+            NAN  constant NAN
+
+                 LDSV = LAN + NAN + 1
+
+     LDSV   + 0  saved working space data word 1
+            ...  ...
+         NDSV-1  saved data word NDSV
+
+                 LFL = LDSV + NDSV    only in P=QDEBUG version
+
+     LFL    + 0  NFL = number of flag words
+            + 1  flag word 1
+            ...  ...
+            NFL  flag word NFL
+\end{verbatim}
+\lspa
+@

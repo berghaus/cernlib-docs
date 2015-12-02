@@ -1,0 +1,106 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%  GEANT manual in LaTeX form                              %
+%                                                                 %
+%  Michel Goossens (for translation into LaTeX)                   %
+%  Version 1.00                                                   %
+%  Last Mod. Jan 24 1991  1300   MG + IB                          %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\Origin{G.Tromba, P.Bregant}
+\Submitted{10.10.89}\Revised{16.12.93}
+\Version{Geant 3.16}\Routid{PHYS251}
+\Makehead{Simulation of Rayleigh scattering}
+\Shubr{GRAYL}{}
+ 
+\Rind{GRAYL} generates Rayleigh scattering of a photon using 
+the random-number
+composition and rejection technique to sample the momentum
+of the scattered photon and the scattering angle, according to the
+form-factor distribution. In this reaction no new particles are
+generated and the kinematical quantities of the scattered photon
+replace the original ones in the \FCind{/GCTRAK/} common block.
+ 
+Activation of the Rayleigh scattering is done via the {\tt FFREAD} data
+record {\tt RAYL}. If this process is activated, \Rind{GRAYL} is called
+by \Rind{GTGAMA} when a Rayleigh scattering occurs.
+\section{ Method }
+ 
+The Rayleigh differential cross section as a function of $ q^2 $ is given
+by \cite{bib-NELS}:
+\begin{equation}
+\frac{d \sigma_R \left( q^2 \right) }{ d \Omega } =
+ \frac{ \pi r_0^2}{ k^2 } \left( \frac{1 + \mu^2 }{ 2 } \right)
+ \left| F_T \left( q \right) \right| ^2
+\end{equation}
+where:\\
+ 
+\[\begin{array}{LL}
+r_0       & \mbox{electron radius} \\
+k         & \mbox{incident wave vector} \\
+q=2k sin \frac{ \theta }{2}  & \mbox{momentum of scattered
+              photon ($\theta$ is the scattering angle)} \\
+\mu = cos \theta  & = 1 - \frac{q^2 }{ 2 k^2} \\
+F_T \left( q \right)     & \mbox{molecular form factor}
+\end{array} \]
+ 
+Under the assumption that the atoms of a molecule are completely independent,
+$ \left| F_T \left( q \right) \right| ^2 $ is given by:
+\begin{equation}
+ \left| F_T \left( q \right) \right| ^2 = \sum_{i=1}^{N}
+ \frac{W_i}{A_i}  \left| F_i \left( q_i , Z_i  \right) \right| ^2
+ \sigma_{c_i} \left( Z_i , E \right)
+\end{equation}
+where the index $i$ runs on the $N$ atoms in the molecule and:
+ 
+\[\begin{array}{LL}
+ W_i        & \mbox{proportion by weight} \\
+ Z_i , A_i  & \mbox{atomic number and weight} \\
+ F_i        & \mbox{form factor} \\
+\sigma_{c_i}& \mbox{total atomic cross section for coherent scattering}\\
+\end{array} \]
+ 
+Using the combined composition and rejection sampling method described in
+\Rind{GPAIRG} ({\tt [PHYS211]}) we may set:
+\begin{equation}
+f \left( q \right) = \sum_{i=1}^{N} \alpha_i f_i \left( q \right)
+g_i \left( q \right) = \sum_{i=1}^{N} A \left( q_i^2 \right)
+\frac{ \left| F_T \left( q \right) \right| ^2 }{ A \left( q_n^2 \right) }
+\left( \frac{1+\mu^2}{2} \right)
+\end{equation}
+
+where:
+ 
+\[\begin{array}{LL}
+ n          & \mbox{number of energy bins} \\
+ q_i        & \mbox{momentum of the photon with energy $ E_i $ of the
+                 $i^{th}$  bin} \\
+ q_n        & \mbox{upper limit for the momentum of the scattered photon} \\
+ \alpha_i   & A \left( q_i^2 \right)  \\
+ f_i \left( q \right )  &
+ \frac{\left| F_T \left( q \right) \right| ^2}{A \left( q_n^2 \right)}  \\
+ g_i \left( q \right )  & = \frac{1+\mu^2}{2} \mbox{\hspace{0.5cm} 
+rejection function.}
+\end{array} \]
+ 
+ 
+Therefore, for given values of the random numbers $r_1$ and $r_2$, \Rind{GRAYL}
+samples the momentum of the scattered photon and the scattering angle
+$\theta$ via the following steps:
+ 
+\begin{enumerate}
+\item sample $ A \left( q^2 \right) = r_1 A \left( q_n^2 \right) $
+\item find the $ \left (  q_{i-1} , q_i  \right] $ interval
+which gives $ A \left( q_{i-1}^2 \right) \leq A \left( q^2 \right)
+\leq  A \left( q_i^2 \right) $
+\item calculate the linear extrapolation:
+\begin{equation}
+q = q_{i-1} + \left( A \left( q^2 \right) -  A \left( q_{i-1}^2 \right) \right)
+\frac{q_i - q_{i-1} }
+{ A \left( q_i^2 \right) -  A \left( q_{i-1}^2 \right)} \nonumber
+\end{equation}
+\item calculate $\mu = cos \theta  = 1 - q^2/(2 k^2) $
+\item calculate $g_i \left( q \right) = (1 + \mu^2 )/2 $
+\item if $g_i \left( q \right) > r_2 $ the event is accepted, otherwise
+go back to 1.
+\end{enumerate}

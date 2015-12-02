@@ -1,0 +1,179 @@
+<PRE>
+
+
+
+
+<H2>Geant  3.16  Routine  TRAK300</H2>
+
+
+<PRE>
+
+
+Origin:  R.Brun                                          Submitted:  01.06.83
+Revision:                                                            Revised:  14.12.93
+Documentation:
+
+
+</PRE>  <HR>  <H2>Storing  secondary  tracks  in  the
+stack</H2>
+
+
+<PRE>
+
+
+
+       CALL  GSKING                         (IT)
+
+
+
+IT                        (INTEGER)  number  of  the  track  to  be
+                          stored  for  subsequent  tracking,  if  IT=0
+                          all  secondary  tracks  generated  in  the
+                          current  step  are  stored  for  tracking.
+
+
+During  transport,  particles  can  generate  new
+particles,  called  secondary.  In  GEANT  these
+particles  are  stored  in  the  common  /GCKING/  (see
+[BASE030]  for  an  explanation  of  the  variables  in
+this  common).  The  number  of  particles  generated
+in  the  current  step  is  NGKINE  (common  /GCKING/).
+If  no  user  action  is  taken,  the  variable  NGKINE  is
+reset  to  0  at  the  beginning  of  the  subsequent  step
+and  these  particles  are  not  transported.
+
+
+To  be  transported  by  GEANT,  these  particles  need
+to  be  stored  in  the  data  structure  JSTAK  (see
+[TRACK399])  which  normally  is  a  LIFO  stack:  the
+last  particle  generated  is  the  first  one  to  be
+tracked  when  the  current  one  stops.  The  order  of
+tracking  can  be  changed  by  the  user,  plase  see
+[TRAK310]  for  more  information  on  this  subject.
+
+
+The  routine  GSKING  moves  particles  from  the
+/GCKING/  common  to  the  JSTAK  structure,  where
+GEANT  looks  for  particles  to  transport.
+
+
+When  a  particle  is  fetched  from  the  JSTAK  data
+structure,  its  place  is  freed  for  a  new  one,  so
+the  information  on  the  initial  kinematics  of  this
+track  is  lost.  It  may  be  useful  in  some  occasion
+to  record  the  initial  kinematic  of  a  track  and
+save  it  till  the  end  of  the  event.  This  is
+accomplished  by  storing  the  particle  information
+both  in  the  JSTAK  data  structure  and  in  the
+JVERTX/JKINE  one,  which  is  permanent  throughout
+the  life  of  the  event.  As  already  said  in
+[KINE100],  this  should  not  be  done  by  the  user
+
+
+
+calling  directly  the  GSVERT/GSKINE  routines
+during  tracking,  but  rather  controlling  the
+action  of  GSKING  via  the  array  IFLGK  in  common
+/GCKING/.  If  the  particle  number  IG  generated  in
+the  current  step  (1  < =     IG  < =     NGKINE)  is  being
+moved  to  the  JSTAK  stack,  either  singularly  or
+together  with  all  the  other  particles  generated
+in  the  current  step  (setting  the  argument  of
+GSKING  to  0),  the  action  performed  depends  on
+IFLGK(IG):
+
+
+IFLGK(IG)<0                          the  particle  is  ignored;
+                =0                   the  particle  is  stored  on  the
+                                     temporary  stack  JSTAK  to  be
+                                     transported;
+                =1                   the  particle  is  stored  on  the
+                                     temporary  stack  JSTAK  to  be
+                                     transported  and  in  the  JKINE  data
+                                     structure  attaching  it  to  a  vertex
+                                     created  in  the  current  position
+                                     (array  VECT(I),  I=1,3  in  the
+                                     /GCTRAK/  common);
+                >1                   the  particle  is  stored  on  the
+                                     temporary  stack  JSTAK  to  be
+                                     transported  and  in  the  JKINE  data
+                                     structure  attaching  it  to  vertex
+                                     number  IFLGK(IG),  which  must  exist.
+
+
+If  IFLGK(IG)>0,  after  the  call  to  GSKING,
+IFLGK(IG)  is  set  to  the  newly  created  track
+number  in  JKINE.  The  number  of  the  vertex  used  is
+returned  in  IFLGK(NGKINE+1).  This  feature  allows
+the  user  to  identify  the  created  vertex  and
+tracks  via  the  routines  GSVERU  and  GSKINU  (see
+[KINE100]).
+
+
+</PRE>
+
+
+<H2>*</H2>
+
+
+<PRE>
+
+
+Example
+
+
+In  case  of  a  hadronic  interaction,  discard  the
+neutrinos,  store  the  protons  in  the  permanent
+data  structure  JVERTX/JKINE,  and  store  all  the
+other  particles  produced  in  the  temporary  stack.
+
+
+Add  to  the  protons  in  the  JKINE  bank  the  JVOLUM
+and  copy  number  of  the  volume  and  the  number  of
+the  tracking  medium  where  they  have  been  produced
+by  an  interaction.
+           SUBROUTINE  GUSTEP
++SEQ,GCKING,GCVOLU,GCTMED.
+
+
+
+           CHARACTER*4  CHCASE
+           DIMENSION  UBUF(3)
+           .
+           .
+           .
+           CALL  UHTOC(KCASE,4,CHCASE,4)
+           IF(CHCASE.EQ.'HADR')  THEN
+                DO  10  IG=1,  NGKINE
+                      IPART  =  GKIN(5,IG)
+                      IF(IPART.EQ.4)  THEN
+*---                             Discard  neutrinos
+                           IFLGK(IG)=-1
+                      ELSEIF(IPART.EQ.14)  THEN
+*---                             Save  protons  in  JKINE  and  transport  them
+                           IFLGK(IG)=1
+                      ELSE
+*---                             Simply  transport  the  rest
+                           IFLGK(IG)=0
+                      ENDIF
+    10         CONTINUE
+           ENDIF
+*---                             Perform  action  on  all  the  particles
+           CALL  GSKING(0)
+*---                           Add  information  to  the  JKINE  bank
+           DO  20  IG=1,NGKINE
+                IPART  =  GKIN(5,IG)
+                IF(IPART.EQ.14)  THEN
+*---                           This  is  a  proton
+*---                           Get  the  track  number
+                      IT  =  IFLGK(IG)
+                      NUBUF  =  3
+                      UBUF(1)  =  LVOLUM(NLEVEL)
+                      UBUF(2)  =  NUMBER(NLEVEL)
+                      UBUF(3)  =  NUMED
+                      IADR  =  0
+*---                           Store  the  information
+                      CALL  GSKINU(IT,NUBUF,UBUF,IADR)
+                ENDIF
+    20    CONTINUE
+</PRE>

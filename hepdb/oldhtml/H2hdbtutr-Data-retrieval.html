@@ -1,0 +1,236 @@
+<TITLE>HEPDB -- H2hdbtutr-Data-retrieval </TITLE>
+<P>
+<H2><A NAME=H2hdbtutr-Data-retrieval.html>Data retrieval</A></H2>
+<P>
+Routines are available to allow the simple retrieval of data from the
+database. The following section addresses the general issue of data
+retrieval with a brief description of the available routines and examines
+the problems of retrieving data into already existing software.
+<P>
+<H3>Retrieving ZEBRA data structures based on a key vector</H3>
+<P>
+Now that we have created and filled our database with data we have to
+generate code which allows us to read the data into our programs. Taking
+the CPLEAR auxiliary database (integer vectors stored under HEPDB) as an
+example and supposing we want to simply load the auxiliary data for a
+given run into our program's arrays we could approach the problem as
+follows.
+<P>
+The general loop of tasks would be to set keys for the object (and
+consequently vector) that is required, retrieve the object into ZEBRA
+store and finally convert the object back to a vector the software can
+use.
+<P>
+We could write a subroutine called say HDBFET to fetch the database object
+with parameters as follows:
+<P>
+<PRE>
+               <B>Example calling parameters of HDBFET</B>
+                                  </PRE>
+<P>
+<PRE>
+      SUBROUTINE HDBFET(PATH,NUMRUN,KY1,KY2,LBANK)
+*
+*     Where: PATH   is the absolute path to where the data resides in the database (string)
+*            NUMRUN is the instant of validity for the object we require (integer)
+*            KY1    user key 1 say the detector name (4 Character hollerith)
+*            KY2    user key 2 say the name of the destination array (4 char hollerith)
+*            LBANK  the address of the retrieved bank.
+</PRE>
+<P>
+This subroutine could be implemented as follows.
+<P>
+<PRE>
+                 <B>Possible implementation of HDBFET</B>
+                                  </PRE>
+<P>
+<PRE>
+      SUBROUTINE HDBFET(PATH,IVALID,UKY1,UKY2,LBANK)
+c|
+c+-------------------------------------------------------------------+
+c|    HDBFET    : Routine to retrieve HEPDB object into a bank       |
+c|                valid at NUMRUN with keys UKY1/2                   |
+c+-------------------------------------------------------------------+
+c|
++SEQ,CPPOIN.
++SEQ,CPBANK.
+      COMMON/QUEST/IQUEST(100)
+      PARAMETER       (IONLINE=0)
+      PARAMETER       (IOFFLINE=1)
+      PARAMETER       (NHDBKEYS=14)
+      INTEGER          LBANK
+      INTEGER          IMASK(NHDBKEYS)
+      INTEGER          HDBKEYS(NHDBKEYS)
+      CHARACTER*255    PATH
+      CHARACTER*4      UKY1,UKY2
+      CHARACTER*8      MESS
+      INTEGER          IVALID
+c|
+c|    Convert CHARACTER --> HOLLERITH for user keys
+c|
+      CALL UCTOH(UKY1,HDBKEYS(13),4,4)
+      CALL UCTOH(UKY2,HDBKEYS(14),4,4)
+c|
+c|  Set up IMASK for relevant keys
+c|
+      CALL VZERO (IMASK,NHDBKEYS)
+      IMASK(10)=1
+      IMASK(13)=1
+      IMASK(14)=1
+c|
+c|    Make the search for an off-line object first
+c|
+      HDBKEYS(10)=IOFFLINE
+c|
+c|    Get Bank from Database
+c|
+      CALL CDUSEM(PATH,LBANK,IVALID,IMASK,HDBKEYS,' ',IRC)
+      IF (IRC.EQ.33) THEN
+         HDBKEYS(10)=IONLINE
+         CALL CDUSEM(PATH,LBANK,IVALID,IMASK,HDBKEYS,' ',IRC)
+      ENDIF
+      IF (IRC.NE.0) THEN
+         PRINT *,'Error. CDUSEM IRC=',IRC
+         PRINT *,'For user keys :',UKY1,' ',UKY2
+         PRINT *,'With path :',PATH
+         STOP
+      ENDIF
+      IF (IB(LBANK+10).EQ.IOFFLINE) THEN
+         MESS='OFF-LINE'
+      ELSE
+         MESS='ON-LINE '
+      ENDIF
+      IF (IQUEST(2).NE.0) THEN
+        PRINT *,
+     + '[Source-->',MESS,'] [Keys-->',UKY1,' ',UKY2,' Data from DISK ]'
+      ELSE
+        PRINT *,
+     + '[Source-->',MESS,'] [Keys-->',UKY1,' ',UKY2,' Data from CACHE]'
+      ENDIF
+      RETURN
+      END
+</PRE>
+<P>
+The comments within the code describe the basic flow of the code, however
+there are a couple of points to note. Firstly notice how the new key (key
+10) we introduced is used to check for off-line versions of data objects
+before resorting to taking an on-line version of the data.
+<P>
+Finally notice how IQUEST(2) is checked at the end of the routine to see
+if data was refreshed from disk or from the cache of objects already in
+memory. This is a powerful feature of HEPDB as it saves the need for
+repeated access to the same object each time the current run-number
+changes as it will not always follow that the required object will need to
+be changed. Later in this section we discuss how the command <A HREF=H2hdbuser-Freeing-information-from-memory.html#CDFREE NAME=CDFREE91> CDFREE</A> is
+used to declare that an object is to be cached.
+<P>
+Now let's imagine a typical call to such a routine. Suppose we want to
+retrieve an integer array stored under HEPDB with user keys CALO and CNEX
+(which represent the integer array of CALOrimeter NEXt wires) for run
+number NUMRUN. We also assume that the object resides in directory
+//CDAU/AUX/CALPA. A section of code to retrieve and convert the object to
+an array in memory would have the form shown below.
+<P>
+<PRE>
+                <B>Example calling sequence to HDBFET</B>
+                                  </PRE>
+<P>
+<PRE>
+c+-------------------------------------------------------------------+
+c|  Input CANEXT data from //CDAU/AUX/CALPA                          |
+c|  For keys CALO , CNEX ---> to vector ICANEX (size 68850)          |
+c+-------------------------------------------------------------------+
+c|  Get object from HEPDB according to run number/user keys
+c|
+      PATH='//CDAU/AUX/CALPA'
+      CALL HDBFET(PATH,NUMRUN,'CALO','CNEX',LBANK)
+c|
+c|     Unpack bank into a vector
+c|
+      CALL CDVECT(' ',ICANEX,68850,LB(LBANK-1),'GI',IRC)
+      IF (IRC.NE.0) THEN
+         WRITE(LUPRNT,*) 'Error. CDVECT IRC=',IRC
+         STOP
+      ENDIF
+</PRE>
+<P>
+The main points to note here are that the call to <A HREF=H2hdbuser-Vector-manipulation.html#CDVECT NAME=CDVECT92> CDVECT</A> must be supplied
+with the type of the vector (in this case INTEGER) via the character
+options 'GI' ( Get Integer) and the expected size of the vector in
+elements.
+Also note that the data part of the object resides at LB(LBANK-1) of the
+keys bank and this is the address that must be passed to <A HREF=H2hdbuser-Vector-manipulation.html#CDVECT NAME=CDVECT93> CDVECT</A> via its
+fourth parameter.
+<P>
+As mentioned before, HEPDB has a facility for the caching of objects in
+memory. Objects are only retrieved from disk when no matching object
+exists in the cache or when explicitly requested by the user. This is
+performed as follows. After an object has been used, it is marked by the
+user as a candidate for deleted from the cache using the routine <A HREF=H2hdbuser-Freeing-information-from-memory.html#CDFREE NAME=CDFREE94> CDFREE</A>.
+<P>
+We therefore add an additional subroutine called say AUCAS to declare an
+object to be a candidate for deletion from database memory with parameters
+defined as follows:
+<P>
+<PRE>
+           +--------------------------------------------------+
+           | CALL <A NAME=AUCAS> AUCAS</A> (SUBROUTINE AUCAS(PATH,KY1,KY2,LBANK) |
+           +--------------------------------------------------+
+                                  </PRE>
+<P>
+<DL>
+<DT><TT>PATH</TT></DT><DD>Character variable specifying the directory in
+which the object resides
+<DT><TT>KY1</TT></DT><DD>user key 1 of the object to be dropped
+<DT><TT>KY2</TT></DT><DD>user key 2 of the object to be dropped
+<DT><TT>LBANK</TT></DT><DD>the address of the keys bank.
+</DL>
+<P>
+This subroutine could be implemented as follows.
+<P>
+<PRE>
+                 <B>Possible implementation of AUCAS</B>
+                                  </PRE>
+<P>
+<PRE>
+      SUBROUTINE AUCAS(PATH,KY1,KY2,LBANK)
+c|
+c+-------------------------------------------------------------------+
+c|   AUCAS      : Routine to declare  HEPDB object in a bank         |
+c|                at LBANK available for deletion.                   |
+c+-------------------------------------------------------------------+
+c|
++SEQ,CPPOIN.
++SEQ,CPBANK.
+      CHARACTER*4       KY1,KY2
+      COMMON/QUEST/     IQUEST(100)
+      INTEGER           LBANK,IKV(14),IMASK(14)
+      CHARACTER*255     PATH
+c|
+c|    Zero, then set the user key mask
+c|
+      CALL VZERO(IMASK,14)
+      IMASK(13)=1
+      IMASK(14)=1
+      CALL UCTOH(KY1,IKV(13),4,4)
+      CALL UCTOH(KY2,IKV(14),4,4)
+      CALL CDFREE (PATH,LBANK,IMASK,IKV,' ',IRC)
+      IF (IRC.NE.0) THEN
+          PRINT *,'Error: CDFREE IRC=',IRC
+          STOP
+      ENDIF
+      RETURN
+      END
+</PRE>
+<P>
+So given our previous example call to HDBFET with keys CALO and CNEX the
+appropriate call to AUCAS would be:
+<P>
+<PRE>
+                 <B>Possible implementation of AUCAS</B>
+                                  </PRE>
+<P>
+<PRE>
+      CALL AUCAS(PATH,'CALO','CNEX',LBANK)
+</PRE>
+<P>

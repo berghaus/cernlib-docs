@@ -1,0 +1,197 @@
+\Version{IOSPAK2}                 \Routid{Z308}
+\Keywords{SUBROUTINE PACKAGE ROUTINE}
+\Keywords{IOSWRT IOSRD IOSDIM}
+\Keywords{IBM FULLSCREEN FULL-SCREEN SCREEN IO I/O}
+\Keywords{7171 3270 X3270 VT100 COMPATIBLE SERIES/1}
+\Keywords{GENERAL IBM INTERFACE}
+\Keywords{PACK VM/CMS}
+\Author{E. Perotto}                \Library{KERNLIB, IBM VM/CMS only}
+\Submitter{}                       \Submitted{22.02.1988}
+\Language{IBM Assembler}          %  %\Revised{}
+\Cernhead {3270 Full Screen I/O Routines}
+These routines write a character string anywhere on a full
+screen 3270 terminal, or any VT100 compatible terminal attached to
+a 7171 or Series/1.
+The screen may also be formatted into fields preceded by attributes,
+to intensify (highlight), protect, or hide the field
+(like in the password entry screen of CP).
+The extended attributes (colors on the 3278) are not supported,
+in this case the four default colors discriminate
+protected/unprotected and normal/highlighted fields.
+\Structure
+{\tt FUNCTION} subprograms \\
+User Entry Names: \Rdef{IOSWRT}, \Rdef{IOSRD}, \Rdef{IOSDIM}
+\Usage
+The variable {\tt IRC} and the functions {\tt IOSWRT}, {\tt IOSRD}
+and {\tt IOSFLD} are of type {\tt INTEGER}.
+\begin{verbatim}
+    IRC = IOSWRT()
+    IRC = IOSWRT('CLEAR')
+\end{verbatim}
+Clears the screen of the 3270 terminal at the time of next write to
+screen, no actual I/O takes place immediately.
+The reason for this is that CP leaves control of the terminal upon
+an {\tt ERASE/WRITE} command (executed {\tt CCW}) by the user program,
+so that the screen should be cleared and written to with the same
+command.
+\begin{verbatim}
+    IRC = IOSWRT(LINE,LENGTH,LINENO,NCOL)
+    IRC = IOSWRT(LINE,LENGTH,LINENO,NCOL,IATTR)
+    IRC = IOSWRT(LINE,LENGTH,LINENO,NCOL,IATTR,0)
+    IRC = IOSWRT(LINE,LENGTH,LINENO,NCOL,IATTR,IBUF)
+\end{verbatim}
+Puts a line of text in a buffer for subsequent writing to screen,
+in this way a panel can be built in (conditional) steps.
+(The call is sensitive to the number of parameters passed.)
+\begin{DLtt}{12345678}
+\item[IRC] Indicates whether the operation was successful or not. \\
+$\mathtt{= \ 0:}$  Operation successful; \\
+$\mathtt{= -1:}$ The screen is under CP control, must clear and rewrite
+it;\\
+$\mathtt{= -2:}$  Invalid line number; \\
+$\mathtt{= -3:}$  Invalid column number; \\
+$\mathtt{= -4:}$  Buffer full; \\
+$\mathtt{= -5:}$  No space for attribute; \\
+$\mathtt{= -6:}$  String length not specified; \\
+$\mathtt{= -7,...,-12:}$  Non-fatal I/0 errors, retry.
+\item [LINE] A character string to be displayed. This string may consist
+of a string in quotes, a character variable or array, or any array
+containing Hollerith constants.
+\item [LENGTH] ({\tt INTEGER}) Contains the length of the character
+string (or the number of bytes in the hollerith array).
+It has a different meaning according to its value: \\
+$\mathtt{> 0:}$  \parbox[t]{138mm}
+{Maximum limit is the end of the buffer.
+A string can occupy the whole screen, wrapping from the end to the
+beginning of the screen.  The last 8 positions at the bottom right
+corner are not visible, being overwritten by CP with
+{\tt 'CERNVM\ \ '}.} \\
+$\mathtt{= 0:}$ \parbox[t]{138mm}
+{A field is started empty if the attribute is present.  An empty
+(unprotected) field may be used for input.} \\
+$\mathtt{< 0:}$ \parbox[t]{138mm}
+{The cursor is positioned on the screen as indicated by the following
+parameters.}
+\item [LINENO] ({\tt INTEGER}) Defines the line in which the start
+of the string should be positioned; the top line is line {\tt 1},
+the bottom line is line {\tt 24} on 3270 Model 2,
+line {\tt 35}, {\tt 43} or {\tt 27} on 3270 Models 3, 4, or 5.
+\item [NCOL] ({\tt INTEGER}) Defines the column in which the start
+of the string should be positioned; the leftmost column is column
+{\tt 1}, the rightmost is {\tt 80} in Models 2-4, and 132 in Model 5.
+\item [IATTR] ({\tt INTEGER}) Contains the attributes of the field.
+If this parameter is present, the string is also the beginning of a
+field, which inherits the properties of the attribute, and extends
+across the screen to the next field.  The attribute is located
+in the position at the left of the first character of the string,
+it is hidden (dark) and protected from overwriting by the keyboard.
+The rightmost 6 bits of {\tt IATTR} define the attribute as follows: \\
+$\mathtt{= 32:}$ ({\tt PROTECT}) The field will not be overwritten
+by the keyboard; \\
+$\mathtt{= 16:}$ ({\tt NUMERIC}) The field will accept only numeric
+input; \\
+$\mathtt{= 12:}$ \parbox[t]{136mm}
+{{\tt (HIDE)} The field will not be displayed,
+like the password input field in the CP {\tt LOGON} screen;} \\
+$\mathtt{= \ 8:}$ ({\tt HIGHLIGHT}) The field will be intensified and
+selector pen detectable;  \\
+$\mathtt{= \ 4:}$ ({\tt SELPEN}) The field will be selector pen
+detectable only; \\
+$\mathtt{= \ 2:}$ ({\tt Reserved}) Should be set to zero;  \\
+$\mathtt{= \ 1:}$ \parbox[t]{136mm}
+{({\tt MDT}) Modified Data Tag, when set the field will be included in
+the next {\tt READ MODIFIED} command executed. This bit
+is set when something is put in the field by the keyboard, but can be
+set under program control to include default responses which will be
+displayed on the screen, and read back even if the content has not been
+modified by the keyboard.} \\
+The attribute is the logical {\tt OR} of all the values.
+\item [IBUF] ({\tt INTEGER}) Array used to prepare a mask for the screen
+which can be used several times.  The first value must be initialized
+by the user to the length in bytes of the {\tt N-2} remaining words
+of the array, while the second value must be initialized to zero.
+Every time this routine is called with all parameters this value
+is updated, so that the user knows the amount used, and can clear
+the buffer by resetting to zero the second element of the array.
+\par
+If {\tt IBUF} (or the first element of the array) is zero,
+an internal array is used (around 3000 bytes, the rest of the 4K
+memory page).  If this parameter is missing altogether, an immediate
+write to screen is performed, useful to fill up the voids of the
+already displayed mask with variable information, defaults
+in input fields, or old inputs which may be modified later;
+in this case the internal buffer is used, destroying its contents;
+so the internal buffer must be used before an immediate write
+is performed.
+\end{DLtt}
+\begin{verbatim}
+    IRC = IOSWRT(IBUF)
+    IRC = IOSWRT(0)
+    IRC = IOSWRT('WRITE')
+\end{verbatim}
+This sequence writes the assembled mask to screen, from the user-supplied
+buffer in the first case, from the internal buffer in the latter two
+cases. The buffer remains intact and can be used repeatedly.
+If $\mathtt{IRC = -1}$, the screen content is lost, so it can be rewritten.
+Successive masks may be overlapped on the screen until it is cleared.
+\newpage
+\begin{verbatim}
+    IRC = IOSRD(ECB)
+\end{verbatim}
+Sets the Attention Interrupt trap, which tells the program when the
+{\tt ENTER} key or any {\tt PF}-key has been hit, without the need to
+wait.
+\begin{DLtt}{123456}
+\item [ECB] ({\tt INTEGER}) Receives a non-zero value upon Attention
+Interrupt (actually the lower part of CSW, with status bits).
+This variable should be set to zero before the call, so that the program
+may periodically inspect, and continue processing while it is zero,
+or go to retrieve full-screen input if not.
+\end{DLtt}
+\begin{verbatim}
+    IRC = IOSRD(BUFF,LENGTH,LINENO,NCOL)
+\end{verbatim}
+Starts a synchronous full-screen read and collects all the data from the
+modified fields in {\tt BUFF}, or in an internal buffer.
+\begin{DLtt}{12345678}
+\item[IRC] Indicates whether the operation was successful or not. \\
+$\mathtt{> \ 0:}$ Operation successfull, {\tt IRC} = Number of
+the {\tt PF}-key pressed; \\
+$\mathtt{= \ 0:}$ Operation successfull, {\tt ENTER} pressed; \\
+$\mathtt{= -1:}$ Screen under CP control ({\tt PA1} key pressed before); \\
+$\mathtt{= -2:}$ {\tt PA2} key pressed (Clear Output in CMS); \\
+$\mathtt{= -3:}$ {\tt CLEAR} key pressed, the screen is now empty; \\
+$\mathtt{= -4:}$ No input available; \\
+$\mathtt{= -5:}$ Incorrect parameters number; \\
+$\mathtt{= -6,...,-12:}$ I/O errors, retry.
+\item [BUFF] Array of convenient length to receive the modified fields.
+This buffer is useful if the input has to be saved, otherwise it
+is not required, the internal buffer is used instead.
+\item [LENGTH] ({\tt INTEGER}) This variable contains, on entry,
+the length of {\tt BUFF}. On exit, it contains the actual length used of
+this array.
+The length of the buffer should be the sum of the field lengths,
+three bytes per field, plus four bytes for the cursor coordinates.
+If this parameter is zero, then the internal buffer is used.
+\item [LINENO] ({\tt INTEGER}) Gives the number of the line where
+the cursor is located at the moment of the full-screen read.
+\item [NCOL] ({\tt INTEGER}) Gives the number of the column where
+the cursor is located at the moment of the full-screen read.
+\end{DLtt}
+\begin{verbatim}
+    CALL IOSFLD(LINE,LENGTH,LINENO,NCOL)
+\end{verbatim}
+Gives the modified fields taken by the last {\tt IOSRD} call, one by one
+with their individual lengths and positions on the screen.
+\begin{DLtt}{12345678}
+\item [LINE] Array of convenient length to receive the modified field.
+\item [LENGTH] ({\tt INTEGER}) This variable contains, on entry,
+the length of {\tt LINE}. On exit, it contains the actual length used of
+the field. When it becomes negative then there are no more fields left
+in the buffer.
+\item [LINENO] ({\tt INTEGER}) Gives the number of the line where
+the first character of the field is located.
+\item [NCOL] ({\tt INTEGER}) Gives the number of the column
+where the first character of the field is located.
+\end{DLtt}
+$\bullet$

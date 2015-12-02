@@ -1,0 +1,296 @@
+<HEAD>
+<TITLE> Technical details of the ZEBRA RZ system</TITLE>
+</HEAD>
+<BODY><P>
+ <HR> <A NAME=tex2html31 HREF=tex2htmlindex2_3.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/next_motif.gif"></A> <A NAME=tex2html29 HREF=ZEBRZA.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/up_motif.gif"></A> <A NAME=tex2html23 HREF=chapter2_1.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/previous_motif.gif"></A>  <A NAME=tex2html33 HREF=tex2htmlindex2_3.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/index_motif.gif"></A><BR>
+<B> Next:</B> <A NAME=tex2html32 HREF=tex2htmlindex2_3.html>Index</A>
+<B>Up:</B> <A NAME=tex2html30 HREF=ZEBRZA.html>No Title</A>
+<B> Previous:</B> <A NAME=tex2html24 HREF=chapter2_1.html> System specific details</A>
+<HR> <P>
+<H1><A NAME=SECTION0020000000000000000> Technical details of the ZEBRA RZ system</A></H1>
+<P>
+<H1><A NAME=SECTION0021000000000000000> RZ I/O</A></H1>
+<P>
+The RZ package uses Fortran I/O, unless the option 'C' is specified
+on the calls to <A HREF=../../zebra/ZEBRZ2/chapter2_1.html#RZOPEN>RZOPEN</A>, <A HREF=../../zebra/ZEBRZ2/chapter2_1.html#RZMAKE>RZMAKE</A> and <A HREF=../../zebra/ZEBRZ2/chapter2_1.html#RZFILE>RZFILE</A>.
+If C I/O is used, the C file pointer is <b>returned</b> by the
+routine <A HREF=../../zebra/ZEBRZ2/chapter2_1.html#RZOPEN>RZOPEN</A>. Thus the LUN parameter must not be a constant.
+<P>
+On most machines, the file pointer returned by the C library
+is a small positive integer. To avoid possible conflicts with
+Fortran logical units, the RZ package adds 1000 to such
+pointers. This is handled internally by the RZ package and has
+no impact on the user.
+<P>
+<H1><A NAME=SECTION0022000000000000000> RZ link area</A></H1>
+<P>
+A permanent reference link area, <tt>RZCL</tt>, is automatically created upon the first
+call to <A HREF=../../zebra/ZEBRZ2/chapter2_1.html#RZFILE>RZFILE</A> or <A HREF=../../zebra/ZEBRZ2/chapter2_1.html#RZMAKE>RZMAKE</A>. This link area is defined
+in the patchy sequence <tt>P=QCDE,D=QCDE,Z=RCL</tt>.
+This link area contains the following definitions:
+<DL COMPACT>
+<DT>LTOP
+<DD>Address of control bank for current RZ file
+<DT>LRZ0
+<DD>Address of bank for memory files
+<DT>LCDIR
+<DD>Address of directory structure for current working directory
+<DT>LRIN
+<DD>Last record read 
+<DT>LROUT
+<DD>Last record written
+<DT>LFREE
+<DD>Pointer to list of free records
+<DT>LUSED
+<DD>Pointer to list of used records
+<DT>LPURG
+<DD>Pointer to list of purged records
+<DT>LTEMP
+<DD>
+<DT>LCORD
+<DD>Pointer to list of ordered cycles
+<DT>LFROM
+<DD>Pointer to copied directory
+</DL><tt>LQRS</tt> (system link 7) points to a linear chain containing
+the control banks for all RZ files currently open.
+A bank for a specific Fortran logical unit or C file pointer 
+can be located using the following code.
+(The numeric bank identifier is set to the Fortran logical
+unit or C file pointer). 
+<b>Locating the RZ control bank by logical unit</b><PRE><TT>*
+*     Any RZ files open?
+*
+      IF(LQRS.EQ.0)GO TO 99
+*
+*     Yes, loop over linear chain looking for the bank
+*     for logical unit LUN
+*
+      LRZ=LQRS
+  10  IF(LRZ.EQ.0)GO TO 99
+      IF(IQ(KQSP+LRZ-5).NE.LUN)THEN
+         LRZ=LQ(KQSP+LRZ)
+         GO TO 10
+      ENDIF
+*
+*     LRZ now points to the control bank for LUN
+*     LRECL is equal to # of data words of bank
+*
+      LRECL = IQ(KQSP+LRZ-1)
+*
+...
+  99  CONTINUE</TT></PRE>
+<P>
+<H1><A NAME=SECTION0023000000000000000> Structure of the RZ control bank</A></H1>
+<P>
+The variable <tt>LTOP</tt> points to the control bank
+for the current RZ file, e.g. the one corresponding
+to the current working directory.
+<P>
+The first data word of this control bank can be accessed by
+<tt>IQ(KQSP+LTOP+1)</tt>, where 
+<tt>KQSP</tt> is the offset of the primary store from <tt>LOCF(LQ(0))</tt>.
+<P>
+The record numbers for each subdirectory of a given
+directory are in a separate structure. The subdirectory
+structure of the top directory is reached by <tt>IQ(KQSP+LTOP+KLS)</tt>.
+<P>
+For the top directory, <tt>IQ(KQSP+LTOP+KLB)</tt>
+points to a file descriptor structure,
+<P>
+<b>RZ Directory structure (DZDOC format)</b><PRE><TT>\label{xmp:rztop}
+ Bank IDH  RZ       RZ system top bank                                          
+ Bank IDN           Numeric bank identifier
+                    Fortran Unit
+                    If CACCESS set: 1000 + file pointer
+                    If HACCESS set: address of user routine
+ Author             R.Brun                                                      
+ Store     0                                                                    
+ Division  SYSTEM                                                               
+ NL              10                                                             
+ NS               9                                                             
+ ND        variable                                                             
+ Next      RZ0                                                                  
+ Up        NONE                                                                 
+ IO-Charac          I                                                           
+              ---------- Description of the links  ----------
+ 1         LSDIR    Pointer to first subdirectory                               
+ 2         LFREE    Pointer to list of free records                             
+ 3         LUSED    pointer to list of used records                             
+ 4         LFROM    Pointer to copied directory                                 
+ 5         LPURG    Pointer to list of purged records                           
+ 6         LROUT    Pointer to output buffer                                    
+ 7         LRIN     Pointer to input buffer                                     
+ 8         LCORD    Pointer to ordered cycles (RZCOPY)                          
+ 9         LSNUSED  Free                                                        
+              ---------- Description of the Reference links  ----------
+ 1         LRNUSED  Free reference link *                                       
+              ---------- Description of the status bits ----------
+ 1         NOAUTH   no authorisation to modify directory                        
+ 2         MODIFIED directory has been modified                                 
+ 3         LOCKED   file locked by 'RZFILE'                                     
+ 4         ORGREL   ORGANIZATION='RELATIVE' on VAX                              
+ 5         CACCESS  C file access routine used                                  
+ 6         HACCESS  Hook to user's I/O routine
+ 7-13      USERLUN  User unit number
+ 14                 Reserved for future use
+ 15-17     LOGLEVEL LOG-level+3  (default taken from MZ)                     
+              ---------- Description of the data words   ----------
+ 1         Z:IDNAME Directory name (up to 16 characters)                        
+ 2         Z:IDNAME &quot;                                                           
+ 3         Z:IDNAME &quot;                                                           
+ 4         Z:IDNAME &quot;                                                           
+ 5         RECPT1   Record number of the mother directory,                      
+ 6         RECPT2   or C file pointer (words 5 and 6)                           
+ 7         B:IWPW1  Write password (1st part)                                   
+ 8         B:IWPW2  (2nd part)                                                  
+ 9         NCHDRW   No. of char. DIR(1:5),WPW(6:10), and bit 12 eX mode         
+ 10        D:IDATEC Creation date/time                                          
+ 11        D:IDATEM Last mod date/time                                          
+ 12        NQUOTA   Maximum number of records QUOTA                             
+ 13        N:NRUSED Number of used records                                      
+ 14        NWUSED   Number of words used MOD 1000000                            
+ 15        NMEGA    Number of megawords used                                    
+ 16        RESERVED Reserved                                                    
+ 17        IRIN     Record number currently in LRIN                             
+ 18        IROUT    Record number currently in LROUT                            
+ 19        IRLOUT   Number of the last record written                           
+ 20        IP1      Pointer to first free word in IRLOUT                        
+ 21        ICONT    Record number continuation                                  
+ 22        NFREE    Number of words free in F                                   
+ 23        N:NSD    Number of subdirectories                                    
+ 24        P:LD     Pointer to directory records                                
+ 25        P:LB     Pointer to file descriptor (only for TOP)                   
+ 26        P:LS     Pointer to first subdirectory S                             
+ 27        P:LK     Pointer to first KEY K                                      
+ 28        P:LF     Pointer to free space F                                     
+ 29        LC       Pointer to last cycle C                                     
+ 30        LE       Pointer to end of directory                                 
+ 31        N:NKEYS  Number of keys in that directory                            
+ 32        N:NWKEY  Number of elements in one key                               
+ --REP level=1  N:NWKEY + 9 / 10                                                
+     1       B:KDES   KEYS descriptor (3 bits per el. ,10 keys per word)        
+ --REP level=1 -- End --                                                        
+ --REP level=1  N:NWKEY                                                         
+     1       Z:TAG1   First part of CHTAG(1) 4 characters                       
+     2       Z:TAG2   Second part                                               
+ --REP level=1 -- End --                                                        
+ 1         L:LD     Directory records structure                                 
+ 1         N:NRD    Number of records to describe this dir.                     
+ --REP level=1  N:NRD                                                           
+     1       IREC(I)  Record number I of directory                              
+ --REP level=1 -- End --                                                        
+ 1         L:LB     file descriptor (only for TOP)                              
+ 1         N:NWREC  Number of words for bitmap descriptor                       
+ 2         LREC     Physical record length (in words)                           
+ 3         D:IDATE  Creation date of the file                                   
+ --REP level=1  N:NWREC                                                         
+     1       B:BITMAP 1 bit per record on the file                              
+ --REP level=1 -- End --                                                        
+ 1         L:LS     Subdirectory structure                                      
+ --REP level=1  N:NSD                                                           
+     1       Z:NAM1   Name of subdirectory                                      
+     2       Z:NAM2   &quot;                                                         
+     3       Z:NAM3   &quot;                                                         
+     4       Z:NAM4   &quot;                                                         
+     5       NCHSD    Number of characters in subdirectory name                 
+     6       IRECSD   Record number of this subdirectory                        
+     7       D:IDTIME Date and Time of creation of subdirectory                 
+ --REP level=1 -- End --                                                        
+ 1         L:LK     KEYS structure                                              
+ --REP level=1  N:NKEYS ! I=1,NKEYS                                             
+     1       P:LCYC   Pointer to highest cycle in C for key I                   
+   --REP level=2  N:NWKEYS! K=1,NWKEYS                                          
+         1     KEYS(I,K Element K of key I                                      
+   --REP level=2 -- End --                                                      
+ --REP level=1 -- End --                                                        
+ 1         L:LF     Start of free space                                         
+ --REP level=1  NFREE                                                           
+     1       EMPTY    Free space                                                
+ --REP level=1 -- End --                                                        
+ 1         L:LCYC   Cycles structure                                            
+ 1         PTOCYCLE                                                             
+ 1         P:BI0015 LCYC Pointer to prev cycle of KEY (0 if no)                 
+ 1         P:BI1631 SECREC Second record (if there) (bits 17 to 32)             
+ 2         D:CREATD Creation date/time relative to 1986 (bits 9 TO 32)          
+ 2         BITVAL04 RZKEEP (bit 5)                                              
+ 2         BITVAL03 Append mode (bit 4)                                         
+ 2         BITS0002 Vector format (if RZVOUT) (bits 1 to 3)                     
+ 3         PTODATA  Pointer to the data                                         
+ 3         BITS1631 Record number where data str. starts (bits 17 to 32)        
+ 3         BITS0015 Offset in record (bits 1 to 16)                             
+ 4         CYWORD4                                                              
+ 4         BITS0019 Number of words in data structure (bits 1 to 20)            
+ 4         BITS2031 Cycle number (bits 21 to 32)</TT></PRE>
+<P>
+<H2><A NAME=SECTION0023100000000000000> Subdirectory descriptor structure</A></H2>
+<P>
+The subdirectories below a given directory are described
+by the part labelled <tt>LS</tt> in the description of the top bank.
+To loop over all subdirectories at a given level, the following code
+could be used.
+<b>Looping over all subdirectories at a given level</b><PRE><TT>*
+*     Loop over all subdirectories at this level
+*
+         DO 5 JJ=1,IQ(KQSP+LCDIR+KNSD)
+            LS=IQ(KQSP+LCDIR+KLS)
+            IH=LS+7*(JJ-1)
+            CALL ZITOH(IQ(KQSP+LCDIR+IH),IHDIR,4)
+            CALL UHTOC(IHDIR,4,CHDIR,16)
+*
+*     CHDIR now contains the name of subdirectory JJ in
+*     CHARACTER format
+*
+...
+   5        CONTINUE</TT></PRE>
+<H2><A NAME=SECTION0023200000000000000> KEYS structure</A></H2>
+<P>
+For a given directory, the keys structure is given
+by the part labelled <tt>LK</tt> in the description of the top bank.
+The following Fortran code could be used to process the keys 
+in a given subdirectory.
+<b>Processing the RZ keys</b><PRE><TT>NWK        = IQ(KQSP+LCDIR+KNWKEY)
+      NKEYS      = IQ(KQSP+LCDIR+KNKEYS)
+      LK         = IQ(KQSP+LCDIR+KLK)
+      DO 50 I=1,NKEYS
+*           Number of this key vector
+         K=LK+(NWK+1)*(I-1)
+         DO 40 J=1,NWK
+            IKDES=(J-1)/10
+            IKBIT1=3*J-30*IKDES-2
+            IF(JBYT(IQ(KQSP+LCDIR+KKDES+IKDES),IKBIT1,3).LT.3)THEN
+               KEYS(J)=IQ(KQSP+LCDIR+K+J)
+            ELSE
+               CALL ZITOH(IQ(KQSP+LCDIR+K+J),KEYS(J),1)
+            ENDIF
+  40     CONTINUE
+*         Here we have KEY vector # I in KEYS()
+      ...
+  50  CONTINUE</TT></PRE>
+<H2><A NAME=SECTION0023300000000000000> CYCLES structure</A></H2>
+<P>
+The cycles structure is given by the part 
+labelled <tt>LCYC</tt> in the description of the top bank.
+<P>
+<H2><A NAME=SECTION0023400000000000000> File descriptor structure</A></H2>
+<P>
+The file descriptor can be found in the
+part labelled <tt>LB</tt> in the description of the top bank.
+<P>
+<H2><A NAME=SECTION0023500000000000000> Lock record</A></H2>
+<P>
+The record lock information is encoded in the 
+part labelled <tt>LC</tt> in the description of the top bank.
+<P>
+ <H2>References</H2>
+<P><A NAME=BIBLIO HREF=../../general/biblio/bibliography.html>Global CERN library references</A><P>/user/goossens/cnasall/cnasbibl,/user/goossens/cnasall/textproc}    
+<HR> <A NAME=tex2html31 HREF=tex2htmlindex2_3.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/next_motif.gif"></A> <A NAME=tex2html29 HREF=ZEBRZA.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/up_motif.gif"></A> <A NAME=tex2html23 HREF=chapter2_1.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/previous_motif.gif"></A>  <A NAME=tex2html33 HREF=tex2htmlindex2_3.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/index_motif.gif"></A><BR>
+<B> Next:</B> <A NAME=tex2html32 HREF=tex2htmlindex2_3.html>Index</A>
+<B>Up:</B> <A NAME=tex2html30 HREF=ZEBRZA.html>No Title</A>
+<B> Previous:</B> <A NAME=tex2html24 HREF=chapter2_1.html> System specific details</A>
+<HR> <P>
+<HR>
+
+</BODY>
+<P><ADDRESS>
+goossens@cern.ch
+</ADDRESS>

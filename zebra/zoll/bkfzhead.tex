@@ -1,0 +1,217 @@
+% file : bkfzhead.tex
+\markboth{}{}             % empty foot
+\vspace*{20pt}
+\begin{center} {\Large\bf ZEBRA version 3.66} \end{center}
+\vspace*{30pt}
+\begin{description}
+  \item[Chapter 1] User specifications for the FZ package
+  \begin{itemize}
+     \item[1.01] Representation of a data-structure
+     \item[1.02] Events, Runs, and Files
+     \item[1.03] Outline of usage for sequential medium 'tape' or 'disk'
+     \item[1.04] FZFILE - initialize a ZEBRA file
+     \item[1.05] FZLOGL - change the logging level of a file
+     \item[1.06] FZMEMO - connect user memory area for medium 'memory'
+     \item[1.07] FZHOOK - connect user routine for medium 'channel'
+     \item[1.08] FZLIMI - limit the size of an output file
+     \item[1.09] FZODAT - storing and recovering the Direct Access Table
+     \item[1.10] FZRUN  - write a RUN record
+     \item[1.11] FZOUT  - write one data-structure
+     \item[1.12] FZIN   - read one data-structure
+     \item[1.13] FZIN   - read one data-structure by segments
+     \item[1.14] FZINXT - reset the read point on a direct access file
+     \item[1.15] FZCOPY - copy one data-structure from input to output
+     \item[1.16] FZENDO - output file termination
+     \item[1.17] FZENDI - input file termination
+     \item[1.18] Usage for medium 'memory'
+     \item[1.19] Usage for medium 'channel'
+     \item[1.20] Usage for random access
+     \item[1.21] User marking of data-structures for FZOUT
+     \item[1.22] Suppress loading of unused parts of FZ
+     \item[1.23] FZ installation options
+  \end{itemize}
+  \item[Chapter 2] Machine dependent usage of FZ files
+  \item[Chapter 3] Format specifications
+  \begin{itemize}
+     \item[3.01] Native mode
+     \item[3.02] Exchange mode
+     \item[3.03] Exchange Data format
+     \item[3.04] Exchange File Format
+     \item[3.05] Example for coding dedicated on-line output
+  \end{itemize}
+  \item[Chapter 4] Technical details
+\end{description}
+\vspace*{10pt}
+\begin{center}
+  J.Zoll\\
+  December 1990
+\end{center}
+\cleardoublepage  % continue on next odd page
+\begin{center}
+  {\large\bf{Principles}}
+\end{center}
+\par
+FZOUT transfers a
+\underline{data-structure}
+from the dynamic store to a sequential file, i.e. to disk or tape,
+or to flat memory, or via a user routine to the outside world.
+FZIN does the inverse transfer.
+In high-energy physics most FZ files contain data-structures
+representing events; but the concepts are completely general.
+\par
+Two kinds of user information can be associated to a
+data-structure on the file.
+The 'user header vector' may contain identifying information,
+essentially numeric, to allow rapid selection of data-structures.
+The 'text vector' may contain zero,
+one, or several lines of Hollerith text,
+giving context information about the data-structure in one of the
+natural languages
+(the implementation of text vectors is pending).
+\par
+On the file, a data-structure is represented by a straight
+copy of the relevant sections of the dynamic store,
+preceded by its 'pilot information' which describes
+the data-structure to follow.
+It predicts the memory requirements of the d/s,
+and it carries the relocation table necessary to recalculate all
+links in the data-structure for the new position in memory.
+It further contains the associated user header vector
+and the text vector.
+Files to be read back on the computer of creation can be written in
+'\underline{native mode}'.
+In this mode, writing and reading is done with standard FORTRAN
+unformatted WRITE and READ statements,
+the representation of numbers and Hollerith is defined by the
+internal representation of the machine,
+blocking of logical records into physical records is defined by the
+FORTRAN I/O system of the machine.
+The data are written directly from the dynamic store to the file
+without going through a Zebra buffer;
+a data-structure is hence represented in general by several
+logical records.
+\par
+Files to be transported from one computer to another one of a
+different make must be written in
+'\underline{exchange mode}'.
+Exchange mode implies two separate features :
+\begin{itemize}
+ \item[--] The Zebra Exchange \underline{File Format}
+ provides for reading and writing machine independent files :
+ it supports logical records blocked
+ onto a string of fixed-length physical records.
+ The data flow through a Zebra buffer,
+ and each data-structure written by FZOUT is one single logical record.
+ For transport of the data via a network which does not allow
+ transmission of binary files, the 'ALFA exchange format' is available :
+ this maps each physical record onto a string of 80 column card-images
+ containing only alpha-numeric characters (and a few others).
+ Such a file can be sent as ordinary text over any network;
+ it is even possible to include some test events onto the
+ PAM file of some program.
+ \item[--] The Zebra Exchange \underline{Data Format}
+ provides a machine independent interface for the representation
+ of the data.
+ On each machine Zebra is capable to convert between the
+ machine internal and the exchange representation;
+ this relies on the I/O characteristic carried by each bank describing
+ the nature of its contents (integer, floating, etc.).
+ On most modern 32-bit machines the 'native' data format is identical
+ to the exchange representation;
+ thus on these machines no conversion is needed.
+ \item[--] It is possible to combine the exchange file format
+ with the native data format;
+ this permits to parcel the data into fixed length records,
+ without also translating to or from the exchange data
+ representation.
+\end{itemize}
+\par
+If the file medium is
+\underline{Disk} or \underline{Tape}
+the records representing a data-structure are transfered
+between the Zebra store and the medium by WRITE or READ statements
+(or equivalent).
+If the 'file' medium is
+\underline{Memory}
+the records are tranfered by copying to or from a region
+of the user's memory
+(possibly involving packing or byte inversion operations).
+If the file medium is
+\underline{Channel}
+the records are handed to, or obtained from,
+a user routine one at a time.
+This routine is supposed to be an interface to a computer link,
+permitting to shuffle the records of the data-structure
+from one machine to another one.
+Thus one may have FZOUT on one machine feeding FZIN on
+the other machine in real time.
+The same can be achieved using the medium Memory,
+but in this case one needs an area of user memory large enough
+to hold the largest d/s.
+For the media Memory and Channel FZIN/FZOUT always operate
+with the Exchange File Format,
+ie. with a string of fixed length records,
+but the Data Format may be either 'exchange' or 'native'.
+\par
+A disk file with Exchange File Format can be read with
+\underline{Direct Access}
+permitting a random access to the data, since it is a
+simple string of fixed-length records.
+For each data-structure written (or read) FZOUT or FZIN deliver
+its D/A address which the user can compile into a Direct Access Table
+together with other relevant information about each d/s.
+Handing a D/A address to FZINXT will reset the current read point
+of the file, and the next call to FZIN will deliver the wanted d/s.
+If the Direct Access table is put into a bank it can be stored
+at the end of the file itself by calling FZODAT,
+to be recovered by FZIDAT when one comes back to read the file.
+\par
+The Fortran implementations on some machines running Unix
+cannot handle sequential access of fixed-length records,
+they insist on having some system control words with each record.
+One can get around this by using the Direct Access mechanisme :
+Zebra operates sequentially, also for a file which has been
+initialized for direct access, until the user tells it otherwise
+by calling FZINXT.
+However, this is not a satisfactory solution for handling tapes.
+Therefore, yet another mode, reading and writing through calls
+to the
+\underline{C Library}, is programmed into Zebra, both for sequential
+and for direct access, but this only on some machines running
+the Unix operating system.
+\par
+It was one of the design aims of the FZ package to provide
+a representation of the data on external media in exchange mode
+which fits both off-line data-processing and on-line data-taking
+requirements.
+Speed is important in both cases, but it is more critical in the
+on-line context.
+For this the ZEBRA Exchange File Format has been defined to allow
+dumping large areas of memory to a file,
+without the need  to insert control information  for physical
+records during the dumping process;
+all control information needed is grouped at the very beginning
+of the data.
+\par
+The program running on a data-taking on-line computer is
+likely not to be a ZEBRA program,
+in which case one will have to write an ad hoc output routine to
+produce a file readable by FZIN in exchange mode.
+This point has been kept in mind when designing the exchange format,
+to make sure that it is simple enough
+to produce files in this format.
+\par
+Although the unit of information for ZEBRA is a data-structure
+in full generality,
+in the on-line application the
+'data-structure' will most likely consist of just one maybe
+very large bank,
+or at most of a few banks.
+For such simple data-structures the interconnection
+by links does not need to exist,
+and the on-line program can disregard this aspect of
+data-structures.
+When a 'link-less' data-structure of several banks is read
+all its banks will be connected by FZIN into
+a linear structure, to permit the reading program to access
+the banks.

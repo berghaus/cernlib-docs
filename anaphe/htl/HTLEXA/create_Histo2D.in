@@ -1,0 +1,97 @@
+<![CDATA[/* create_Histo2D.cpp */
+#include <iostream.h>
+#include "HTL/PHistograms.h" 	// Persistent histograms.
+class Histo_App : public HepDbApplication
+{
+public:
+	Histo_App( const char *a_db_name = 0 )
+	{ db_name_ = ( a_db_name == 0 ) ? "Default_DB" : a_db_name; }
+		// If no database name is provided then the default one is 
+		// "Default_DB".
+public:
+	void run();
+		// Create a 1D histo named "Histo 1D" and fill it.
+		// Print simple properties and global statistics.
+public:
+	void init();
+private:
+	ooHandle(ooDBObj) db_; // Handle on the database.
+	const char *db_name_; // Name of the database.
+};
+//
+// Implementation:
+//
+void Histo_App::init()
+{
+	Init();
+	startUpdate();
+	db_ = db(db_name_);
+}
+void Histo_App::run()
+{
+	const int n_bin = 10;
+	// Create a 2D histo using Weighted_Bin and Even_Partition:
+	// (The type of the points is double.)
+	//
+	HepRef(PHisto2D) histo = new (db_) PHisto2D( "Histo_2D", n_bin, 5., 15., n_bin, 5., 15. );
+	// Let's fill the histo with 50000 points:
+	//
+	double x, w = 0.5;
+	for( long i=0; i<50000; i++ ) {
+		x = -i*sin(float(i));
+		histo->fill(x,x,w);
+		histo->fill(20.-x,x,w);
+	}
+	// Let's print some properties of the new histo:
+	//
+	cout << "Histo name: " << histo->name() << endl
+		<< "X: Bin count : " << histo->partition_X().bin_count()
+		<< " from " << histo->partition_X().lower_point()
+		<< " to "   << histo->partition_X().upper_point() << endl;
+	cout << "Y: Bin count : " << histo->partition_Y().bin_count()
+		<< " from " << histo->partition_Y().lower_point()
+		<< " to "   << histo->partition_Y().upper_point() << endl;
+	// Now some statistics:
+	//
+	long in_entries = HStat::in_range_entries_count( *histo );
+	long extra_entries = HStat::extra_entries_count( *histo );
+	cout << "Entries count: " << (in_entries + extra_entries)
+		<< " with IN_RANGE: " << in_entries
+		<< " EXTRA: " << extra_entries << endl;
+	cout << "In Range values: " << H_Bin_Helper::in_range_value( *histo )
+		<< endl;
+	// Print histo contents:
+	//
+#define EH(h,i,j) 	h->extra_bin(i,j).value()
+	cout << endl;
+	cout << "(U,O): " << EH( histo, H_UNDERFLOW, H_OVERFLOW )
+		<< " (I,O): " << EH( histo, H_IN_RANGE, H_OVERFLOW )
+		<< " (O,O): " << EH( histo, H_OVERFLOW, H_OVERFLOW ) << endl;
+	cout << "(U,I): " << EH( histo, H_UNDERFLOW, H_IN_RANGE )
+		<< " (I,I): " << "XXXXXX"
+		<< " (O,I): " << EH( histo, H_OVERFLOW, H_IN_RANGE ) <<endl;
+	cout << "(U,U): " << EH( histo, H_UNDERFLOW, H_UNDERFLOW )
+		<< " (I,U): " << EH( histo, H_IN_RANGE, H_UNDERFLOW )
+		<< " (O,U): " << EH( histo, H_OVERFLOW, H_UNDERFLOW ) << endl;
+	cout << endl;
+	for( long y=0; y<histo->partition_Y().bin_count(); y++ )
+	for( long x=0; x<histo->partition_X().bin_count(); x++ ) {
+		if( histo->bin(x,y).value() != 0.0 ) {
+			cout << "bin(" << x << "," << y << "): "
+				<< histo->bin(x,y).value() << " -/+ "
+				<< histo->bin(x,y).error() << endl;
+		}
+	}
+	cout << endl;
+	// Print using HPrinter:
+	//
+	HPrinter hp( cout );
+	hp.print( *histo );
+}
+int main( int argc, char **argv )
+{
+	Histo_App app;
+	app.init();
+	app.run();
+	app.commit();
+}]]>

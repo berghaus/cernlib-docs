@@ -1,0 +1,1761 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%   HEPDB    - Reference Manual -- LaTeX Source                   %
+%                                                                 %
+%   Reference section with a description of all HEPDB routines    %
+%                                                                 %
+%   Original: Jamie Shiers    (from DBL3 and OPCAL doc)           %
+%                                                                 %
+%   Last Mod.: 02 Sep  1991 11:20 mg                              %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\Filename{H1hdbuser-Description-of-user-callable-HEPDB-routines}
+\chapter{Description of user callable HEPDB routines}
+
+\Filename{H2hdbuser-Initialisation-and-termination}
+\section{Initialisation and termination}
+
+\subsection{HEPDB, Zebra and HBOOK initialisation}
+
+\Shubr{CDPAW}{(NWPAW,NHBOOK,IDIV*,CHNAME,NW,NWMAX,CHOPT,IRC*)}
+
+\begin{DLtt}{123456}
+\item[NWPAW]The number of words of dynamic store in common \Lit{/PAWC/}
+\item[NHBOOK]Variable containing the number of words for use by HBOOK
+\item[IDIV]Variable containing the index of user division created in common \Lit{/PAWC/}
+\item[CHNAME]Name of user division
+\item[NW]Initial number of words for user division
+\item[NWMAX]Maximum number of words for user division
+\item[CHOPT]Character option
+  \begin{DLtt}{123}
+    \item[' ']Initialise HEPDB divisions in common \Lit{/PAWC/},
+              including user division {\tt CHNAME}.
+    \item['Z']Also initialise Zebra via a call to \Rind{MZEBRA}
+    \item['P']Issue call to \Rind{MZPAW}
+    \item['H']Also initialise HBOOK with \Rarg{NHBOOK} words
+  \end{DLtt}
+\item[IRC]Integer return code
+  \begin{DLtt}{1}
+    \item[0]Normal completion
+\index{return code!{\tt IRC}}
+  \end{DLtt}
+\end{DLtt}
+
+This routine initialises Zebra, HBOOK and HEPDB. Note that HEPDB
+is automatically initialised on the first call to \Rind{CDOPEN}.
+
+\subsection{Obtain file name from database prefix}
+
+\Shubr{CDPREF}{(LUN,CHPREF,CHTOP*,CHFILE*,IRC*)}
+
+\begin{DLtt}{123456}
+\item[LUN]Fortran logical unit for accessing the names file.
+\item[CHPREF]Two character database prefix
+\item[CHTOP]Top directory name constructed from database prefix
+\item[CHFILE]Full file name of the database
+\index{return code!{\tt IRC}}
+\item[IRC]Integer return code
+  \begin{DLtt}{1}
+    \item[0]Normal completion
+  \end{DLtt}
+\end{DLtt}
+
+This routine returns the top directory name and full file name of
+a HEPDB database, identified by a unique two character prefix.
+In the case of VM/CMS systems, the appropriate mini-disks
+are linked and accessed automatically.
+The environmental variable \Lit{CDSERV} must be set before calling
+this routine, as shown below.
+
+\medskip
+
+\begin{tabular}{@{}l@{\quad}l@{\quad}>{\tt}l}
+\bf Unix     & Bourne shell & CDSERV=/hepdb/l3; export CDSERV   \\
+             & C shell      & setenv CDSERV /hepdb/l3           \\
+             & Korn shell   & export CDSERV=/hepdb/l3           \\[2mm]
+\bf VMS      &              & CDSERV:==HEPDB:[L3]               \\[2mm]
+\bf VM/CMS   &              & setenv CDSERV cdl3.191            \\
+\end{tabular}
+
+\subsection{Access an existing database file}
+
+\Shubr{CDOPEN}{(*LUNDB*,LUNFZ,CHTOP,CHFILE,*LRECL*,IDIV,CHOPT,IRC*)}
+
+\begin{DLtt}{123456}
+\item[LUNDB]Fortran logical unit or C file pointer for accessing the database
+  file.
+\item[LUNFZ]Fortran logical unit to be used for sending updates to the
+database server.
+\item[CHTOP]Name of the Top Directory
+\item[CHFILE]Character variable giving the file name
+\item[LRECL]Integer variable specifying the record length of the database
+  file in words. If a value of zero is given on input, the record length
+  will be automatically determined from the file itself. The actual
+  value used is returned in this variable if the file is successfully opened.
+\item[IDIV]User Division
+\item[CHOPT]Character Option
+  \begin{DLtt}{12}
+    \item['E']Expand system division of the store in which \Lit{IDIV} resides
+    \item['Q']Do not print messages such as version number
+    \item['N']The database file is in native format (exchange mode is the default)
+    \item['T']Suppress check on insertion time.~\footnote{By default,
+only objects inserted prior to the local time as returned by
+the KERNLIB routine \Rind{DATIME} will be visible via \Rind{CDUSE}
+or \Rind{CDUSEM}.}
+
+    \item['C']Use C I/O instead of Fortran I/O
+    \item['P']Preserve case of file name (Unix systems)
+    \item['R']Access the database in read only mode - updates not permitted.
+  \end{DLtt}
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+  \begin{DLtt}{123}
+    \item[\ \ 0]Normal completion
+    \item[\ -1]Invalid top directory name
+    \item[\ -2]The file is already open with correct \Rarg{LUNDB} and \Rarg{CHTOP}
+    \item[\ -3]The file is already open with wrong \Rarg{LUNDB} or \Rarg{CHTOP}
+    \item[\ -4]Already a file is opened with the same unique
+      identifier as requested for this \Rarg{CHTOP}
+    \item[\ -5]Invalid process name in Online context
+    \item[\ -6]Error in \Lit{IC_BOOK} for booking the \Lit{CACHE}
+    \item[\ -7]Error in \Lit{CC_SETUP} for reserving the \Lit{CLUSCOM}
+    \item[\ -8]Cannot open journal file in server context
+    \item[\ -9]Unable to open FZ communication channel
+    \item[-10]Host unable to open RZ file
+  \end{DLtt}
+\end{DLtt}
+
+On {\tt VAX/VMS} systems, C I/O is automatically triggered for
+files of record type {\tt STREAM\_LF}.
+
+\subsection{Create and access a new database file}
+
+\Shubr{CDNEW}{(*LUNDB*,CHTOP,CHFILE,IDIV,NPAIR,NQUO,NPRE,NTOP,LRECL,CHOPT,IRC*)}
+
+\begin{DLtt}{123456}
+\item[LUNDB]Fortran logical unit or C file pointer
+\item[CHTOP]Name of the Top Directory
+\item[CHFILE]Character variable giving the file name
+\item[IDIV]User Division
+\item[NPAIR]Number of key pairs to be used in object selection.
+\item[NQUO]Quota for the database file (see \Rind{RZMAKE}).
+\item[NPRE]Number of records that should be preformatted (essential for
+VM systems or when afs access is desired)
+\item[NTOP]Unique identifier for the database file (optional)
+\item[CHOPT]Character Option as for \Rind{RZOPEN}/\Rind{RZMAKE}
+  {\bf except} exchange mode is the default.
+  \begin{DLtt}{123}
+  \item['A']In the case of more than one key pair, all pairs will
+          be checked in turn.
+  \item[' '](Default) Assume a hierarchy in the validity keys. That is, the second
+          and subsequent key pairs are only checked if the match on
+          the first pair was successful (e.g. in the case of PERIOD/RUN/EVENT,
+          the run validity is only checked if the period matches etc.)
+  \end{DLtt}
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+\end{DLtt}
+
+\subsection{Send or cancel pending database updates}
+\Shubr{CDSAVE}{(CHTOP,CHOPT,IRC*)}
+
+\begin{DLtt}{123456}
+\item[CHTOP]Name of the Top Directory (without the leading //). See below.
+\item[CHOPT]Character variable specifying the options required.
+  \begin{DLtt}{123}
+    \item[' ']default - any pending updates are sent and the journal file
+              reopened.
+    \item['P']Pending updates are purged.
+    \item['S']On Unix systems, a signal is sent to the server indicating
+              that new updates have arrived. This will cause the server
+              to wakeup immediately, rather than at the default interval.
+    \item['W']Wait for response from server (not yet implemented).
+  \end{DLtt}
+\index{return code!{\tt IRC}}
+\end{DLtt}
+
+It is not normally necessary to call \Rind{CDSAVE} to send updates
+to the server. Each time an update is made, a check is performed to
+see if it is for the same database as previous updates. If not, pending
+updates are sent. When \Rind{CDEND} is called, any remaining
+updates are sent.
+
+To send pending updates and switch to a new database, specify
+in {\tt CHTOP} the top directory name of the {\it new} database
+(e.g. CDXX for a database with prefix XX).
+
+To send pending updates without switching to a new database,
+specify a blank character.
+
+
+\Rind{CDSAVE} will only send updates if the top directory name
+differs from 
+\subsection{Terminate access to one or all database files}
+
+\Shubr{CDEND}{(CHDIR,CHOPT,IRC*)}
+
+\begin{DLtt}{123456}
+\item[CHDIR]Character variable specifying the name of the top directory of the
+file to be closed.
+\item[CHOPT]Character variable specifying the options required.
+  \begin{DLtt}{123}
+    \item[' ']default, close file specified by the variable \Rarg{CHDIR}
+    \item['A']close all files - \Rarg{CHDIR} not used
+    \item['C']journal file is closed and sent to the server. (By default,
+              the journal file is reopened.)
+    \item['P']journal file is purged - updates will not be performed.
+    \item['S']For CDSERV only - suppresses call to CDSAVE
+    \item['W']call \Rind{MZWIPE} for the division(s) associated with the files that are closed.
+  \end{DLtt}
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+  \begin{DLtt}{123}
+    \item[\ \ 0]Normal completion
+  \end{DLtt}
+\end{DLtt}
+
+This routine closes the specified database file by calling
+the RZ routine \Rind{RZCLOS}.
+Any existing journal file is closed and sent
+to the database server. If option \Ropt{A} is not specified, the journal
+file will be reopened after being sent to the server.
+
+\Filename{H2hdbuser-Alias-manipulation}
+\section{Alias manipulation}
+
+\subsection{Enter, delete or retrieve an alias}
+
+\Shubr{CDALIA}{(PATH,ALIAS,CHOPT,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[PATH]Character string specifying the directory path name
+\item[ALIAS]Character string specifying the alias or
+in which the alias is returned (option \Ropt{R})
+\item[CHOPT]Character variable specifying the options required.
+  \begin{DLtt}{123}
+    \item['D']Delete the current alias definition for the specified
+      path name (\Rarg{ALIAS} is ignored).
+    \item['P']Print the current alias definition for \Rarg{PATH}
+      (\Rarg{ALIAS} is ignored).
+    \item['G']Get the current alias for \Rarg{PATH}.
+              The alias is returned in \Rarg{ALIAS}.
+    \item['R']Return the current equivalence name for \Rarg{ALIAS} in \Rarg{PATH}
+    \item['S']Set the specified alias for the specified path name
+              for this session
+    \item['U']As option \Ropt{S}, but also updates the database
+  \end{DLtt}
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+  \begin{DLtt}{123}
+    \item[\ \ 0]Normal completion
+    \item[182]Illegal path name
+    \item[185]Illegal top directory name
+    \item[187]\Rind{FZOUT} fails to write on the sequential file
+    \item[188]Error in RZ for writing to the random access file
+    \item[201]Dictionary directory not found
+    \item[205]Not a valid alias
+  \end{DLtt}
+\end{DLtt}
+This routine may be used to enter, remove, print or retrieve aliases.
+
+See page~\pageref{HDB-ALIAS} for a discussion of {\tt HEPDB} aliases.
+
+\Filename{H2hdbuser-Mnemonic-name-manipulation}
+\section{Mnemonic name manipulation}
+
+\subsection{Enter, delete or retrieve a mnemonic name}
+
+\Shubr{CDNAME}{(PATH,NW,CHTAG,CHOPT,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[PATH]Character string specifying the directory path name
+  in which the alias is returned (option \Ropt{R})
+\item[NW]Integer variable specifying the number of significant
+  elements of \Rarg{CHTAG}
+\item[CHTAG]Character array of significant length
+            \Rarg{NW} containing the mnemonic names for each
+            element of objects stored in the directory \Rarg{PATH}
+\item[CHOPT]Character variable specifying the options required.
+  \begin{DLtt}{123}
+    \item['D']Delete the current mnemonic name definitions for the specified
+    path name (\Rarg{NW} and \Rarg{CHTAG} are ignored).
+    \item['R']Return the current mnemonic name definitions in \Rarg{CHTAG}
+    \item['P']Print the current mnemonic name definitions for objects stored
+    in the directory \Rarg{PATH} (\Rarg{NW} and \Rarg{CHTAG} are ignored)
+    \item['U']Update the \Lit{DICTIONARY} directory with the specified
+    mnemonic names.
+  \end{DLtt}
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+  \begin{DLtt}{123}
+    \item[\ \ 0]Normal completion
+    \item[182]Illegal path name
+    \item[183]Illegal number of data words
+    \item[201]Dictionary directory not found
+    \item[205]No mnemonic name definitions found
+\end{DLtt}
+\end{DLtt}
+
+See page~\pageref{HDB-MNEMONIC} for a discussion of {\tt HEPDB} mnemonic names.
+
+\Filename{H2hdbuser-Help-manipulation}
+\section{Help manipulation}
+
+\subsection{Enter, delete or retrieve a help file}
+
+\Shubr{CDHELP}{(LUN,CHFILE,PATH,CHOPT,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[LUN]Logical unit on which to read or write the
+  help file
+\item[CHFILE]Character variable giving the file name
+\item[PATH]Character string specifying the path name
+  of the help directory
+\item[CHOPT]Character variable specifying the options required.
+  \begin{DLtt}{123}
+    \item['A']File is already open on unit \Rarg{LUN}
+    \item['D']Delete the help information for the specified path name
+    (\Rarg{LUN} ignored)
+    \item['P']Print the help information for the specified path name
+    If \Rarg{LUN} is non-zero, then the information will be printed on this
+    unit. Otherwise, \Lit{IQPRNT} will be used.
+    \item['R']Read the help information from the specified logical
+    unit and enter into the database
+    \item['W']Write the help information for the specified path name
+    onto the specified logical unit
+  \end{DLtt}
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+  \begin{DLtt}{123}
+    \item[\ \ 0]Normal completion
+    \item[\ 66]Illegal logical unit number
+    \item[182]Illegal path name
+    \item[203]No help directory in database
+    \item[204]No help information for specified path name
+  \end{DLtt}
+\end{DLtt}
+
+\Filename{H2hdbuser-Text-file-manipulation}
+\section{Text file manipulation}
+
+\subsection{Enter or retrieve a text file}
+
+\Shubr{CDTEXT}{(LUN,CHFILE,CHPATH,LBANK*,CHOPT,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[LUN]Fortran logical unit on which the file should be read or written
+\item[CHFILE]Character variable giving the file name
+\item[CHPATH]Character string specifying the path name
+\item[LBANK]Address of data bank (option \Ropt{R})
+\item[CHOPT]Character string with any of the following characters
+  \begin{DLtt}{123}
+    \item['A']File on unit \Rarg{LUN} is already open
+    \item['R']Read the text file from disk and convert to a bank at \Rarg{LBANK}
+    \item['P']Print the text from the bank at \Rarg{LBANK}
+    \item['W']Write the text from the bank at \Rarg{LBANK} to the file \Rarg{CHFILE}
+  \end{DLtt}
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+  \begin{DLtt}{123}
+    \item[\ 0]Normal completion
+    \item[66]Illegal logical unit number
+    \item[67]Array too long; no space in buffer
+  \end{DLtt}
+\end{DLtt}
+
+Subroutine \Rind{CDTEXT} can be used to read a text file from disk
+and convert it into a bank for insertion into the database with
+\Rind{CDSTOR}, or to write a file from information in an existing
+bank. Alternatively, the information from the bank may be printed
+in character format.
+
+\subsection{Copy character data to or from a bank}
+
+\Shubr{CDCHAR}{(CHTEXT,NTEXT,LTEXT,CHPATH,LBANK,CHOPT,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[CHTEXT]Character array of length \Rarg{NTEXT} in which the text is
+  written (option \Ropt{W}) or from which the text is read (option \Ropt{R})
+\item[NTEXT]Length of array \Rarg{CHTEXT}
+\item[LTEXT]Maximum number of characters per element of \Rarg{CHTEXT}
+\item[CHPATH]Character string specifying the path name
+\item[LBANK]Address of Keys bank \Lit{KYDB} (with option \Ropt{C})
+\item[CHOPT]Character string with any of the following characters
+  \begin{DLtt}{123}
+    \item['R']Read the text file from the character array \Rarg{CHTEXT} 
+              and convert to a bank at \Rarg{LBANK}
+    \item['P']Print the text from the bank at \Rarg{LBANK}
+    \item['W']Write the text from the bank at \Rarg{LBANK} to the character array \Rarg{CHTEXT}
+  \end{DLtt}
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+  \begin{DLtt}{123}
+    \item[\ 0]Normal completion
+    \item[61]Too many keys
+    \item[66]Illegal logical unit number
+    \item[67]File too long; no space in buffer
+  \end{DLtt}
+\end{DLtt}
+
+Subroutine \Rind{CDCHAR} is functionally similar to \Rind{CDTEXT},
+but reads or writes the text from the array \Rarg{CHTEXT}.
+
+\Filename{H2hdbuser-Vector-manipulation}
+\section{Vector manipulation}
+
+\subsection{Enter or retrieve a vector}
+
+\Shubr{CDVECT}{(CHPATH,IVECT,LVECT,LBANK,CHOPT,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[CHPATH]Character string describing the pathname
+\item[IVECT]Vector to be stored. In case of option \Ropt{G},
+  \Rarg{IVECT} is an output vector in which the data
+  retrieved from the database is written.
+\item[LVECT]Length of vector \Rarg{IVECT}
+\item[LBANK]Input address of the data bank (option G) or output address
+of the data bank (option P).
+\item[CHOPT]Character string with any of the following characters
+  \begin{DLtt}{12}
+    \item['G']Get the vector from the bank at \Rarg{LBANK}
+    \item['P']Put the vector into the bank whose address is returned in \Rarg{LBANK}
+    \item['B']Vector is bit string
+    \item['R']Vector is real
+    \item['I']Vector is integer
+    \item['D']Vector is double precision
+    \item['H']Vector is hollerith
+  \end{DLtt}
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+  \begin{DLtt}{123}
+  \item[\ 0]Normal completion
+  \item[53]Path name does not exist in database
+  \item[61]Too many keys
+  \item[63]Database structure in memory clobbered
+  \item[64]Error in \Rind{MZCOPY} while copying Data bank
+  \end{DLtt}
+\end{DLtt}
+
+Routine \Rind{CDVECT} can be used to store a vector in a bank suitable
+for insertion into the database or to retrieve data from an existing
+bank.
+
+\Filename{H2hdbuser-Directory-manipulation}
+\section{Directory manipulation}
+
+\subsection{Creation}
+
+\Shubr{CDMDIR}{(PATH,NKEYS,CHFOR,CHTAG,MAXOBJ,IPREC,DELTA,CHOPT,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[PATH]Character string specifying the path name
+  to be created
+\item[NKEYS]Integer variable specifying the number of user
+  keys, if any. The directory will automatically be created
+  with the standard keys (system keys, experiment keys and
+  the number of validity range pairs as specified when the
+  database was created).
+\item[CHFOR]Character string specifying the user key type,
+  as for the routine \Rind{RZMDIR}
+\item[CHTAG]Character array of significant length \Rarg{NKEYS} containing
+  the tags for the user keys
+\item[MAXOBJ]Integer variable specifying the maximum number of
+  objects to be stored in each partition of a partioned directory
+\item[IPREC]Precision word specifying the number of significant
+  digits to be stored (which may be zero). If \Rarg{IPREC} is negative,
+  then it specifies the number of digits to the left of the
+  decimal point to retain.
+\item[DELTA]Variable specifying the absolute value below which
+  data is treated as zero
+\item[CHOPT]
+  \begin{DLtt}{123}
+    \item[' ']Default - non-partitioned directory
+    \item['C']Data in this directory will be compressed by default
+    \item['P']Create partitioned directories
+  \end{DLtt}
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+  \begin{DLtt}{12}
+    \item[\ 0]Normal completion
+    \item[43]Illegal number of user keys
+  \end{DLtt}
+\end{DLtt}
+
+This routine creates directories in a database and sets various directory
+constants.
+
+\subsection{Conversion}
+
+\Shubr{CDPART}{(PATHI,PATHO,MXPART,CHOPT,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[PATHI]Character string describing the input  pathname
+\item[PATHO]Character string describing the output pathname
+\item[MXPART]Maximum number of objects in each partition
+\item[CHOPT]Character string
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+  \begin{DLtt}{12}
+    \item[\ 0]Normal completion
+    \item[68]Input directory is already partitioned
+    \item[71]Illegal path name
+    \item[73]\Rind{RZOUT} fails to write on disk
+    \item[74]Error in \Rind{RZRENK} in updating key values for data set
+    \item[75]Cannot find the Top directory name in pathname
+    \item[76]Cannot form the IO descriptor for the FZ header
+    \item[77]\Rind{FZOUT} fails to write on to the sequential file
+  \end{DLtt}
+\end{DLtt}
+
+Transforms the contents of a non-partitioned directory to a
+partitioned directory.
+
+\subsection{Deletion}
+
+\Shubr{CDDDIR}{(PATH,CHOPT,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[PATH]Character string specifying the path name
+  to be deleted
+\item[CHOPT]Character variable specifying the options required.
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+  \begin{DLtt}{123}
+    \item[\ \ 0]Normal completion
+    \item[171]Illegal Path name
+    \item[172]Cannot find the top directory for the path name
+    \item[173]Error in RZ for reading the dictionary object
+    \item[174]Error in \Rind{FZOUT} for saving the journal file
+    \item[175]Error in RZ in writing the dictionary object
+    \item[176]Error in RZ in purging the dictionary directory
+    \item[177]Error in RZ in deleting the tree
+  \end{DLtt}
+\end{DLtt}
+
+\subsection{Deleting partitions from a partitioned directory}
+
+\Shubr{CDPURP}{(PATH,NKEEP,CHOPT,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[PATH]Character array specifying the path names
+  of the directory tree to be purged.
+\item[NKEEP]Integer variable specifying the number of
+  partitions to keep. Only the last \Rarg{NKEEP}
+  partitions will be kept.
+\item[CHOPT]Character variable specifying the options required.
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+  \begin{DLtt}{12}
+    \item[\ 0]Normal completion
+    \item[69]Input directory is not partitioned
+    \item[70]Error in deleting a partition
+    \item[71]Illegal path name
+    \item[73]\Rind{RZOUT} fails to write on disk
+    \item[74]Error in \Rind{RZRENK} in updating key values for
+      partitioned data set
+    \item[75]Cannot find the Top directory name in pathname
+    \item[77]\Rind{FZOUT} fails to write on to the sequential file
+  \end{DLtt}
+\end{DLtt}
+
+This routine can be used to delete partitions from a
+partitioned directory. Only the last \Rarg{NKEEP}
+partitions will be kept.
+
+
+\subsection{Deleting multiple directory trees}
+
+\Shubr{CDKEEP}{(PATH,NPATH,CHOPT,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[PATH]Character array specifying the path names
+  of the directory trees to be {\bf kept}. All directory
+  trees that are not in this list will be {\bf deleted}.
+\item[NPATH]Integer variable specifying the number of path
+  names in the character array \Rarg{PATH}.
+\item[CHOPT]Character variable specifying the options required.
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+    \begin{DLtt}{123}
+    \item[\ 0]Normal completion
+    \item[69]Input directory is not partitioned
+    \item[70]Error in deleting a partition
+    \item[71]Illegal path name
+    \item[73]RZOUT fails to write on disk
+    \item[74]Error in \Rind{RZRENK} in updating key values for
+      partitioned data set
+    \item[75]Cannot find the Top directory name in pathname
+    \item[77]\Rind{FZOUT} fails to write on to the sequential file
+\end{DLtt}
+\end{DLtt}
+
+This routine can be used to delete all bar the specified directory
+trees from a database.
+
+\Filename{H2hdbuser-Storing-information-in-the-database}
+\section{Storing information in the database}
+
+\subsection{Storing single ZEBRA datastructures}
+
+\Shubr{CDSTOR}{(PATH,LADDR,LKYBK*,IUDIV,KEYS,CHOPT,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[PATH]Character string describing the pathname
+\item[LADDR]Address of the datastructure to be stored
+  {\bf N.B. LADDR must be protected against relocations or garbage
+collection, e.g. by using a {\it link area}}.
+\item[LKYBK]Returned address of the key bank (option \Ropt{C})
+\item[IUDIV]Division where the datastructure resides
+\item[KEYS]Vector of keys. This vector must include space for the standard
+system and experiment keys and validity range pairs. The user must
+fill in the validity range pairs and user keys, if any.
+\item[CHOPT]Character string with any of the following characters
+  \begin{DLtt}{123}
+    \item[' ']Datastructure is stored asis, i.e. uncompressed
+    \item['C']create Node/Key data structure ala \Rind{CDUSE}
+    \item['D']store only differences from existing object in directory
+      specified by \Rarg{PATH}
+    \item['F']With option \Ropt{D}, differences are calculated from an
+    object with which all user keys match (FULL match)
+    \item['K']Store only the keys (\Rarg{LADDR} ignored)
+    \item['H']Insertion time in input \Rarg{KEYS} vector is to be honoured
+    \item['P']Data is compressed (bit packing)
+    \item['Y']Store complete datastructure. {\bf N.B. by default, only
+              the bank at \Rarg{LADDR} will be stored.}
+    \item['Z']Store only nonzero elements. An element is considered to
+      be zero if its absolute value is less than \Lit{DELTA} (a directory
+      constant set by \Rind{CDMDIR} on page~\pageref{CDMDIR}.
+  \end{DLtt}
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+    \begin{DLtt}{123}
+    \item[\ 0]Normal completion
+    \item[53]Path name does not exist in database
+    \item[61]Too many keys
+    \item[63]Database structure in memory clobbered
+    \item[64]Error in \Rind{MZCOPY} while copying Data bank
+    \end{DLtt}
+\end{DLtt}
+
+Routine \Rind{CDSTOR} stores a ZEBRA datastructure in the database.
+The data, if packed, is stored with a precision determined by the directory
+constant \Lit{IPREC} as specified in the call
+to \Rind{CDMDIR} on page~\pageref{CDMDIR}
+
+If the pathname begins with a \% character then it is assumed to be
+an alias and is automatically translated by the internal {\tt HEPDB}
+routines.
+
+\subsection{Storing multiple ZEBRA datastructures}
+
+\Shubr{CDSTOM}{(PATH,LADDR,LKYBK*,IUDIV,NWKEY,NOBJ,KEYO,KEYN,CHOPT,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[PATH]Character string describing the pathname
+\item[LADDR]Vector of \Rarg{NOBJ} bank addresses, created by \Rind{CDBOOK}
+  {\bf N.B. LADDR must be protected against relocations or garbage
+collection, e.g. by using a {\it link area}}.
+\item[LKYBK]Output address of first key bank (if option \Ropt{C} is specified)
+\item[IUDIV]Division index of the user data bank
+\item[NWKEY]Number of keys associated with the data banks
+\item[NOBJ]Number of objects to be stored. The key vectors
+\Rarg{KEYO} and \Rarg{KEYN} must be dimensioned (\Rarg{NWKEY},\Rarg{NOBJ})
+\item[KEYO]Vector/matrix of old keys
+\item[KEYN]Vector/matrix of new keys
+\item[CHOPT]Character string with any of the following characters
+  \begin{DLtt}{123}
+    \item[' ']Datastructure(s) are stored asis, i.e. uncompressed
+    \item['C']create Node/Key data structure ala \Rind{CDUSE}
+    \item['D']store only differences from existing object in directory
+      specified by \Rarg{PATH}
+    \item['F']With option \Ropt{D}, differences are calculated from an
+      object with which all user keys match (FULL match)
+    \item['K']Store only the keys (\Rarg{LADDR} ignored)
+    \item['H']Insertion time in input keys vector is to be honoured.
+      The insertion time is stored in \Lit{KEYSN(KOFINS)}, packed using
+      the routine \Rind{CDPKTM}.
+    \item['P']Data is compressed (bit packing) according to the precision
+      IPREC specified in the call to \Rind{CDMDIR}.
+    \item['Y']Store complete datastructure. {\bf N.B. by default, only
+              the bank at \Rarg{LADDR} will be stored.}
+    \item['Z']Store only nonzero elements. An element is considered to
+      be zero if its absolute value is less than \Rarg{DELTA} (a directory
+      constant set by \Rind{CDMDIR} on page~\pageref{CDMDIR}
+    \item['R']Replace existing objects as specified by the vector
+      \Ropt{KEYO}
+  \end{DLtt}
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+  \begin{DLtt}{123}
+    \item[\ 0]Normal completion
+    \item[53]Path name does not exist in database
+    \item[61]Too many keys
+    \item[62]Too many keys with option \Ropt{N}
+    \item[63]Database structure in memory clobbered
+    \item[64]Error in \Rind{MZCOPY} while copying Data bank
+  \end{DLtt}
+\end{DLtt}
+
+This routine permits multiple datastructures to be stored in
+a single call, or to replace one or more existing datastructures.
+
+If the pathname begins with a \% character then it is assumed to be
+an alias and is automatically translated by the internal {\tt HEPDB}
+routines.
+
+\Filename{H2hdbuser-Retrieving-information-from-the-database}
+\section{Retrieving information from the database}
+
+\subsection{Retrieving ZEBRA datastructures}
+
+\Shubr{CDUSE}{(PATH,*LSUP*,ISEL,CHOPT,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[PATH]Character string describing the pathname
+\item[LSUP]Address of the supporting link of the
+  Keys bank(s) \Lit{KYDB}   (input or output)
+  {\bf N.B. LSUP must be protected against relocations or garbage
+collection, e.g. by using a {\it link area}}.
+\item[ISEL]Integer vector specifying the instant of validity
+for which a database object is required. The length of the vector
+is equal to the number of validity range pairs, itself a database constant.
+For example, in the case when we select by {\tt run} and {\tt event},
+the number of pairs is 2. ISEL then contains the specific {\tt run}
+and {\tt event} for which an object is required.
+\item[CHOPT]Character string with any of the following characters
+  \begin{DLtt}{123}
+    \item[A]Accept existing datastructure if one already exists in memory.
+    \item[D]Drop datastructure at \Rarg{LSUP} before retrieving new datastructure
+    \item[F]Force retrieval of new datastructure even if current information
+    as still valid
+    \item[K]read only the keys (no data is required)
+  \end{DLtt}
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+  \begin{DLtt}{123}
+    \item[\ 0] Successful operation
+    \item[\ 1]Illegal character option
+    \item[\ 2]Illegal path name
+    \item[\ 3]Database structure in memory clobbered
+    \item[\ 4]Illegal key option
+    \item[\ 5]Error in \Lit{DBCHLD} in \Lit{P3} communication
+    \item[36]Data bank address zero on return from \Lit{DBKXIN}
+    \item[37]Insufficient space in \Lit{USER} store array
+  \end{DLtt}
+\end{DLtt}
+
+Prepares the database data structure in memory for any required
+Pathname and set of Keys, unless already done.
+Returns (optionally) the addresses in memory for the corresponding
+Key banks and Data banks after checking their validity for the
+given time and keys.
+
+If the pathname begins with a \% character then it is assumed to be
+an alias and is automatically translated by the internal {\tt HEPDB}
+routines.
+
+\subsubsection*{Supplementary return information}
+
+\begin{DLtt}{123456789}
+\item[IQUEST(2)]Return status (if \Lit{IRC = 0})
+\index{quest@{\tt QUEST}!{\tt IQUEST}}\index{iquest@{\tt IQUEST}}%
+  \begin{DLtt}{1}
+    \item[0]No disk I/O has been performed
+      \item[1]Data have been refreshed from the disk
+\end{DLtt}
+\end{DLtt}
+
+\subsection{Retrieving multiple ZEBRA datastructures}
+
+\Shubr{CDUSEM}{(PATH,LSUP*,ISEL,IMASK,KEYS,CHOPT,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[PATH]Character string describing the pathname
+\item[LSUP]Address of the supporting link of the
+  Keys bank(s) \Lit{KYDB}
+  {\bf N.B. LSUP must be protected against relocations or garbage
+collection, e.g. by using a {\it link area}}.
+\item[ISEL]Integer vector specifying the instant of validity
+for which a database object is required. The length of the vector
+is equal to the number of validity range pairs, itself a database constant.
+For example, in the case when we select by {\tt run} and {\tt event},
+the number of pairs is 2. ISEL then contains the specific {\tt run}
+and {\tt event} for which an object is required.
+\item[IMASK]Integer vector indicating which elements of
+  \Rarg{KEYS} are significant in selection.
+  If an element of \Rarg{IMASK} is non-zero, then the corresponding
+  element of \Rarg{KEYS} is used in selecting a dataset.
+\item[KEYS]Vector of keys. Only the elements for which the
+  corresponding element of \Rarg{IMASK} is non-zero are
+  assumed to contain useful information.
+
+If MASK corresponding to     
+one of the fields of 'Beginning' validity range is set, 
+it will select objects with start validity smaller than 
+those requested in KEYS. If MASK corresponding to one   
+of the fields of 'End' validity range is set, it will   
+select objects with end validity larger than those in   
+KEYS. If MASK corresponding to time of insertion is set,
+objects inserted earlier than KEYS(IDHINS) are selected. 
+
+\item[CHOPT]Character string with any of the following characters
+  \begin{DLtt}{123}
+    \item['A']Accept existing datastructure if one already exists in memory.
+              {\bf N.B. if this option is specified, ANY datastructure in
+               memory for this path and validity instant will be accepted,
+               regardless of other selections specified.}
+    \item['K']read only the keys (no data is required)
+    \item['D']Drop datastructure at \Rarg{LSUP} before retrieving new datastructure
+    \item['F']Force retrieval of new datastructure even if current information
+    is still valid
+    \item['M']Perform multiple selection: select according to {\bf input}
+    keys banks, rather than \Rarg{KEYS} vector.
+    The user must prepare a linear chain of key banks prior to calling
+    this routine using the routine \Rind{CDBOOK}.
+    \item['N']If appropriate object does not exist, take nearest neighbour
+    \item['S']Select all objects satisfying the input selection criteria
+  \end{DLtt}
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+  \begin{DLtt}{123}
+    \item[\ 0] Successful operation
+    \item[\ 1]Illegal character option
+    \item[\ 2]Illegal path name
+    \item[\ 3]Database structure in memory clobbered
+    \item[\ 4]Illegal key option
+    \item[\ 5]Error in \Lit{DBCHLD} in \Lit{P3} communication
+    \item[36]Data bank address zero on return from \Lit{DBKXIN}
+    \item[37]Insufficient space in \Lit{USER} store array
+  \end{DLtt}
+\end{DLtt}
+
+Prepares the database data structure in memory for any required
+Pathname and set of Keys, unless already done.
+Returns (optionally) the addresses in memory for the corresponding
+Key banks and Data banks after checking their validity for the
+given time and keys.
+
+If the pathname begins with a \% character then it is assumed to be
+an alias and is automatically translated by the internal {\tt HEPDB}
+routines.
+
+\subsubsection*{Supplementary return information}
+
+\begin{DLtt}{123456789}
+\item[IQUEST(2)]Return status (if \Lit{IRC = 0})
+\index{quest@{\tt QUEST}!{\tt IQUEST}}\index{iquest@{\tt IQUEST}}%
+  \begin{DLtt}{1}
+    \item[0]No disk i/o has been performed
+    \item[1]Data have been refreshed from the disk
+  \end{DLtt}
+\end{DLtt}
+
+\subsection{Retrieving data structure to user specified address}
+
+\Shubr{CDGET}{(PATH,IXDIV,LSUP*,JBIAS,ISEL,KEYS,CHOPT,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[PATH]Character string describing the pathname
+\item[IXDIV]Index of the division in which the data structure
+should be returned
+\item[LSUP]Address of the data bank
+  {\bf N.B. LSUP must be protected against relocations or garbage
+collection, e.g. by using a {\it link area}}.
+\item[JBIAS]\Rarg{LSUP} and \Rarg{JBIAS}
+  together specify the address at  which the
+  structure is to be inserted.
+  If \Lit{JBIAS < 1} it is used as an
+  offset to the value of \Rarg{LSUP}, so the structure will be connected
+  at \Lit{LQ(LSUP+JBIAS}).
+  If \Lit{JBIAS = 1} the data-structure will be a
+  top level data-structure connected at \Rarg{LSUP}.
+  If \Lit{JBIAS = 2} the
+  data-structure will be created as a standalone structure
+\item[ISEL]Integer vector specifying the instant of validity
+for which a database object is required. The length of the vector
+is equal to the number of validity range pairs, itself a database constant.
+For example, in the case when we select on {\tt run} and {\tt event},
+the number of pairs is 2. ISEL then contains the specific {\tt run}
+and {\tt event} for which an object is required.
+\item[KEYS]Integer vector in which the keys vector associated
+with the retrieved data object are returned.
+\item[CHOPT]Character string with any of the following characters
+  \begin{DLtt}{123}
+    \item['A']Accept existing datastructure if one already exists in memory.
+    \item['K']read only the keys (no data is required)
+    \item['D']Drop datastructure at \Rarg{LSUP} before retrieving new datastructure
+    \item['N']Force retrieval of new datastructure even if current information
+    is still valid
+  \end{DLtt}
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+  \begin{DLtt}{12}
+    \item[\ 0] Successful operation
+    \item[\ 1]Illegal character option
+    \item[\ 2]Illegal path name
+    \item[\ 3]Database structure in memory clobbered
+    \item[\ 4]Illegal key option
+    \item[\ 5]Error in \Lit{DBCHLD} in \Lit{P3} communication
+    \item[36]Data bank address zero on return from \Lit{DBKXIN}
+    \item[37]Insufficient space in \Lit{USER} store array
+  \end{DLtt}
+\end{DLtt}
+
+In some cases, for example in existing applications, one may wish to
+retrieve a data structure to a user specified location. In this
+case, \Rind{CDGET} may be used. Note that the data caching provided
+by \Rind{CDUSE} and \Rind{CDFREE} is not supported by this routine.
+
+If the pathname begins with a \% character then it is assumed to be
+an alias and is automatically translated by the internal {\tt HEPDB}
+routines.
+
+\subsubsection*{Supplementary return information}
+
+\begin{DLtt}{123456789}
+\item[IQUEST(2)]Return status (if \Lit{IRC = 0})
+\index{quest@{\tt QUEST}!{\tt IQUEST}}\index{iquest@{\tt IQUEST}}%
+  \begin{DLtt}{1}
+    \item[0]No disk i/o has been performed
+    \item[1]Data have been refreshed from the disk
+  \end{DLtt}
+\end{DLtt}
+
+\Filename{H2hdbuser-Freeing-information-from-memory}
+\section{Freeing information from memory}
+
+\Shubr{CDFREE}{(PATH,LSUP,MASK,KEYS,CHOPT,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[PATH]Character string describing the pathname
+\item[LSUP]Address of Keys bank(s) \Lit{KYDB}
+\item[MASK]Integer vector indicating which elements of KEYS are
+significant for selection.
+\item[KEYS]Vector of keys
+\item[CHOPT]Character string with any of the following characters
+  \begin{DLtt}{123}
+    \item['A']trust \Rarg{LSUP} address if non-zero
+    \item['D']drop the Data bank(s) supported at link 1 of Key bank(s)
+    \item['K']drop the Key bank(s) as well as Data bank(s)
+  \end{DLtt}
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+  \begin{DLtt}{12}
+    \item[\ 0]Normal completion
+    \item[51]Illegal character option
+    \item[52]No access to the Key banks
+    \item[53]Pathname not found in the RZ directory
+    \item[54]Pathname not matched to that found in bank \Lit{NODB}
+    \item[55]Too many keys with option \Ropt{M}
+    \item[56]Illegal Key option
+    \item[57]Illegal pathname
+    \item[58]Database structure in memory clobbered
+    \item[59]Some of the expected key banks not found
+  \end{DLtt}
+\end{DLtt}
+
+Routine \Rind{CDFREE} declares the given data bank(s) as candidates to be
+dropped in case space is needed in the database division. Optionally it
+deletes the Data bank(s) (with option \Ropt{D}) or the Keys as well as
+the Data bank(s) (with option \Ropt{K}).
+
+If the pathname begins with a \% character then it is assumed to be
+an alias and is automatically translated by the internal {\tt HEPDB}
+routines.
+
+\Filename{H2hdbuser-Deleting-information-from-the-database}
+\section{Deleting information from the database}
+
+\subsection{Deleting a range of objects}
+
+\Shubr{CDPURG}{(PATH,KYDAT,KYTIM,CHOPT,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[PATH]Character string describing the pathname
+\item[KYDAT]Key element number (for option \Ropt{K} in \Rarg{CHOPT}) or
+  Minimum value of Key 1 to be deleted (for option \Ropt{S})
+\item[KYTIM]Cutoff value for the key (for option \Ropt{K}) or
+  Maximum value of Key 1 to be deleted (for option \Ropt{S})
+\item[CHOPT]Character string with any of the following characters
+  \begin{DLtt}{123}
+    \item['A']Deletes all data objects
+    \item['K']Deletes all data objects for which \Lit{KEY(KYDAT)<KYTIM}
+    \item['L']Deletes all but the last (one with highest \Lit{KEY(1)} value)
+      data objects
+    \item['P']Deletes all data objects with identical start and end
+      validity but those having the highest Program Version
+      number (i.e., \Lit{KEY(6)} value)
+    \item['S']Deletes all data objects with Serial number (\Lit{KEY(1)}) in
+      the range \Lit{KYDAT-KYTIM} (the terminal points included)
+  \end{DLtt}
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+  \begin{DLtt}{123}
+    \item[\ \ 0]Normal completion
+    \item[111]Illegal path name
+    \item[112]No key or data found for specified path
+  \end{DLtt}
+\end{DLtt}
+
+If the pathname begins with a \% character then it is assumed to be
+an alias and is automatically translated by the internal {\tt HEPDB}
+routines.
+
+\subsubsection*{Supplementary return information}
+
+\begin{DLtt}{123456789}
+\item[IQUEST(2)]Number of objects deleted (if \Lit{IRC = 0})
+\index{quest@{\tt QUEST}!{\tt IQUEST}}\index{iquest@{\tt IQUEST}}%
+\end{DLtt}
+
+\subsection{Deleting objects based on key vector}
+
+\Shubr{CDPURK}{(PATH,ISEL,IMASK,KEYS,CHOPT,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[PATH]Character string describing the pathname
+\item[ISEL]Vector of length \Lit{NPAIR} specifying the validity instant.
+  Only objects valid for this instant of validity are candidates for purging.
+\item[IMASK]Integer vector specifying which elements of the \Rarg{KEYS}
+  vector are to be considered.
+\item[KEYS]Vector of keys. Only the elements for which the corresponding
+  element of \Rarg{IMASK} is non-zero are assumed to contain useful information
+\item[CHOPT]Character string with any of the following characters
+  \begin{DLtt}{123}
+    \item['K']Delete object with key serial number as given in \Rarg{KEYS} vector.
+      \Rarg{IMASK} is ignored.
+    \item['F']Require a full match of the entire \Rarg{KEYS} vector.
+      \Rarg{IMASK} is ignored.
+    \item['U']Undelete a previously deleted object.
+  \end{DLtt}
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+  \begin{DLtt}{123}
+    \item[\ \ 0]Normal completion
+    \item[111]Illegal path name
+    \item[112]No key for the path name satisfying the Key assignments
+    \item[113]Illegal character option
+    \item[114]Valid data objects in the Node/Key structure
+  \end{DLtt}
+\end{DLtt}
+
+Routine \Rind{CDPURK} deletes objects in a directory path name steered by
+a selection on a number of key elements. The elements are specified
+by a non-zero value in the corresponding element of the \Rarg{IMASK} vector.
+If the pathname begins with a \% character then it is assumed to be
+an alias and is automatically translated by the internal {\tt HEPDB}
+routines.
+
+\subsubsection*{Supplementary return information}
+
+\begin{DLtt}{123456789}
+\item[IQUEST(2)]Number of objects deleted (if \Lit{IRC = 0})
+\index{quest@{\tt QUEST}!{\tt IQUEST}}\index{iquest@{\tt IQUEST}}%
+\end{DLtt}
+
+\Filename{H2hdbuser-Utility-routines}
+
+\section{Modifying information in the database}
+
+\subsection{Changing the keys for an existing object}
+\Shubr{CDRENK}{(PATHN, KEYO, KEYN, IRC*)}
+\begin{DLtt}{1234567}
+\item[PATHN]Name of the directory containing the object
+\item[KEYO]Old key vector
+\item[KEYN]New key vector
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+  \begin{DLtt}{123}
+    \item[\ \ 0]Normal completion
+    \item[191]Illegal path name                               
+    \item[192]Illegal KEYO values (no matching object)
+    \item[194]Error in getting the IO descriptor     
+    \item[195]Error in FZOUT in saving the journal file
+    \item[196]Error in RZRENK in renaming key value
+  \end{DLtt}
+\end{DLtt}
+
+\section{Utility routines}
+
+\subsection{Changing the HEPDB logging level}
+
+\Shubr{CDLOGL}{(PATH,LOGLEV,CHOPT,IRC)}
+
+\begin{DLtt}{1234567}
+\item[PATH]Top directory name of HEPDB file.
+\item[LOGLEV]Log level
+ \begin{DLtt}{12}
+   \item[<0]no messages are printed
+   \item[\ 1]error messages from main HEPDB routines (default value)
+   \item[\ 2]error messages and warnings from main HEPDB routines
+   \item[\ 3]error messages, warnings and informative messages from
+     main HEPDB routines
+   \item[\ 4]as above, but also error messages from HEPDB internal routines
+   \item[\ 5]as above, but also warnings from HEPDB internal routines
+   \item[>5]all messages are printed, and also additional debug.
+ \end{DLtt}
+\item[CHOPT]Character option
+  \begin{DLtt}{123}
+    \item['A']Set RZ loglevel for all HEPDB files that are currently open
+  \end{DLtt}
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+  \begin{DLtt}{1}
+    \item[0]Normal completion
+    \item[1]Invalid path name
+    \item[2]Database corresponding to specified path name is not open
+  \end{DLtt}
+\end{DLtt}
+
+The level of diagnostic print out can be set at any time using the
+routine \Rind{CDLOGL}. By default, the log level for each database
+file is  set to 0 when the routine \Rind{CDOPEN} is called.
+Note that this routine sets both the HEPDB and RZ log levels.
+
+\subsection{Create a linear chain of keys banks}
+
+\Shubr{CDBOOK}{(PATH,LSUP,NBANKS,CHOPT,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[PATH]Character variable specifying the pathname for which
+  the banks are to be created
+\item[LSUP]Address of the first bank in the linear chain
+\item[NBANKS]Number of banks to create
+\item[CHOPT]Character options (not used at present)
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+  \begin{DLtt}{12}
+    \item[\ 0]Normal completion
+    \item[99]Insufficient dynamic storage to create all of the requested banks
+  \end{DLtt}
+\end{DLtt}
+
+This routine creates a linear structure of \Rarg{NBANKS}
+key banks. Each bank has a single structural link, to which
+a databank may eventually be attached.
+
+\subsection{Create information bank containing usage information}
+
+\Shubr{CDINFO}{(IUDIV,LAD*,LSUP,JBIAS,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[IUDIV]User division where the \Lit{DBTB} bank has to be created
+\item[LAD]Address of the \Lit{DBTB} bank (should be in the same store
+  as all DB objects)
+\item[LSUP]Address of the supporting bank
+\item[JBIAS]Link bias as described in ZEBRA manual
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+  \begin{DLtt}{1}
+    \item[0]Normal completion
+  \end{DLtt}
+\end{DLtt}
+
+This routine creates the \Lit{DBTB} bank with information of the database objects used
+for this event (since the last call to \Rind{DBINFO}). It stores two words
+per object used, a unique identifier corresponding to the path
+name and the serial number of the object (\Lit{KEY(1)} value)
+
+\subsection{Print statistics on database usage}
+
+\Shubr{CDSTAT}{(LUN,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[LUN]Logical unit on which the statistics should be printed
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+  \begin{DLtt}{12}
+    \item[\ 0]Normal completion
+    \item[98]Invalid path name in node bank
+  \end{DLtt}
+\end{DLtt}
+
+This routine prints a summary of database usage for the current
+job on the specified logical unit.
+
+\subsection{List directory}
+
+\Shubr{CDLDIR}{(PATH,LUN,NLEVEL,CHOPT,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[PATH]Character string describing the pathname
+\item[LUN]Integer variable specifying the Fortran logical unit on
+  which the information should be printed
+\item[NLEVEL]The number of levels of subdirectories that should
+be scanned.
+\item[CHOPT]Character string with any of the following characters
+  \begin{DLtt}{123}
+  \item[H]Write a header showing the command and options
+  \item[C]List the creation date and time of the directory/ies
+  \item[M]List the modification date and time of the directory/ies
+  \item[O]Display the number of objects
+  \item[R]List subdirectories recursively
+  \item[S]Display number of subdirectories
+  \item[T]Display the tags for the directory/ies
+  \item[V]Generate a "very wide" listing (132 columns)
+  \item[W]Generate a "wide" listing (80 columns)
+  \end{DLtt}
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+  \begin{DLtt}{123}
+    \item[\ \ 0]Normal completion
+    \item[101]Illegal path name
+    \item[102]No key or data for specified path
+  \end{DLtt}
+\end{DLtt}
+
+\subsection{List objects in a directory}
+\Shubr{CDLIST}{(CHPATH,KSN,CHBANK,ILNK1,ILNK2,IDAT1,IDAT2,CHOPT,IRC)}
+\begin{DLtt}{1234567}
+\item[CHPATH]Character variable specifying the path name to list
+\item[KSN]Key serial number of a specific object, or 0.
+If 0 is specified, no check will be made on key serial number.
+\item[CHBANK]Character bank identifier (for option Z)
+\item[ILNK1]First link to be printed (as in \Rind{DZSHOW})
+\item[ILNK2]Last link to be printed
+\item[IDAT1]First data word to be printed
+\item[IDAT2]Last data word to be printed
+\item[CHOPT]Character string with any of the following characters
+  \begin{DLtt}{123}
+  \item[C]display object count
+  \item[D]display key definitions
+  \item[E]display the experiment keys
+  \item[G]display keys using generic routine (RZPRNK)
+  \item[K]display all keys
+  \item[L]list only lowest level (end node) directories
+  \item[M]show maxima and minima of validity ranges
+  \item[N]display number of data words
+  \item[P]display pathname
+  \item[S]display the system keys
+  \item[T]display insertion date and time (RZ value)
+  \item[U]display user keys
+  \item[V]display validity range pairs
+  \item[Z]dump ZEBRA bank with DZSHOW
+  \end{DLtt}
+\item[IRC]
+\end{DLtt}
+
+\subsection{Display objects in a directory}
+\Shubr{CDSHOW}{(CHPATH,ISEL,IMASK,KEYS,CHBANK,IDBANK,IDAT1,DAT2,CHOPT,IRC)}
+\begin{DLtt}{1234567}
+\item[CHPATH]Character variable specifying the path name to list
+\item[ISEL]Integer vector specifying the instant of validity
+\item[IMASK]Integer vector indicating which elements of KEYS are
+significant for selection. If MASK corresponding to
+one of the fields of 'Beginning' validity range is set,
+it will select objects with start validity smaller than
+those requested in KEYS. If MASK corresponding to one
+of the fields of 'End' validity range is set, it will
+select objects with end validity larger than those in
+KEYS. If MASK corresponding to time of insertion is set,
+objects inserted earlier than KEYS(IDHINS) are selected
+\item[KEYS]Vector of keys.
+\item[CHBANK]ZEBRA bank name
+\item[IDBANK]ZEBRA bank identifier
+\item[IDAT1]First data word to be printed
+\item[IDAT2]Last data word to be printed
+\item[CHOPT]Character string with any of the following characters
+  \begin{DLtt}{123}
+  \item[ ]Find all banks with position in walk > IDBANK
+  \item[S]FInd bank with Zebra ID = IDBANK
+  \end{DLtt}
+\item[IRC]
+\end{DLtt}
+
+\subsection{Obtain last object inserted into directory}
+
+\Shubr{CDLKEY}{(PATH,KEY*,IDATE*,ITIME*,CHOPT,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[PATH]Character string describing the pathname
+\item[KEY]Scalar in which the highest KEY(1) (key serial number)
+is returned. If option {\tt K} is specified, then {\tt KEY} must
+be a vector of sufficient length to retrieve the entire key vector
+for objects in the specified directory. The length of the key
+vector may be obtained using the routine \Rind{RZKEYD}.
+\item[IDATE]Date (\Lit{YYMMDD}) of the insertion of the last element
+\item[ITIME]Time (\Lit{HHMM})   of the insertion of the last element
+\item[CHOPT]Character string with any of the following characters
+  \begin{DLtt}{123}
+    \item[' ']Return just the key serial number (\Lit{KEY(1)})
+    \item['K']Return complete key vector in \Rarg{KEY}
+  \end{DLtt}
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+  \begin{DLtt}{123}
+    \item[\ \ 0]Normal completion
+    \item[131]Illegal pathname
+    \item[132]Illegal number of keys in the directory
+  \end{DLtt}
+\end{DLtt}
+
+This routine returns the key serial number (optionally
+the complete key vector) of the last object inserted
+into the specified directory. If the option \Ropt{K}
+is specified, then the vector \Rarg{KEY} must be of sufficient
+size as to receive the complete vector.
+
+\subsection{Date of last directory modification}
+
+\Shubr{CDLMOD}{(PATH,IDATE*,ITIME*,CHOPT,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[PATH]Character variable specifying the path name of interest
+\item[IDATE]Date of last modification in \Lit{YYMMDD} format
+\item[ITIME]Time of last modification in \Lit{HHMM}   format
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+  \begin{DLtt}{123}
+    \item[\ \ 0]Normal completion
+    \item[131]Invalid path name
+  \end{DLtt}
+\end{DLtt}
+
+This routine returns the date and time of the last modification of
+the specified directory.
+
+\subsection{Pack and unpack date and time}
+
+Two sets of routines are provided: \Rind{CDPKTM} and \Rind{CDUPTM},
+for storing times with 1 minute precision, and \Rind{CDPKTS}
+and \Rind{CDUPTS} which provide 1 second precision.
+In the case of the latter two routines, only times
+relating to 1980 and after may be stored.
+
+\Shubr{CDPKTM}{(IDATE,ITIME,IPACK*,IRC*)}
+\Shubr{CDPKTS}{(IDATE,ITIME,IPACK*,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[IDATE] Integer variable with date in \Lit{YYMMDD} format
+\item[ITIME] Integer variable with time in \Lit{HHMM} format for \Rind{CDPKTM}
+  and in \Lit{HHMMSS} format for \Rind{CDPKTS}.
+\item[IPACK*] Integer variable to store the date and time in packed format.
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+  \begin{DLtt}{12}
+    \item[0]Normal completion
+    \item[93]Illegal date or time
+  \end{DLtt}
+\end{DLtt}
+
+\Shubr{CDUPTM}{(IDATE*,ITIME*,IPACK,IRC*)}
+\Shubr{CDUPTS}{(IDATE*,ITIME*,IPACK,IRC*)}
+\begin{DLtt}{1234567}
+\item[IDATE*] Integer variable to store the date in \Lit{YYMMDD} format.
+\item[ITIME*] Integer variable with time in \Lit{HHMM} format for \Rind{CDUPTM}
+     and in \Lit{HHMMSS} format for \Rind{CDUPTS}.
+\item[IPACK] Integer variable with date and time in packed format.
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+  \begin{DLtt}{12}
+    \item[0]Normal completion
+    \item[93]Illegal packed time
+  \end{DLtt}
+\end{DLtt}
+
+These routines
+allow a date and time to be stored in, and retrieved from
+a 4 byte integer word.
+\Rarg{IPACK} must be the result of a previous call to \Rind{CDPKTM},
+or is the output packed time. The CERNLIB routine \Rind{DATIME},
+entry \Lit{Z007}, can be
+used to obtain \Lit{IDATE} and \Lit{ITIME} in the correct format.
+The time can be obtained in the \Lit{HHMMSS} format
+required by \Rind{CDPKTS} as shown in the following example.
+\begin{XMPt}{Example of obtaining the time in {\tt HHMMSS} format}
+*
+*     Subroutine DATIME returns the date and time in the format
+*     datime(id,it) ID=YYMMDD, e.g. 930425, IT=hhmm, e.g. 1230
+*     Additional information is also returned in the common SLATE,
+*     e.g. IS(6) = seconds
+*
+      COMMON/SLATE/IS(40)
+
+      CALL DATIME(ID,IT)
+      IT = IT*100 + IS(6)
+\end{XMPt}
+
+\Filename{H2hdbuser-Ranges-or-values-for-selection-by-keys}
+\section{Ranges or values for selection by keys}
+
+\subsection{Retrieving ranges for key pairs}
+
+\Shubr{CDVALI}{(IVECT*,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[IVECT]Vector returning the minimum and maximum values
+for the various key pairs since the last call to \Rind{CDINFO}
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+  \begin{DLtt}{1}
+    \item[0]Normal completion
+  \end{DLtt}
+\end{DLtt}
+
+This routine returns the overlapping validity ranges for
+the various key pairs since the last call to \Rind{CDINFO}
+
+\subsection{Setting the historical retrieval time}
+
+\Shubr{CDBFOR}{(TOPN,IDATE,ITIME,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[TOPN]Name of the top directory (\Lit{'*'} means all)
+\item[IDATE]Date : 6 Decimal integer : \Lit{YYMMDD}
+\item[ITIME]Time : 4 Decimal integer : \Lit{HHMM}
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+  \begin{DLtt}{1}
+    \item[0]Normal completion
+  \end{DLtt}
+\end{DLtt}
+
+Set the maximum insertion time for retrieval of all subsequent
+data objects for a given top directory
+Only objects inserted before the specified time will be
+retrieved, until a further call to \Rind{CDBFOR} is made.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\Filename{H1hdbuser-Description-of-command-line-interface}
+\chapter{Description of command line interface}
+\let\condbreak\origcondbreak
+
+A simple shell interface to HEPDB is provided, using the KUIP \cite{bib-KUIP}
+package. To run this interface, simply type {\tt hepdb}.
+
+\SKUIP{COUNT}{[ PATH CHOPT ]}
+
+\begin{DLtt}{1234567}
+\item[PATH]Character variable specifying the pathname in which the objects
+  are to be counted.
+\item[CHOPT]Character variable specifing the options required
+  \begin{DLtt}{1}
+    \item[D]display number of subdirectories at each level
+    \item[O]display number of objects at each level
+    \item[L]display lowest level only, i.e. directories with no subdirectories
+    \item[Z]display only directories with no (zero) objects
+  \end{DLtt}
+\end{DLtt}
+
+Use the \Cind{COUNT} command to count the number of objects in the specified
+directories.
+
+\SKUIP{FILES}{ }
+
+Use the \Cind{FILES} command to display the files that are currently
+open.
+
+\SKUIP{LOGLEVEL}{[ PATH LOGLEVEL CHOPT ]}
+
+\begin{DLtt}{1234567}
+\item[PATH]Top directory name of HEPDB file.
+\item[LOGLEV]Log level
+  \begin{DLtt}{12}
+    \item[<0]no messages are printed
+    \item[\ 1]error messages from main HEPDB routines (default value)
+    \item[\ 2]error messages and warnings from main HEPDB routines
+    \item[\ 3]error messages, warnings and informative messages from
+      main HEPDB routines
+    \item[\ 4]As above, but also error messages from HEPDB internal routines
+    \item[\ 5]As above, but also warnings from HEPDB internal routines
+    \item[>5]all messages are printed, and also additional debug.
+  \end{DLtt}
+\item[CHOPT]Character option
+  \begin{DLtt}{1}
+    \item[A]Set RZ loglevel for all HEPDB files that are currently open
+  \end{DLtt}
+\end{DLtt}
+
+Use the \Cind{LOGLEVEL} command to set the HEPDB logging level.
+
+\SKUIP{OPEN}{PREFIX [ CHFILE ] [ CHOPT ]}
+
+\begin{DLtt}{1234567}
+\item[PREFIX]Character variable specifying the two character database prefix
+\item[CHFILE]Character variable specifying the file name
+\item[CHOPT]Character option, as for the \Rind{CDOPEN} routine.
+\end{DLtt}
+
+Use the \Cind{OPEN} command to open a {\tt HEPDB} file
+
+\SKUIP{CLOSE}{PREFIX [ CHOPT ]}
+
+\begin{DLtt}{1234567}
+\item[PREFIX]Character variable specifying the database prefix
+of the database to be cloed.
+\item[CHOPT]Character option, as for the \Rind{CDEND} routine.
+\end{DLtt}
+
+Use the \Cind{CLOSE} command to close a {\tt HEPDB} file.
+previously opened using the \Cind{OPEN} command.
+
+The \Cind{CLOSE} command accepts a two character database
+prefix, top directory name, or pathname. Thus, for a file
+with database prefix {\tt BK}, the following commands
+are identical.
+
+\begin{XMP}
+
+CLOSE BK
+
+CLOSE CDBK
+
+CLOSE //CDBK
+
+\end{XMP}
+
+\SKUIP{RZOPEN}{CHTOP CHFILE [ CHOPT ]}
+
+\begin{DLtt}{1234567}
+\item[CHTOP]Character variable specifying the top directory name
+\item[CHFILE]Character variable specifying the file name
+\item[CHOPT]Character option
+\end{DLtt}
+
+Use the \Cind{RZOPEN} command to open an RZ file
+
+\SKUIP{RZCLOSE}{CHTOP [ CHFILE ] [ CHOPT ]}
+
+\begin{DLtt}{1234567}
+\item[CHTOP]Character variable specifying the top directory name
+\item[CHFILE]Character variable specifying the file name
+\item[CHOPT]Character option
+  \begin{DLtt}{1}
+    \item[A]Close all files
+  \end{DLtt}
+\end{DLtt}
+
+Use the \Cind{RZCLOSE} command to close a file previously opened with
+\Cind{RZOPEN}
+
+\SKUIP{OUTPUT}{[ FILE CHOPT ]}
+
+\begin{DLtt}{1234567}
+\item[FILE]Character variable specifying the name of the file
+\item[CHOPT]Character options
+  \begin{DLtt}{1}
+    \item[C]close file and redirect output to terminal
+    \item[P]preserve case of file
+    \item[R]replace existing file
+    \item[S]switch back to previously opened file
+    \item[T]redirect output back to terminal
+  \end{DLtt}
+\end{DLtt}
+
+Use the \Cind{OUTPUT} command to redirect output to a specified file
+or to the terminal.
+
+\SKUIP{VERSION}{ }
+
+Use the \Cind{VERSION} command to display the version of the HEPDB
+software that you are running.
+
+\SKUIP{CD}{[ CHPATH ] [ CHOPT ]}
+
+\begin{DLtt}{1234567}
+\item[CHPATH]Character variable specifying the name of the new directory
+\item[CHOPT]Character option
+  \begin{DLtt}{1}
+    \item[Q]show quota for new directory
+    \item[S]show number of subdirectories
+    \item[T]show creation and modification times
+    \item[U]show usage information
+    \item[A]all of the above
+  \end{DLtt}
+\end{DLtt}
+
+Use the \Cind{CD} command to change the current working directory.
+
+If the pathname begins with a \% character then it is assumed to be
+an alias and is automatically translated by the internal {\tt HEPDB}
+routines.
+
+\SKUIP{LD}{[ CHPATH NLEVEL CHOPT ]}
+
+\begin{DLtt}{1234567}
+\item[CHPATH]Character variable specifying the pathname
+\item[KSN]Serial number of the object to be displayed
+\item[NLEVEL]Number of levels to display
+\item[CHOPT]Character options
+  \begin{DLtt}{1}
+    \item[C]Display the RZ creation date and time
+    \item[M]Display the RZ modification date and time
+    \item[O]List the number of objects at each level
+    \item[R]List subdirectories recursively
+    \item[S]Display the number of subdirectories at each level
+    \item[T]Display the tags as specified in the call to \Rind{RZMDIR}
+  \end{DLtt}
+\end{DLtt}
+
+Use the \Cind{LD} command to display subdirectories below the specified
+level.
+
+\SKUIP{LS}{[ CHPATH KSN BANK CHOPT ]}
+
+\begin{DLtt}{1234567}
+\item[CHPATH]Character variable specifying the path name to be listed
+\item[BANK]Character variable specifying the name of the bank to display
+\item[ILNK1]Index of the first link to be printed
+\item[ILNK2]Index of the last link to be printed
+\item[IDAT1]Index of the first word to be printed
+\item[IDAT2]Index of the last word to be printed
+\item[CHOPT]Character options
+  \begin{DLtt}{1}
+    \item[C]display object count
+    \item[D]display key definitions
+    \item[S]display the system keys
+    \item[E]display the experiment keys
+    \item[G]display keys using generic routine (\Rind{RZPRNK})
+    \item[V]display validity range pairs
+    \item[U]display user keys
+    \item[K]display all keys
+    \item[L]list only lowest level (end node) directories (default)
+    \item[M]show maxima and minima of validity range pairs
+    \item[N]display number of data words
+    \item[P]display pathname (default)
+    \item[T]display insertion date and time (RZ value)
+    \item[Z]dump ZEBRA bank with \Rind{DZSHOW}
+  \end{DLtt}
+\end{DLtt}
+
+Use the \Cind{LS} command to display the contents of a directory.
+If option \Copt{Z} is specified, the name of the bank(s) to be displayed
+may be given. If multiple banks are to be displayed, their names
+should be separated by commas. Wild cards are permitted in
+bank names.
+
+\SKUIP{PWD}{ }
+
+Use the \Cind{PWD} command to print the current (working) directory.
+\begin{DLtt}{1234567}
+\item[CHOPT]Character options
+  \begin{DLtt}{1}
+    \item[A]display alias name for current directory
+  \end{DLtt}
+\end{DLtt}
+
+\SKUIP{STATUS}{[ CHPATH NLEVEL CHOPT ]}
+
+\begin{DLtt}{1234567}
+\item[CHPATH]Character variable specifying the pathname
+\item[NLEVEL]Number of levels to display
+\item[CHOPT]Character options as for \Rind{RZSTAT}
+\end{DLtt}
+
+Use the \Cind{STATUS} command to print usage statistics on the
+specified directory down \Carg{NLEVEL} levels.
+
+\SKUIP{TREE}{[ CHPATH NLEVEL ]}
+
+\begin{DLtt}{1234567}
+\item[CHPATH]Character variable specifying the pathname
+\item[NLEVEL]Number of levels to display
+\item[CHOPT]Character options
+  \begin{DLtt}{1}
+    \item[A]show alias name (if any) for each directory
+    \item[N]show the number of objects for each directory if non-zero
+    \item[O]show the number of objects for each directory
+    \item[S]show the number of subdirectories for each directory
+    \item[C]show the date and time the directory was created
+    \item[M]show the date and time of the last modification (RZ)
+  \end{DLtt}
+\end{DLtt}
+
+Use the \Cind{TREE} command to draw a directory tree starting at the
+specified directory down \Carg{NLEVEL} levels.
+
+\SKUIP{SELECT}{ISEL1 [ ISEL2 ISEL3 ]}
+
+\begin{DLtt}{1234567}
+\item[ISEL1]Integer variable specifying the primary selection
+\item[ISEL2]Integer variable specifying the secondary selection
+\item[ISEL3]Integer variable specifying the tertiary selection
+\end{DLtt}
+
+Use the \Cind{SELECT} command to specify the instant of validity for which
+objects are required.
+
+\SKUIP{ZOOM}{PATH}
+
+\begin{DLtt}{1234567}
+\item[CHPATH]Character variable specifying the pathname
+\end{DLtt}
+
+Use the \Cind{ZOOM} command to descend the specified
+directory tree to the first lowest level directory that
+contains one or more entries. The directory specification
+may contain wild-cards.
+
+\SKUIP{DIR}{[ CHPATH CHOPT ]}
+
+\begin{DLtt}{1234567}
+\item[CHPATH]Character variable specifying the pathname
+\item[CHOPT]Character variable specifying the options
+  \begin{DLtt}{123}
+    \item['T']List also subdirectory tree
+  \end{DLtt}
+\end{DLtt}
+
+Use the \Cind{DIR} command to issue a call to \Rind{RZLDIR} for the specified
+path. This command is normally used for debug purposes only.
+
+\SKUIP{EXTRACT}{[ CHPATH OUTPUT CHOPT ]}
+
+\begin{DLtt}{1234567}
+\item[CHPATH]Character variable specifying the pathname
+\item[OUTPUT]Character variable specifying the output filename
+\item[CHOPT]Character variable specifying the options
+\end{DLtt}
+
+Use the \Cind{EXTRACT} command to copy a subset of the HEPDB catalogue
+
+\SKUIP{MERGE}{[ INPUT CHPATH CHOPT ]}
+
+\begin{DLtt}{1234567}
+\item[INPUT]Character variable specifying the input file name
+\item[CHPATH]Character variable specifying the pathname
+\item[CHOPT]Character variable specifying the options
+\end{DLtt}
+
+Use the \Cind{MERGE} command to merge an update file created by
+the \Cind{EXTRACT} command into the specified path.
+
+\SKUIP{MKDIR}{CHPATH}
+
+\begin{DLtt}{1234567}
+\item[CHPATH]Character variable specifying the pathname
+\end{DLtt}
+
+Use the MKDIR command to create a directory
+
+\SKUIP{RM}{KEY1}
+
+\begin{DLtt}{1234567}
+\item[KEY1]Integer variable specifying the key serial number of the
+  object to be deleted
+\end{DLtt}
+
+\SKUIP{RMDIR}{CHPATH}
+
+\begin{DLtt}{1234567}
+\item[CHPATH]Character variable specifying the pathname
+\end{DLtt}
+
+Use the \Cind{RMDIR} command to remove a directory from the catalogue.
+
+Note that directories can only be removed if:
+\begin{OL}
+\item They contain no subdirectories
+\item They contain no entries
+\end{OL}
+
+\SKUIP{RMTREE}{CHPATH}
+\begin{DLtt}{1234567}
+\item[CHPATH]Character variable specifying the pathname
+\end{DLtt}
+
+Use the \Cind{RMTREE} command to remove a complete directory tree.
+
+Note that if any of the directories below the named directory
+contain entries, then the command will be refused.

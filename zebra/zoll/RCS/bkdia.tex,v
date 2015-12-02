@@ -1,0 +1,1376 @@
+head     1.1;
+access   ;
+symbols  ;
+locks    goossens:1.1; strict;
+comment  @@;
+
+
+1.1
+date     93.08.03.09.00.11;  author goossens;  state Exp;
+branches ;
+next     ;
+
+
+desc
+@initial version
+
+@
+
+
+
+1.1
+log
+@Initial revision
+@
+text
+@% file : bkdia.tex   12 Jan 93
+\thispagestyle{empty}     % empty head
+\markboth{}{12 Jan 93}    % empty foot
+\begin{center} {\large\bf Zebra Reference Manual} \vspace{8mm} \end{center}
+\begin{center} {\LARGE\bf book DIA} \vspace{2mm} \end{center}
+\begin{center} {\Large\bf Error Diagnostics} \vspace{6mm} \end{center}
+\begin{center}
+  {\large\bf Zebra version 3.69 \vspace{4mm} \\
+             January 1993       \vspace{4mm} \\
+             J. Zoll}
+\end{center}
+\newpage
+\vspace*{4cm}
+\lile{14mm}
+The text of this book can be found in the Zebra documentation files,
+which are kept on the Apollo system at CERN in /cern/pro/doc.
+
+To print on the Apollo with dvips 5.46 installed on /usr/local/bin :
+\bva
+            dvips  -t a4  -o rundia.ps  /cern/pro/doc/rundia
+            lpr    -P513-pub  -J X8NAME  rundia.ps
+\end{verbatim}
+
+The originals under evolution are in /user/zoll/zebra/tex,
+on the files bkdia.tex, dvi/rundia.dvi, and dvi/rundia.ps,
+which are the LATEX input and output files.
+\vspace*{5mm}
+
+\centerline{Date of last printing: 30 July 1991}
+\vspace*{5mm}
+
+
+Changes since last printing :
+
+
+26 June 91 : "FZDIA", "FZOUT", "ZTELL"
+
+30 July 91 : "MZSTOR"
+
+12 Jan 93 :  "FZITRX"
+\cleardoublepage  % continue on next odd page
+\markboth{}{}             % empty foot
+\lile{-7mm}
+\vspace*{10mm}
+\begin{center} {\Large\bf General information} \end{center}
+
+Zebra has been programmed to be as helpful as reasonably
+possible in the task of detecting and diagnosing errors.
+Depending on the kind of the error,
+three different approaches are used :
+for the convenience of the user we have made it a general rule
+that he does not have to test on the success of a request to Zebra,
+the return from the CALL to Zebra implies successful completion.
+For example : if the user calls MZLIFT he can be sure that
+the bank has been created if he receives control on the next
+FORTRAN statement;
+if MZLIFT is in trouble, either because the parameters supplied
+by the user are faulty,
+or because there is no free memory left,
+Zebra will not return to the calling routine,
+but take an escape road,
+by calling ZFATAL in the first case to stop the program with
+diagnostics,
+or by calling ZTELL in the second case to allow the user
+to re-gain control at the top-level to handle the problem.
+
+The exceptions to this general rule are again dictated by the
+convenience of usage,
+since there are cases where it is necessary to be able to
+handle errors in-line to the code as a matter of routine.
+This is realized with the first approach:
+
+{\large\bf Return-status codes}
+
+This approach is used in all instances where "errors" are part of
+the normal processing.
+The obvious example is the routine FZIN which must allow the
+user to handle read errors in particular, exceptions in general.
+
+The status-return code
+is always in the word IQUEST(1) of /QUEST/IQUEST(100).
+This word is zero if the request has been completed successfully;
+a non-zero value indicates an exception.
+The value is positive for a normal exception (such as end-of-file),
+the value is negative for errors (such as read errors);
+the particular value indicates which exception has occurred.
+The significance of the status-return code is part of the
+specifications of the routine.
+
+For an error status, other words in /QUEST/ carry more
+information to identify the problem,
+the exact details are found in the present paper
+under the name of the routine in question.
+
+{\large\bf Exit to ZTELL}
+
+    This approach is used in the instances where Zebra cannot
+satisfy a request, without the program being really at fault.
+The obvious example is a request for memory, such as with MZLIFT,
+which cannot be satisfied even after garbage collection.
+The exit to ZTELL allows the user at the high level to take
+control away from the failing low level of his program.
+The first parameter to ZTELL is an integer identifying the
+cause of the problem; this ID is 99 for 'no memory'.
+Under the heading 'ZTELL' in the present paper a list of
+the Zebra routines which call ZTELL is given,
+together with their identifiers;
+further details are found under the name of the calling routine.
+
+{\large\bf Exit to ZFATAL}
+
+    This approach is used to catch programming mistakes,
+such as faulty parameters in a Zebra call.
+Also, some Zebra routine may detect that the user has overwritten
+some system information in a bank,
+thereby destroying the sequential chaining from one bank in
+memory to the physically next bank
+('bank chaining clobbered').
+
+    Any error of this kind is trapped as soon as it is detected,
+information to localize the problem is loaded into
+/QUEST/ and control is transferred to ZFATAL.
+ZFATAL will print the name of the routine which has called it
+(if ZFATAL is reached by in an internal transfer within Zebra)
+and the diagnostic information,
+whose significance is found in the present paper under
+the name of the routine which catches the error.
+
+    The routine which detects the problem is not necessarily the
+routine actually called by the user.
+For example : the user may call MZLIFT which in turn may need to
+call the garbage collector;
+one of its routines may discover that the memory is invalid,
+and it will transfer control to ZFATAL.
+ZFATAL will print its name, which the user may never have
+heard of.
+In order to be able to tell the user which routine he
+actually called,
+Zebra keeps an internal trace-back stack which is printed by ZFATAL.
+If the FORTRAN trace-back is available on a particular
+machine, this will also be printed as it contains information
+very useful to localize the problem.
+
+This paper gives the details on error information
+under the name of the routine in question, sorted alphabetically.
+\newpage
+\lile{-7mm}
+\bmark{FZFILE}
+\ROUTA{CALL FZFILE  (LUN,LREC,options)}
+
+
+\bva
+---- ZFATAL termination ----
+
+messages printed via ZFATAM :
+
+       FZFILE - no dynamic store initialized.
+
+          if MZSTOR has not been called at least once before
+          the first call to FZFILE.
+
+       FZFILE - File already open.
+
+          if FZFILE has already been called for this unit without
+          it having been closed by one of the FZEND routines
+          with the T option.
+
+       FZFILE - LUN invalid.
+
+          if LUN does not contain a small positive integer.
+
+       FZFILE - Requested format not available.
+
+          if the format is not available, either not at all or
+          not on the particular Zebra library used.
+
+       FZFILE - L mode and IQUEST(1)=0 on call.
+
+          normally this means that CFOPEN failed to open
+          the file for reading in C library mode.
+\end{verbatim}
+\newpage
+\bmark{FZDIA: FZIN - FZCOPY}
+\ROUTCM{subroutine FZDIA}
+{CALL FZIN (LUN,IXDIV,LSUP,JBIAS,CHOPT,NWUH,IUHEAD)}
+{CALL FZCOPY (LUNIN,LUNOUT,IEVT,CHOPT,NIO,NWUH,IUHEAD)}
+
+If an exception is found by one of the routines which handle
+an FZIN request, or an input request for FZCOPY,
+it stores information into IQUEST which is then handled
+by FZDIA, passing the relevant information back to the caller.
+\bva
+The primary status information is :
+
+ IQUEST(1)= -1  BAD CALLING : options T/A/D given, but no pending d/s
+            -2  NOT ENOUGH SPACE in the store to receive the data
+                                 and the table
+            -3  BAD DATA, data corrupted or file written by user
+                          output routine not yet fully debugged
+            -4  BAD CONSTRUCTION, maybe not a ZEBRA file
+            -5  READ ERROR, error return from the Fortran READ
+                            or maybe some other system read routine;
+                            the error code, if any, is in IQUEST(14)
+            -6  for 2 consecutive errors
+            -7  for 3 consecutive errors
+            -8  -- etc --
+ IQUEST(2)= number of logical records read so far
+ IQUEST(3)= number of physical records (exchange file format only)
+
+The detailed error information is in :
+
+ IQUEST(11)= -1, ..., -5  as above
+       (12)= error number JERROR as shown below
+       (13)= LRTYP, type of the last record read :
+                    0 : not known
+                    1 : start or end of run
+                    2 : pilot record for start event
+                    3 : pilot record
+                    4 : pilot continuation record (native file format)
+                    4 : bank material continuation record (exchange fifo)
+               5 or 6 : dummy padding record
+                    7 : bank material record (native file format)
+                    8 : last bank material record in the d/s (native fifo)
+   (14->17)= further information related to the error
+\end{verbatim}
+FZDIA prints an error message, showing LUN and the contents of IQUEST,
+and returns to the caller, expecting he will test on IQUEST(1).
+
+In the following the error numbers JERROR are shown, giving the name
+of the lower level routine which detected the error, and the meaning
+of IQUEST(14...) if they contain useful further information.
+\newpage
+\bva
+ --- FZIN
+
+   JERROR = 10  FZIN called for Channel or Memory mode,
+                user routine or user memory not yet connected
+   JERROR = 11  multiple options T A D not allowed
+   JERROR = 12  no pending d/s for entry with T A D options
+   JERROR = 13  no segment table for entry with D option :
+                either FZIN had not been called with the T option,
+                or the table has meanwhile been overwritten by
+                some other call to ZEBRA
+   JERROR = 14  options T A D not allowed together with R 2 3 4
+
+ --- FZIMTB - table builder
+
+   JERROR = 14  invalid division index in segment table
+                IQUEST(14)= JS, the segment number
+                IQUEST(16)= IQSEGD(JS)
+
+   JERROR = 15  NQSEG has been changed by the user
+                IQUEST(14)= NQSEG on entry
+                IQUEST(15)= number of words in the segment table
+                    = 3 times the number of segments
+
+   JERROR = 21  not enough space
+
+ --- FZIREL - relocator
+
+   JERROR = 31  segment table tries to overshoot rel. table
+   JERROR = 32  segment limit does not match a rel. table entry
+   JERROR = 33  ends of segment and rel. tables do not match
+   JERROR = 34  bank chaining clobbered in the input data
+
+ --- FZIFFN - reading file format native for FZIN
+
+     131 -> 133  record of unexpected record type read
+   JERROR = 131  expect pilot continuation for text vector
+   JERROR = 132  expect pilot continuation for table
+   JERROR = 133  expect bank material
+
+   JERROR = 134  end of segm skipped does not coincide with LR
+                IQUEST(14)= segment number
+                IQUEST(15)= size of the segment
+                IQUEST(16)= number of words mis-match
+
+   JERROR = 135  end of segm read does not coincide with LR
+                IQUEST(14)= segment number
+                IQUEST(15)= size of the segment
+                IQUEST(16)= number of words mis-match
+
+   JERROR = 136  last bank material record needed is not type 8
+   JERROR = 137  emergency-stop record seen
+\end{verbatim}
+\newpage
+\bva
+   JERROR = 141  LRTYP invalid when hunting for pilot
+
+   JERROR = 142  check-word in word 1 of the pilot is wrong
+                IQUEST(16)= check-word read from the file
+                IQUEST(17)= check-word expected (12345.0 floating)
+
+   JERROR = 143  control wd of I/O char. for user header invalid
+                IQUEST(14)= NWUHCI (size I/O char. + header vector)
+                IQUEST(16)= first word of the characteristic
+
+   JERROR = 144  NWSEG control-word in the pilot is wrong
+                IQUEST(14)= NWSEG, the length of the segment table
+
+   JERROR = 145  text vector NWTXI words longer than its record
+                IQUEST(14)= NWTX control-word in the pilot
+                IQUEST(15)= NWR - NWDONE, words available
+                IQUEST(16)= NWDONE words in the record before the text
+
+   JERROR = 146  number of early table words wrong
+                IQUEST(14)= NWTAB control-word in the pilot
+                IQUEST(15)= NTBE, number of early words inferred
+
+   JERROR = 147  table end does not coincide with LR
+                IQUEST(14)= NWTAB control-word in the pilot
+                IQUEST(15)= LIN - LQTE words of mis-match
+
+   JERROR = 151  read error, the IOSTAT error code is returned :
+                IQUEST(14)= error code, if any
+
+ --- FZIPHR - read physical records, exchange format sequential
+
+   JERROR = 201  Steering block expected, but control-words invalid;
+                 if the log level is -1 or more they are printed
+
+   JERROR = 202  Block size (physical record size) wrong
+                IQUEST(14) = expected size, as specified to FZFILE
+                IQUEST(15) = size seen in word 5 of the steering block
+
+   JERROR = 204  Break in block sequence number
+                IQUEST(14) = expected sequence number
+                IQUEST(15) = sequence number seen
+
+     205 -> 208  Fast burst stopped by ...
+   JERROR = 205  ... by unusable start/end-of-run
+   JERROR = 206  ... by unusable steering block
+   JERROR = 207  ... by usable start/end-of-run in unusable block
+   JERROR = 208  ... by usable steering block
+                IQUEST(14/15/16) = word 6/9/10 of the steering block
+                 (a block is 'unusable' if only the first few words
+                 have been read, but not the whole block; this can
+                 happen if FZIN is instructed to skip the current d/s)
+
+   JERROR = 209  emergency stop record seen
+
+   JERROR = 215  read error, the IOSTAT error code is returned :
+                IQUEST(14)= error code, if any
+
+\end{verbatim}
+\newpage
+\bva
+ --- FZIREC - handle logical records, exchange format
+
+   JERROR = 221  LR overshoots steering block control
+                IQUEST(14) = # of words consumed in current block
+                IQUEST(15) = # of words missing to complete LR
+
+   JERROR = 222  LR undershoots steering block control
+                IQUEST(14) = # of words consumed in current block
+                IQUEST(15) = # of words before start of next LR
+
+   JERROR = 224  LR type 1,2,3 seen when 4 expected
+                IQUEST(14) = # of words before start of next LR
+
+   JERROR = 225  Faulty LR type
+   JERROR = 226  Faulty LR length
+   JERROR = 227  LR of type 1,2,3 must start on steering block
+   JERROR = 228  Padding record longer than one physical record
+   JERROR = 229  More than 4 padding records in a row
+                IQUEST(14) = # of words before start of next LR
+                IQUEST(15) = # of words missing to complete LR
+                IQUEST(16) = LR length
+
+ --- FZIFFX - reading file format exchange for FZIN
+
+   JERROR = 240  FZIN called for Channel or Memory mode,
+                 user routine or user memory not yet connected
+
+   JERROR = 241  check-word in word 1 of the pilot is wrong
+                IQUEST(16)= check-word read from the file
+                IQUEST(17)= check-word expected (12345.0 floating)
+
+   JERROR = 242  control wd of I/O char. for user header invalid
+                IQUEST(14)= NWUHCI (size I/O char. + header vector)
+                IQUEST(16)= first word of the characteristic
+
+   JERROR = 243  NWSEG control-word in the pilot is wrong
+                IQUEST(14)= NWSEG, the length of the segment table
+
+   JERROR = 251  inconsistent bank parameters
+   JERROR = 252  link part of bank overshoots segment end
+   JERROR = 253  data part of bank overshoots segment end
+   JERROR = 254  short dead region overshoots segment end
+   JERROR = 255  bank material does not end exactly with LR
+
+\end{verbatim}
+\newpage
+\bva
+ --- FZIPHA - read physical records, exchange alfa
+
+   JERROR = 301  Control-words of steering block invalid;
+                 if the log level is -1 or more they are printed
+
+   JERROR = 302  Block size (physical record size) wrong
+                IQUEST(14) = expected size, as set by FZFILE
+                IQUEST(15) = size seen in word 5 of the steering block
+
+   JERROR = 303  Unexpected fast record
+   JERROR = 307  Unexpected and faulty steering block
+
+   JERROR = 308  Fast burst stopped by unexpected steering block
+                IQUEST(14) = word 6
+                IQUEST(15) = word 9
+                IQUEST(16) = word 10 of the steering block
+
+ --- FZIASC - crack one physical alfa record for FZIPHA
+
+   JERROR = 309  read error, the IOSTAT error code is returned :
+                IQUEST(14)= error code, if any
+
+   The following error codes simply indicate that the text on the file
+   has been corrupted, which particular code will appear is a matter
+   of chance and is of no interest to the user :
+
+   JERROR = 310  Invalid character in column 1
+   JERROR = 311  Record shorter than expected
+   JERROR = 312  Faulty type code
+   JERROR = 313  Faulty numeric value, > 31
+   JERROR = 314  Record longer than expected
+   JERROR = 315  Repetition count overshoots record end
+   JERROR = 316  Repetition count negative
+   JERROR = 317  Double open square bracket
+   JERROR = 318  Record shorter than expected
+   JERROR = 319  Check-sum error
+   JERROR = 320  Illegal combination =< or <=
+
+ --- FZCOPY
+
+   JERROR = 401  input/output different data format
+   JERROR = 402  native input record length too long
+   JERROR = 403  input/output both channel mode
+   JERROR = 404  Alfa mode not allowed
+   JERROR = 409  no 'pending' d/s on input
+
+\end{verbatim}
+\newpage
+\bva
+ --- FZCFFN - reading file format native for FZCOPY
+
+   JERROR = 433  record of unexpected record type read
+   JERROR = 434  table or d/s data longer than expected
+   JERROR = 435  premature LR type 8
+   JERROR = 436  last bank material record needed is not type 8
+   JERROR = 437  emergency stop record seen
+   JERROR = 451  (Fortran) read error
+               IQUEST(14) = IOSTAT error code
+
+ --- FZCFFX - reading format exchange for FZCOPY
+
+   JERROR = 455  bank material does not end exactly with LR
+
+ --- FZIPHD - read physical records, exchange direct-access
+
+   JERROR = 501  Steering block expected, but control-words invalid;
+                 if the log level is -1 or more they are printed
+
+   JERROR = 502  Block size (physical record size) wrong
+                IQUEST(14) = expected size, as specified to FZFILE
+                IQUEST(15) = size seen in word 5 of the steering block
+
+   JERROR = 504  Break in block sequence number
+                IQUEST(14) = expected sequence number
+                IQUEST(15) = sequence number seen
+
+   JERROR = 508  Fast burst stopped by usable steering block
+                IQUEST(14/15/16) = word 6/9/10 of the steering block
+
+   JERROR = 509  emergency stop record seen
+
+   JERROR = 514  seek error, the IOSTAT error code is returned :
+                IQUEST(14)= error code, if any
+
+   JERROR = 515  read error, the IOSTAT error code is returned :
+                IQUEST(14)= error code, if any
+
+ --- FZIPHM - read physical records, exchange memory
+
+   JERROR = 521  Steering block expected, but control-words invalid;
+                 if the log level is -1 or more they are printed
+
+   JERROR = 522  Block size (physical record size) wrong
+                IQUEST(14) = expected size, as specified to FZFILE
+                IQUEST(15) = size seen in word 5 of the steering block
+
+   JERROR = 523  Block size larger than buffer
+                IQUEST(14) = expected size, as specified to FZFILE
+                IQUEST(15) = size seen in word 5 of the steering block
+
+\end{verbatim}
+\newpage
+\bmark{FZITRX + FZOTRX}
+\ROUTA{subroutine FZITRX}
+
+This routine is called from FZIN etc to convert arrays of data
+from tranport to internal format.
+If it has problems it prints a message for the last bad number
+in each array and bumps the corresponding counter in the
+statistics for the file. Since this very low level routine
+has no information  on the context of the data it is converting
+it cannot help the user on localizing the problem exactly.
+\bva
+
+The message is:
+
+      FZITRX.  LUN= lun, Conversion problem:  n1 n2 n3
+
+with the 3 numbers n1, n2, n3, printed in hexadecimal:
+
+          n1 = -1  faulty sector control word
+               -2  odd number of words for double precision
+                2  conversion for integer
+                3  conversion for floating single
+                4  conversion for double precision
+
+          n2   address local to the array of
+          n3   the word in trouble before conversion
+
+\end{verbatim}
+\ROUTA{subroutine FZOTRX}
+
+Same as above but for FZOUT.
+\newpage
+\bmark{FZLOC}
+\ROUTA{CALL FZLOC  (LUN,IOMODE)}
+
+This routine is called from the FZ routines to access the control
+information for the needed stream.
+FZLOC checks whether the access is legal.
+
+\bva
+---- ZFATAL termination ----
+
+  case 1 :  WRITE after READ without switching by FZENDI
+  case 2 :  READ after WRITE without switching by FZENDO
+  case 3 :  access permission fault, for example : trying to
+            write to a file which is open for input only
+  case 4 :  access to a file not declared with FZFILE
+
+the following numbers are given in /QUEST/IQUEST(100)
+
+for cases 1 to 4 :
+
+ IQUEST(11) = LUN, the logical unit number
+ IQUEST(12) = I/O mode :   1 : needed for input
+                           2 : needed for output
+
+for cases 1 to 2 :
+
+ IQUEST(13) = last activity on this file
+              (cf. FZ control-bank decription in book FZ)
+
+      =  0  file unused             10  switch input to output
+         1  read start-of-run       11  write start-of-run
+         2  read d/s                12  write d/s
+         3  read end-of-run         13  write d/s, buffer flushed
+         4  read Zebra EoF          14  write end-of-run
+         5  read system EoF         15  write end-of-file
+         6  read end-of-data        16  write end-of-data
+         7  attempted read          17  attempted write beyond EoD
+         8  rewind after read       18  rewind after write
+
+for case 3 :
+
+ IQUEST(13) = ready for  input :  1 or 3
+                        output :  2 or 3
+\end{verbatim}
+\newpage
+\bmark{FZOUT}
+\ROUTA{CALL FZOUT  (LUN,IXDIV,LENTRY,IEVENT,options,IOCH,NUH,IUHEAD)}
+
+\bva
+---- ZTELL exits ----
+
+      CALL ZTELL (11,1)   LENTRY invalid
+                            IQUEST(11) = LENTRY
+
+      CALL ZTELL (12,1)   bank chaining clobbered
+                            IQUEST(11) = store number
+                            IQUEST(12) = division number
+
+      CALL ZTELL (13,1)   not enough space to construct rel. table
+
+      CALL ZTELL (14,1)   medium 'memory' only : user memory too small
+                          Starting from Zebra version 3.62 the following
+                          will be provided :
+                            IQUEST(8) = size of the user memory
+                            IQUEST(9) = number of words needed
+
+---- ZFATAL termination ----
+
+messages printed via ZFATAM :
+
+    FZOUT - IOCH invalid.
+                   faulty I/O characteristic for user header
+
+    FZOUT - Faulty parameter IEVENT.
+                   only 0 or 1 are allowed
+                   IQUEST(11) = IEVENT
+
+    FZOUT - Going beyond Eod.
+                   second attempt to read beyond EoD
+
+    FZOUT - User routine / buffer not connected
+
+    FZOPHR - error from IORITE.
+                   IQUEST(11) = IOPACK error code
+\end{verbatim}
+\newpage
+\bmark{LZFID - LZSCAN}
+\ROUTCS{CALL LZFIDH (IXDIV,IDH,LGO)}
+       {CALL LZFID  (IXDIV,IDH,IDN,LGO)}
+       {LNEXT = LZSCAN (IXDIV,LGO)}
+
+\bva
+---- ZFATAL termination ----
+
+  case 1 :  LGO (if non-zero) does not point into the division IXDIV
+  case 2 :  LGO is not a valid bank address
+  case 3 :  bank chaining clobbered at address LN
+
+the following numbers are given in /QUEST/
+
+for cases 1 to 3 :
+
+ IQUEST(11) = IXDIV
+ IQUEST(12) = IDH
+ IQUEST(13) = IDN   (zero in case of LZFIDH)
+ IQUEST(14) = LGO
+ IQUEST(15) = LSTA, start adr of the division
+ IQUEST(16) = LEND,   end adr of the division
+
+for case 3 :
+
+ IQUEST(17) = LN
+\end{verbatim}
+
+\vspace*{8mm}
+\ROUTA{CALL MZBOOK (IXDIV,L*,LSUP,JB, IDH,NL,NS,ND,IOD,NZERO)}
+
+\centerline{see MZLIFT}
+\newpage
+\bmark{MZCHNB}
+\ROUTA{subroutine MZCHNB (L)}
+
+This routine is called from Zebra routines which take as input
+a link which may be updated for the user, like for example MZLIFT.
+Such a link must not be a link in a bank, thus
+\bva
+      CALL MZLIFT (IXDIV, L, ...)         is allowed,
+      CALL MZLIFT (IXDIV, LQ(L-4), ...)   is not.
+\end{verbatim}
+MZCHNB takes the LOCF of the link passed and checks that that this
+does not fall into the bank space of the current store.
+\bva
+
+---- ZFATAL termination ----
+
+   case 1 :  LOCF(L) is in the bank space
+
+the following numbers are given in /QUEST/
+
+   IQUEST(11) = K, the adr of the link relative to the
+                   start of store, ie. LQ(K) contains L
+   IQUEST(12) = L, the content of the link
+\end{verbatim}
+\newpage
+\bmark{MZCOPY}
+\ROUTA{CALL MZCOPY (IXDVFR,LENTRY,options,IXDVTO,LSUP,JBIAS)}
+
+      If an error exit occurs the space allocated for the copy,
+      if any, is released.
+
+\bva
+---- ZTELL exits ----
+
+      CALL ZTELL (15,1)   with  IQUEST(2) = JERROR,
+
+where JERROR :
+
+        = 1 :  LENTRY invalid
+                 IQUEST(11) = LENTRY
+
+        = 2 :  bank chaining clobbered found in the input d/s
+                 IQUEST(11) = store number
+                 IQUEST(12) = division number
+
+        = 3 :  not enough space to construct the relocation table
+
+        = 4 :  d/s larger than the target space
+                 IQUEST(11) = NW, size of the d/s
+                 IQUEST(12) = NWMAX, size ot the target space
+
+        = 5 :  d/s to be copied is empty
+
+        = 6 :  bank chaining clobbered found in the copied d/s
+
+        = 7 :  target division not specified
+
+
+---- Error return ----
+
+      If the P option was selected by the user to permit error return
+      IQUEST(1) in COMMON /QUEST/IQUEST(100) is set non-zero :
+
+                 IQUEST(1) = JERROR
+\end{verbatim}
+\newpage
+\bmark{MZDIV}
+\ROUTA{CALL MZDIV  (IXSTOR,IXDIV*,CHNAME,NW,NWMAX,CHOPT)}
+
+\bva
+---- ZFATAL termination ----
+
+  case 1 :  invalid input parameters
+  case 2 :  maximum number of divisions possible exceeded
+  case 3 :  not enough space to create the division
+
+the following numbers are given in /QUEST/
+
+for cases 1 to 3 :
+
+ IQUEST(11) = char 1:4
+       (12) =      5:8 of the printing name of the new division
+       (13) = parameter NW, the primary allocation
+       (14) = parameter NWMAX
+       (15) = mode option :  0/1 = forward/reverse  (R)
+       (16) = kind option
+                   1 : user short-range
+                   2 : user long-range  (L)
+                   3 : package          (P)
+       (17) = C option :  0/1 = no/yes
+
+for case 3 :
+
+ IQUEST(18) = number of words missing
+       (19) = number of words required
+       (20) = no. of words available in the reserve area
+       (21) = max. shift of division 2 allowed
+\end{verbatim}
+\newpage
+\bmark{MZDROP}
+\ROUTA{CALL MZDROP (IXSTOR,L,CHOPT)}
+
+\bva
+---- ZFATAL termination ----
+
+  case 1 :  invalid input parameter L
+  case 2 :  LN = LQ(L) is invalid
+
+the following numbers are given in /QUEST/
+
+for cases 1 and 2 :
+
+ IQUEST(11) = L
+
+for case 2 :
+
+ IQUEST(12) = LN
+
+\end{verbatim}
+In either case the parameters of the 'bank' pointed to by the
+invalid link L or LN are found in the post-mortem dump of /MZCN/.
+\newpage
+\bmark{MZFLAG - MZMARK - MZVOLM}
+\ROUTCM{CALL MZFLAG (IXSTOR,L,IBIT,CHOPT)}
+       {CALL MZMARK (IXSTOR,L,CHOPT,NID,IDLIST)}
+       {CALL MZVOLM (IXSTOR,L,CHOPT)}
+
+\bva
+---- ZFATAL termination ----
+
+  case 1 :  maximum depth exceeded
+  case 2 :  invalid input parameter L
+  case 3 :  invalid next-link LNEW contained in bank LCUR
+  case 4 :  invalid link LNEW contained in link JL of bank LCUR
+  case 5 :  the bank pointed to by the next-link LNEW in bank LCUR
+            does not point back to LCUR with its origin-link
+
+the following numbers are given in /QUEST/
+
+for cases 1 to 5 :
+
+ IQUEST(11) = L, the input parameter
+
+for cases 3 to 5 :
+
+       (12) = LNEW = LQ(LCUR+JL)
+       (13) = LCUR, the adr of the bank containing the link LNEW
+
+for case 4 :
+
+       (14) = JL, at this link number
+
+for case 5 :
+
+       (14) = LQ(LNEW+2)
+
+\end{verbatim}
+The post-mortem dump of /MZCN/ shows the parameters of the bank
+pointed to by L or LNEW.
+\newpage
+\bmark{MZGARB - MZGAR1}
+\ROUTA{CALL MZGARB (IXGARB,IXWIPE)}
+
+\bva
+---- ZFATAL termination ----
+
+  case 1 :  the store numbers of IXGARB and IXWIPE do not agree
+
+the following numbers are given in /QUEST/
+
+for case 1 :
+
+ IQUEST(11) = store number of IXGARB
+ IQUEST(12) = store number of IXWIPE
+
+\end{verbatim}
+\ROUTA{subroutine MZGAR1}
+
+This is called from various parts of the system to force
+an automatic garbage collection for lack of space;
+NQRESV contains the amount of space available,
+a negative value indicates how much space has still to be found.
+
+\bva
+---- ZFATAL termination ----
+
+  case 1 :  not enough space can be found for a long range division
+
+the following numbers are given in /QUEST/
+
+for case 1 :
+
+ IQUEST(11) = NQRESV, the amount of free space available,
+                      a negative number in this context
+ IQUEST(12) = current store number
+ IQUEST(13) = current division number (which may not be meaningful)
+
+---- ZTELL exit ----
+
+      CALL ZTELL (99,1)   not enough space for a short-range division
+                          IQUEST(11:13) as above
+\end{verbatim}
+\newpage
+\bmark{MZIOCH - MZFORM}
+\ROUTCS{CALL MZIOCH (IOWDS,NWIOMX,CHFORM)}
+       {CALL MZIOBK (MMBK,NWBK,CHFORM)}
+       {CALL MZFORM (CHIDH,CHFORM,IXIO)}
+
+\bva
+---- ZFATAL termination ----
+
+  case 0 :  CHFORM too long with NCH > 120 characters
+  case 1 :  CHFORM contains NCHU significant recognized and also
+            NINV non-recognized characters
+  case 2 :  bad syntax in CHFORM detected at character number JCH
+  case 3 :  -t not allowed after /
+  case 4 :  no characters allowed after -t
+  case 5 :  character / must not occur twice
+  case 6 :  more than 15 leading sectors
+  case 7 :  NWIO > NWIOMX, to many I/O words needed
+            (one word for the control-byte counted)
+
+the following numbers are given in /QUEST/
+
+for all cases :
+
+ IQUEST(11) = IDH, the Hollerith bank ID, if called from MZFORM/MZIOBK
+
+ IQUEST(14) onwards : the characters of CHFORM with non-significant
+                      or invalid characters removed
+
+for case 0 :  (12) = NCH
+
+for case 1 :  (12) = NCHU
+              (13) = NINV
+
+for cases 2 to 5 :
+
+              (12) = JCH, as counted in the string of IQUEST(14)
+
+for case 6 :  (12) = number of sectors in all
+              (13) = number of leading sectords
+
+for case 7 :  (12) = NWIOMAX, maybe derived from NWBK,
+                              in any case not more than 16
+              (13) = NWIO words would be needed (at least)
+\end{verbatim}
+\newpage
+\bmark{MZIXCO}
+\ROUTA{IXCO = MZIXCO (IX1,IX2,IX3,IX4)}
+
+\bva
+---- ZFATAL termination ----
+
+  case 1 :  the    store byte of parameter IXn is invalid
+  case 2 :  the division byte of parameter IXn is invalid
+  case 3 :  parameter IXn does not specify the same store as IX1
+
+the following numbers are given in /QUEST/
+
+for cases 1 to 3 :
+
+ IQUEST(11) = input parameter IX1
+ IQUEST(12) = input parameter IX2
+ IQUEST(13) = input parameter IX3
+ IQUEST(14) = input parameter IX4
+ IQUEST(15) = n for parameter IXn being faulty
+ IQUEST(16) = the    store byte of parameter IXn, bits 27 to 32
+ IQUEST(17) = the division byte of parameter IXn, bits  1 to 26
+\end{verbatim}
+\newpage
+\bmark{MZLIFT - MZBOOK}
+\ROUTBM{CALL MZLIFT (IXDIV,L*,LSUP,JB, NAME, NZERO)}
+       {CALL MZBOOK (IXDIV,L*,LSUP,JB, IDH,NL,NS,ND,IOD,NZERO)}
+
+\bva
+---- ZFATAL termination ----
+
+  case 1 :  faulty NAME parameters
+  case 2 :  JB < 1 : LSUP does not point to a live bank
+            JB = 1 : LSUP contains an invalid link
+  case 3 :  JB < 0 : the bank at LSUP has less than -JB structural links
+  case 4 :  LNEXT is invalid
+  case 5 :  I/O characteristic for IDH does not exist
+  case 6 :  I/O parameter NAME(5) = IOD(1) is invalid
+  case 7 :  trying to lift the bank into a wrong division,
+            ie. the predecessor or the successor bank, address LSAME,
+            is not in the division selected by IXDIV.
+  case 8 :  with JB=1 : trying to connect the new bank to the link
+                        at LQ(LP) in bank-space
+
+the following numbers are given in /QUEST/
+
+for all cases :
+
+ IQUEST(11) = input value of LSUP
+       (12) = JB
+       (13) = IDH  -  NAME(1)
+       (14) = NL   -  NAME(2)
+       (15) = NS   -  NAME(3)
+       (16) = ND   -  NAME(4)
+       (17) = IOD  -  NAME(5)
+
+for case 4 :
+
+ IQUEST(18) = LNEXT          if JB < 1 :  LNEXT=LQ(LSUP+JB)
+                                   = 1 :  LNEXT=LSUP
+
+for case 7 :
+
+ IQUEST(18) = LSAME
+
+for case 8 :
+
+ IQUEST(18) = LP
+\end{verbatim}
+
+The parameters of the bank at LCHK are found in the post-mortem
+dump of /MZCN/, where LCHK is LSUP for cases 2 and 3;
+for case 4 LCHK is LNEXT.
+\newpage
+\bmark{MZLINK - MZLINT}
+\ROUTBM{CALL MZLINK (IXSTOR,CHNAME,LAREA,LREF,LREFL)}
+       {CALL MZLINT (IXSTOR,CHNAME,LAREA,LREF,LREFL)}
+
+\bva
+---- ZFATAL termination ----
+
+  case 1 :  the parameters are inconsistent
+  case 2 :  the new link-area overlaps with the table of some store
+  case 3 :  the new link-area overlaps with some store
+  case 4 :  the new link-area overlaps with a previously defined
+            link-area for some store
+
+the following numbers are given in /QUEST/
+
+for cases 1 to 4 :
+
+ IQUEST(11) = char 1:4
+       (12) =      5:8 of the printing name of the new link-area
+       (13) = absolute adr of parameter LAREA
+       (14) = absolute adr of parameter LREF
+       (15) = absolute adr of parameter LREFL
+       (16) = number of structural links derived
+       (17) = total number of links derived
+
+for cases 2 to 4 :
+
+ IQUEST(18) = serial number of the clashing store;
+                = 0 for the primary store,
+                = 1 for the first secondary store, etc.
+       (19) = char 1:4
+       (20) =      5:8 of the printing name of the clashing store
+
+for case 4 :
+
+ IQUEST(21) = char 1:4
+       (22) =      5:8 of the printing name of the clashing link-area
+       (23) = absolute adr of the start of the clashing link-area
+       (24)   only for MZLINT : = initial content of LAREA(2)
+\end{verbatim}
+
+Case 4 will happen with MZLINT if the user over-writes
+the system word in LAREA(2),
+in which case the link-area will appear to clash with itself.
+
+\vspace*{4mm}
+\ROUTA{CALL MZMARK (IXSTOR,L,CHOPT,NID,IDLIST)}
+
+\centerline{see MZFLAG}
+\newpage
+\bmark{MZPUSH}
+\ROUTA{CALL MZPUSH (IXSTOR,*L*,INCNL,INCND,CHOPT)}
+
+\bva
+---- ZFATAL termination ----
+
+  case 1 :  invalid input parameter L
+  case 2 :  L designates a dead bank
+  case 3 :  invalid input parameters INCNL or INCND
+  case 4 :  attempt to give up non-zero structural link N
+  case 5 :  invalid origin-link in bank at L
+
+the following numbers are given in /QUEST/
+
+for cases 1 to 5 :
+
+ IQUEST(11) = L
+
+for cases 2 to 5 :
+
+ IQUEST(12) = ID  original parameters of the bank
+       (13) = NS
+       (14) = NL
+       (15) = ND
+       (16) = NIO  (number of extra I/O words)
+       (17) = INCNL  the input parameters
+       (18) = INCND
+
+for case 4 :
+
+ IQUEST(19) = N, the link number
+       (20) = the link content
+
+for case 5 :
+
+ IQUEST(19) = K = the origin-link of the bank at L
+\end{verbatim}
+\newpage
+\bmark{MZRELB - MZRELL}
+\ROUTA{subroutine MZRELB}
+
+This is the relocator for links in banks.
+
+\bva
+---- ZFATAL termination ----
+
+  case 1 :  bank chaining clobbered
+  case 2 :  a structural link pointing into a dead area, and to be
+            bridged, does not contain a valid bank address
+
+the following numbers are given in /QUEST/
+
+for case 1 :
+
+ IQUEST(11) = LN, the start of the clobbered region
+
+for case 2 :
+
+ IQUEST(11) = LS, the adr of the bank containing the invalid link
+ IQUEST(12) = LW, the adr of the word containing the invalid link
+ IQUEST(13) = the content of this link
+
+\end{verbatim}
+\ROUTA{subroutine MZRELL}
+
+This is the relocator for links in Link Areas.
+
+\bva
+---- ZFATAL termination ----
+
+  case 1 :  a structural link pointing into a dead area, and to be
+            bridged, does not contain a valid bank address
+
+the following numbers are given in /QUEST/
+
+for case 1 :
+
+ IQUEST(11) = absolute adr of the first word of the link area
+ IQUEST(12) = relative position within the link area
+                       of the link to be bridged
+ IQUEST(13) = the content of this link
+ IQUEST(14) = char 1:4
+       (15) =      5:8 of the printing name of the link area
+\end{verbatim}
+\newpage
+\bmark{MZREPL}
+\ROUTA{CALL MZREPL (IXDIV, LIX, CHOPT)}
+
+\bva
+
+---- ZFATAL termination ----
+
+   case 1 :  division not defined
+   case 2 :  not enough table space
+   case 3 :  LIX is not a valid (index) bank adr
+   case 4 :  bank at LIX has less than 2 links or zero data words
+   case 5 :  bank LOLD or LNEW of index bank LIX is not in division JDIVI
+   case 6 :  LOLD is not a valid bank adr
+   case 7 :  LNEW is not a valid bank adr
+
+the following numbers are given in /QUEST/
+
+for cases 1 to 7 :
+
+   IQUEST(11) = JDIVI, the division number for the old/new banks
+
+for cases 3 to 7 :
+
+   IQUEST(12) =  start adr of division JDIVI
+         (13) =    end adr of division JDIVI
+         (14) =  LIX, the adr of the current index bank
+
+for cases 4 to 7 :
+
+   IQUEST(15:17) = NL, NS, ND of the current index bank
+         (18:19) = LOLD, LNEW of the current index bank
+\end{verbatim}
+\newpage
+\bmark{MZSDIV}
+\ROUTA{CALL MZSDIV (IXDIV,IFLAG)}
+
+This routine is called from everywhere within the system to switch
+the current store and/or division according to the parameter IXDIV.
+\bva
+The parameter IFLAG requests :
+
+      IFLAG = -1  :  set only the store
+               0  :  set store and also division,
+                     provided a specific division is specified
+              +1  :  set store and specific division
+
+---- ZFATAL termination ----
+
+  case 1 :  the    store byte of parameter IXDIV is invalid
+  case 2 :  the division byte of parameter IXDIV is invalid
+  case 3 :  a specific division is required,
+            but IXDIV is a generic or compound division index
+
+the following numbers are given in /QUEST/
+
+for cases 1 to 3 :
+
+ IQUEST(11) = IXDIV
+ IQUEST(12) = IFLAG
+ IQUEST(13) = the store byte of IXDIV
+
+for cases 2 to 3 :
+
+ IQUEST(14) = the division byte of IXDIV
+\end{verbatim}
+\newpage
+\bmark{MZSTOR}
+\ROUTBM{ CALL MZSTOR (IXSTOR*,CHNAME,CHOPT,FENCE}
+       {+,            LQ(1),LQ(LR),LQ(LW),LQ(LIM2),LQ(LAST))}
+
+\bva
+---- ZFATAL termination ----
+
+  case 1 :  the sizes of the various regions of the store
+            are either inconsistent or too small
+  case 2 :  the size of the fence is less than 1 or more than 1000
+  case 3 :  the maximum number of stores which can be handled
+            by ZEBRA is exceeded
+  case 4 :  the new store overlaps with the table of a previous store
+  case 5 :  the new store overlaps with a previous store
+  case 6 :  the primary store cannot be a split store
+
+the following numbers are given in /QUEST/
+
+for all cases :
+
+ IQUEST(11) = char 1:4
+       (12) =      5:8 of the printing name of the new store
+       (13) = size of the fence
+       (14) = number of permanent structural links
+       (15) = number of permanent links
+       (16) = number of low words
+       (17) = total size of the store
+       (18) = minimum size of the reserve area required
+       (19) = minimum size of the data part of the store required
+
+for cases 4 to 5 :
+
+ IQUEST(20) = serial number of the clashing previous store;
+                 = 0 for the primary store,
+                 = 1 for the first secondary store, etc.
+       (21) = char 1:4
+       (22) =      5:8 of the printing name of the clashing store
+\end{verbatim}
+\newpage
+\bmark{MZTABC}
+\ROUTA{subroutine MZTABC}
+
+This is part of the table builder;
+it scans all banks of a given memory region (division usually)
+to identify the wanted/unwanted banks.
+It is called for garbage collection, but also for output.
+
+\bva
+---- ZFATAL termination ----
+
+  case 1 :  bank chaining clobbered
+
+the following numbers are given in /QUEST/
+
+for case 1 :
+
+ IQUEST(11) = LN, the start of the clobbered region
+ IQUEST(12) = LIM1, the start of
+ IQUEST(13) = LIM2, the end   of the region to be scanned
+\end{verbatim}
+
+\vspace*{8mm}
+\ROUTA{CALL MZVOLM (IXSTOR,L,CHOPT)}
+
+\centerline{see MZFLAG}
+\newpage
+\bmark{MZWORK}
+\ROUTA{CALL MZWORK (IXSTOR,DFIRST,DLAST,IFLAG)}
+
+\bva
+---- ZFATAL termination ----
+
+Let   NQREF  be the number of permanent links in the store
+      NL     be the number of wsp links derived from DFIRST
+      ND     be the number of data words derived from DLAST
+
+      NEWL = NQREF + NL
+      NEWD = NQREF + NL + ND
+
+  case 1 :  the value of parameter IFLAG is illegal
+  case 2 :  NEWL is less than NQREF, ie. NL is negative
+  case 3 :  NEWD is less than NEWL,  ie. ND is negative
+  case 4 :  NEWD reaches beyond the end of division 2
+
+the following numbers are given in /QUEST/
+
+ IQUEST(11) = NQREF
+       (12) = NEWL
+       (13) = NEWD
+       (14) = IFLAG
+
+\end{verbatim}
+\newpage
+\bmark{MZXREF}
+\ROUTA{CALL MZXREF (IXFROM,IXTO,CHOPT)}
+
+\bva
+---- ZFATAL termination ----
+
+  case 1 :  parameter IXFROM is invalid
+  case 2 :  IXFROM and IXTO do not specify the same store
+  case 3 :  parameter IXTO is invalid
+
+the following numbers are given in /QUEST/
+
+for cases 1 to 3 :
+
+ IQUEST(11) = IXFROM
+ IQUEST(12) = IXTO
+ IQUEST(13) = option :  -2/-1/0/1 =  C/A/normal/R
+\end{verbatim}
+\newpage
+\bmark{ZSHUNT}
+\ROUTA{CALL ZSHUNT (IXSTOR,LSH,LSUP,JB,IFLAG)}
+
+\bva
+---- ZFATAL termination ----
+
+  case 1 :  LSH does not contain a valid bank address
+                (see /MZCN/ in the post-mortem dump)
+  case 2 :  LSUP does not contain a valid address (see /MZCN/)
+  case 3 :  the bank at LSUP has less than -JB str. links (see /MZCN/)
+  case 4 :  LSH is not in the same division as the bank at L of the
+            target linear stucture
+  case 5 :  LNEX, the link 0 of the bank at L, is an invalid address
+
+the following numbers are given in /QUEST/
+
+for cases 1 to 5 :
+
+ IQUEST(11) = LSH  - the input parameters
+       (12) = LSUP
+       (13) = JB
+       (14) = IFLAG
+
+for cases 4 and 5 :
+
+ IQUEST(15) = L
+
+for case 5 :
+
+ IQUEST(16) = LNEX
+\end{verbatim}
+\newpage
+\bmark{ZTELL}
+\ROUTA{CALL ZTELL (ID,IFLAG)}
+
+\bva
+   with      ID  identifier, 1 to 99 reserved for system
+          IFLAG  severity :
+                 0  ZTELL may return to the calling routine
+                 1  ZTELL may not return
+                 2  fatal error, the run must stop
+
+     --- List of ID's used by the system ---
+
+ 11-14  FZOUT, RZOUT via FZOTAB
+
+    15  MZCOPY
+
+    99  MZGAR1, called for automatic garbage collection
+\end{verbatim}
+\newpage
+\bmark{ZVERIF}
+\ROUTA{CALL ZVERIF (IXDIV,IFRETN,CHIDENT)}
+
+\vspace*{8mm}
+\lile{15mm}
+This routine will go to ZFATAL when it finds corruption of
+the selected areas of the Zebra stores, if the users has
+so requested with IFRETN, or if automatic verification
+is running.
+
+ZVERIF will print details about all inconsistencies which it finds.
+
+Two separate routines, ZVDO1 and ZVDO2, first check that the global
+Zebra parameters in /MZCA/ and the store table for each store
+corresponding to /MZCC/ are intact.
+If this is not the case there is serious trouble,
+and therefore these two routines go to ZFATAL unconditionally.
+
+@

@@ -1,0 +1,1 @@
+/afs/cern.ch/project/tex/xml/docbook/xsl/html/docbook.xsl

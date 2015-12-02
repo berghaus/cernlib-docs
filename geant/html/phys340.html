@@ -1,0 +1,1062 @@
+<PRE>
+
+
+
+
+<H2>Geant  3.16  Routine  PHYS340</H2>
+
+
+<PRE>
+
+
+Origin:  L.  Urban                                     Submitted:  28.05.86
+Revision:                                                            Revised:  16.12.93
+Documentation:
+
+
+</PRE>  <HR>  <H2>Total  cross-section  and  energy
+loss  for  bremsstrahlung  by  e-/e+</H2>
+
+
+<PRE>
+
+
+</PRE>
+
+
+<H2>Subroutines</H2>
+
+
+<PRE>
+
+
+
+       CALL  GBRELA
+
+
+
+GBRELA  fills  the  tables  for  the  energy  loss  of
+electrons,  positrons  and  muons  due  to
+bremsstrahlung  at  initialisation  time  for
+different  materials.  The  energy  binning  is  set
+within  the  array  ELOW  (common  /CGMULO/)  in  the
+routine  GPHYSI.  In  the  tables,  the  dE/dx  due  to
+bremsstrahlung  is  summed  with  that  due  to  the
+ionisation.  For  energy  loss  of  electrons  and
+positrons,  GBRELA  calls  the  function  GBRELE.
+Following  pointers  are  used:
+
+
+
+                                                                      th
+JMA  =  LQ(JMATE-I)                                pointer  to  the  I        material;
+JEL1  =  LQ(JMA-1)                                 pointer  to  dE/ dx  for  e-;
+JEL1+NEK1                                          pointer  to  dE/ dx  for  e+.
+
+
+GBRELA  is  called  at  initialisation  time  by
+GPHYSI.
+
+
+
+       VALUE    =    GBRELE                            (ZZ,T,BCUT)
+
+
+
+GBRELE  calculates  the  energy  loss  due  to
+bremsstrahlung  of  an  electron  with  kinetic  energy
+T  in  material  with  atomic  number  ZZ.  It  is  called
+by  GBRELA  and  for  energies  below  the  cut  BCUT  it
+adds  the  contribution  of  bremsstrahlung  to.  Above
+this  cut,  the  bremsstrahlung  process  is  simulated
+explicitly  (see  [PHYS341])  and  tabulation  of
+
+
+
+these  continuous  losses  is  not  needed.  GBRELE  is
+called  by  GBRELA.
+
+
+
+       VALUE    =    GBFLOS                            (T,C)
+
+
+
+GBFLOS  calculates  a  weight  factor  for  the
+positron  continuous  bremsstrahlung  energy  loss.
+T  is  the  kinetic  energy  in  GeV  of  the  positron  and
+C  is  the  energy  cut  for  bremsstrahlung  (BCUTE).
+The  value  is  the  ratio  of  the  energy  loss  due  to
+bremsstrahlung  of  the  positron  to  that  of  the
+electron  so  that:  <positron  loss>  =  GBFLOS  x
+<electron  loss>.  GBFLOS  is  called  by  GBRELA.
+
+
+
+       CALL  GBRSGA
+
+
+
+GBRSGA  calculates  the  total  cross-section  for
+bremsstrahlung  in  all  materials.  It  tabulates  the
+mean  free  path,  lambda            = ((1)/ (Sigma         ))  (in  cm)  as
+a  function  of  medium  and  energy.  The  energy
+binning  is  set  within  the  array  ELOW  (common
+/CGMULO/)  in  the  routine  GPHYSI.  The  following
+pointers  are  used:
+
+
+
+                                                                           th
+JMA  =  LQ(JMATE-I)                                     pointer  to  the  I        material
+JBREM  =  LQ(JMA-9)                                     pointer  to  bremsstrahlung
+                                                        cross-sections
+JBREM                                                   pointer  for  e-
+JBREM+NEK1                                              pointer  for  e+
+
+                                                                            +         -
+JBREM+2*NEK1                                            pointer  for  mu       / mu
+
+
+GBRSGA  is  called  at  initialisation  time  by
+GPHYSI.
+
+
+
+       VALUE    =    GBRSGE                            (ZZ,T,BCUT)
+
+
+
+GBRSGE  calculates  the  total  cross-section  of
+bremsstrahlung  of  an  electron  with  kinetic  energy
+T  in  material  with  atomic  number  ZZ.  It  is  called
+by  GBRSGA.  For  kinetic  energies  which  are  below
+the  cut  BCUT  or  for  which  bremsstrahlung  process
+is  not  simulated  explicitly  (see  [PHYS341])  it
+returns  0.
+
+
+
+       VALUE    =    GBFSIG                            (T,C)
+
+
+
+GBFSIG  calculates  a  weight  factor  for  the
+positron  discrete  (hard)  bremsstrahlung  cross
+section.  T  is  the  kinetic  energy  in  GeV  of  the
+positron  and  C  is  the  energy  cut  for
+bremsstrahlung  (BCUTE).  The  value  returned  is  the
+ratio  of  the  positron  bremsstrahlung
+cross-section  to  that  of  the  electron  so  that:
+<positron  cross-section>  =  GBFSIG  x  <electron
+cross-section>.  GBFSIG  is  called  by  GBRSGA.
+
+
+</PRE>
+
+
+<H2>Method</H2>
+
+
+<PRE>
+
+
+Let's  call  dsigma         (Z, T, k)/ dk  the  differential
+cross-section  for  production  of  a  photon  of
+energy  k  by  an  electron  of  kinetic  energy  T  in  the
+field  of  an  atom  of  charge  Z,  and  k     the  energy
+                                           c
+
+cut-off  below  which  the  soft  photons  are  treated
+as  continuous  energy  loss  (BCUTE  in  the  program).
+Then  the  mean  value  of  the  energy  lost  by  the
+electron  due  to  soft  photons  is
+
+
+
+      brem                          k
+     E            (Z, T, k   ) = R   c    k((dsigma         (Z, T, k))/ (dk))dk
+                          c
+      Loss
+                                    0
+
+                                                                                                                            (1)
+whereas  the  total  cross-section  for  the  emission
+of  a  photon  of  energy  larger  than  k     is
+                                          c
+
+
+                                            T
+ sigma                    (Z, T, k   ) = R        ((dsigma         (Z, T, k))/ (dk))dk
+               brem               c
+                                            k
+                                             c
+
+                                                                                                                            (2)
+Many  theories  of  the  bremsstrahlung  process
+exist,  each  with  its  own  limitations  and  regions
+of  applicability.  Perhaps  the  best  synthesis  of
+these  theories  can  be  found  in  the  paper  of  S.M.
+Seltzer  and  M.J.  Berger  .  The  authors  give  a
+tabulation  of  the  bremsstrahlung  cross-section
+dsigma         / dk  differential  in  the  photon  energy  k,
+for  electrons  with  kinetic  energies  T  from  1  keV
+to  10  GeV.  For  electron  energies  above  10  GeV  the
+
+
+
+screened  Bethe-Heitler  differential
+cross-section  can  be  used    together  with  the
+Midgal  corrections  .  The  first  of  the  two  Migdal
+corrections  is  important  for  very  high  electron
+energies  only  (T> =     1  TeV)  and  has  the  effect  of
+reducing  the  cross-section.  The  second  Migdal
+correction  is  effective  even  at  ``ordinary''
+energies  (100  MeV  --  1  GeV)  and  it  decreases  the
+differential  cross-section  at  photon  energies
+below  a  certain  fraction  of  the  incident  electron
+energy  (dsigma         / dk  decreases  significantly  if
+
+             -4
+k/ T< =    10      .)
+
+
+</PRE>
+
+
+<H3>Parameterisation  of  energy  loss  and  total
+cross-section</H3>
+
+
+<PRE>
+
+
+Using  the  tabulated  cross-section  values  of
+Seltzer  and  Berger  together  with  the  Migdal
+corrected  Bethe-Heitler  formula  we  have  computed
+sigma         (Z, T, k   )  and  we  have  used  these  computed
+                      c
+
+values  as  ``data  points''  in  the  fitting
+procedure.  Calculating  the  ``low  energy''  (T< =    10
+GeV)  data  we  have  applied  the  second  Midgal
+correction  to  the  results  of  Seltzer  and  Berger.
+We  have  chosen  the  parameterisations:
+
+
+                                                             2                                alpha
+sigma         (Z, T, k   ) = ((Z(Z+xi                  )(T+m)   )/ (T(T+2m)))[ln    (T/ k   )]               F               (Z, X,*
+ * Y)   (barn)
+                      c                  sigma                                           c                    sigma
+
+                                                                                                                            (3)
+and
+
+
+ brem                                            2                                 beta
+E            (Z, T, k   ) = ((Z(Z+xi       )(T+m)   )/ ((T+2m)))[((k   C   )/ (T))]            F   (Z, X, Y)   (GeV  barn)
+                     c                  l                           c   M                       l
+ Loss
+
+                                                                                                                            (4)
+where  m  is  the  mass  of  the  electron,
+
+
+
+    X = ln    (E/ m),                    Y = ln    (v               E/ k   )                       for  the  total  cross-section  *
+ *                     @
+                                                     sigma              c
+                                                                                                                                   *
+ *                     @
+    X = ln    (T/ m),                    Y = ln    (k   / v   E)                                   for  the  energy  loss          *
+ *                    E
+                                                     c     l
+                                                                                                                                   *
+ *                     @
+
+
+with  E = T + m.  The  constants
+xi                  ,   xi      ,   alpha         ,   beta       ,   v               ,   v     are
+      sigma                  l                                        sigma               l
+
+
+
+parameters  to  be  fitted.
+
+
+                                                           2         2             2
+C            =         ((1)/ (1 + ((nr   lambda         -     (T + m)   )/ (pi    k   ))))
+ M                                    0
+                                                                                   c
+
+
+is  the  Midgal  correction  factor,  with
+
+
+r        classical  electron  radius;
+ o
+
+lambda         -  reduced  electron  Compton  wavelength;
+n        electron  density  in  the  medium.
+
+
+
+                     2                           2
+The  factors  (T + m)   / T(T + 2m)  and  (T + m)   / (T + 2m)
+come  from  the  scaled  cross-section  computed  by
+Seltzer  and  Berger:
+
+
+                       2        2                                                   2   2
+f(k/ T) = ((beta           )/ (Z   ))k((dsigma         )/ (dk)) = ((T(T+2m))/ ((T+m)   Z   ))k((dsigma         )/ (dk))
+
+
+
+The  functions  F   (Z, X, Y)  (i = sigma         , l)  have  the
+                 i
+
+form
+                        F   (Z, X, Y) = F      (X, Y) + ZF      (X, Y)                                                      (5)
+                         i               i0               i1
+
+
+where  F      (X, Y)  are  polynomials  of  the  variables
+        ij
+
+X, Y
+
+
+                                                                          5                                          5
+F      (X, Y)                  =         (C    + C   X + . . .     + C   X   ) + (C    + C   X + . . .     + C      X   )Y
+ i0                                        1      2                   6            7      8                   12
+
+
+
+                                                                                    5    2                                         *
+ *                  5  @
+                                         +(C       + C      X + . . .     + C      X   )Y    + . . .     + (C       + C      X + . *
+ *. .     + C      X   @
+                                            13        14                     18                              31        32          *
+ *           36
+
+
+
+                                                                                                                                   *
+ *                     @
+
+
+
+                                                                          5                                          5
+                               =         (C    + C   X + . . .     + C   X   ) + (C    + C   X + . . .     + C      X   )
+                                           1      2                   6            7      8                   12
+
+
+
+                                                                                    5    2                                         *
+ *                  5  @
+                                         +(C       + C      X + . . .     + C      X   )Y    + . . .     + (C       + C      X + . *
+ *. .     + C      X   @
+                                            37        38                     42                              55        56          *
+ *           60
+
+
+
+                                                                                                                                   *
+ *                     @
+
+
+
+                                                                                   4                                               *
+ * 4
+F      (X, Y)                  =         (C       + C      X + . . .     + C      X   ) + (C       + C      X + . . .     + C      *
+ *X   )Y
+ i1                                        61        62                     65              66        67                     70
+
+
+
+                                                                                    4    2                                         *
+ *                  4  @
+                                         +(C       + C      X + . . .     + C      X   )Y    + . . .     + (C       + C      X + . *
+ *. .     + C      X   @
+                                            71        72                     75                              81        82          *
+ *           85
+
+
+
+                                                                                                                                   *
+ *                     @
+
+
+
+                                                                                   4                                               *
+ * 4
+                               =         (C       + C      X + . . .     + C      X   ) + (C       + C      X + . . .     + C      *
+ *X   )Y
+                                           61        62                     65              66        67                     70
+
+
+
+                                                                                    4    2                                         *
+ *                     @
+                                         +(C       + C      X + . . .     + C      X   )Y    + . . .     + (C       + C      X + . *
+ *. .     + C         X@
+                                            86        87                     90                              96        97          *
+ *           100
+
+
+
+                                                                                                                                   *
+ *                     @
+
+
+                                                                                                                                   *
+ *                     @
+
+F      (X, Y)  denotes  in  fact  a  function  constructed
+ ij
+
+from  two  polynomials
+
+
+                                     neg
+                                    F         (X, Y)                 for             Y< =    0
+
+
+
+               F      (X, Y) = -     ij                                                              .
+                ij                  Fpos      (X, Y)                 for             Y>0
+
+
+
+                                     ij
+
+
+where  the  polynomials  F        fulfil  the  conditions
+                          ij
+
+
+ neg                         pos                                                        neg                                pos
+F         (X, Y)          = F         (X, Y)                                       (((@F         )/ (@Y)))          = (((@P        *
+ * )/ (@Y)))
+                Y=0                         Y=0                                                           Y=0                      *
+ *          Y=0
+ ij                          ij                                                         ij                                 ij
+
+
+We  have  computed  4000  ``data  points''  in  the
+range
+
+Z = 6; 13; 29; 47; 74; 92               10keV      < =   T< =    10TeV                     10keV      < =   k   < =    T
+                                                                                                             c
+
+
+and  we  have  performed  a  least-squares  fit  to
+determine  the  parameters.
+
+
+The  values  of  the  parameters  (xi                  ,  alpha         ,
+                                         sigma
+
+v               ,  C     for  sigma           and  xi       ,  beta       ,  V   ,  C  for
+ sigma              i                                    l                    l
+
+
+
+ brem
+E            )  can  be  found  in  the  DATA  statement  within
+
+
+ Loss
+
+the  functions  GBRSGE  and  GBRELE  which  compute  the
+formula  (??    )  and  (??    )  respectively.
+
+
+The  errors  of  the  parameterisations  (??    )  and  (??    )
+can  be  estimated  as
+
+
+
+                                                                                     12- 15%                  for                  *
+ *             T< =    @
+ ((Delta         sigma         )/ (sigma         ))                   =         -                                                  *
+ *                     @
+
+                                                                                     < =   5- 6%              for              1MeV*
+ *<T< =    10TeV
+
+
+
+                                                                                     10- 15%                 for                   *
+ *                  T< @
+                 brem             brem
+((Delta         E            )/ (E            ))                      =         -    5- 6%                   for                 1M*
+ *eV<T< =    100GeV    @
+
+
+                 Loss             Loss
+                                                                                     10%                     for               100G*
+ *eV<T< =    10TeV
+
+
+
+We  have  performed  a  fit  to  the  ``data''  without
+the  Midgal  corrections,  too.  In  this  case  we  used
+the  data  of  Seltzer  and  Berger  without  any
+correction  for  T< =    10  GeV  and  we  used  the
+Bethe-Heitler  cross-section  for  T> =    10  GeV.  The
+parameterised  forms  of  the  cross-section  and
+energy  loss  are  the  same  as  they  were  in  the  first
+fit  (i.e.  (??    )  and  (??    )),  only  the  numerical
+values  of  the  parameters  have  changed.  These
+values  are  in  DATA  statements  in  the  functions
+GBRSGE  and  GBRELE  and  this  second  kind  of
+parameterisation  can  be  activated  using  the
+PATCHY  switch  +USE,BETHE.  (The  two
+parameterisations  give  different  results  for
+high  electron  energy.)
+
+
+The  energy  loss  due  to  soft  photon  bremsstrahlung
+is  tabulated  at  initialisation  time  as  a  function
+of  the  medium  and  of  the  energy  by  routine  GBRELA
+(see  JMATE  data  structure).
+
+
+The  mean  free  path  for  discrete  bremsstrahlung  is
+tabuled  at  initialisation  time  as  a  function  of
+the  medium  and  of  the  energy  by  routine  GBRSGA
+(see  JMATE  data  structure).
+
+
+</PRE>
+
+
+
+<H3>Corrections  for  e- / e+  differences</H3>
+
+
+<PRE>
+
+
+The  radiative  energy  loss  for  electrons  or
+positrons  is:
+
+
+
+                                                                                                                          2        *
+ *         2
+- ((1)/ (rho      ))(((dE)/ (dx)))                                                      =         ((N      alpha         r   )/ (A)*
+ *)(T + m)Z   Phi      @
+                                                                                                     Av
+                                  rad                                                                                     e        *
+ *                     @
+
+
+
+                                                                                                                        2   2      *
+ *         T
+                                                 Phi              (Z, T)                =         ((1)/ (alpha         r   Z   (T +*
+ * m))) R     k((dsigma@
+
+
+                                                         rad                                                            e          *
+ *         0
+
+
+
+Reference    says  that:
+``The  differences  between  the  radiative  loss  of
+positrons  and  electrons  are  considerable  and
+cannot  be  disregarded.
+
+
+[...]  The  ratio  of  the  radiative  energy  loss  for
+positrons  to  that  for  electrons  obeys  a  simple
+scaling  law,  [...]  is  a  function  only  of  the
+
+              2
+quantity  T/ Z   ''
+
+
+In  other  words:
+
+
+
+                                     +                          -                                   2
+eta             =         ((Phi              (Z, T))/ (Phi              (Z, T))) = eta     (((T)/ (Z   )))
+
+
+                                     rad                        rad
+
+
+
+The  authors  have  calculated  this  function  in  the
+
+         -7                   2
+range  10      < =    ((T)/ (Z   ))< =    0. 5  (here  the  kinetic
+energy  T  is  expressed  in  MeV).  Their  data  can  be
+fairly  accurately  reproduced  using  a
+parametrisation:
+
+
+
+                               0                                                                                                   *
+ *                     @
+
+                                                                                           3          5
+eta             =         -    ((1)/ (2)) + ((1)/ (pi    )) arctan           (a   x + a   x    + a   x   )                         *
+ *                     @
+
+                                                                               1       3          5
+
+
+                               1                                                                                                   *
+ *                     @
+
+
+
+where:
+
+
+
+                                                             2
+                     x         =         log       (C((T)/ (Z   )))(T  in  GeV)
+
+
+
+                                                     6
+                     C         =         7. 5221 x 10
+
+
+                  a            =         0. 415
+                   1
+
+
+
+                  a            =         0. 0021
+                   3
+
+
+
+                  a            =         0. 00054
+                   5
+
+
+
+This  e- / e+  energy  loss  difference  is  not  a  pure
+low-energy  phenomenon  (at  least  for  high  Z),  as
+it  can  be  seen  from  Tables  ??    ,  ??     and  ??    .
+___________________________________________________________________________________________________________________________________*
+ *_____________________@
+            2                                                              ||                       ||
+    ((T)/ (Z   ))(GeV)                                        T            |         eta            |   (((rad.   loss)/ (total  lo*
+ *ss))) -
+                                                                           |                        |
+___________________________________________________________________________|________________________|______________________________*
+ *_____e_______________@
+                                     -9                             ||                       ||
+                                   10                       7keV    |                0. 1    |                                     *
+ *                     @
+                                                                    |                        |
+                                     -8                              ||                      ||
+                                   10                       67keV    |               0. 2    |                                     *
+ *                     @
+                                                                     |                       |
+                                  -7                              ||                         ||
+                            2 x 10                    1. 35MeV    |                  0. 5    |                                     *
+ *                     @
+                                                                  |                          |
+                                  -6                              ||                         ||
+                            2 x 10                    13. 5MeV    |                  0. 8    |                                     *
+ *                     @
+                                                                  |                          |
+                                  -5                              ||                       ||
+                            2 x 10                    135. MeV    |               0. 95    |                                       *
+ *                     @
+__________________________________________________________________|________________________|_______________________________________*
+ *_____________________@
+
+
+Table  0.1:  ratio  of  the  e- / e+  radiative  energy
+loss  in  lead  (Z=82).
+
+
+
+The  scaling  holds  for  the  ratio  of  the  total
+radiative  energy  losses,  but  it  is  significantly
+broken  for  the  photon  spectrum  in  the  screened
+case.  In  case  of  a  point  Coulomb  charge  the
+scaling  would  hold  also  for  the  spectrum.  The
+scaling  can  be  expressed  by:
+
+
+
+           +               -                        2                                                                              *
+ *                     @
+((Phi         )/ (Phi         )) = eta     (((T)/ (Z   )))                                                                         *
+ *                    (@
+
+
+
+If  we  consider  the  photon  spectrum  from
+bremsstrahlung  reported  in    we  see  that:
+
+
+
+                                                                                 +          -                                      *
+ *                     @
+((dsigma            )/ (dk)) = S   (((k)/ (T)))                               ((S   (k))/ (S   (k)))< =    1                       *
+ *                     @
+
+
+___________________________________________________________________________________________________________________________________*
+ *_____________________@
+                        |                                                                                           |
+    T(MeV)              ||                                            C                                             ||             *
+ *                     @
+                        ||                                                                                          ||
+                        |                  0                                                                         |             *
+ *    0
+                        |   Delta         E            Delta         E            Delta         sigma                |  Delta      *
+ *   E            Delta@
+                        |                                                                                            |
+                        |                                             l                                       l      |             *
+ *                     @
+________________________|__________________l_________________________________________________________________________|_____________*
+ *____l________________@
+                 |                                                                                        |
+    0.02         |                -2.86                      -2.86                              +52.00    |                   -4.89*
+ *                     @
+                 | |                                                                                      ||
+                   |                                                                                      |
+    0.1            |              -0.33                      -0.33                              +21.10    |                   -0.52*
+ *                     @
+                   |   |                                                                                  | |
+                       |                                                                                    |
+    1                  |          +0.07                      +0.07                                 +6.49    |                 +0.11*
+ *                     @
+                     | |                                                                                    ||
+                     |                                                                                      |
+    10               |               0.00                       0.00                               +1.75    |                    0.*
+ *00                   @
+                     |                                                                                      |
+      2              ||                                                                                       ||
+    10               |               0.00                       0.00                                  0.00    |                  0.*
+ *00                   @
+                     |                                                                                        |
+      3              ||                                                                                       ||
+    10               |               0.00                       0.00                                  0.00    |                  0.*
+ *00                   @
+                     |                                                                                        |
+      4              ||                                                                                       ||
+    10               |               0.00                       0.00                                  0.00    |                  0.*
+ *00                   @
+_____________________|________________________________________________________________________________________|____________________*
+ *_____________________@
+
+
+
+                               -     +       -                                                                                     *
+ *                     @
+    Delta         E    = 100((E   - E   )/ (E   ))%                                         and           Delta         sigma      *
+ *       = 100((sigma  @
+                   l                                                                                                               *
+ *    l
+                               l     l       l                                                                                     *
+ *                     @
+
+
+Table  0.2:  Difference  in  the  energy  loss  and
+bremsstrahlung  cross-section  for  e- / e+  in  Carbon
+
+
+and  Lead  with  a  cut  for  gamma           and  e     of  10keV.
+
+               0
+Delta         E     is  the  value  without  the  correction  for
+
+
+               l
+
+the  difference  e- / e+.
+
+
+
+We  further  assume  that:
+
+
+
+                 +                                                     -
+((dsigma            )/ (dk)) = f(epsilon             )((dsigma            )/ (dk))                                                 *
+ *                     @
+
+
+
+In  order  to  satisfy  approximately  the  scaling  law
+for  the  ratio  of  the  total  radiative  energy  loss,
+we  require  for  f(epsilon             ):
+
+
+
+                            1
+                         R     f(epsilon             )depsilon                           =         eta                   (10)
+
+
+                            0
+
+
+
+From  the  photon  spectra  we  require:
+
+
+
+                  f(0) = 1
+             .                          "                               for  all  Z, T                                   (11)
+
+                  f(1) = 0
+
+
+
+We  have  chosen  a  simple  function  f:
+
+
+
+                                                                      alpha
+f(epsilon             )            =         C(1- epsilon            )                                                            C*
+ *, alpha         >0   @
+
+
+
+from  the  conditions  (??    ),  (??    )  we  get:
+
+
+
+                          C        =         1
+
+
+              alpha                =         ((1)/ (eta      ))- 1                               (alpha         >0  because  eta   *
+ *  <1)
+
+
+
+                                                                     ((1)/(eta      ))-1
+f(epsilon             )            =         (1- epsilon            )
+
+
+
+We  have  defined  weight  factors  F     and  F                for
+                                     l          sigma
+
+the  positron  continuous  energy  loss  and  discrete
+bremsstrahlung  cross  section:
+
+
+
+                                           epsilon                                                                                 *
+ *                     @
+
+F    = ((1)/ (epsilon                )) R                     0   f(epsilon             )depsilon                                  *
+ *                     @
+ l                                0                                                                                                *
+ *                     @
+                                                                                                                                   *
+ *                     @
+                                           0                                                                                       *
+ *                     @
+
+
+___________________________________________________________________________________________________________________________________*
+ *_____________________@
+                        |                                                                                           |
+    T(MeV)              ||                                            C                                             ||             *
+ *                     @
+                        ||                                                                                          ||
+                        |                  0                                                                         |             *
+ *    0
+                        |   Delta         E            Delta         E            Delta         sigma                |  Delta      *
+ *   E            Delta@
+                        |                                                                                            |
+                        |                                             l                                       l      |             *
+ *                     @
+________________________|__________________l_________________________________________________________________________|_____________*
+ *____l________________@
+                       |                                                                                    |
+    2                  |          +4.19                      +4.21                                 +7.29    |                 +4.47*
+ *                     @
+                     | |                                                                                    ||
+                     |                                                                                      |
+    10               |            +0.87                      +0.87                                 +1.93    |                 +0.87*
+ *                     @
+                     |                                                                                      |
+      2              ||                                                                                       ||
+    10               |            +0.08                      +0.08                                    0.00    |               +0.06*
+ *                     @
+                     |                                                                                        |
+      3              ||                                                                                       ||
+    10               |               0.00                       0.00                                  0.00    |                  0.*
+ *00                   @
+                     |                                                                                        |
+      4              ||                                                                                       ||
+    10               |               0.00                       0.00                                  0.00    |                  0.*
+ *00                   @
+_____________________|________________________________________________________________________________________|____________________*
+ *_____________________@
+
+
+
+                               -     +       -                                                                                     *
+ *                     @
+    Delta         E    = 100((E   - E   )/ (E   ))%                                         and           Delta         sigma      *
+ *       = 100((sigma  @
+                   l                                                                                                               *
+ *    l
+                               l     l       l                                                                                     *
+ *                     @
+
+
+Table  0.3:  Difference  in  the  energy  loss  and
+bremsstrahlung  cross-section  for  e- / e+  in  Carbon
+
+
+and  Lead  with  a  cut  for  gamma           and  e     of  1MeV.
+
+               0
+Delta         E     is  the  value  without  the  correction  for
+
+
+               l
+
+the  difference  e- / e+.
+
+
+
+where  epsilon                 = ((k   )/ (T))  and  k     is  the  photon
+                           0        c                 c
+
+cut  BCUTE.  In  this  scheme  the  positron  energy
+loss  and  discrete  bremsstrahlung  can  be
+calculated  as:
+
+
+
+                +                         -                                                                                        *
+ *                     @
+(- ((dE)/ (dx)))    = F   (- ((dE)/ (dx)))                                                                                         *
+ *           sigma     @
+                       l                                                                                                           *
+ *                     @
+                                                                                                                                   *
+ *                     @
+
+
+
+As  in  this  approximation  the  photon  spectra  are
+identical,  the  same  SUBROUTINE  is  used  for
+generating  e- / e+  bremsstrahlung.  The  following
+relations  hold:
+
+
+
+                                                        p  =======================================
+
+                               +           -                             2                   2
+                         100((E         - E         )/ (   sigma             + sigma             ))(%)
+
+
+_______________________________dep_________dep___________________________+___________________-_____________________________________*
+ *_____________________@
+                                                                                              |
+                                                                                              |
+          Depth                                                C                              |                           Pb
+                                                                                              |
+                     |                                                                |
+    (X     units)    ||               No  e     diff                    e     diff    ||          No  e     diff                   *
+ *e     diff
+______0______________|________________________________________________________________|____________________________________________*
+ *_____________________@
+                              |                                                       |
+                       0.5    |                    -11.7                     -13.0    |                          -0.8              *
+ *        -3.9
+                              ||                                                      ||
+                              |                                                        |
+                       1.0    |                      -5.3                      -4.9    |                         -1.0              *
+ *        -4.1
+                              ||                                                       ||
+                              |                                                        |
+                       1.5    |                      +7.3                      +8.0    |                         -1.4              *
+ *        -3.5
+                              ||                                                       ||
+                              |                                                        |
+                       2.0    |                      +7.1                      +5.3    |                         -0.7              *
+ *        -0.0
+                              ||                                                       ||
+                              |                                                        |
+                       2.5    |                      +4.9                      +4.3    |                         +1.7              *
+ *        +3.6
+                              ||                                                       ||
+                              |                                                        |
+                       3.0    |                      +4.8                      +4.1    |                         +1.1              *
+ *        +4.3
+                              ||                                                       ||
+                              |                                                        |
+                       3.5    |                      +3.3                      +2.7    |                         +2.7              *
+ *        +3.1
+                              ||                                                       ||
+                              |                                                        |
+                       4.0    |                      +3.6                      +5.3    |                         +2.9              *
+ *        +3.0
+                              ||                                                       ||
+                              |                                                        |
+                       4.5    |                      +1.7                      +2.8    |                         +0.5              *
+ *        +2.3
+                              ||                                                       ||
+                              |                                                        |
+                       5.0    |                      +3.4                      +3.5    |                         -1.9              *
+ *        +1.8
+______________________________|________________________________________________________|___________________________________________*
+ *_____________________@
+
+
+Table  0.4:  Difference  in  the  shower  development
+for  e- / e+  in  Carbon  and  Lead.  No  diff  refers
+to  the  value  without  the  correction  for  the
+difference  e- / e+.
+
+
+
+                                                                                                                                   *
+ *      ((1)/(eta      @
+                                                                   F                        =         eta     (1- epsilon          *
+ *     )               @
+                                                                    sigma                                                          *
+ *  0
+
+
+
+epsilon                F    + (1- epsilon               )F                                  =         eta                          *
+ *                     @
+                    0   l                            0    sigma
+
+
+
+                                                                                                                                   *
+ *           ((1)/(eta @
+                                                                           ) F              =         eta     ((1- (1- epsilon     *
+ *          )          @
+                                                                              l                                                    *
+ *       0             @
+
+                                                                                                                                   *
+ *                     @
+
+
+
+which  is  consistent  with  the  spectra.
+
+
+The  effect  of  this  e- / e+  bremsstrahlung
+difference  can  be  also  seen  in  e.m.  shower
+development,  when  the  primary  energy  is  not  too
+high.  An  example  can  be  found  in  table  ??    .
+</PRE>

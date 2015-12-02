@@ -1,0 +1,113 @@
+\Version{FINT}                  \Routid{E104}
+\Keywords{MULTIDIMENSIONAL LINEAR INTERPOLATION}
+\Author{C. Letertre}            \Library{KERNLIB}
+\Submitter{B. Schorr}           \Submitted{17.05.1971}
+\Language{Fortran}              \Revised{27.11.1984}
+\Cernhead{Multidimensional Linear Interpolation}
+Function subprogram {\tt FINT} uses repeated linear interpolation to
+evaluate a
+function $ f(x_1,x_2,\ldots,x_n$) of $n$ variables which has been
+tabulated at the nodes of an $n$-dimensional rectangular grid. It is
+not necessary that the table arguments corresponding to any
+coordinate $ x_i$ be equally spaced.
+\Structure
+{\tt FUNCTION} subprogram \\
+User Entry Names: \Rdef{FINT}\\
+Files Refernced: Printer\\
+External References: \Rind{KERMTR}{N001}, \Rind{ABEND}{Z035}
+\Usage
+In any arithmetic expression,
+\begin{center}
+{\tt FINT(N,X,NA,A,F)}
+\end{center}
+has an approximate value of $f(\mathtt{X_1,X_2,\ldots,X_n})$.
+\begin{DLtt}{1234}
+\item [N] ({\tt INTEGER}) Number of coordinates $n$ required
+to define the function $f$.
+\item [X]({\tt REAL}) One-dimensional array.
+$\mathtt{X(j)},\,(j=1,2,\ldots,\mathtt{N})$, must contain the coordinates
+of the point at which the interpolation is to be performed.
+\item [NA] ({\tt INTEGER}) One-dimensional array.
+For $j=1,2,\ldots,\mathtt{N,\,NA(j)}$ must be equal to the number
+of numerical values of variable $x_j$ which are stored in array {\tt A}.
+\item [A]({\tt REAL}) One-dimensional array of length not less than
+the sum of $\mathtt{NA(1),\ldots,NA(N)}$. The first {\tt NA(1)}
+elements of {\tt A} must
+contain numerical values $a_{11}, a_{12},\ldots$ of the first variable
+$x_1$ in strictly increasing order, the next {\tt NA(2)} elements of
+{\tt A} must contain numerical values $a_{21}, a_{22},\ldots$ of the
+second variable $x_2$ in strictly increasing order, and so on.
+\item [F]({\tt REAL}) Multidimensional array with dimensions {\tt NA(1),
+NA(2)}, \ldots,{\tt NA(N)}, containing values of the function $f$ at the
+nodes of the rectangular grid defined by {\tt A}:\\
+$\mathtt{F(i,j,\ldots,m)} = f(a_{1{\tt i}},a_{2{\tt j}},\ldots,
+a_{n\mathtt{m}}),(i=1,2,\ldots,\mathtt{NA(1)},\ldots;m=1,2,\ldots,
+\mathtt{NA(N))}$.
+\end{DLtt}
+If any coordinate $x_i$ of the given point $X$ lies
+outside the range of the corresponding table arguments, the
+interpolation for this coordinate is replaced by an extrapolation
+based on the two nearest table arguments, with consequent loss of
+accuracy.
+\Method
+Repeated linear interpolation with respect to variables $x_1,
+x_2,\ldots$ within the grid cell which contains the given point $X$. For
+$n=2$, with $(x_1,x_2)$ replaced by $(x,y)$ for clarity, the
+procedure is equivalent to the following:
+\par
+Let $a_1,a_2,\ldots$ be the tabulated values of $x$.
+Let $b_1,b_2,\ldots$ be the tabulated values of $y$. \\
+Let $i$ and $j$ be the subscripts for which
+$a_i\leq x<a_{i+1}, b_j\leq y <b_{j+1}$. \\
+Then compute:
+\begin{eqnarray*}
+t & = & (x-a)/(a_{i+1}-a),\\
+g_j & = & (1-t)f(a_i,b_j)+t f(a_{i+1},b_j),\\
+g_{j+1} & = & (1-t)f(a_i,b_{j+1}+t f(a_{i+1},b_{j+1}),\\
+u & = &  (y-b)/(b_{j+1}-b),\\
+f_{appr}  & = &  (1-u) g_j + u g_{j+1}
+\end{eqnarray*}
+\Restrict
+\begin{enumerate}
+\item  $\mathtt{1\leq N \leq 5}$. {\tt FINT} is set equal to zero if
+{\tt N} is not in this range.
+\item  $\mathtt{NA(j) \geq 1,\,(j=1,2,\ldots,N)}.$
+\item The table arguments for each variable must be in strictly
+increasing order.
+\end{enumerate}
+There is no test for conditions 2 or 3.
+\Errorh
+{\tt E104.1:}  $\mathtt{N<1}$ or $\mathtt{N>5}$.
+{\tt FINT} is set equal to zero, and a message is printed unless
+subroutine {\tt KERSET (N001)} has been called.
+\Examples
+Given a function of two variables $g(x,y)$ defined by a {\tt FUNCTION}
+subprogram {\tt G}, to construct a table of values of
+$f_{km} = g(\sqrt{k},\log m)$ for $k=1,2,\ldots,10, m=1,2,\ldots,15$,
+and to interpolate in this table to set {\tt GINT} equal to an
+approximate value of $g(1.7,2.9)$. The program is written in a form which
+allows generalization to functions of more than two variables.
+\begin{verbatim}
+      PARAMETER (NA1=10,NA2=15)
+      DIMENSION X(2),NA(2),A(NA1+NA2),F(NA1,NA2)
+      DATA NA/NA1,NA2/
+C     STORE ARGUMENT ARRAY
+      K1=0
+      K2=K1+NA1
+      DO 1 J = 1,MAX(NA1,NA2)
+        IF (J .LE. NA1) A(J+K1)=SQRT(FLOAT(J))
+        IF (J .LE. NA2) A(J+K2)=LOG(FLOAT(J))
+    1 CONTINUE
+C     STORE FUNCTION ARRAY
+      DO 3 J1 = 1,NA1
+        DO 2 J2 = 1,NA2
+          F(J1,J2)=G(A(J1+K1),A(J2+K2))
+    2   CONTINUE
+    3 CONTINUE
+C     INTERPOLATE IN TABLE
+      X(1)=1.7
+      X(2)=2.9
+      GINT=FINT(2,X,NA,A,F)
+      ...
+\end{verbatim}
+$\bullet$

@@ -1,0 +1,364 @@
+% 13 November 1993 mg
+\Filename{H1-MZ-special-applications}
+\chapter{MZ routines for special applications}
+\label{sec:H1-MZ-routines-for-special-applications}
+
+\Filename{H2-MZCOPY-copy-d-s}
+\section{MZCOPY - copy a data-structure}
+
+\Rind{MZCOPY} allows one to copy a data-structure from memory to memory.
+\begin{verbatim}
+The source memory may be
+
+  either (case 1) one or several divisions in some store F;
+
+      or (case 2) ordinary stand-alone memory,
+                  called 'flat memory' below.
+
+The target memory may be
+
+  either (case 3) one particular division in a store T, which may
+                  or may not be the same as store F;
+
+      or (case 4) ordinary stand-alone memory.
+\end{verbatim} 
+
+For case 1, the data-structure may be identified in the usual way
+as the collection of banks which depend structurally
+from the header bank.
+This (option \Ropt{D} not selected) requires a logical walk through
+the structure,
+marking each bank which belongs to it by setting a system bit
+in the status word.
+A sequential scan over the memory between the first and the last bank
+involved constructs then the table of the material to be copied.
+(This way of identifying the d/s must not be used with
+a read-only store.)
+
+Alternatively, the d/s may be identified as the contents
+of one or several divisions,
+in which case the user has to be certain that the complete contents
+of this division(s) belong to one single d/s.
+This (option \Ropt{D} selected) does not require the logical walk,
+and is by that much faster.
+Moreover, the copy may or may not be immediate (option I):
+if yes (option \Ropt{DI}) dead banks present in the division(s) are
+also copied, if not (option \Ropt{D} without \Ropt{I}) a sequential scan
+over the division(s) concerned constructs a more detailed
+table of all the sectors of contiguous live banks in the division(s).
+Thus, if the user knows a priori that the amount of dead material
+is negligeable he should select option \Ropt{DI} for speed,
+saving the sequential scan.
+However, if the amount of dead material is significant,
+he should select option \Ropt{D} only,
+again for speed saving the time to copy the useless material.
+
+Cases 2 and 4 (flat memory) are intendend for use in communication
+between separate processes running on the same computer
+through shareable Common blocks:
+the sending process places a d/s into a flat memory area,
+the receiving process copies it from there into its Zebra store.
+Again, the data must all belong to one single d/s.
+
+If the No-link option is selected the copied result
+is a simple collection of banks,
+with all links except link 0 reset to zero,
+connected to be a linear structure;
+the entry address returned is the address of
+the physically first bank.
+
+
+\subsection*{Copy from and to Zebra storage:}
+
+\Shubr{MZCOPY}{(IXDVFR,!LENTRY, IXDVTO,*!LSUP*,JBIAS, chOPT)}
+
+with
+\begin{XMP}
+     IXDVFR:  index of division(s) to be copied from
+               may be zero [or IXSTOR] if the D option is not selected
+               may be a compound index if the D option is selected
+
+    !LENTRY:  entry address of the d/s
+
+     IXDVTO:  index of the division to be copied to;
+               this must be the index of one particular division
+
+            The d/s copied is linked into a pre-existing d/s
+            as directed by LSUP and JBIAS, which have the same
+            significance as for MZLIFT:
+
+      !LSUP:  if JBIAS < 1: LSUP is the supporting bank,
+      JBIAS:                 connection to link LQ(LSUP-JBIAS)
+
+               if JBIAS = 1: LSUP is the supporting link,
+                              connection to LSUP (top-level d/s)
+                              LSUP* returns the entry adr to the d/s
+
+               if JBIAS = 2: stand-alone d/s, no connection
+                              LSUP* returns the entry adr to the d/s
+
+      chOPT:  character string,
+               individual characters select options:
+
+            d/s:    by default the d/s supported by the bank at
+                     LENTRY is copied (link 0 not followed)
+
+                   L copy the d/s supported by the linear structure
+                     at LENTRY (link 0 followed)
+
+                   M  copy the banks pre-marked by the user,
+                      see section{sec:MZFLAG} for details
+                      (also: section~\ref{sec:FZmarking}, User marking ...)
+
+                   D  copy complete division(s)
+                      default: dead banks are squeezed out
+                               (slower but maybe more economic than DI)
+                   DI immediate dump of division(s),
+                      dead banks, if any, are also copied
+
+                   S copy the single bank at LENTRY
+
+                    see separate descriptions below for
+
+                   F   copy from flat memory
+                   T   copy   to flat memory
+
+         others:   N no links, ie. linkless handling,
+                     default: links are significant
+
+                   P permit error returns
+                     default: error exit is with CALL ZTELL (15,1)
+
+                   Z zero all links pointing outside the d/s
+                     (this is implied if store T is not store F)
+\end{XMP} 
+
+\subsection*{Copy from flat memory:}
+
+\begin{verbatim}
+      IQUEST(1) = NWFR:    number of words
+      IQUEST(2) = JOFFFR:  link relocation off-set, usually zero
+\end{verbatim} 
+
+\Shubrz{MZCOPY}{(MEMFR,!LENTRY, IXDVTO,*!LSUP*,JBIAS, chOPT)}
+
+with
+\begin{verbatim}
+      MEMFR:   the words MEMFR(1:NWFR) hold the d/s to be copied,
+               links in the d/s, if any, assume addressing such that
+               MEMFR(L) corresponds to LQ(L+JOFFFR)
+
+      In this case options L, D, I, S are irrelevant.
+\end{verbatim} 
+
+\subsection*{Copy to flat memory:}
+
+\begin{verbatim}
+      IQUEST(3) = NWMXTO:  maximum # of words, ie. capacity of MEMTO
+      IQUEST(4) = JOFFTO:  link relocation off-set, usually zero
+\end{verbatim} 
+
+\Shubrz{MZCOPY}{(IXDVFR,!LENTRY, MEMTO*,LENTO*,NWTO*, chOPT)}
+
+\begin{verbatim}
+with
+     MEMTO*:   the words MEMTO(1:NWTO) receive the d/s copied,
+               NWTO is not allowed to exceed NWMXTO,
+               links in the d/s, if any, will be relocated such that
+               MEMTO(L) corresponds to LQ(L+JOFFTO)
+     !LENTO*   is the entry address into the copied d/s.
+\end{verbatim} 
+
+\subsection*{Error return}
+
+\Lit{IQUEST(1/2)} will signal on return the status of the copy:
+\begin{verbatim}
+        = 0:  all is well,  IQUEST(2) = number of words
+   and if option P given:
+        = 1:  LENTRY invalid
+        = 2:  bank chaining clobbered found in the input d/s
+        = 3:  not enough space to construct the relocation table
+        = 4:  d/s larger than the target space
+        = 5:  d/s to be copied is empty
+        = 6:  bank chaining clobbered found in the copied d/s
+\end{verbatim} 
+
+\Filename{H2-MZNEED}
+\section{MZNEED - calculate free space in division}
+
+This routine measures the free space available in a particular
+division, either the space available immediately
+or the space after garbage collection.
+
+\Shubr{MZNEED}{(IXDIV, NEED, chOPT)}
+
+with
+\begin{verbatim}
+      IXDIV     index of the division
+
+      NEED      number of words needed, trigger garbage collection
+                if G option selected and less than NEED words available
+
+      chOPT     character string of options:
+
+                G  execute garbage collection
+                   if less than NEED words available
+
+On return /QUEST/IQUEST(100) contains the following information
+about the division IXDIV:
+
+   IQUEST(11)   NEX, the number of free words beyond NEED,
+                negative if less than NEED words available,
+                ie. the total available is NEED+IQUEST(11);
+
+   IQUEST(12)   the space occupied by the banks, including dead banks
+                if any, of the division;
+
+   IQUEST(13)   the maximum space allowed for this division,
+                as given to MZDIV.
+\end{verbatim} 
+
+\Example
+
+Suppose \Rarg{IXDIV} is a forward division, and the user wants to
+take all its space into one single maximum size bank,
+which will be filled by a variable amount of data, but less
+than \Rarg{NEED} words; when the filling is complete the bank
+will be reduced to its true size:
+
+\begin{verbatim}
+      NEED = 8000
+      CALL MZNEED (IXDIV, NEED, 'G')
+      IF (IQUEST(11).LT.0)              GO TO no luck
+
+      ND = NEED + IQUEST(11) - 19       (7 links, 12 system words)
+      CALL MZBOOK (IXDIV,L,LSUP,JB, 'name',7,2,ND,2, -1)
+
+      fill words IQ(L+1) TO IQ(L+NU)
+
+      CALL MZPUSH (IXDIV,L,0, NU-ND, 'R')
+\end{verbatim}
+
+\Filename{H2-MZINQS}
+\section{MZINQS - inquiry to get the parameters of a store}
+
+This routine returns the parameters of the selected store in \IQUEST:
+
+\Shubr{MZINQS}{(IXSTOR)}
+
+\begin{verbatim}
+with     IXSTOR     index of the store
+
+On return /QUEST/IQUEST(100) contains the following information:
+
+    IQUEST(1):  opmode   operation mode of the store, = zero normally
+    IQUEST(2):  NQSTRU   number of structural permanent links
+    IQUEST(3):  NQREF    number of permanent links
+    IQUEST(4):  NQLINK   number of permanent + working space links
+    IQUEST(5):  LSTA1    first word after the working space
+    IQUEST(6):  LSTA21   first word after the store
+    IQUEST(7):  NQMINR   minimum size of the reserve area after div. 1
+    IQUEST(8):  LQ2END   minimum value of LQEND(2)
+    IQUEST(9):  JQDVLL   last low division
+   IQUEST(10):  JQDVSY   system division, also: first high division
+   IQUEST(11):  NQLOGL   current log level for this store
+   IQUEST(12):  NQSNAM   chars 1:4 of the printing name of the store
+   IQUEST(13):           chars 5:8
+   IQUEST(14):  lowORG   lowest  possible origin-adr for the store
+   IQUEST(15):  highORG  highest possible origin-adr for the store
+   IQUEST(16):  initalc  initial allocation to last division created
+   IQUEST(17):  toffset  offset of the system tables
+\end{verbatim} 
+The permanent links occupy  LQ(1) to LQ(NQREF).
+\begin{verbatim}
+The working space links go from LQ(NQREF+1)  to LQ(NQLINK),
+the working space data  go from LQ(NQLINK+1) to LQ(LSTA1-1).
+\end{verbatim} 
+Divsion 1 starts at \Lit{LSTA1}.
+
+Bank space goes from \Lit{LQ(LSTA1)} to \Lit{LQ(LSTA21-1)}.
+
+There must always be a gap of at least \Lit{NQMINR} words between divisions 1 and 2.
+
+\Lit{LQ2END} is the lowest possible address for the end of division 2.
+
+The existing short range divisions have numbers 1 to \Lit{JQDVLL}.
+
+The system division has the number \Lit{JQDVSY} at the moment,
+this will change if \Rind{MZDIV}is called to create a new long-range division.
+If \Lit{JQDVSY} is less than 20 the user's long range divisions have numbers 
+\Lit{JQDVSY+1} to 20.
+
+No 'origin link' may have a value less than \Lit{lowORG} or larger than \Lit{highORG},
+both numbers could be negative; they depend on where the link-areas are
+physically in absolute memory, relative to the store.
+
+For a secondary store the system tables are at the end of
+the memory declared to \Rind{MZSTOR}, they start in \Lit{LQ(toffset)}.
+For the primary store \Lit{toffset=0} is returned.
+
+At log-level 2 the information returned is also printed by \Lit{MZINQS}.
+
+\Filename{H2-MZINQD}
+\section{MZINQD - inquiry to get the parameters of a division}
+
+This routine returns the parameters of the selected division in \IQUEST:
+
+\Shubr{MZINQD}{(IXDIV)}
+
+\begin{verbatim}
+with     IXDIV     index of the division
+
+On return /QUEST/IQUEST(100) contains the following information
+about the division IXDIV:
+
+    IQUEST(1):  mode = 0 forward, 1 reverse division
+    IQUEST(2):  kind = 1 short range, 2 long, 4 package, 8 system
+    IQUEST(3):  start adr LSTA
+    IQUEST(4):  end   adr LEND
+    IQUEST(5):  LEXTR highest or lowest possible value of LEND or LSTA
+    IQUEST(6):  initial size declared to MZDIV
+    IQUEST(7):  maximum size declared to MZDIV
+    IQUEST(8):  char 1:4 of the printing name of the division
+    IQUEST(9):  char 5:8
+   IQUEST(10):  JDVSH, if non-zero: sharing neighbour division
+
+This means:
+
+The memory actually occupied by the division goes
+from LQ(LSTA) to LQ(LEND-1), ie. LEND-LSTA words.
+
+The reserve space immediately available to the division would go
+   from  LQ(LEND)  to LQ(LEXTR-1) for a forward division,
+or from  LQ(LEXTR) to LQ(LSTA-1)  for a reverse division (mode=1).
+\end{verbatim} 
+
+If \Lit{JDVSH} is non-zero this division shares the reserve area with
+the division designated by \Lit{IXDIV}.
+
+At log-level 2 the information returned is also printed by \Rind{MZINQD}.
+
+\Filename{H2-MZDRED}
+\section{MZDRED - reduce the space reserved to a division}
+
+The situation can arise that one needs a lot of space in some
+long-range division during the initialization phase,
+which is then abandoned.
+Since divisions can only grow, but never shrink, this space
+could be blocked for the whole run.
+
+To reduce this space of a particular division
+to the initial allocation for for this division
+(or to its present occupation, whichever is larger),
+one should first 
+\Lit{CALL \Rind{MZGARB} (IXDIV)}, to collect dead banks,
+followed by
+
+\Shubr{MZDRED}{(IXDIV)}
+
+\begin{verbatim}
+with  IXDIV     index of the division
+\end{verbatim} 
+
+This will shift all divisions below division \Lit{IXDIV} upwards
+by the amount of space liberated.

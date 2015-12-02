@@ -1,0 +1,256 @@
+ \chapter[Computing the occurrence of a process]
+   {Computing the occurrence of a process} 
+
+\section{Particle transport using the {\em differential} approach}
+\subsection{The interaction length}
+\begin{itemize}
+\item[*]
+         In a simple material the number of atoms per volume is:
+         \[n  = \frac{\mathcal{N}\rho}{A}\]
+         where:
+         \begin{eqnarray*}
+          \mathcal{N} &  & \mbox{Avogadro's number} \\
+          \rho        &  & \mbox{density of the medium} \\
+          A           &  & \mbox{mass of mole} 
+         \end{eqnarray*}
+\item[*]
+         In a compound material the number of atoms of Element elm per volume is:
+         \[n_{elm}  = \frac{\mathcal{N}\rho w_{elm}}{A_{elm}}\]
+         where:
+         \begin{eqnarray*}
+          \mathcal{N} &  & \mbox{Avogadro's number} \\
+          \rho        &  & \mbox{density of the medium} \\
+          w_{elm}     &  & \mbox{proportion by mass of the Element elm}\\
+          A_{elm}     &  & \mbox{mass of mole of the Element elm} 
+         \end{eqnarray*} 
+\item[*] 
+         The mean free path, $\lambda$, of a process can be given in terms of its 
+ total cross section. 
+         \[
+           \lambda(E) \equiv \frac{1}{\Sigma (E)} 
+             = \frac{1}{\sum_{elm}{\lbrack n_{elm} \sigma(Z_{elm},E)\rbrack}}
+         \]
+         where $\sigma(Z,E)$  is the total cross section per atom of the
+         process and
+          $\sum_{elm}$ runs over all Elements the material is made of.
+\end{itemize}
+
+\noindent
+Cross sections per atom and mean free path values are tabulated during 
+initialisation.
+
+\subsection{Determination of the interaction point}
+The mean free path of a particle for a given process,
+$\lambda$, depends on the medium and cannot be used
+directly to sample the probability of an interaction in a heterogeneous
+detector. The number of mean free paths which a particle travels is:
+
+\begin{equation}
+\label{int.c}
+n_\lambda =\int \frac{dx}{\lambda(x)}
+\end{equation}
+
+and it is independent of the material traversed. If $n_r$ is
+a random variable denoting the number of mean free paths from a given
+point until the point of interaction, it can be shown that $n_r$ has the
+distribution function
+\begin{equation}
+\label{int.d}
+P( n_r < n_\lambda ) = 1-e^{-n_\lambda}
+\end{equation}
+The total number of mean free paths the particle travels before
+the interaction point, $n_\lambda$, is sampled at the beginning
+of the trajectory as:
+\begin{equation} 
+\label{int.e}
+n_\lambda = -\log \left ( \eta \right )
+\end{equation}   
+where $\eta$ is a random number uniformly distributed
+in the range $(0,1)$.
+$n_\lambda$ is updated after each step $\Delta x$ according the formula:
+\begin{equation}
+\label{int.f}
+n'_\lambda=n_\lambda -\frac{\Delta x }{\lambda(x)}
+\end{equation}
+until the step originating from $s(x) = n_\lambda \lambda(x)$ is
+the shortest and this triggers the specific process.
+
+The short description given above is the {\em differential approach} 
+ of the particle transport , which is used in most of the simulation
+codes( e.g. \cite{int.geant3},\cite{int.egs4}).
+
+ In this approach besides the other ({\em discrete}) processes  
+ the continuous energy loss imposes a limit on the stepsize, too.
+ The reason of this is the
+energy dependence of the cross sections. It is assumed in this approach
+that
+the cross sections of the particles are  constant during a step , i.e.
+ the step size should be so small that the relative difference of the cross 
+ sections
+at the beginning of the step and at the end can be small enough.In principle
+one
+has to use very small steps in order to have an accurate simulation , but the 
+computing
+time increases if the stepsize decreases. As a good compromise the stepsize is
+limited in GEANT4 by the requirement that the stopping range of the particle can
+decrease by not more than 20 \% during the step. This condition works fine for
+a particle of kinetic energy \(> 0.5 MeV - 1. MeV\) , but for low energy it
+gives very short step sizes.
+ To cure this problem a lower limitation on the stepsize is also introduced.
+The lower limit of the stepsize is
+ the {\em cut in range} parameter of the program. 
+
+ There is another disadvantage of this usual differential algorithm , 
+ which can be a serious problem in the case of certain processes. If the
+ interaction process has a cross section with narrow peaks in it , 
+in this approach the particle can easily skip over these peaks.(This can happen
+ in the case of a number of hadronic processes.)
+
+ To overcome these shortcomings the {\em integral approach} has been implemented
+ in GEANT4 as an option .
+
+\section{Particle transport with {\em integral} approach}
+
+ In this algorithm the integral in eq. \ref{int.c} is really computed for every
+ process and another equation is used instead of eq. \ref{int.f} when 
+ $n_\lambda$ is updated. This section gives a short overview on the formulae
+ used in this approach.
+
+  The change in the number of mean free path after a {\em small} step
+ can be written as
+
+\begin{equation}
+\label{int.g}
+   \Delta n_\lambda = \frac{\Delta x}{\lambda (x)} .
+\end{equation} 
+
+This formula can be rewritten in the following form
+
+\begin{equation}
+\label{int.h}
+   \Delta n_\lambda = \frac{dx}{dT}\cdot \frac{1}{\lambda (T)} \cdot dT  ,
+\end{equation} 
+
+where 
+\begin{tabular}[t]{ll}
+$T$         & kinetic energy of the particle \\  
+$\frac{dx}{dT} = \frac{1}{\frac{dT}{dx}}$ & inverse of the well-known quantity {\em $\frac{dE}{dx}$}  . \\
+\end{tabular}
+
+After these preliminaires the number of mean free paths (eq. \ref{int.c})
+ can be rewritten as 
+\begin{equation}
+\label{int.i}
+n_\lambda (T) = \int_{0}^{T}\frac{d\tau}{f(\tau)\cdot \lambda (\tau)}   
+\end{equation}
+
+ or
+
+\begin{equation}
+\label{int.j}
+n_\lambda (T) = \int_{0}^{T}\frac{\sigma (\tau ) \cdot d\tau}{f(\tau) }  
+\end{equation}
+
+where $\frac{dE}{dx}$ has been denoted by $f()$ . Eqs. \ref{int.i} and \ref{int.j} are
+the basic equations of the integral approach . The meaning of the integrals
+on the right hand sides of the equations is the number of mean free paths
+ for a given process between the initial state of energy $T$ and the stopping
+ of the particle ( energy $0$). 
+
+ The steps of the algorithm using the integral approach are the following:
+\begin{itemize}
+\item the number of mean free paths the particle travels to the interaction
+      point , $\Delta n_\lambda$ is sampled using eq. \ref{int.e}
+\item initial value of the quantity $n_\lambda (T_0)$ is computed 
+\item the (possible) final energy $T$ is calculated from 
+  \begin{equation}
+  \label{int.k}
+   \Delta n_\lambda = n_\lambda (T_0) - n_\lambda (T)
+  \end{equation}
+
+\item the step limitation originating from the process is
+   \begin{equation}
+  \label{int.l}
+   steplimit = r(T_0) - r(T)      
+  \end{equation},
+  where the function $r(T)$ gives the range of the particle for a kinetic
+ energy value T.
+\end{itemize}
+ 
+ If the interaction occurred at the end of the step was  some other
+process or the step was limited by 
+the geometry (at medium boundary) , the number of mean free
+paths $\Delta n_\lambda$ should be updated. This update can be easily done
+ using the function $n_\lambda (T)$
+\begin{equation}
+\label{int.m}
+ \Delta n_{\lambda,updated} =  \Delta n_\lambda - [n_\lambda (T_0)-
+                                    n_\lambda (T) ]  
+\end{equation}
+  
+\section{Updating of the proper and laboratory time of the particle}
+
+ The proper and lab. time of the particle should be updated after each step.
+This update is done differently in the two approaches.
+
+ In the differential approach the following formula is used to update the
+particle time in the laboratory system
+
+\begin{equation}
+\label{int.n}
+  \Delta t_{lab} = \frac{\Delta x}{\frac{v_0 + v}{2}}
+\end{equation}
+ 
+  , where 
+\[
+\begin{array}{ll}
+\Delta x    & \mbox{step travelled by the particle,} \\
+ v_0  &
+ \mbox{particle velocity at the beginning  of the step} \\
+ v  &
+ \mbox{particle velocity at the end of the step .} \\
+\end{array}
+\]
+This expression is a good approximation for use in the differential
+approach , because in this scheme the velocity is not allowed to
+change too much during the step.This is not the case in the integral approach,
+the kinetic energy and the velocity of the particle can change a lot here,
+therefore the update of the laboratory time is done by using the integral
+expression
+\begin{equation}
+\label{int.o}
+ t = \int_{0}^{s} \frac{dx}{v(x)}
+\end{equation}
+which can be written as
+\begin{equation}
+\label{int.p}
+ t = \int_{0}^{T} \frac{f(\tau ) \cdot d\tau }{v(\tau )}.
+\end{equation}
+In the eqs. \ref{int.o} and \ref{int.p} 
+\[
+\begin{array}{ll}
+t  &  \mbox{time}  \\
+v  &  \mbox{velocity of the particle} \\
+s  &  \mbox{path length can be travelled by the particle before stopping} \\
+T  &  \mbox{kinetic energy} \\
+f(T) & dE/dx \\
+\end{array}
+\]
+
+ Using eq. \ref{int.p} the expression for $\Delta t_{lab}$ is
+\begin{equation}
+\label{int.q}
+ \Delta t_{lab} = t(T_0)-t(T)  .
+\end{equation}
+
+ The update of the proper time is performed similarly in the two approaches.
+
+\section{Status of this document}
+  9.10.98   created by L. Urb\'an.
+
+\begin{thebibliography}{99}
+\bibitem[EGS4]{int.egs4} W.R. Nelson et al.:The EGS4 Code System.
+   {\em SLAC-Report-265 , December 1985 }
+\bibitem[GEANT3]{int.geant3}
+  GEANT3 manual ,CERN Program Library Long Writeup W5013 (October 1994).
+\end{thebibliography}

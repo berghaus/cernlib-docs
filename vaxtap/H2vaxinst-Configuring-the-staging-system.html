@@ -1,0 +1,108 @@
+<TITLE>VAXTAP -- H2vaxinst-Configuring-the-staging-system </TITLE>
+<P>
+<H2><A NAME=H2vaxinst-Configuring-the-staging-system.html>Configuring the staging system</A></H2>
+<P>
+To use the STAGE command, one must also allocate some disk space. It is
+recommended that a seperate disk or disks be used for staging, rather than
+mixing the staging area with, say, user disks. In fact, the current clean
+up procedures assume that this has been done and will DELETE and files
+which do not conform to the staging file name convention.
+<P>
+At CERN, the cluster size for the staging disk, which is in fact a stripe
+set, is set to 250 blocks. The average size of a staged file is typically
+180 MB and so the default cluster size is far too low.
+<P>
+The staging disk may be also be a volume set or a search list. In the
+latter case, the staging system uses that disk with the most free blocks.
+<P>
+Once the staging disk has been allocated, access must be enabled on a
+group basis. This is typically by UIC group, such as PUBZV at CERN. One
+may also use the logical name STAGEGROUP to group users together. In this
+case, care must be taken to establish the correct access to the staging
+directories, using for example ACLs and rights identifiers. The command
+file to enable staging is shown below.
+<P>
+<PRE>
+                <B>Command file to enable stage access</B>
+                                  </PRE>
+<P>
+<PRE>
+$ !
+$ ! Command file to enable tape staging for a given group
+$ ! Tapes are staged to disk DISK$STAGE to subdirectories
+$ ! 'IN' and 'OUT' of directory 'UIC-GROUP'
+$ !
+$ !   Get top directory of staging disk
+$ !
+$  stage_disk = f$trnlnm("DISK$STAGE")
+$  if f$locate(":",stage_disk) .eq. f$length(stage_disk) then -
+      stage_disk = f$trnlnm(stage_disk)
+$  if f$locate(".]",stage_disk) .lt. f$length(stage_disk)
+$     then
+$        stage_disk = stage_disk - ".]" + "]"
+$     else
+$        stage_disk = stage_disk + "[000000]"
+$     endif
+$ !
+$ if f$logical("STAGE_TAPES") .eqs. "YES" then goto uic
+$ write sys$output "Tape staging is currently not enabled"
+$ inquire/nopunc ans "Do you wish to enable tape staging? "
+$ if ans then define/system stage_tapes "YES"
+$ uic:
+$ type/nopage sys$input
+Enter group UIC of group that you wish to enable for tape staging.
+$eod
+$ inquire/nopunc uic "Group UIC (RETURN=exit)? "
+$ if uic .eqs. "" then exit
+$ uic = uic - "[" - "]"
+$ if f$locate(uic,"ALEPH,DELPHI,L3,OPAL") .lt. -
+f$length("ALEPH,DELPHI,L3,OPAL") then goto lep_groups
+$ number = f$identifier(uic,"NAME_TO_NUMBER")
+$ if number .eq. 0 then goto bad_uic
+$ group_ok:
+$  in_dir  = stage_disk - "]" + ".''uic']"
+$  out_dir = stage_disk - "]" + ".''uic'.OUT]"
+$  write sys$output "Input directory  = ''in_dir'"
+$  write sys$output "Output directory = ''out_dir'"
+$ if f$search("''stage_disk'''uic'.DIR;") .nes. "" then goto exists
+$ create/dir 'in_dir' /version_limit=1/owner=['uic',*] -
+/protection=(s:rwe,g:rwe,w:re)
+$ create/dir 'out_dir' /version_limit=1/owner=['uic',*] -
+/protection=(s:rwe,g:rwe,w:re)
+$ all:
+$ set file/acl=(default_protection,s:rwed,o:rwed,g:rwed,w:re) -
+'stage_disk''uic'.dir
+$ set file/acl=(default_protection,s:rwed,o:rwed,g:rwed,w:re) -
+'in_dir'out.dir
+$ goto uic
+$ bad_uic:
+$ write sys$output ""
+$ write sys$output "Tape staging is normally enabled by UIC group ", -
+"and ''uic' is an invalid group UIC."
+$ write sys$output "Each user in this group must ", -
+"have a logical name STAGE_GROUP defined"
+$ write sys$output "e.g. DEFINE STAGE_GROUP ''uic'"
+$ write sys$output ""
+$ inquire/nopunc ans -
+"Type any character to reenter a staging group, or return to accept ''uic' "
+$ if ans .eqs. "" then goto group_ok
+$ goto uic
+$ exists:
+$ write sys$output "Group ''uic' is already enabled for staging"
+$ goto uic
+$ lep_groups:
+$ create/dir disk$stage:['uic'] /version_limit=1/owner=id$_'uic' -
+/protection=(s:rwe,g:rwe,w:re)
+$ create/dir disk$stage:['uic'.OUT] /version_limit=1/owner=id$_'uic' -
+/protection=(s:rwe,g:rwe,w:rwe)
+$ set file/acl=(id=id$_'uic',access=read+write+execute) -
+disk$stage:[000000]'uic'.dir
+$ set file/acl=(id=id$_'uic',options=default,access=read+write+delete+execute) -
+disk$stage:[000000]'uic'.dir
+$ set file/acl=(id=id$_'uic',access=read+write+execute) -
+disk$stage:['uic']out.dir
+$ set file/acl=(id=id$_'uic',options=default,access=read+write+delete+execute) -
+disk$stage:['uic']out.dir
+$ goto uic
+</PRE>
+<P>

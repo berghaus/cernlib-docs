@@ -1,0 +1,137 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%  GEANT manual in LaTeX form                              %
+%                                                                 %
+%  Michel Goossens (for translation into LaTeX)                   %
+%  Version 1.00                                                   %
+%  Last Mod. Jan 24 1991  1300   MG + IB                          %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\Origin{G.N.Patrick, L.Urb\'{a}n}
+\Submitted{26.09.83}\Revised{16.12.93}
+\Version{Geant 3.16}\Routid{PHYS221}
+\Makehead{Simulation of Compton scattering}
+\section{Subroutines}
+\Shubr{GCOMP}{}
+\Rind{\tt GCOMP} generates the Compton scattering of a photon on an 
+atomic electron. It uses the random number techniques of Butcher and 
+Messell \cite{bib-BUTC} to sample the scattered photon energy according 
+to the Klein-Nishina formula \cite{bib-KLEI}.
+
+The interaction produces one electron, which is put in the \FCind{/GCKING/} 
+common block for further tracking. Tracking of the scattered photon will
+continue, with direction and energy changed by the interaction.
+All input/output information is through {\tt GEANT} common blocks.
+ 
+\begin{tabular}{ll}
+Input: & via COMMON \FCind{/GCTRACK/} \\
+Output: & via COMMONs \FCind{/GCTRAK/} and \FCind{/GCKING/} 
+\end{tabular}
+ 
+Compton scattering is selected in {\tt GEANT} by the input data 
+record {\tt COMP}. When Compton scattering is selected, \Rind{GCOMP} 
+is called automatically from the {\tt GEANT} photon tracking
+routine \Rind{GTGAMA}.
+
+\section {Method}
+ 
+For a complete account of the Monte Carlo methods used the
+interested
+user is referred to the publications of Butcher and Messel 
+\cite{bib-BUTC}, Messel
+and Crawford \cite{bib-MESS} and Ford and Nelson \cite{bib-EGS3}.
+Only the basic formalism is outlined here.
+ 
+The quantum  mechanical Klein-Nishina differential cross-section
+is:
+\[
+\Phi(E,E') =\frac{X_0 n \pi r_0^2 m_{\rm e}}{E^2}
+     \left[\frac{1}{\epsilon}+\epsilon\right]
+     \left[1 - \frac{\epsilon \sin^2 \theta}{1+\epsilon^2}\right]
+\]
+where,\quad
+\begin{tabular}[t]{l@{\ = \ }l}
+$E$         & energy of the incident photon   \\
+$E'$        & energy of the scattered photon  \\
+$\epsilon$  & $E'/E$                          \\
+$m_{e}$     & electron mass                   \\
+$n$         & electron density                \\
+$r_0$       & classical electron radius       \\
+$X_0$       & radiation length
+\end{tabular}
+ 
+Assuming an elastic collision, the scattering angle $\theta$ is
+defined by the Compton formula:
+ 
+\[
+E'   = E \frac{m_{\rm e}}{ m_{\rm e} + E(1-\cos\theta )}
+\]
+ 
+Using the combined ``composition and rejection'' Monte Carlo methods
+described in chapter {\tt PHYS211}, we may set:
+ 
+\[
+\begin{array}{LcLLcL}
+f(\epsilon)   & = & \left[\frac{1}{\epsilon}+\epsilon\right] =
+                    \sum^{2}_{i=1} \alpha_i f_i(E)
+                    &  \multicolumn{2}{l}{\mbox{for}}
+                    & \epsilon_0 > \epsilon > 1     \\
+g(\epsilon)   & = & \left[ 1 - \frac{\epsilon\sin^2\theta}{1+\epsilon^2}
+                    \right] & \multicolumn{3}{l}{\mbox{rejection function}} \\
+\alpha_1      & = & \frac{1}{\ln(1/\epsilon_0)}   &
+\alpha_2      & = & \frac{1}{2} (1-\epsilon_0^2)                             \\
+f_1(\epsilon) & = & \frac{1}{\epsilon\ln(1/\epsilon_0)} &
+f_2(\epsilon) & = & \frac{2\epsilon}{1-\epsilon^2}
+\end{array}
+\]
+ 
+The value of $\epsilon$ corresponding to the minimum
+photon energy (backward scattering) is given by:
+\begin{eqnarray*}
+\epsilon_0 & = & \frac{1}{1+2E/m_{\rm e}}
+\end{eqnarray*}
+
+Given a set of random numbers $r_i$ uniformly distributed in [0,1],
+the sampling procedure for $\epsilon$ is the following:
+\begin{enumerate}
+\item
+decide which element of the $f(\epsilon)$ distribution to sample from.
+Let $\alpha_T = (\alpha_1+\alpha_2)r_0$. If $\alpha_1\geq\alpha_T$
+select $f_1(\epsilon)$, otherwise select $f_2(\epsilon)$;
+ 
+\item  sample $\epsilon$ from the distributions
+corresponding to $f_1$ or $f_2$. For $f_1$ this is simply achieved by:
+\[
+\epsilon = \epsilon_0 e^\alpha_1 r_1
+\]
+For $f_2$, we change variables and use:
+\[
+\epsilon' = \left\{ \begin{array}{lll}
+\max(r_2,r_3) & \mbox{for } & E/m \geq (E/m+1)r_4 \\
+r_5           & \multicolumn{2}{l}{\mbox{for all other cases}}
+ \end{array} \right.
+\]
+Then, $\epsilon = \epsilon_0+(1-\epsilon_0)\epsilon'$;
+ 
+\item calculate $\sin^2\theta = \max(0,t(2-t))$ 
+where $t=m_{\rm e}(1-\epsilon)/E'$ 
+
+\item test the rejection function, if $r_6 \leq g(\epsilon)$ accept
+$\epsilon$, otherwise return to step 1.
+\end{enumerate}
+
+After the successful sampling of $\epsilon$, \Rind{GCOMP} generates the
+polar angles of the scattered photon with respect to the direction of
+the parent photon. The azimuthal angle, $\phi$, is generated isotropically and
+$\theta$ is as defined above. The momentum vector of the scattered
+photon is then calculated according to kinematic considerations. Both
+vectors are then transformed into the {\tt GEANT} coordinate system.
+
+\section{Restriction}
+ 
+The differential cross-section is only valid for those
+collisions in which the energy of the recoil electron is large compared
+with its binding energy (which is ignored). However, as pointed out by
+Rossi \cite{bib-ROSS}, this has a negligible effect 
+because of the small number of
+recoil electrons produced at very low energies.

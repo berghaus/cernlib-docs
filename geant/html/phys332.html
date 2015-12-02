@@ -1,0 +1,1164 @@
+<PRE>
+
+
+
+
+<H2>Geant  3.16  Routine  PHYS332</H2>
+
+
+<PRE>
+
+
+Origin:  L.Urban                                       Submitted:  10.04.86
+Revision:  L.Urban                                       Revised:  16.12.93
+Documentation:  F.Carminati,  K.Lassila-Perini
+
+
+</PRE>  <HR>  <H2>Simulation  of  energy  loss
+straggling</H2>
+
+
+<PRE>
+
+
+</PRE>
+
+
+<H2>Subroutines</H2>
+
+
+<PRE>
+
+
+
+       CALL  GFLUCT                         (DEMEAN,DE*)
+
+
+
+DEMEAN                    (REAL)  average  energy  loss  according  to
+                          the  energy  loss  tables;
+DE                        (REAL)  actual  energy  loss.
+
+
+GFLUCT  selects  the  method  to  sample  the
+fluctuations  around  the  mean  energy  loss  DEMEAN
+and  returns  the  energy  loss  DE  in  the  current
+step.
+
+
+If  delta         -rays  are  not  produced  (DRAY=0),  it  calls
+GLANDG  when  the  current  particle  and  material
+parameters  are  in  the  validity  range  of  Landau
+theory,  GVAVIV  when  in  the  range  of  Vavilov
+theory,  or  performs  a  Gaussian  sampling.  For
+fluctuations  in  small  steps  GLANDZ  is  called.
+
+
+If  delta         -rays  are  produced  (DRAY=1),  it  calls
+GLANDZ  which,  the  cut  for  the  delta         -ray
+production  being  set,  does  sampling  from
+restricted  formula.
+
+
+GFLUCT  is  called  from  the  tracking  routines
+GTELEC,  GTHADR  and  GTMUON  when  the  LOSS  flag  is
+set  to  1,  2  or  3.
+
+
+
+       CALL  GLANDG                         (YRAN*)
+
+
+
+YRAN                      (REAL)  random  variable  distributed
+                          according  to  the  Landau  distribution;
+
+
+
+GLANDG  samples  from  the  Landau  distribution.  It
+is  called  from  GFLUCT.
+
+
+
+       VALUE    =    GVAVIV                            (RKAPPA,BETA2,RAN)
+
+
+
+RKAPPA                    (REAL)  kappa           parameter  of  the  Vavilov
+                          distribution  (see  below);
+
+                                             2
+BETA2                     (REAL)  beta            of  the  particle;
+RAN                       (REAL)  random  number  uniformly
+                          distributed  in  ]0,1[.
+
+
+GVAVIV  samples  samples  the  variable
+lambda            = lambda              / kappa         - ln    kappa         ,  sometimes  called
+                                     v
+
+the  Landau  lambda           ,  where  lambda                is  distributed
+                                                         v
+
+according  to  the  Vavilov  distribution.  For  more
+details  see  below.  It  is  called  from  GFLUCT.
+
+
+
+       CALL  GLANDZ                         (Z,STEP,P,E,DEDX,DE*,POTI,POTIL)
+
+
+
+Z                         (REAL)  atomic  number  of  the  medium;
+STEP                      (REAL)  step  size  in  cm;
+P                         (REAL)  momentum  of  the  particle  in  GeV
+
+                           -1
+                          c      ;
+E                         (REAL)  total  energy  of  the  particle  in
+                          GeV;
+DEDX                      (REAL)  average  energy  loss  in  the  step
+                          according  to  the  energy  loss  tables;
+DE                        (REAL)  actual  energy  loss  in  the  step;
+POTI                      (REAL)  average  ionisation  potential  for
+                          the  medium;
+POTIL                     (REAL)  logarithm  of  the  average
+                          ionisation  potential.
+
+
+GLANDZ  gives  the  energy  loss  DE  for  the  current
+particle  with  energy  E  and  momentum  P  in  a
+material  of  atomic  number  Z  where  the  average
+energy  loss  is  DEDX  and  the  current  step  length
+STEP.  It  is  called  from  GFLUCT  for  restricted
+Landau  fluctuations  when  delta         -rays  are  produced
+or  to  sample  the  fluctuations  in  thin  layers
+(with  or  without  delta         -ray  production).
+
+
+</PRE>
+
+
+
+<H2>Method</H2>
+
+
+<PRE>
+
+
+Due  to  the  statistical  nature  of  ionisation
+energy  loss,  large  fluctuations  can  occur  in  the
+amount  of  energy  deposited  by  a  particle
+traversing  an  absorber  element.  As  recently
+reviewed  ,  continuous  processes  such  as  multiple
+scattering  and  energy  loss  play  a  relevant  role
+in  the  longitudinal  and  lateral  development  of
+electromagnetic  and  hadronic  showers,  and  in  the
+case  of  sampling  calorimeters  the  measured
+resolution  can  be  significantly  affected  by  such
+fluctuations  in  their  active  layers.  The
+description  of  ionisation  fluctuations  is
+characterised  by  the  significance  parameter
+kappa         ,  which  is  proportional  to  the  ratio  of  mean
+energy  loss  to  the  maximum  allowed  energy
+transfer  in  a  single  collision  with  an  atomic
+electron
+                                      kappa          = ((xi    )/ (E         ))
+                                                                    max
+
+E           is  the  maximum  transferable  energy  in  a
+ max
+
+single  collision  with  an  atomic  electron.
+
+
+                                2                2                                              2
+E          = ((2m   beta           gamma            )/ (1+2gamma         m   / m   +(m   / m   )   )),
+ max             e                                                        e     x     e     x
+
+
+where  gamma          = E/ m   ,  E  is  energy  and  m     the  mass  of
+                            x                          x
+
+                                     2                         2
+the  incident  particle,  beta           = 1- 1/ gamma              and  m
+                                                                          e
+
+is  the  electron  mass.  xi     comes  from  the
+Rutherford  scattering  cross  section  and  is
+defined  as:
+
+
+                   2   4                                                      2   2                 2                 2
+xi     = ((2pi    z   e   N      Zrho      delta         x)/ (m   beta           c   A)) = 153. 4((z   )/ (beta           ))((Z)/ (*
+ *A))rho      delta    @
+                           Av                                  e
+
+
+where
+
+
+
+     z                       charge  of  the  incident  particle
+
+
+
+     N                       Avogadro's  number
+      Av
+
+
+     Z                       atomic  number  of  the  material
+
+
+
+     A                       atomic  weight  of  the  material
+
+
+
+     rho                     density
+
+
+
+     delta         x         thickness  of  the  material
+
+
+
+ kappa           measures  the  contribution  of  the  collisions
+ with  energy  transfer  close  to  E         .  For  a  given
+                                     max
+
+ absorber,  kappa           tends  towards  large  values  if
+ delta         x  is  large  and/or  if  beta         is  small.
+ Likewise,  kappa           tends  towards  zero  if  delta         x  is
+ small  and/or  if  beta         approaches  1.
+
+
+ The  value  of  kappa           distinguishes  two  regimes
+ which  occur  in  the  description  of  ionisation
+ fluctuations  :
+
+
+1.      A  large  number  of  collisions  involving  the  loss
+        of  all  or  most  of  the  incident  particle  energy
+        during  the  traversal  of  an  absorber.
+        As  the  total  energy  transfer  is  composed  of  a
+        multitude  of  small  energy  losses,  we  can  apply
+        the  central  limit  theorem  and  describe  the
+        fluctuations  by  a  Gaussian  distribution.  This
+        case  is  applicable  to  non-relativistic
+        particles  and  is  described  by  the  inequality
+        kappa         >10  (i.e.  when  the  mean  energy  loss  in  the
+        absorber  is  greater  than  the  maximum  energy
+        transfer  in  a  single  collision).
+2.      Particles  traversing  thin  counters  and
+        incident  electrons  under  any  conditions.
+        The  relevant  inequalities  and  distributions
+        are  0. 01<kappa         <10,  Vavilov  distribution,  and
+        kappa         <0. 01,  Landau  distribution.
+
+
+ An  additional  regime  is  defined  by  the
+ contribution  of  the  collisions  with  low  energy
+ transfer  which  can  be  estimated  with  the  relation
+ xi    / I   ,  where  I     is  the  mean  ionisation  potential
+          0             0
+
+ of  the  atom.  Landau  theory  assumes  that  the
+ number  of  these  collisions  is  high,  and
+ consequently,  it  has  a  restriction  xi    / I   >>    1.  In
+                                                  0
+
+
+
+GEANT,  the  limit  of  Landau  theory  has  been  set  at
+xi    / I    = 50.  Below  this  limit  special  models  taking
+         0
+
+into  account  the  atomic  structure  of  the  material
+are  used.  This  is  important  in  thin  layers  and
+gaseous  materials.  Figure  ??     shows  the  behaviour
+of  xi    / I     as  a  function  of  the  layer  thickness  for
+             0
+
+an  electron  of  100  keV  and  1  GeV  of  kinetic  energy
+in  Argon,  Silicon  and  Uranium.
+
+
+ <A  HREF=  "  file=eps/phys332-1.eps,width=14cm  "  >
+                              PS  picture  (click  here)</A>
+
+
+Figure  1:  The  variable  xi    / I     can  be  used  to
+                                    0
+
+measure  the  validity  range  of  the  Landau  theory.
+It  depends  on  the  type  and  energy  of  the  particle,
+Z,  A  and  the  ionisation  potential  of  the  material
+and  the  layer  thickness.
+
+
+
+In  the  following  sections,  the  different  theories
+and  models  for  the  energy  loss  fluctuation  are
+described.  First,  the  Landau  theory  and  its
+limitations  are  discussed,  and  then,  the  Vavilov
+and  Gaussian  straggling  functions  and  the  methods
+in  the  thin  layers  and  gaseous  materials  are
+presented.
+
+
+</PRE>
+
+
+<H3>  Landau  theory</H3>
+
+
+<PRE>
+
+
+For  a  particle  of  mass  m     traversing  a  thickness
+                             x
+
+of  material  delta         x,  the  Landau  probability
+distribution  may  be  written  in  terms  of  the
+universal  Landau  ,    function  phi     (lambda           )  as:
+
+
+    f(epsilon             , delta         x)               =         ((1)/ (xi    ))phi      (lambda           )
+
+
+where
+
+
+                                                                     c+i1
+phi      (lambda           )          =         ((1)/ (2pi    i)) R              exp       (u ln    u + lambda           u)du      *
+ *                     @
+
+
+                                                                     c-i1
+
+
+
+                                                                                                                                   *
+ *  2
+              lambda                  =         ((epsilon             - epsilon            )/ (xi    ))- gamma         '- beta     *
+ *     - ln   ((xi    )@
+                                                                                                                                   *
+ *                     @
+
+
+
+              gamma         '         =         0. 422784. . . = 1- gamma
+
+
+
+                  gamma                =         0. 577215. . . (Euler's  constant)
+
+
+            epsilon                    =         average  energy  loss
+
+
+            epsilon                    =         actual  energy  loss
+
+
+
+ </PRE>
+
+
+ <H4>Restrictions</H4>
+
+
+ <PRE>
+
+
+ The  Landau  formalism  makes  two  restrictive
+ assumptions  :
+
+
+1.      The  typical  energy  loss  is  small  compared  to
+        the  maximum  energy  loss  in  a  single  collision.
+        This  restriction  is  removed  in  the  Vavilov
+        theory  (see  section  ??    ).
+2.      The  typical  energy  loss  in  the  absorber  should
+        be  large  compared  to  the  binding  energy  of  the
+        most  tightly  bound  electron.  For  gaseous
+        detectors,  typical  energy  losses  are  a  few  keV
+        which  is  comparable  to  the  binding  energies  of
+        the  inner  electrons.  In  such  cases  a  more
+        sophisticated  approach  which  accounts  for
+        atomic  energy  levels  (see  for  instance  Talman  )
+        is  necessary  to  accurately  simulate  data
+        distributions.  In  GEANT,  a  parameterised  model
+        by  L.  Urban  is  used  (see  section  ??    ).
+
+
+ In  addition,  the  average  value  of  the  Landau
+ distribution  is  infinite.  Summing  the  Landau
+ fluctuation  obtained  to  the  average  energy  from
+ the  dE/ dx  tables,  we  obtain  a  value  which  is
+ larger  than  the  one  coming  from  the  table.  The
+ probability  to  sample  a  large  value  is  small,  so
+ it  takes  a  large  number  of  steps  (extractions)
+ for  the  average  fluctuation  to  be  significantly
+ larger  than  zero.  This  introduces  a  dependence  of
+ the  energy  loss  on  the  step  size  which  can  affect
+ calculations.
+
+
+ A  solution  to  this  has  been  to  introduce  a  limit
+ on  the  value  of  the  variable  sampled  by  the  Landau
+ distribution  ,  in  order  to  keep  the  average
+ fluctuation  to  0.  The  value  obtained  from  the
+ GLANDO  routine  is:
+
+
+                                                                                                                         2
+ delta         dE/ dx = epsilon             - epsilon             = xi    (lambda           - gamma         '+beta           +ln   *
+ * ((xi    )/ (E        @
+                                                                                                                                   *
+ *              max
+
+
+ In  order  for  this  to  have  average  0,  we  must
+
+
+
+impose  that:
+
+
+                                                               2
+              lambda            =- gamma         '- beta          - ln   ((xi    )/ (E         ))
+
+                                                                                      max
+
+
+
+This  is  realised  introducing  a  lambda                    (lambda           )
+                                                     max
+
+such  that  if  only  values  of  lambda           < =   lambda                      are
+                                                                          max
+
+accepted,  the  average  value  of  the  distribution
+is  lambda           .
+
+
+A  parametric  fit  to  the  universal  Landau
+distribution  has  been  performed,  with  following
+result:
+
+
+
+lambda                     = 0. 60715+1. 1934lambda           +(0. 67794+0. 052382lambda           ) exp       (0. 94753+0. 74442la*
+ *mbda           )
+                 max
+
+
+
+only  values  smaller  than  lambda                     are  accepted,
+                                              max
+
+otherwise  the  distribution  is  resampled.
+
+
+</PRE>
+
+
+<H3>Vavilov  theory</H3>
+
+
+<PRE>
+
+
+Vavilov    derived  a  more  accurate  straggling
+distribution  by  introducing  the  kinematic  limit
+on  the  maximum  transferable  energy  in  a  single
+collision,  rather  than  using  E          = 1.  Using  the
+                                  max
+
+notations  of    we  can  write:
+
+
+                                                                                                                                   *
+ *            2
+f(epsilon             , delta         s)                =         ((1)/ (xi    ))phi         (lambda              , kappa         ,*
+ * beta          )
+                                                                                          v                    v
+
+
+
+where
+
+
+
+                                                              2                                               c+i1                 *
+ *   lambda           s
+phi         (lambda              , kappa         , beta          )             =         ((1)/ (2pi    i)) R              phi     (*
+ *s)e                  @
+         v                    v
+                                                                                                              c-i1
+
+
+
+                                                                                                                                   2
+                                                       phi      (s)            =         exp        [kappa         (1 + beta       *
+ *   gamma         )]  @
+
+
+
+                                                                                                                                 2 *
+ *                     @
+                                                       psi      (s)            =         s ln    kappa         + (s + beta         *
+ * kappa         )[ln  @
+                                                                                                                                   *
+ *                     @
+
+
+and
+
+
+                                        1    -1     -t
+      E   (z)              =         R      t      e      dt                 (the  exponential  integral)
+       1
+                                        z
+
+
+
+                                                                                                                                   *
+ *      2
+lambda                     =         kappa         [((epsilon             - epsilon            )/ (xi    ))- gamma         '- beta *
+ *         ]
+                 v
+
+
+The  Vavilov  parameters  are  simply  related  to  the
+Landau  parameter  by
+lambda               = lambda              / kappa         - ln    kappa         .  It  can  be  shown
+                 L                      v
+
+that  as  kappa         - >   0,  the  distribution  of  the
+variable  lambda                approaches  that  of  Landau.  For
+                           L
+
+kappa         < =    0. 01  the  two  distributions  are  already
+practically  identical.  Contrary  to  what  many
+textbooks  report,  the  Vavilov  distribution  does
+not  approximate  the  Landau  distribution  for  small
+kappa         ,  but  rather  the  distribution  of  lambda
+                                                                      L
+
+defined  above  tends  to  the  distribution  of  the
+true  lambda             from  the  Landau  density  function.
+Thus  the  routine  GVAVIV  samples  the  variable
+lambda                rather  than  lambda              .  For  kappa         > =   10  the
+                 L                                   v
+
+Vavilov  distribution  tends  to  a  Gaussian
+distribution  (see  next  section).
+
+
+</PRE>
+
+
+<H3>Gaussian  Theory</H3>
+
+
+<PRE>
+
+
+Various  conflicting  forms  have  been  proposed  for
+Gaussian  straggling  functions,  but  most  of  these
+appear  to  have  little  theoretical  or  experimental
+basis.  However,  as  noted  by  Schorr    it  has  been
+demonstrated  by  Seltzer  and  Berger    that  for
+kappa         > =    10  the  Vavilov  distribution  can  be
+replaced  by  a  Gaussian  of  the  form  :
+
+
+                                                         p  =======================================================================*
+ *====
+
+                                                                                                        2                          *
+ *                     @
+f(epsilon             , delta         s) ss ((1)/ (xi       ((2pi    )/ (kappa         ))(1- beta          / 2)                    *
+ *   )) exp       [(((e@
+
+thus  implying
+
+      mean               =        epsilon
+
+
+
+              2                           2                                     2                                        2
+sigma                    =        ((xi       )/ (kappa         ))(1- beta          / 2) = xi    E         (1- beta          / 2)
+                                                                                                 max
+
+
+
+</PRE>
+
+
+<H3>Urban  model</H3>
+
+
+<PRE>
+
+
+The  method  for  computing  restricted  energy  losses
+with  delta         -ray  production  above  given  threshold
+energy  in  GEANT  is  a  Monte  Carlo  method  that  can
+be  used  for  thin  layers.  It  is  fast  and  it  can  be
+used  for  any  thickness  of  a  medium.  Approaching
+the  limit  of  the  validity  of  Landau's  theory,  the
+loss  distribution  approaches  smoothly  the  Landau
+form  as  shown  in  figure  ??    .
+
+
+ <A  HREF=  "  file=eps/phys332-2.eps,width=14cm  "  >
+                              PS  picture  (click  here)</A>
+
+
+Figure  2:  Energy  loss  distribution  for  a  3  GeV
+electron  in  Argon  as  given  by  standard  GEANT.  The
+width  of  the  layers  is  given  in  centimeters.
+
+
+
+It  is  assumed  that  the  atoms  have  only  two  energy
+levels  with  binding  energy  E     and  E   .  The
+                                1          2
+
+particle--atom  interaction  will  then  be  an
+excitation  with  energy  loss  E     or  E   ,  or  an
+                                 1         2
+
+ionisation  with  an  energy  loss  distributed
+
+                                      2
+according  to  a  function  g(E)  1/ E   :
+
+
+                                                             2
+           g(E) = (((E          + I)I)/ (E         ))((1)/ (E   ))                                                          (1)
+                      max                 max
+
+
+The  macroscopic  cross-section  for  excitations
+(i = 1, 2)  is
+
+
+                                                           2                 2                      2                          2   *
+ *              2      @
+Sigma             = C((f   )/ (E   ))((ln    (2mbeta           gamma            / E   )- beta          )/ (ln    (2mbeta           *
+ *gamma            / I)@
+              i         i       i                                                  i
+
+                                                                                                                            (2)
+and  the  macroscopic  cross-section  for  ionisation
+is
+
+Sigma             = C((E         )/ (I(E         +I) ln   (((E         +I)/ (I)))))  r
+              3         max             max                   max
+
+                                                                                                                            (3)
+
+
+
+E           is  the  GEANT  cut  for  delta         -production,  or
+ max
+
+the  maximum  energy  transfer  minus  mean  ionisation
+energy,  if  it  is  smaller  than  this  cut-off  value.
+The  following  notation  is  used:
+
+
+
+    r, C            parameters  of  the  model
+
+
+
+    E               atomic  energy  levels
+     i
+
+
+    I               mean  ionisation  energy
+
+
+
+    f               oscillator  strengths
+     i
+
+
+The  model  has  the  parameters  f   ,  E   ,  C  and
+                                   i      i
+
+r  (0< =    r< =    1).  The  oscillator  strengths  f     and  the
+                                                      i
+
+atomic  level  energies  E     should  satisfy  the
+                          i
+
+constraints
+
+                                                          f    + f               =         1                                (4)
+                                                           1      2
+
+
+
+                                 f    ln    E    + f    ln    E                  =         ln    I                          (5)
+                                  1          1      2          2
+
+The  parameter  C  can  be  defined  with  the  help  of
+the  mean  energy  loss  dE/ dx  in  the  following  way:
+The  numbers  of  collisions  (n   ,  i  =  1,2  for  the
+                                i
+
+excitation  and  3  for  the  ionisation)  follow  the
+Poissonian  distribution  with  a  mean  number  <n   >.
+                                                   i
+
+In  a  step  Delta         x  the  mean  number  of  collisions  is
+
+                                          <n   >= Sigma            Delta         x                                          (6)
+                                            i                   i
+
+
+The  mean  energy  loss  dE/ dx  in  a  step  is  the  sum  of
+the  excitation  and  ionisation  contributions
+
+                                                                                                E         +I
+
+((dE)/ (dx))Delta         x = [Sigma            E   +Sigma            E   +Sigma             R   max              E  g(E)  dE]Delta*
+ *         x
+                                             1   1                 2   2                 3
+
+                                                                                                I
+
+                                                                                                                            (7)
+From  this,  using  the  equations  (??    ),  (??    ),  (??    )
+and  (??    ),  one  can  define  the  parameter  C
+
+                                               C = ((dE)/ (dx))                                                             (8)
+
+
+
+The  following  values  have  been  chosen  in  GEANT
+for  the  other  parameters:
+
+
+
+                0               if  Z< =    2
+    f    = -                                           .             )         f    = 1- f
+     2          2/ Z            if  Z>2                                         1         2
+
+
+              2                                                                                f        ((1)/(f   ))
+    E    = 10Z     eV                                                )         E    = (((I)/ (E 2    )))       1
+     2                                                                          1
+
+                                                                                               2
+
+
+    r = 0. 4
+
+
+
+With  these  values  the  atomic  level  E     corresponds
+                                          2
+
+approximately  the  K-shell  energy  of  the  atoms  and
+Zf     the  number  of  K-shell  electrons.  r  is  the  only
+  2
+
+variable  which  can  be  tuned  freely.  It  determines
+the  relative  contribution  of  ionisation  and
+excitation  to  the  energy  loss.
+
+
+The  energy  loss  is  computed  with  the  assumption
+that  the  step  length  (or  the  relative  energy
+loss)  is  small,  and  ---  in  consequence  ---  the
+cross-section  can  be  considered  constant  along
+the  path  length.  The  energy  loss  due  to  the
+excitation  is
+
+
+                                        Delta         E    = n   E    + n   E                                               (9)
+                                                       e      1   1      2   2
+
+
+where  n     and  n     are  sampled  from  Poissonian
+        1          2
+
+distribution  as  discussed  above.  The  loss  due  to
+the  ionisation  can  be  generated  from  the
+distribution  g(E)  by  the  inverse  transformation
+method:
+
+
+                                                 E
+           u = F(E)                 =         R     g(x)dx
+
+
+                                                 I
+
+
+
+          -1
+     E = F      (u)                 =         ((I)/ (1- u((E         )/ (E          + I))))                              (10)
+                                                            max           max
+
+
+
+                                                                                                                         (11)
+
+
+where  u  is  a  uniform  random  number  between  F(I) = 0
+and  F(E          + I) = 1.  The  contribution  from  the
+        max
+
+
+
+ionisations  will  be
+
+
+
+                              n
+                               3
+       Delta         E    = sum       ((I)/ (1- u   ((E         )/ (E          + I))))
+                      i      j=1                 j     max           max
+
+
+
+                                                                                                                         (12)
+where  n     is  the  number  of  ionisation  (sampled
+        3
+
+from  Poissonian  distribution).  The  energy  loss  in
+a  step  will  then  be  Delta         E = Delta         E    + Delta         E   .
+                                                          e                    i
+
+
+</PRE>
+
+
+<H4>Fast  simulation  for  n   > =    16</H4>
+                            3
+
+
+<PRE>
+
+
+If  the  number  of  ionisation  n     is  bigger  than  16,
+                                  3
+
+a  faster  sampling  method  can  be  used.  The
+possible  energy  loss  interval  is  divided  in  two
+parts:  one  in  which  the  number  of  collisions  is
+large  and  the  sampling  can  be  done  from  a  Gaussian
+distribution  and  the  other  in  which  the  energy
+loss  is  sampled  for  each  collision.  Let  us  call
+the  former  interval  [I, alpha         I]  the  interval  A,
+and  the  latter  [alpha         I, E         ]  the  interval  B.
+                                     max
+
+alpha           lies  between  1  and  E         / I.  A  collision  with
+                                        max
+
+a  loss  in  the  interval  A  happens  with  the
+probability
+
+
+                       alpha         I
+P(alpha         ) = R                   g(E) dE = (((E         +I)(alpha         - 1))/ (E         alpha         ))
+                                                      max                                 max
+                       I
+
+                                                                                                                         (13)
+The  mean  energy  loss  and  the  standard  deviation
+for  this  type  of  collision  are
+
+
+                                                                 alpha         I
+<Delta         E(alpha         )>= ((1)/ (P(alpha         ))) R                   E g(E) dE = ((Ialpha          ln    alpha        *
+ * )/ (alpha         - @
+
+
+                                                                 I
+
+                                                                                                                         (14)
+
+
+
+and
+
+
+              2                                                   alpha         I   2              2                               *
+ *           2         @
+sigma            (alpha         ) = ((1)/ (P(alpha         ))) R                   E    g(E) dE = I   alpha         (1- ((alpha    *
+ *      ln      alpha  @
+
+
+                                                                  I
+
+                                                                                                                         (15)
+If  the  collision  number  is  high  ,  we  assume  that
+the  number  of  the  type  A  collisions  can  be
+calculated  from  a  Gaussian  distribution  with  the
+following  mean  value  and  standard  deviation:
+
+
+                       <n   >             =         n   P(alpha         )                                                (16)
+                         A                           3
+
+
+
+                                2
+                  sigma                   =         n   P(alpha         )(1- P(alpha         ))                          (17)
+                                                     3
+                                A
+
+
+It  is  further  assumed  that  the  energy  loss  in
+these  collisions  has  a  Gaussian  distribution  with
+
+
+                     <Delta         E   >             =         n   <Delta         E(alpha         )>                    (18)
+                                     A                           A
+
+
+
+                                      2                                           2
+                        sigma                         =         n   sigma            (alpha         )                    (19)
+                                                                 A
+                                      E,A
+
+
+The  energy  loss  of  these  collision  can  then  be
+sampled  from  the  Gaussian  distribution.
+
+
+The  collisions  where  the  energy  loss  is  in  the
+interval  B  are  sampled  directly  from
+
+
+
+                     n   -n
+                      3    A
+Delta         E    =   sum          ((alpha         I)/ (1- u   ((E         +I- alpha         I)/ (E         +I))))
+               B        i=1                                  i     max                              max
+
+
+                                                                                                                         (20)
+The  total  energy  loss  is  the  sum  of  these  two
+types  of  collisions:
+
+
+                                  Delta         E = Delta         E    + Delta         E                                 (21)
+                                                                   A                    B
+
+
+
+The  approximation  of  equations  ((??    ),  (??    ),  (??    )
+and  (??    )  can  be  used  under  the  following
+conditions:
+
+
+                                             <n   >- c sigma                            > =          0                   (22)
+                                               A                     A
+
+
+
+                                              <n   >+c sigma                            < =          n                   (23)
+                                                A                    A                                3
+
+
+
+                          <Delta         E   >- c sigma                                 > =          0                   (24)
+                                          A                     E,A
+
+
+where  c> =    4.  From  the  equations  (??    ),  (??    )  and
+(??    )  and  from  the  conditions  (??    )  and  (??    )  the
+following  limits  can  be  derived:
+
+
+                                   2                                         2                                                     *
+ *               2     @
+alpha                   = (((n   +c   )(E         +I))/ (n   (E         +I)+c   I)) < =   alpha          < =    alpha              *
+ *    = (((n   +c   )(E@
+              min             3          max              3    max                                                            max  *
+ *          3          @
+
+                                                                                                                         (25)
+This  conditions  gives  a  lower  limit  to  number  of
+the  ionisations  n     for  which  the  fast  sampling
+                   3
+
+can  be  done:
+
+                                                                     2
+                                                        n    > =    c                                                    (26)
+                                                         3
+
+
+As  in  the  conditions  (??    ),  (??    )  and  (??    )  the  value
+of  c  is  as  minimum  4,  one  gets  n    > =    16.  In  order  to
+                                        3
+
+speed  the  simulation,  the  maximum  value  is  used
+for  alpha         .
+
+
+The  number  of  collisions  with  energy  loss  in  the
+interval  B  (the  number  of  interactions  which  has
+to  be  simulated  directly)  increases  slowly  with
+the  total  number  of  collisions  n   .  The  maximum
+                                     3
+
+number  of  these  collisions  can  be  estimated  as
+
+
+             n               = n   - n               ss n   (<n   >- sigma            )                                  (27)
+              B,max             3     A,min              3     A                   A
+
+
+From  the  previous  expressions  for  <n   >  and  sigma
+                                         A                        A
+
+one  can  derive  the  condition
+
+
+                                                             2              2
+                       n    < =    n               = ((2n   c   )/ (n    + c   ))                                        (28)
+                        B           B,max                3           3
+
+
+The  following  values  are  obtained  with  c = 4:
+
+
+
+    n              n                                    n            n
+_____3______________B,max________________________________3____________B,max_______________
+
+
+    16             16                                 200               29.63
+
+
+
+    20             17.78                              500               31.01
+
+
+
+    50             24.24                           1000                 31.50
+
+
+
+    100            27.59                                   1            32.00
+
+
+
+</PRE>
+
+
+<H4>Special  sampling  for  lower  part  of  the
+spectrum</H4>
+
+
+<PRE>
+
+
+If  the  step  length  is  very  small  (< =    5  mm  in  gases,
+< =     2-3  mu    m  in  solids)  the  model  gives  0  energy
+loss  for  some  events.  To  avoid  this,  the
+probability  of  0  energy  loss  is  computed
+
+
+
+                                          -(<n   >+<n   >+<n   >)
+                P(Delta         E = 0) = e    1      2      3                                                            (29)
+
+
+If  the  probability  is  bigger  than  0.01  a  special
+sampling  is  done,  taking  into  account  the  fact
+that  in  these  cases  the  projectile  interacts  only
+with  the  outer  electrons  of  the  atom.  An  energy
+level  E    = 10  eV  is  chosen  to  correspond  to  the
+        0
+
+outer  electrons.  The  mean  number  of  collisions
+can  be  calculated  from
+
+
+                <n>= ((1)/ (E   ))((dE)/ (dx))Delta         x                                                            (30)
+                             0
+
+
+The  number  of  collisions  n  is  sampled  from
+Poissonian  distribution.  In  the  case  of  the  thin
+layers,  all  the  collisions  are  considered  as
+ionisations  and  the  energy  loss  is  computed  as
+
+
+
+                           n
+     Delta         E = sum       ((E   )/ (1- ((E         )/ (E          + E   ))u   ))
+                        i=1         0            max           max          0     i
+
+
+                                                                                                                         (31)
+
+
+</PRE>
+
+
+<H2>Implementation</H2>
+
+
+
+<PRE>
+
+
+The  method  to  be  used  for  energy  loss  straggling
+is  chosen  in  GFLUCT.  If  delta         -rays  are  produced
+(DRAY  =  1)  above  the  cut  value  DCUTE  and  the
+detailed  PAI  simulation  for  straggling  in  thin
+layers  (see  PHYS334)  is  not  chosen  (STRA  =  0,
+default),  GLANDZ  is  called  always  as  it  samples
+from  the  restricted  distribution  (the  energy  loss
+of  the  delta         -rays  which  are  explicitly  produced
+should  not  be  taken  into  the  energy  loss
+distribution).
+
+
+If  delta         -rays  are  not  produced,  the  values  of
+kappa           and  xi    / I  are  computed,  and  Urban,  Landau,
+Vavilov  or  Gaussian  model  is  chosen  accordingly.
+If  Urban  model  is  used,  GLANDZ  will  be  called  with
+infinite  (BIG)  value  for  the  delta         -ray
+production.
+
+
+When  Landau  model  is  chosen,  it  is  possible  to  use
+a  routine  from  the  CERN  Program  Library  to  sample
+random  numbers  from  the  Landau  distribution  :
+GENLAN  written  by  James  and  Hancock    and  copied
+into  GEANT  source  file  as  GLANDG.  This  routine
+has  been  modified  in  order  to  reproduce  the  tail
+for  large  values  of  X.  The  original  routine  did
+not  give  values  of  X  larger  than  200.
+           CALL  GENLAN(X)
+
+
+It  should  be  noted  that  over  the  years
+considerable  confusion  has  arisen  over  the
+precise  form  and  features  of  the  Landau
+distribution.  As  an  example,  a  simpler  form  of
+phi      (lambda           )  had  been  proposed  by  Moyal    and  used
+on  occasions  which  has  little  in  common  with  the
+function  defined  in  section  ??     .
+
+
+For  the  Vavilov  distribution  we  have  used  the
+function  GVAVIV  by  Rotondi  and  Montagna  .
+</PRE>

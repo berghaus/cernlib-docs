@@ -1,0 +1,83 @@
+<![CDATA[/* create_profile.cpp */
+#include <stdlib.h>
+#include <iostream.h>
+#include <iomanip.h> 		// Formatting output string.
+#include "CLHEP/Random/Randomize.h"
+#include "HTL/PHistograms.h" // Persistent histograms.
+class Histo_App : public HepDbApplication
+{
+public:
+	Histo_App( const char *a_db_name = 0 )
+	{ db_name_ = ( a_db_name == 0 ) ? "Default_DB" : a_db_name; }
+		// If no database name is provided then the default one is 
+		// "Default_DB".
+public:
+	void run();
+		// Create a profile histo and fill it.
+		// Print simple properties and global statistics.
+public:
+	void init();
+private:
+	ooHandle(ooDBObj) db_; // Handle on the database.
+	const char *db_name_; // Name of the database.
+};
+//
+// Implementation:
+//
+void Histo_App::init()
+{
+	Init();
+	startUpdate();
+	db_ = db(db_name_);
+}
+void Histo_App::run()
+{
+  // Create a profile histogram
+  HepRef(PProfileHisto) histo = new (db_) PProfileHisto ("Profile", 20, 0., 1.);
+  // Let's fill the histo with 50000 points:
+  //
+  long i;
+  double x;
+  for( i=0; i<50000; i++ ) {
+    double x  = RandFlat::shoot(1.);       // fnum  ]0,1.[
+    histo->fill(x,x,1.);
+  }
+  // Let's print some properties of the new histo:
+  //
+  cout << "Histo name: " << histo->name() << endl
+       << "Bin count : " << histo->bin_count()
+       << " from " << histo->partition().lower_point()
+       << " to " << histo->partition().upper_point() << endl << endl;
+	// Now display some statistics:
+	//
+  long in_entries = HStat::in_range_entries_count(*histo);
+  long extra_entries = HStat::extra_entries_count(*histo);
+  cout << "Entries count: " << (in_entries + extra_entries)
+       << " with IN_RANGE: " << in_entries
+       << " EXTRA: " << extra_entries << endl;
+	//double mean = HStat::mean( *histo );
+	//cout << "MEAN (B.C.): " << mean << endl;
+	//cout << "RMS  (B.C.): " << HStat::rms(*histo, mean)
+	//	<< endl << endl;
+  cout << "MEAN (B.C.): " << histo->mean() << endl;
+  cout << "RMS  (B.C.): " << histo->rms() << endl;
+	// Print histo contents:
+	//
+  cout << ". UNDERFLOW: " << histo->extra_bin(H_UNDERFLOW).value();
+  for( i=0; i<histo->bin_count(); i++ ) {
+    cout << endl << ". " << setw(2) << i << ": "
+	 << setw(9) << histo->i_bin(i).value() << " Error "
+	 << setw(4) << histo->i_bin(i).error() << " Spread Error "  
+	 << setw(4) << histo->i_bin(i).error(1);
+  }
+  cout << endl << ". OVERFLOW: " << histo->extra_bin(H_OVERFLOW).value();
+  cout << endl <<  "TOTAL IN_RANGE: " 
+       << HInfo::in_range_value( *histo ) << endl << endl;
+}
+int main( int argc, char **argv )
+{
+  Histo_App app;
+  app.init();
+  app.run();
+  app.commit();
+}]]>

@@ -1,0 +1,153 @@
+<PRE>
+
+
+
+
+<H2>Geant  3.16  Routine  GEOM110</H2>
+
+
+<PRE>
+
+
+Origin:  R.Brun,  A.McPherson      Submitted:  15.08.83
+Revision:                                                            Revised:  16.11.93
+Documentation:
+
+
+</PRE>  <HR>  <H2>Positioning  a  volume  inside  its
+mother</H2>
+
+
+<PRE>
+
+
+
+       CALL  GSPOS                       (CHNAME,NR,CHMOTH,X,Y,Z,IROT,CHONLY)
+
+
+
+Places  a  copy  of  a  volume  previously  defined  by  a
+call  to  GSVOLU  inside  its  mother  volume  CHMOTH.
+
+
+CHNAME                         (CHARACTER*4)  name  of  the  volume
+                               being  positioned;
+NR                             (INTEGER)  copy  number  of  the  volume
+                               CHNAME  being  positioned;
+CHMOTH                         (CHARACTER*4)  name  of  the  volume  in
+                               which  copy  NR  of  CHNAME  is  positioned;
+X                              (REAL)  x  position  of  the  volume  in  the
+                               mother  reference  system;
+Y                              (REAL)  y  position  of  the  volume  in  the
+                               mother  reference  system;
+Z                              (REAL)  z  position  of  the  volume  in  the
+                               mother  reference  system;
+IROT                           (INTEGER)  rotation  matrix  number
+                               describing  the  orientation  of  the
+                               volume  relative  to  the  coordinate
+                               system  of  the  mother;
+CHONLY                         (CHARACTER*4)  flag  to  indicate
+                               whether  a  point  found  to  be  in  this
+                               volume  may  also  be  in  other  volumes
+                               which  are  not  direct  descendants  of  it
+                               --  possible  values  are  ONLY  and  MANY.
+
+
+The  following  points  are  important  for  a  correct
+use  of  GSPOS:
+
+
+   *   the  position  and  rotation  with  which  a  volume
+       is  positioned  are  relative  to  the  mother
+       reference  system,  that  is  to  the  reference
+       system  of  the  volume  which  contains  the  copy
+       being  positioned.  To  see  how  the  reference
+       system  is  defined  for  the  GEANT  shapes,  see
+       [GEOM050];
+   *   GSPOS  can  be  called  several  times  with  the  same
+       name,  to  place  multiple  copies  of  the  same
+
+
+
+    volume  either  in  the  same  mother  volume  or  in
+    different  ones.  The  copy  number  parameter  NR  is
+    user  defined,  and  it  allows  the  different
+    copies  of  the  same  volume  to  be  distinguished.
+    The  user  is  free  to  assign  any  valid  integer  to
+    this  parameter.  If  two  volumes  are  positioned
+    with  the  same  copy  number,  it  will  be
+    impossible  to  decide  in  which  one  a  particle  is
+    during  tracking.  If  the  same  volume  is
+    positioned  twice  inside  the  same  mother  with
+    the  same  copy  number,  the  parameters  of  the
+    second  call  to  GSPOS  will  override  the  first
+    ones  for  that  copy;
+*   all  the  copies  of  a  volume  are  identical:  in
+    particular  they  contain  all  the  same  daughters
+    recursively  --  conversely,  positioning  a
+    volume  inside  a  mother  will  insert  it  in  all
+    the  copies  of  that  mother;
+*   the  volumes  mentioned  in  the  call  must  be
+    already  defined  by  a  call  to  GSVOLU;
+*   no  volume  can  be  positioned  in  a  divided
+    mother;
+*   in  case  of  positioning  without  rotation,  IROT
+    should  be  set  to  0  --  note  that  this  is  faster
+    than  defining  a  unit  matrix;
+*   the  first  volume,  containing  all  the
+    apparatus,  cannot  be  positioned;
+*   if  the  CHONLY  flag  is  equal  to  ONLY,  the  volume
+    being  positioned  should  not  overlap  with  any
+    other  volume  except  his  mother  and  his
+    daughters  and  should  not  extend  beyond  the
+    limits  of  its  mother.  In  this  case  the  search
+    routines  assume  that,  when  a  point  is  found  in
+    this  volume,  the  only  further  searching
+    required  is  in  its  contents.  Other  volumes  at
+    the  same  or  higher  levels  or  in  separate
+    branches  will  not  be  looked  at.  The  first
+    volume  must  be  ONLY;
+*   if  the  CHONLY  flag  is  set  to  MANY,  a  point  found
+    in  this  volume  can  also  be  in  another  volume  at
+    the  same  or  higher  level  or  in  a  different
+    branch  of  the  tree.  To  decide  where  a  point  is
+    the  following  algorithm  is  applied:
+           1.      the  tree  is  scanned  upward  until  an  ONLY
+                   mother  with  positioned  contents  (i.e.
+                   non-divided)  is  found;
+           2.      all  the  branches  of  the  tree  descending
+                   from  this  volume  are  scanned  to  find
+                   other  volumes  where  the  point  may  be;
+           3.      a  winner  is  selected  among  the  candidates
+                   according  to  the  following  rules:
+                                 --     if  one  of  the  candidates  is  ONLY,
+                                        the  point  is  declared  in  this
+                                        volume.  If  more  than  one
+                                        candidate  is  ONLY  there  is  an
+                                        error  in  the  geometry  definition;
+
+
+
+                                    --     amongst  several  MANY  candidates,
+                                           the  one  at  the  deepest  level  is
+                                           chosen;
+                                    --     amongst  several  MANY  candidates
+                                           at  the  same  level,  the  first  one
+                                           found  is  chosen;
+       Although  a  considerable  effort  has  been  put  in
+       making  sure  that  the  MANY  option  works  properly
+       and  caters  for  all  the  possible  cases,  still  it
+       introduces  a  considerable  complication  in  the
+       tracking  and  performance  can  be  rather  poor.
+       Users  should  resort  to  this  only  when  it  is  not
+       possible  to  describe  the  experimental  setup
+       with  ONLY  volumes.
+
+
+The  data  structure  is  so  designed  that,  in  any
+case,  the  parameters  of  a  volume  and  the
+information  about  the  number  and  position  of  its
+daughters  are  stored  only  once.  This  allows  the
+creation  of  very  complex  geometries  without
+correspondingly  large  storage  requirements.
+</PRE>

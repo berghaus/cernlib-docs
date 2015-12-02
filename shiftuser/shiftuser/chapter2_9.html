@@ -1,0 +1,399 @@
+<HEAD>
+<TITLE> Using SHIFT Software</TITLE>
+</HEAD>
+<BODY><P>
+ <HR> <A NAME=tex2html175 HREF=chapter2_10.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/next_motif.gif"></A> <A NAME=tex2html173 HREF=shiftuser.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/up_motif.gif"></A> <A NAME=tex2html167 HREF=chapter2_8.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/previous_motif.gif"></A> <A NAME=tex2html177 HREF=tableofcontents2_1.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/contents_motif.gif"></A> <BR>
+<B> Next:</B> <A NAME=tex2html176 HREF=chapter2_10.html>  About this document </A>
+<B>Up:</B> <A NAME=tex2html174 HREF=shiftuser.html>No Title</A>
+<B> Previous:</B> <A NAME=tex2html168 HREF=chapter2_8.html> Batch Job Submission </A>
+<HR> <P>
+<H1><A NAME=SECTION0090000000000000000> Using SHIFT Software</A></H1>
+<P>
+This chapter is intended as a tutorial introduction to
+the SHIFT software. A separate
+<em>SHIFT Reference manual</em>
+is also available which describe SHIFT commands and the C and FORTRAN
+interfaces to SHIFT in more detail.
+<P>
+<H1><A NAME=SECTION0091000000000000000> Disk Pools and Files</A></H1>
+<P>
+<A NAME=secpools><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<P>
+A <b>disk pool</b> is a set of Unix file systems on one or more
+<i>shift</i> disk servers. Each of these file systems is mounted by NFS on every
+<i>shift</i> server, using a convention for the names of the mount points which
+ ensures that
+files may be referred to by the same Unix
+pathname on all cpu, disk and tape servers
+in the <i>shift</i> configuration. This name is referred to as the <i>nfs_pathname</i>.
+<P>
+The <b>sfget</b> command is used to allocate a file. This is a call to the
+<i>Disk Pool Manager</i> (DPM), which selects a suitable file system within the
+pool specified by the user, creates any necessary directory structure within
+the file system, creates an empty file, and echoes its full <i>nfs_pathname</i>.
+<P>
+The <i>nfs_pathname</i> has the following form:
+<P>
+<b>/shift/</b><i>node</i><b>/</b><i>file_system_name</i><b>/</b><i>group</i><b>/</b><i>user</i><b>/</b><i>user_supplied_partial_pathname</i>
+<P>
+e.g. <b>/shift/shift1/data1/c3/les/tape23</b>
+<P>
+The <i>node</i> is the name of the <i>shift</i> server on which the file system
+is physically located. The <i>file_system_name</i> identifies the
+file system on the node (it is by convention the name of the ``special&quot; file
+which identifies the file system in the /dev directory).
+The <i>group</i> and <i>user</i> define the owner of the file (see the discussion
+on file permissions in Section <A HREF=chapter2_9.html#secpermissions><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/cross_ref_motif.gif"></A>). The <i>user_supplied_partial_pathname</i> is the
+ name of the file as supplied
+by the user in the sfget command. It may be a single term (e.g. tape23),
+or it may include directories (e.g. period21/run7/file26). In the latter
+case the system will create the directories if necessary. Thus, the <i>nfs_pathname</i> 
+returned by:
+<P>
+<b>sfget -p opaldst period21/run7/file26</b>
+<P>
+might have the form:
+<P>
+<b>/shift/shd01/data3/c3/les/period21/run7/file26</b>
+<P>
+This name may be used by the user in subsequent commands, such as
+<i>tpread</i> or a call to a FORTRAN program. The user does not need to
+remember the full pathname between sessions, as a
+subsequent sfget call using the same <i>user_supplied_partial_pathname</i>
+will locate the file and return the full pathname again.
+The sfget command also sets the Unix command status to indicate if the file was
+created (the status is set to a value of 1) or simply located (value 0). This
+may be useful in shell scripts (the status of the last Unix command may be
+tested through the $?[Bourne shell] or $status[C shell] variables).
+<P>
+If the user only wishes to locate the file if it is present, but not to
+create it, he may use the <b>-k</b> option of sfget.
+<P>
+<b>sfget -p opaldst -k period21/run8/file41</b>
+<P>
+This example will return a status of 0, and echo the <i>nfs_pathname</i> if the file exists
+in the specified pool, but merely return a status of 1 if it does not exist.
+<P>
+A user may list all of his files in a particular pool by means of the <b>sfsh</b>
+command.
+<P>
+e.g. <b>sfsh -p opaldst ls period21/run7</b>
+<P>
+sfsh effectively performs a <i>cd</i> (change working directory) to the user's
+ directory
+in each of the file systems in the pool in turn, issuing the <i>ls</i> command
+in each of these directories. The sfsh command is actually much more general,
+ and will
+issue any command specified by the user in each of the file systems in the
+pool. Be careful, however, as the shell expands some characters in the command
+ line
+using the working directory at the time the sfsh command is issued. Thus, if it
+ is wished
+to issue the command <i>ls *</i> it is necessary to protect the
+* from expansion by the shell by enclosing it in single quotes as follows:
+<P>
+<b>sfsh -p opaldst 'ls *'</b>
+<P>
+Files are removed from <i>shift</i> pools by means of the <b>sfrm</b> command.
+<P>
+e.g. <b>sfrm -p opaldst period21/run7/file26</b>
+<P>
+In addition to the <b>-p</b> option, specifying the disk pool to be used, all of
+ the
+DPM commands support the <b>-u</b> option, which allows the
+caller to specify the user (and implied group) associated with the file. The
+ default
+is the user who issues the command.
+<P>
+Here is some more information about disk pools.
+<P>
+<UL><LI> A file system belongs to at most one disk pool.
+<LI> A pool can be <i>temporary</i> or <i>permanent</i>.
+If a pool is temporary, a garbage collector is run periodically
+to maintain the amount of free space on each of the component
+file systems above a specified <i>free space threshold</i>. This involves
+deleting files on the basis of size and time of last access.
+Files are deleted from permanent pools only
+on explicit request by a user.
+<LI> A pool can be <i>public</i> or <i>private</i>. If it is private only a
+ defined set of
+users
+will be able to allocate space within the pool.
+<LI> When a file is created by sfget the user specifies the pool which
+should be used. If no pool is specified a default pool named <i>public</i> will
+ be used.
+The disk pool management system selects a suitable file system within the pool
+ using
+criteria like occupancy level, performance characteristics, etc.
+<LI> The user may supply an estimate
+of the size of the file which will be created (<b>-s</b> option of the sfget
+ command),
+to ensure that a
+file system with sufficient free space is selected. The default is
+200 MBytes, and so
+there must be at least this amount of free space in one of the file systems
+in the pool. If <i>-s 0</i> is specified this check will be omitted.
+</UL><H1><A NAME=SECTION0092000000000000000> Using shift Files with FORTRAN Programs</A></H1>
+<P>
+Once a file has been created or located by the the Disk Pool Manager,
+and the user knows the full pathname (the <i><i>nfs_pathname</i></i>), the file may be used
+exactly like any other file.
+Normally, however, the <i>shift</i> Remote File I/O System (RFIO) will be used to
+access these files, in order to obtain the best possible performance.
+The RFIO routines are used by the ZEBRA and FATMEN packages. In order to
+ connect
+a file to the RFIO routines, the <b>assign</b> command
+must be used. Assign sets up a connection for both the RFIO routines and
+for FORTRAN. The above example becomes:
+<P>
+<b>assign `sfget sample45` 10<BR>gendata</b>
+<P>
+<H1><A NAME=SECTION0093000000000000000> File Permissions and Authorisation</A></H1>
+<P>
+<A NAME=secpermissions><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<P>
+This section sounds rather complicated. If you do not wish to be concerned with
+the details, skip to the summary.
+<P>
+There are two distinct access control facilities:
+<UL><LI> The right of a user to
+allocate space in a disk pool. This is specified in
+a configuration file used by the DPM.
+The DPM will create files on behalf of a user only if
+he is authorised for the particular pool.
+<LI> Unix File Permissions. These are checked by the Unix file system software
+whenever a file is accessed (create, read, write, remove). The DPM 
+will set permissions in directories and files which it creates, as described
+ later in
+the present section. The user may change these permissions using normal
+Unix functions. Access to a file depends on the permissions set at the time of
+access, according to the usual Unix rules.
+</UL>When the DPM creates directories and files, it performs checks and sets
+ ownership
+and permissions as follows. The <i>client</i> is the user who issues the command.
+<DL ><DT>group directory
+<DD>  <BR>Checks: The client must belong to the group defined by the name of the
+ directory.<BR>Owner: gid of the group name, uid of root.<BR>Permissions: rwxr_xr_x<DT>user directory
+<DD>  <BR>Checks: gid of the client must match that of the parent (group) directory,
+and the name of the directory must correspond to a username in that group.<BR>Owner: gid of the parent directory, uid of the user defined by the name of the
+ directory.<BR>Permissions: rwxr_xr_x.
+<DT>lower level directories
+<DD>  <BR>Checks: gid of the client must match that of the parent directory.<BR>Owner: gid and uid of the parent directory.<BR>Permissions: rwxr_xr_x.<BR><DT>the file
+<DD>  <BR>Checks: gid of the client must match that of the parent directory.<BR>Owner: gid of the parent directory, uid of the client.<BR>Permissions: rwxrwxrwx minus the current user mask of the client.
+<P>
+ </DL><b>Summary:</b>
+<P>
+All files are world <b>visible</b>: anyone may read any of the
+directories.
+<P>
+To create a file, a client must belong to the <i>group</i> in whose sub-tree the
+ file
+will be created. He may, however, create a file in a directory
+which belongs to another <i>user</i> in that group. This allows several users
+in the same group, working on a common topic, to maintain their files in
+a single directory.
+<P>
+The client's <i>umask</i> defines access to the file itself, and so
+read and write access to the file may be restricted.
+<P>
+The user whose name is associated with
+the user-level directory owns all inferior directories, and he alone is able to
+ manipulate
+the directory structure manually. All other people may manipulate it only
+ through DPM 
+commands.
+<P>
+Before removing a file, the DPM checks that the
+client has write permission to the file <b>or</b>
+is the owner of the parent
+directory <b>or</b> is the garbage collector. When a file
+or directory is removed, its parent directory is also
+removed if it is now empty and is below the user directory level.
+No permission checks are made when directories are removed, as this is
+seen as a system function, rather than being performed on behalf of the
+client. The directories will be recreated automatically when required.
+<P>
+<b>Example</b>
+<P>
+Let us assume that the client is user <i>les</i> in group <i>c3</i>. There is
+ another
+user in group <i>c3</i> called <i>pubc3</i> (probably this is a ``dummy&quot; user
+ which has been
+created specifically
+to own files which are common to the group). The user mask is set to 22, which
+ means that
+files will be created with permissions: rwxr_xr_x.
+<P>
+<PRE><TT>shift1 [1] umask
+22
+shift1 [2] sfget -u pubc3 performance/disk/rs6000/test22
+/shift/shift1/data0/c3/pubc3/performance/disk/rs6000/test22
+shift1 [3] sfget -u pubc3 performance/disk/sgi340/test7
+/shift/shd01/data4/c3/pubc3/performance/disk/sgi340/test7
+shift1 [4] sfsh -u pubc3 'ls -ls performance/disk/*'
+ 
+/shift/shift1/data0/c3/pubc3
+ls -ls performance/disk/*
+ 
+performance/disk/rs6000:
+total 0
+   0 -rwxr-xr-x   1 les      c3             0 Jan 25 08:58 test22
+ 
+/shift/shd01/data4/c3/pubc3
+ls -ls performance/disk/*
+ 
+performance/disk/sgi340:
+total 0
+   0 -rwxr-xr-x   1 les      c3             0 Jan 25 08:59 test7
+shift1 [5] sfrm -u pubc3 performance/disk/rs6000/test22
+shift1 [6] sfrm -u pubc3 performance/disk/sgi340/test7</TT></PRE>
+<P>
+<H1><A NAME=SECTION0094000000000000000> Tape-Disk Copying</A></H1>
+<P>
+The <i>shift</i> system provides two commands to copy data between tape and disk:
+<b>tpread</b> (tape to disk) and <b>tpwrite</b> (disk to tape). These commands
+select a <i>shift</i> tape server which has a device of the correct type available,
+and initiate a process on the server to mount the tape and perform the copy
+ operation.
+The remote process uses the basic <i>shift</i> tape copy commands, <i>cptpdsk</i>
+and <i>cpdsktp</i>.Normally the user
+will not invoke these commands directly himself.
+<P>
+When using the tpread or tpwrite commands, the user must specify the
+tape vsn or vid and the pathname of the file. The type of tape unit and its
+location are specified by means of the <b>-g device_group_name</b>
+option. By default this is <i>CART</i> meaning an IBM 3480-compatible
+tape unit in the manually-operated section of the CERN Computer Centre
+tape vault. A tape in the CERN cartridge tape robot would be
+selected by <i>-g SMCF</i>.
+<P>
+The following example copies data from tape into a file in a <i>shift</i> disk pool.
+First we obtain the pathname of the file from sfget. The example assumes that we
+are using the C shell, and first stores the pathname allocated by sfget in a
+shell variable called NFSNAME.
+This variable is then used in the subsequent
+tpread, which copies the first file from a cartridge tape into the disk file.
+<P>
+<b>set NFSNAME=`sfget -p opaldst testtape`<BR>tpread -v xu4125 $NFSNAME</b>
+<P>
+This could of course be achieved by the single command:
+<P>
+<b>tpread -v xu4125 `sfget -p opaldst testtape`</b>
+<P>
+Similarly, data can be copied from disk to tape using the sequence:
+<P>
+<b>set NFSNAME=`sfget -p opaldst testtape`<BR>tpwrite -v fz7425 -q 1 $NFSNAME</b>
+<P>
+The next example demonstrates how to copy the first four files
+from a tape into a single disk file (in this case in the PUBLIC pool).
+<P>
+<b>tpread -v qw8256 -q 1-4 `sfget testtape`</b>
+<P>
+The files may be copied into separate files by simply supplying
+a list of pathnames.
+<P>
+<b>tpread -v qw8256 -q 1-4 `sfget tfile1` `sfget tfile2` `sfget
+ tfile3` `sfget tfile4`</b>
+<P>
+Multiple files may be created on tape with a single tpwrite command in the same
+ way.
+<P>
+<b>tpwrite -v mv1423 -q 1-4 `sfget tfile1` `sfget tfile2`
+ `sfget tfile3` `sfget tfile4`</b>
+<P>
+There are many other parameters to the tpread and tpwrite commands,
+concerned with label formats, record formats, etc.
+<P>
+Although the above examples all use <i>sfget</i> to generate a pathname, the
+ tpread and tpwrite
+commands are entirely independent of the Disk Pool Manager, and may be used to
+ copy data to and
+from any disk files accessible to the <i>shift</i> system.
+<P>
+<H1><A NAME=SECTION0095000000000000000> Tape Staging</A></H1>
+<P>
+The idea of tape staging, with a history at CERN dating back to the CDC7600
+in the early 70's, is that a file which has a permanent home on tape
+is copied to disk while it is being used, the disk copy being thrown away when
+ the
+space is needed for new data. Similarly, a program creates a new file on disk,
+ and
+copies it to tape when the program has terminated correctly. The disk copy may
+ then
+be removed immediately, or may be left in the stage area, to be removed
+ automatically
+by a garbage collector.
+<P>
+<i>shift</i> will not support a general tape staging mechanism, but it includes a
+ number of features
+which can be used to build such facilities, and a simple stage script is
+ provided -
+See <em>SHIFT Reference Manual.</em>
+This may be used as an example for more complicated
+stage routines tailored to the user's needs.  The source of the script is
+ maintained in the library
+<b>/usr/local/bin</b>. It is basically a one-line interface to <i>sfget</i>, <i>tpread/tpwrite</i>
+and <i>assign</i>. When used in conjunction with a <i>shift</i> <i>temporary</i> disk
+ pool it provides
+a straight-forward staging facility.
+<P>
+There are two stage commands: <b>stagein</b>, which checks to see if the file is
+ already present on
+disk and copies it in from tape if necessary, and <b>stageout</b> which copies a
+ file from disk to
+tape. Both of these commands are implemented by a single shell script, <i>stage</i>.
+<P>
+<H2><A NAME=SECTION0095100000000000000> stagein</A></H2>
+<P>
+<UL><LI> issues an <i>sfget</i> to locate or create the file;
+<LI> if the file was created, issues a <i>tpread</i> to copy the
+data from tape to disk;
+<LI> if requested by the user (-U option) issues an <i>assign</i> command
+to connect the file to a FORTRAN unit number.
+</UL><H2><A NAME=SECTION0095200000000000000> stageout</A></H2>
+<P>
+<UL><LI> issues an <i>sfget</i> to locate the file to be staged out;
+<LI> issues a <i>tpwrite</i> to copy the file to tape;
+</UL>The parameters of both stagein and stageout are those of the
+sfget, tpread and tpwrite commands, with the restriction that multiple
+disk files are not supported.
+<P>
+<b>Examples</b>
+<P>
+<OL><LI> <b>stagein -v ux3456 -g SMCF -q 4 -U 11 testfile.4</b>
+<P>
+will stage in file 4 from a tape in the CERN cartridge robot,
+to the PUBLIC disk pool and assign
+the disk file to FORTRAN unit 11.
+<P>
+<LI> <b>stageout -v uz1654 -g SMCF -q 6 -p opaldst run26</b>
+<P>
+locates the file <i>run26</i> in the pool <i>opaldst</i> and copies it to tape.
+<P>
+<LI> <b>stagein -v rm3458 -g CART -q 3- batch6.ntuples</b>
+<P>
+will stage tape data from file 3 to the end of the tape into a single disk file.
+<P>
+<LI> Notice that <i>stageout</i> copies the file immediately.
+If a job creates a file
+and wishes to copy it to tape at the end, it is probably more appropriate to use
+ the
+<i>sfget</i>, <i>assign</i> and <i>tpwrite</i> commands directly.
+<P>
+<b>....<BR>....<BR>OUTFILE=`sfget tempfile`<BR>assign $OUTFILE10</b><BR><i>( get a file in the public pool, and assign it to FORTRAN unit 10)</i><BR><b>....<BR>....<BR>simul</b>  <i>( run the program, which writes to unit 10)</i><BR><b>....<BR>....<BR>tpwrite -v wg7634 -g CART $OUTFILE<BR>sfrm $OUTFILE</b><BR><i>(write out the file, and remove the disk copy)</i>
+<P>
+</OL>-
+John Gordon Lee
+CERN-CN/CO/RE
+<HR> <A NAME=tex2html175 HREF=chapter2_10.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/next_motif.gif"></A> <A NAME=tex2html173 HREF=shiftuser.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/up_motif.gif"></A> <A NAME=tex2html167 HREF=chapter2_8.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/previous_motif.gif"></A> <A NAME=tex2html177 HREF=tableofcontents2_1.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/contents_motif.gif"></A> <BR>
+<B> Next:</B> <A NAME=tex2html176 HREF=chapter2_10.html>  About this document </A>
+<B>Up:</B> <A NAME=tex2html174 HREF=shiftuser.html>No Title</A>
+<B> Previous:</B> <A NAME=tex2html168 HREF=chapter2_8.html> Batch Job Submission </A>
+<HR> <P>
+<HR>
+
+</BODY>
+<P><ADDRESS>
+<I>goossens@ <BR>
+Fri Mar  4 17:06:49 MET 1994</I>
+</ADDRESS>

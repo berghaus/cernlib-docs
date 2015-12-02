@@ -1,0 +1,333 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%   ZEBRA User Guide -- LaTeX Source                              %
+%                                                                 %
+%   Appendix chapter: Example jobs                                %
+%                                                                 %
+%   The following external EPS files are referenced:              %
+%   none                                                          %
+%                                                                 %
+%   Editor: Michel Goossens / AS-MI                               %
+%   Last Mod.:  8 Dec. 1990   mg                                  %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{Examples}
+\section{Initializing ZEBRA in the main program}
+\par ZEBRA must be initialized by a call to \Rind{MZEBRA}.
+This is most conveniently placed in the main program.
+\par
+The first example {\tt ZTESTQ} shows how to build a linear structure in the
+default store (the first one initiated, in this case the blank common).
+Maximum use is made of ZEBRA's default settings and the banks are created with
+\Rind{MZLIFT} using the bank name vector facility initialized at the beginning
+of the subroutine. \par
+The second example {\tt ZTESTG} teaches how a structure similar to the one in
+{\tt ZTESTQ} can be constructed with fanout banks. The use of a link area,
+several divisions and the way of describing the type of the data part of the
+banks with \Rind{MZFORM} is shown.
+\par Example {\tt ZTESTA} shows how to specify complex I/O descriptors.
+\par The last example {\tt ZTESTF} writes the structures built in the previous
+three examples in machine-dependent format to disk, then reads them back into
+the same store, outputs them again all together in a 'division' write
+to a different output unit and finally re-reads the division in again
+as one piece, locating the entry addresses to the different structures
+using the \Rind{LZLOC} routine as described on page~\pageref{SR_LZLOC}
+\par
+In all examples extensive use is made of the DZ debug routines.
+\begin{verbatim}
+      PROGRAM ZEXAM
+ 
+      CALL MZEBRA(0)
+ 
+C--     Build linear structures in the default store
+ 
+      CALL ZTESTQ
+ 
+C--     Build fanout structures in a secondary store
+ 
+      CALL ZTESTG
+ 
+C--     Describe a few complicated I/O characteristics with MZFORM
+ 
+      CALL ZTESTA
+ 
+C--     Use the structures built up to now, and write and read them
+ 
+      CALL ZTESTF
+ 
+C--     Print the end of run statistics
+ 
+      CALL MZEND
+ 
+      END
+\end{verbatim}
+\section{Linear structures}
+\subsection{Building a data structure with vertices and tracks}
+\par
+In example {\tt ZTESTQ} a structure similar to the one in section ``Using data
+structures'' in chapter 1 is built.
+To simplify matters only default
+settings for the ZEBRA routine parameters are used. Since the store in
+{\tt ZTESTQ} is the first one declared its store index is 0 and its default
+divisions will have indices 1 and 2. Not specifying the division index
+to \Rind{MZLIFT} will create all banks in the present example in division 2.
+\par After creation of the ``mother' bank at {\tt LEV}, 
+a double {\tt DO} loop
+creates first 3 {\tt VX} (vertex) banks
+as down banks, and then attaches respectively 3, 2 and 2 {\tt TK}
+(track) banks to the {\tt VX} banks as downs. 
+All {\tt VX} banks and the {\tt TK} banks
+connected to a given vertex
+are grouped together in a linear structure.
+The data part of each bank is filled with information of a type specified
+in the calls to \Rind{MZFORM}.
+\par At the end of the routine
+the complete tree of the {\tt EV} data structure is printed,
+followed by a map of division 2. Finally a detailed verification
+of the same division is made.
+\begin{verbatim}
+      SUBROUTINE ZTESTQ
+ 
+      COMMON//IFENCE(2),LEV,BLVECT(10000)
+      DIMENSION LQ(999),IQ(999)
+      DIMENSION  Q(999)
+      EQUIVALENCE (IQ(1),Q(1),LQ(9)),(LQ(1),LEV)
+ 
+      DIMENSION MMEV(5),MMTK(5),MMVX(5)
+      DIMENSION NTK(3)
+ 
+      DATA MMEV/4HEV  ,7,7,10,0/
+      DATA MMTK/4HTK  ,0,0,15,3/
+      DATA MMVX/4HVX  ,1,1,12,0/
+ 
+      DATA NTK/3,2,2/ , NVX/3/
+ 
+C--     Initialize store in blank common //
+ 
+      CALL MZSTOR(IXBLST,'//',' ',IFENCE,LEV,BLVECT(1),BLVECT(1),
+     X            BLVECT(2000),BLVECT(10000)                )
+ 
+C--     Create a structure in the default division (2)
+ 
+      CALL MZFORM('EV  ','3H 3I -F',MMEV(5))
+      CALL MZFORM('VX  ','3I -F',MMVX(5))
+ 
+      CALL MZLIFT(0,LEV,LEV,1,MMEV,0)
+ 
+      IQ(LEV+1) = MMEV(1)
+      IQ(LEV+2) = MMTK(1)
+      IQ(LEV+3) = MMVX(1)
+      DO 1 I=4,6
+    1 IQ(LEV+I) = I
+      DO 2 I=7,MMEV(4)
+    2 Q(LEV+I) = FLOAT(I)
+ 
+C--     Create the vertex (VX) banks
+ 
+      DO 20 IVX=1,NVX
+          CALL MZLIFT(0,LVX,LEV,-1,MMVX,0)
+          DO 7 I=1,3
+    7     IQ(LVX+I) = 10*IVX+I
+          DO 8 I=4,MMVX(4)
+    8     Q(LVX+I) = FLOAT(10*IVX+I)
+ 
+C--     Create the track (TK) banks associated to a given VX bank
+ 
+          DO 10 ITK=1,NTK(IVX)
+              CALL MZLIFT(0,LTK,LVX,-1,MMTK,0)
+              DO 9 I=1,MMTK(4)
+    9         Q(LTK+I) = FLOAT(100*ITK+10*IVX+I)
+              JB  = 0
+   10     CONTINUE
+   20     CONTINUE
+ 
+C--     Print the complete structure and the store, then verify complete
+ 
+      CALL DZSHOW('Dump EV structure',0,LEV,'BDLV',0,0,0,0)
+      CALL DZSHOW('Dump EV structure',0,LEV,'BSLV',0,0,0,0)
+      CALL DZSTOR('Dump of store //',0)
+      CALL DZSURV('Survey of the EV data structure',0,LEV)
+      CALL DZSNAP('Snap of //',2,'M')
+      CALL DZVERI('Verify default division in //',2,'CFLSU')
+ 
+      END
+\end{verbatim}
+\begin{Listing}\begin{verbatim}
+ MZSTOR.  ZEBRA table base TAB(0) in /MZCC/ at adr      130537    0001FDE9 HEX
+ MZSTOR.  Initialize Store  0  in //
+          with Store/Table at absolute adrs      100007      130537
+                                        HEX    000186A7    0001FDE9
+                                        HEX    FFFF89AA    00000000
+                              relative adrs      -30294           0
+          with     1 Str. in     1 Links in   2001 Low words in   10001 words.
+          This store has a fence of    2 words.
+ DZSHOW --- Dump EV structure                                                                       OPTIONS : BDLV
+ DZSHOW  +++++ LEVEL     0 ++++++++++            Store  //       at absolute address 00061AA0      ++++++++++
+  EV  .     1     9580(QDIV2   ) SY/US/IO 0001/00000/2153 NL/NS/ND    7/    7/      10 N/U/O/@O       0/       0/       1/    9580
+ STRUCTURAL links               ********************************************************************************************************************************************************************************************************************************
+|***************************************************************************************************************************************************************************************************************************************************************
+|********************************* 6     8     8.0000000        10     10.000000
+ DZSHOW  +++++ LEVEL     1 ++++++++++            Store  //       at absolute address 00061AA0      ++++++++++
+  VX  .     3     9379(QDIV2   ) SY/US/IO 0000/00000/01A3 NL/NS/ND    1/    1/      12 N/U/O/@O    9452/    9580/    9579/    9379
+ STRUCTURAL links                                          --------------------
+           1    TK        9328
+ DATA part of bank                                         -------------------- /61880/
+ DATA      1                31     4     34.000000         7     37.000000        10     40.000000
+           2                32     5     35.000000         8     38.000000        11     41.000000
+           3                33     6     36.000000         9     39.000000        12     42.000000
+ DZSHOW  +++++ LEVEL     2 ++++++++++            Store  //       at absolute address 00061AA0      ++++++++++
+  TK  .     2     9328(QDIV2   ) SY/US/IO 0000/00000/0003 NL/NS/ND    0/    0/      15 N/U/O/@O    9353/    9379/    9378/    9328
+ DATA part of bank                                         --------------------
+ DATA      1     231.00000         4     234.00000         7     237.00000        10     240.00000        13     243.00000
+           2     232.00000         5     235.00000         8     238.00000        11     241.00000        14     244.00000
+           3     233.00000         6     236.00000         9     239.00000        12     242.00000        15     245.00000
+  TK  .     1     9353(QDIV2   ) SY/US/IO 0000/00000/0003 NL/NS/ND    0/    0/      15 N/U/O/@O       0/    9379/    9328/    9353
+ DATA part of bank                                         --------------------
+ DATA      1     131.00000         4     134.00000         7     137.00000        10     140.00000        13     143.00000
+           2     132.00000         5     135.00000         8     138.00000        11     141.00000        14     144.00000
+           3     133.00000         6     136.00000         9     139.00000        12     142.00000        15     145.00000
+ DZSHOW  +++++ LEVEL     1 ++++++++++            Store  //       at absolute address 00061AA0      ++++++++++
+  VX  .     2     9452(QDIV2   ) SY/US/IO 0000/00000/01A3 NL/NS/ND    1/    1/      12 N/U/O/@O    9550/    9580/    9379/    9452
+ STRUCTURAL links                                          --------------------
+           1    TK        9401
+ DATA part of bank                                         --------------------
+ DATA      1                21     4     24.000000         7     27.000000        10     30.000000
+           2                22     5     25.000000         8     28.000000        11     31.000000
+           3                23     6     26.000000         9     29.000000        12     32.000000
+ DZSHOW  +++++ LEVEL     2 ++++++++++            Store  //       at absolute address 00061AA0      ++++++++++
+  TK  .     2     9401(QDIV2   ) SY/US/IO 0000/00000/0003 NL/NS/ND    0/    0/      15 N/U/O/@O    9426/    9452/    9451/    9401
+ DATA part of bank                                         --------------------
+ DATA      1     221.00000         4     224.00000         7     227.00000        10     230.00000        13     233.00000
+           2     222.00000         5     225.00000         8     228.00000        11     231.00000        14     234.00000
+           3     223.00000         6     226.00000         9     229.00000        12     232.00000        15     235.00000
+  TK  .     1     9426(QDIV2   ) SY/US/IO 0000/00000/0003 NL/NS/ND    0/    0/      15 N/U/O/@O       0/    9452/    9401/    9426
+ DATA part of bank                                         --------------------
+ DATA      1     121.00000         4     124.00000         7     127.00000        10     130.00000        13     133.00000
+           2     122.00000         5     125.00000         8     128.00000        11     131.00000        14     134.00000
+           3     123.00000         6     126.00000         9     129.00000        12     132.00000        15     135.00000
+ DZSHOW  +++++ LEVEL     1 ++++++++++            Store  //       at absolute address 00061AA0      ++++++++++
+  VX  .     1     9550(QDIV2   ) SY/US/IO 0000/00000/01A3 NL/NS/ND    1/    1/      12 N/U/O/@O       0/    9580/    9452/    9550
+ STRUCTURAL links                                          --------------------
+           1    TK        9474
+ DATA part of bank                                         --------------------
+ DATA      1                11     4     14.000000         7     17.000000        10     20.000000
+           2                12     5     15.000000         8     18.000000        11     21.000000
+           3                13     6     16.000000         9     19.000000        12     22.000000
+ DZSHOW  +++++ LEVEL     2 ++++++++++            Store  //       at absolute address 00061AA0      ++++++++++
+  TK  .     3     9474(QDIV2   ) SY/US/IO 0000/00000/0003 NL/NS/ND    0/    0/      15 N/U/O/@O    9499/    9550/    9549/    9474
+ DATA part of bank                                         --------------------
+ DATA      1     311.00000         4     314.00000         7     317.00000        10     320.00000        13     323.00000
+           2     312.00000         5     315.00000         8     318.00000        11     321.00000        14     324.00000
+           3     313.00000         6     316.00000         9     319.00000        12     322.00000        15     325.00000
+  TK  .     2     9499(QDIV2   ) SY/US/IO 0000/00000/0003 NL/NS/ND    0/    0/      15 N/U/O/@O    9524/    9550/    9474/    9499
+ DATA part of bank                                         --------------------
+ DATA      1     211.00000         4     214.00000         7     217.00000        10     220.00000        13     223.00000
+           2     212.00000         5     215.00000         8     218.00000        11     221.00000        14     224.00000
+           3     213.00000         6     216.00000         9     219.00000        12     222.00000        15     225.00000
+  TK  .     1     9524(QDIV2   ) SY/US/IO 0000/00000/0003 NL/NS/ND    0/    0/      15 N/U/O/@O       0/    9550/    9499/    9524
+ DATA part of bank                                         --------------------
+ DATA      1     111.00000         4     114.00000         7     117.00000        10     120.00000        13     123.00000
+           2     112.00000         5     115.00000         8     118.00000        11     121.00000        14     124.00000
+           3     113.00000         6     116.00000         9     119.00000        12     122.00000        15     125.00000
+ DZSHOW --- Dump EV structure                                                                       OPTIONS : BSLV
+ DZSHOW  +++++ LEVEL     0 ++++++++++            Store  //       at absolute address 00061AA0      ++++++++++
+  EV  .     1     9580(QDIV2   ) SY/US/IO 0001/00000/2153 NL/NS/ND    7/    7/      10 N/U/O/@O       0/       0/       1/    9580
+ --------  LINK part of bank  --------
+       1 /        9379           0           0           0           0           0           0
+ --------  DATA part of bank  --------
+       1 /        "EV          "TK          "VX             4           5           6   7.000       8.000       9.000       10.00
+ DZSHOW  +++++ LEVEL     1 ++++++++++            Store  //       at absolute address 00061AA0      ++++++++++
+  VX  .     3     9379(QDIV2   ) SY/US/IO 0000/00000/01A3 NL/NS/ND    1/    1/      12 N/U/O/@O    9452/    9580/    9579/    9379
+ --------  LINK part of bank  --------
+       1 /        9328
+ --------  DATA part of bank  --------
+       1 /          31          32          33   34.00       35.00       36.00       37.00       38.00       39.00       40.00
+      11 /   41.00       42.00
+ DZSHOW  +++++ LEVEL     2 ++++++++++            Store  //       at absolute address 00061AA0      ++++++++++
+  TK  .     2     9328(QDIV2   ) SY/US/IO 0000/00000/0003 NL/NS/ND    0/    0/      15 N/U/O/@O    9353/    9379/    9378/    9328
+ --------  DATA part of bank  --------
+       1 /   231.0       232.0       233.0       234.0       235.0       236.0       237.0       238.0       239.0       240.0
+      11 /   241.0       242.0       243.0       244.0       245.0
+  TK  .     1     9353(QDIV2   ) SY/US/IO 0000/00000/0003 NL/NS/ND    0/    0/      15 N/U/O/@O       0/    9379/    9328/    9353
+ --------  DATA part of bank  --------
+       1 /   131.0       132.0       133.0       134.0       135.0       136.0       137.0       138.0       139.0       140.0
+      11 /   141.0       142.0       143.0       144.0       145.0
+ DZSHOW  +++++ LEVEL     1 ++++++++++            Store  //       at absolute address 00061AA0      ++++++++++
+  VX  .     2     9452(QDIV2   ) SY/US/IO 0000/00000/01A3 NL/NS/ND    1/    1/      12 N/U/O/@O    9550/    9580/    9379/    9452
+ --------  LINK part of bank  --------
+       1 /        9401
+ --------  DATA part of bank  --------
+       1 /          21          22          23   24.00       25.00       26.00       27.00       28.00       29.00       30.00
+      11 /   31.00       32.00
+ DZSHOW  +++++ LEVEL     2 ++++++++++            Store  //       at absolute address 00061AA0      ++++++++++
+  TK  .     2     9401(QDIV2   ) SY/US/IO 0000/00000/0003 NL/NS/ND    0/    0/      15 N/U/O/@O    9426/    9452/    9451/    9401
+ --------  DATA part of bank  --------
+       1 /   221.0       222.0       223.0       224.0       225.0       226.0       227.0       228.0       229.0       230.0
+      11 /   231.0       232.0       233.0       234.0       235.0
+  TK  .     1     9426(QDIV2   ) SY/US/IO 0000/00000/0003 NL/NS/ND    0/    0/      15 N/U/O/@O       0/    9452/    9401/    9426
+ --------  DATA part of bank  --------
+       1 /   121.0       122.0       123.0       124.0       125.0       126.0       127.0       128.0       129.0       130.0
+      11 /   131.0       132.0       133.0       134.0       135.0
+ DZSHOW  +++++ LEVEL     1 ++++++++++            Store  //       at absolute address 00061AA0      ++++++++++
+  VX  .     1     9550(QDIV2   ) SY/US/IO 0000/00000/01A3 NL/NS/ND    1/    1/      12 N/U/O/@O       0/    9580/    9452/    9550
+ --------  LINK part of bank  --------
+       1 /        9474
+ --------  DATA part of bank  --------
+       1 /          11          12          13   14.00       15.00       16.00       17.00       18.00       19.00       20.00
+      11 /   21.00       22.00
+ DZSHOW  +++++ LEVEL     2 ++++++++++            Store  //       at absolute address 00061AA0      ++++++++++
+  TK  .     3     9474(QDIV2   ) SY/US/IO 0000/00000/0003 NL/NS/ND    0/    0/      15 N/U/O/@O    9499/    9550/    9549/    9474
+ --------  DATA part of bank  --------
+       1 /   311.0       312.0       313.0       314.0       315.0       316.0       317.0       318.0       319.0       320.0
+      11 /   321.0       322.0       323.0       324.0       325.0
+  TK  .     2     9499(QDIV2   ) SY/US/IO 0000/00000/0003 NL/NS/ND    0/    0/      15 N/U/O/@O    9524/    9550/    9474/    9499
+ --------  DATA part of bank  --------
+       1 /   211.0       212.0       213.0       214.0       215.0       216.0       217.0       218.0       219.0       220.0
+      11 /   221.0       222.0       223.0       224.0       225.0
+  TK  .     1     9524(QDIV2   ) SY/US/IO 0000/00000/0003 NL/NS/ND    0/    0/      15 N/U/O/@O       0/    9550/    9499/    9524
+ --------  DATA part of bank  --------
+       1 /   111.0       112.0       113.0       114.0       115.0       116.0       117.0       118.0       119.0       120.0
+      11 /   121.0       122.0       123.0       124.0       125.0
+ DZSTOR --- Dump of store //
+  --- Store Parameters ---
+ Id    Name    Abs.addr.  Length   Fence      NS      NL      WS  Min.Resv.  Act.Resv.   Min(1+2)   Low  High
+  0  //        00061AA0     9998       2       1       0       0        164       9325       2000     2     0
+  --- Division parameters ---
+    DIVISION    START    END       MAX    KIND   MODE  WIPES  GARB.  GARB. PUSHES      LIVE BANKS  DROPPED BANKS    BANKS TOTAL
+  NB.   NAME   ADDRESS ADDRESS  LENGTH                        SYST.   FREE         NUMB.   LENGTH NUMB.   LENGTH NUMB.   LENGTH
+ ==============================================================================================================================
+   1  QDIV1          2       1       0 U/EVENT  FORWD      0      0      0      0       0        0     0        0     0        0
+   2  QDIV2       9327    9598       0 U/EVENT  REVRS      0      0      0      0      11      272     0        0    11      272
+  20  QDIVSYST    9750    9998       0  SYSTEM  REVRS      0      0      0      0       6      249     0        0     6      249
+  --- Link area parameters ---
+ QWSP     PERMANENT LIST AREA      is at absolute 00061AA0 NL/NS     1    1     status   ACTIVE
+ QLASYST  PERMANENT LIST AREA      is at absolute 0007F7E8 NL/NS    20   10     status   ACTIVE
+ DZSURV --- Survey of the EV data structure                                                         ST= //        LSTART=     9580
+   NWCUM     NW   WBK  NBK    IDENTIFIER(S)
+      27     27    27    1     EV
+      96     69    23    3       -1 VX
+     271    175    25    7            -1 TK
+ 
+  DZSURV --- The structure supported by bank EV   at       9580 in store //       occupies        271 words in     11 banks
+  DZSNAP --- Snap of //                                                                              OPTIONS : M
+   NAME       LQSTOR NQSTRU  NQREF NQLINK LQMINR LQ2END JQDVLL JQDVSY NQFEND  LOW-1  LOW-N HIGH-1 HIGH-N SYST-1 SYST-N    END
+  //      (00061AA0)      1      1      1    164   2001      2     20      2      2      1   9327   9598   9750   9998   9998
+ DZSNAP.   -----  Store nb. 0 = //       Division nb. 2 = QDIV2                       --------------------
+  TK  .     2     9328(QDIV2   ) SY/US/IO 0000/00000/0003 NL/NS/ND    0/    0/      15 N/U/O/@O    9353/    9379/    9378/    9328
+  TK  .     1     9353(QDIV2   ) SY/US/IO 0000/00000/0003 NL/NS/ND    0/    0/      15 N/U/O/@O       0/    9379/    9328/    9353
+  VX  .     3     9379(QDIV2   ) SY/US/IO 0000/00000/01A3 NL/NS/ND    1/    1/      12 N/U/O/@O    9452/    9580/    9579/    9379
+      . LINKS    9328
+  TK  .     2     9401(QDIV2   ) SY/US/IO 0000/00000/0003 NL/NS/ND    0/    0/      15 N/U/O/@O    9426/    9452/    9451/    9401
+  TK  .     1     9426(QDIV2   ) SY/US/IO 0000/00000/0003 NL/NS/ND    0/    0/      15 N/U/O/@O       0/    9452/    9401/    9426
+  VX  .     2     9452(QDIV2   ) SY/US/IO 0000/00000/01A3 NL/NS/ND    1/    1/      12 N/U/O/@O    9550/    9580/    9379/    9452
+      . LINKS    9401
+  TK  .     3     9474(QDIV2   ) SY/US/IO 0000/00000/0003 NL/NS/ND    0/    0/      15 N/U/O/@O    9499/    9550/    9549/    9474
+  TK  .     2     9499(QDIV2   ) SY/US/IO 0000/00000/0003 NL/NS/ND    0/    0/      15 N/U/O/@O    9524/    9550/    9474/    9499
+  TK  .     1     9524(QDIV2   ) SY/US/IO 0000/00000/0003 NL/NS/ND    0/    0/      15 N/U/O/@O       0/    9550/    9499/    9524
+  VX  .     1     9550(QDIV2   ) SY/US/IO 0000/00000/01A3 NL/NS/ND    1/    1/      12 N/U/O/@O       0/    9580/    9452/    9550
+      . LINKS    9474
+  EV  .     1     9580(QDIV2   ) SY/US/IO 0001/00000/2153 NL/NS/ND    7/    7/      10 N/U/O/@O       0/       0/       1/    9580
+      . LINKS    9379
+ 
+  DZVERI --- Verify default division in //                                                           OPTIONS : CFLSU          OK
+\end{verbatim}\end{Listing}

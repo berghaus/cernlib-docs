@@ -1,0 +1,307 @@
+head	1.5;
+access;
+symbols;
+locks
+	goossens:1.5; strict;
+comment	@# @;
+
+
+1.5
+date	98.10.07.15.25.23;	author goossens;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	98.08.06.06.34.07;	author goossens;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	98.08.05.14.21.36;	author goossens;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	98.07.22.15.31.58;	author goossens;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	98.07.22.15.31.31;	author goossens;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.5
+log
+@add treatment of &UNIX; &WNT; &GNU; and &NICE; entities
+@
+text
+@#!/bin/sh
+# 	$Id: makewww.sh,v 1.4 1998/08/06 06:34:07 goossens Exp goossens $	
+# Script to prepare HTML files from SGML file (LHC++ manual)
+# 1) split source file into separate files
+#
+# parameter   Input file
+# Author:     M.Goossens IT/ASD
+# Last mod:   Oct. 7th 1998
+
+Name=`basename $0`
+Usage="Usage: $Name "
+
+# First transform sgml file into HTML file with tags uppercased
+sed -e '/<!DOCTYPE/d'             \
+    -e '/<!ENTITY/d'              \
+    -e '/^]>/d'                   \
+    -e '/^<!-- Cha/d'             \
+    -e '/<HTML>/d'                \
+    -e '/<\/HTML>/d'              \
+    -e '/<\/html>/d'              \
+    -e '/<HEAD>/d'                \
+    -e '/<\/HEAD>/d'              \
+    -e '/<BODY>/d'                \
+    -e '/<\/BODY>/d'              \
+    -e '/<\/body>/d'              \
+    -e '/<TITLE>/d'               \
+    -e '/<\/TITLE>/d'             \
+    -e '/!!TEX!!/d'               \
+    -e 's/!!HTML!!//g'            \
+    -e 's/&GNU;/GNU/g'\
+    -e 's/&NICE;/Nice/g'\
+    -e 's/&OBJ;/Objectivity\/DB/g'\
+    -e 's/&UNIX;/Unix/g'\
+    -e 's/&WNT;/Windows\/NT/g'\
+    -e 's/``/`/g'                 \
+    -e "s/''/'/g"                 \
+    -e 's/<h1>/<H1>/g'            \
+    -e 's/<\/h1>/<\/H1>/g'        \
+    -e 's/<h2>/<H2>/g'            \
+    -e 's/<\/h2>/<\/H2>/g'        \
+    -e 's/<h3>/<H3>/g'            \
+    -e 's/<\/h3>/<\/H3>/g'        \
+    -e 's/<h4>/<H4>/g'            \
+    -e 's/<\/h4>/<\/H4>/g'        \
+    -e 's/<em>/<EM>/g'            \
+    -e 's/<\/em>/<\/EM>/g'        \
+    -e 's/<tt>/<TT>/g'            \
+    -e 's/<\/tt>/<\/TT>/g'        \
+    -e 's/<p>/<P>/g'              \
+    -e 's/<\/p>/<\/P>/g'          \
+    -e 's/<i>/<I>/g'              \
+    -e 's/<\/i>/<\/I>/g'          \
+    -e 's/<li>/<LI>/g'            \
+    -e 's/<\/li>/<\/LI>/g'        \
+    -e 's/<ol>/<OL>/g'            \
+    -e 's/<\/ol>/<\/OL>/g'        \
+    -e 's/<ul>/<UL>/g'            \
+    -e 's/<\/ul>/<\/UL>/g'        \
+    -e 's/<a href=/<A HREF=/g'    \
+    -e 's/<a name=/<A NAME=/g'    \
+    -e 's/<\/a>/<\/A>/g'          \
+    -e 's/<img /<IMG /g'          \
+    -e '/<IMG /s/src=/SRC=/g'     \
+lhcppintro.sgml > lhcppmain.html
+
+# Cut files into various other files based on comments of the
+# form <!--filename=FILENAME--> and output labels to file "/tmp/ttt"
+# to get later cross-references correct.
+
+if (test -f temp.tmp)
+  then
+    rm temp.tmp
+  fi    
+
+gawk ' BEGIN	{ nout = 0
+                }	
+$0 ~  /<!--filename=/ { gsub("-->","")               # new file name
+#		       print $0
+                       split($0,a,"=") 
+		       filename=a["2"]
+#                       print filename
+                       next 
+                      }
+$0 ~  /<A.*NAME=/    {str=$0
+#                      print "*** str ORIG  **** " str 
+			while (match(str,"<A.*NAME=.*>")){
+#                          print "*** str **** " str   
+                          sstr = substr(str,RSTART,RLENGTH)
+                          ii   = index(sstr,"\">")
+			  sstr = substr(sstr,1,ii-1)
+#			  print "**** sstr RSTART RLENGTH ii ***** " sstr " " RSTART " " RLENGTH " " ii
+			  sub ("<A.*NAME=\"","",sstr)
+			  label=sstr
+                          str=substr(str,RSTART+ii)
+                          if ( nout == 0 ) 
+                            print label " " filename "#" label > "temp.tmp"
+ 		          else
+			    print label " " filename "#" label >> "temp.tmp"
+		          nout = 1
+#                            print " ****** label filename ****** " label " " filename "#" label 
+                       } 
+                          next
+                       }'   lhcppmain.html
+
+echo '********************************************************'
+
+rm lhcppmaster.html
+
+cat LHCPPBEGIN.HTML > lhcppmaster.html
+
+# First make an associative array out of labels in temp.tmp
+# then cut files accorging to filename comments and correct
+# cross-references thanks to temp.tmp information in ass. array.
+# A main file lhcppmaster.html will contain top level pointers
+# to the various chapters. 
+
+gawk ' BEGIN	{ while (getline < "temp.tmp" > 0 ) 
+ 		  { ref[$1] = $2 }
+		  nout = 0
+                  masterfile="lhcppmaster.html"
+                  outfile=masterfile
+                  headtext="<!DOCTYPE HTML PUBLIC  \"-//W3C//DTD HTML 3.2//EN\">\n\
+<HEAD>\n\
+<TITLE>Class Libraries for HEP Computing</TITLE>\n\
+<!-- Changed by: Michel Goossens, " strftime("%d-%b-%Y") " -->\n\
+</HEAD>\n\
+<BODY>\n"
+                }
+
+       END      { print "</BODY>\n</HTML>\n" >> outfile
+                  close(masterfile)
+                }
+
+$0 ~  /<!--filename=/ { gsub("-->","")              # new file name
+                       split($0,a,"=") 
+		       filename=a["2"]
+                       if (nout != 0) { print "</BODY>\n</HTML>\n" >> outfile
+                                        close(outfile)
+                                      }
+                       outfile  = filename
+		       nout += 1
+                       print headtext>filename
+                       next 
+                     }
+$0 ~ /<H1>/  	{ # chapter start
+                  print >> outfile 
+                  gsub("</A></H1>","</A></H2>")
+                  gsub("<H1><A.*\">","<H2><A HREF=\""filename"\">")
+                  print 
+                  print >> masterfile
+                  next
+                } 
+
+$0 ~  /<A HREF=\"#/  { str=$0		# Substitute the references
+			while (match (str,"<A HREF.*\">"))
+                        { sstr = substr(str,RSTART,RLENGTH)
+print $0 "\n 1 str " str  "\n sstr " sstr "\n\n"
+			  ii = index(sstr,"\">")
+			  sstr = substr(sstr,1,ii-1)
+			  sub ("<A.*#","",sstr)
+			  label=sstr
+                          str=substr(str,RSTART+ii)
+print $0 "\n 2 str " str "\n ii " ii "\n sstr " sstr "\n ref[label] " ref[label] "\n\n"
+			  if (ref[label] !="")
+				{ sub ("#"label,ref[label])
+                                   print "\$0 " $0 "\n"
+				}
+			  else
+				{ print "?? file " outfile "Unresolved cross-reference ***** " label
+				  print $0
+				}
+			} # end of while
+			  print >> outfile
+			  next
+		     }
+		     { print >> outfile				 # normal line
+		}
+     '  lhcppmain.html
+
+echo "Specify whether you want to delete the large HTML working file"
+rm -i lhcppmain.html
+
+rm -f a
+cat  lhcppmaster.html LHCPPEND.HTML >> a
+date=`date | gawk '{print $3 "-" $2 "-" $6}'`
+sed -e "s/!!DATE!!/$date/g" < a > lhcpp.html
+
+echo "Now you should copy all these HTML files to "
+echo "/afs/.cern.ch/project/cndoc/wwwasd/lhc++/lhcppguide/"
+
+exit
+
+
+
+
+
+
+
+
+
+
+
+@
+
+
+1.4
+log
+@eliminate two typos
+@
+text
+@d2 1
+a2 1
+# 	$Id: makewww.sh,v 1.3 1998/08/05 14:21:36 goossens Exp goossens $	
+d7 2
+a8 2
+# Author:     M.Goossens / IT/ASD
+# Last mod:   Aug. 5th 1998
+d30 2
+d33 2
+@
+
+
+1.3
+log
+@Update for version 1.2
+@
+text
+@d2 1
+a2 1
+# 	$Id: makewww.sh,v 1.2 1998/07/22 15:31:58 goossens Exp goossens $	
+d176 1
+a176 1
+echo "Specify whether you want telete the large HTML work file"
+d179 1
+a179 1
+rm a
+d182 4
+a185 1
+sed -e "s/!!DATE!!/$date/g" < a > lhcppmaster.html
+@
+
+
+1.2
+log
+@inital entry
+@
+text
+@d2 1
+a2 1
+# 	$Id$	
+d8 1
+a8 1
+# Last mod:   Mar 24th 1998
+d176 1
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d2 1
+@

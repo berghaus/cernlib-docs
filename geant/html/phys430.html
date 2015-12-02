@@ -1,0 +1,887 @@
+<PRE>
+
+
+
+
+<H2>Geant  3.16  Routine  PHYS430</H2>
+
+
+<PRE>
+
+
+Origin:  G.N.Patrick,  L.Urban,  D.Ward      Submitted:
+                                                       12.03.82
+Revision:                                                            Revised:  16.12.93
+Documentation:
+
+
+</PRE>  <HR>  <H2>Ionisation  processes  for  muons
+and  protons</H2>
+
+
+<PRE>
+
+
+</PRE>
+
+
+<H2>Subroutines</H2>
+
+
+<PRE>
+
+
+
+       CALL  GDRELA
+
+
+
+GDRELA  initialises  the  ionisation  energy-loss
+tables  for  different  materials  and  particles.  The
+energy  binning  is  in  the  array  ELOW  (/GCMULO/)
+initialised  in  the  routine  GPHYSI.  The  tables  are
+
+                                                -1
+filled  with  the  quantity  dE/ dx  in  GeV  cm      ,  for
+elements,  mixtures  and  compounds.  A  temporary
+table  is  also  filled,  containing  additional
+points  for  integration,  to  obtain  the
+range-energy  table  (see  [PHYS010]).
+
+
+GDRELP  computes  the  ionisation  energy  loss  for
+protons,  and  the  values  are  stored  in  the  energy
+loss  table.  This  value  is  used  for  other  charged
+hadrons  with  scaled  energy  bin.
+
+
+GDRELM  computes  the  ionisation  energy  loss  for
+muons,  and  sums  it  in  the  muon  table  with  the
+energy  loss  due  to  the  other  processes
+(bremsstrahlung,  pair  production  and  nuclear
+interactions).
+
+
+The  following  pointers  are  used:
+
+
+
+                                                       th
+JMA  =  LQ(JMATE-I)                                   I        material  bank;
+JEL1  =  LQ(JMA-1)                                    dE/ dx  for  e+/e-(see
+                                                      [PHYS330]);
+
+                                                                         +         -
+JEL2  =  LQ(JMA-2)                                    dE/ dx  for  mu       / mu      ;
+
+
+
+JEL3  =  LQ(JMA-3)                                    dE/ dx  for  protons  (used  also
+                                                      for  other  charged  particles).
+
+
+GDRELA  is  called  during  initialisation  by  GPHYSI.
+
+
+
+       CALL  GDRELP                         (A,Z,DENS,T,DEDX*)
+
+
+
+GDRELP  computes  the  ionisation  energy  loss  for
+protons.  It  is  called  by  the  routine  GDRELA.  See
+GDRELX  below  for  the  meaning  of  the  parameters.
+
+
+
+       CALL  GDRELM                         (A,Z,DENS,T,DEDX*)
+
+
+
+GDRELM  computes  the  energy  loss  due  to  ionisation
+for  muons.  It  is  called  by  the  routine  GDRELA.  See
+GDRELX  below  for  the  meaning  of  the  parameters.
+
+
+
+       CALL  GDRELX                         (A,Z,DENS,T,HMASS,DEDX*)
+
+
+
+A                         (REAL)  mass  number  of  the  material;
+Z                         (REAL)  atomic  number  of  the  material;
+DENS                      (REAL)  density  of  the  material  in  g
+
+                            -3
+                          cm      ;  it  is  only  used  to  calculate  the
+                          density  correction  in  case  of  high
+                          values  of  T;
+T                         (REAL)  kinetic  energy  of  the  particle  in
+                          GeV;
+HMASS                     (REAL)  mass  of  the  particle;
+DEDX                      (REAL)  energy  loss  of  the  particle  in
+
+                                 2     -1
+                          GeV  cm     g      .
+
+
+This  routine  calculates  the  ionisation  energy
+loss  for  a  muon  or  a  proton.  It  is  called  by  GDRELM
+and  GDRELP.
+
+
+
+       CALL  GDRSGA
+
+
+
+CDRSGA  calculates  the  total  cross-section  for  the
+production  of  delta         -rays  by  electrons  (M"oller
+
+
+
+scattering),  positrons  (Bhabha  scattering)  and
+muons.  For  hadrons,  this  value  is  calculated  at
+tracking  time.  The  mean  free  path  as  a  function  of
+the  energy  is  stored  for  every  medium.  The
+following  pointers  are  used:
+
+
+
+                                                                         th
+JMA  =  LQ(JMATE-I)                                   pointer  to  the  I        material;
+JDRAY  =  LQ(JMA-11)                                  delta         -ray  cross-section  for
+                                                      electrons;
+JDRAY+NEK1                                            delta         -ray  cross-section  for
+                                                      positrons;
+JDRAY+2*NEK1                                          delta         -ray  cross-section  for
+                                                      muons.
+
+
+The  routine  is  called  during  initialisation  by
+GPHYSI.
+
+
+</PRE>
+
+
+<H2>Method</H2>
+
+
+<PRE>
+
+
+In  GEANT,  delta         -rays  are  generated  only  above  a
+threshold  energy  T           which  corresponds  to  the
+                    cut
+
+variable  DCUTE  for  electrons  and  positrons,  DCUTM
+for  all  other  charged  particles.  The  total
+cross-section  for  the  production  of  a  delta         -ray
+electron  of  kinetic  energy  T>T          =DCUTE,  DCUTM
+                                  cut
+
+by  a  particle  of  kinetic  energy  E  is:
+
+
+                                      T
+
+   sigma         (E, T         ) = R   max        ((dsigma         (E, T))/ (dT))dT                                         (1)
+                      cut
+
+                                      T
+                                       cut
+
+
+where  T           is  the  maximum  energy  transferable  to
+        max
+
+the  free  electron:
+
+
+                                2                                                  2
+T          = ((2m(gamma            - 1))/ (1+2gamma         ((m)/ (M))+(((m)/ (M)))   ))
+ max
+
+                                                                                                                            (2)
+
+
+The  energy  lost  in  ionising  collisions  producing
+delta         -rays  below  T            are  included  in  the
+                             cut
+
+continuous  energy  loss.  The  mean  value  of  the
+
+
+
+energy  lost  due  to  these  soft  collisions  is:
+
+
+                                       T
+
+     E            (E, T         ) = R   cut        T((dsigma         (E, T))/ (dT))dT
+      loss             cut
+
+                                       0
+
+                                                                                                                            (3)
+where  m  is  the  electron  mass  and  M  is  the  mass  of
+the  incident  particle.
+
+
+In  this  chapter,  the  method  of  calculation  of  the
+continuous  energy  loss  and  the  total
+cross-section  are  explained.  The  generation  of
+delta         -rays  is  explained  in  chapter  [PHYS331].
+
+
+</PRE>
+
+
+<H3>Continuous  energy  loss</H3>
+
+
+<PRE>
+
+
+The  integration  of  (??    )  leads  to  the  Bethe-Block
+stopping  power  or  to  the  restricted  energy  loss
+formula  :
+
+
+                                             2                        2                                2                2          *
+ *       2             @
+                                        D((ZZ         )/ (Abeta           ))[ln    (((2m   beta           gamma            T       *
+ *  )/ (I   )))- 2beta @
+                                                                                        e                                   max    *
+ *                     @
+((1)/ (rho      ))(((dE)/ (dx))) = -         inc2                     2                                2                2          *
+ * 2                  2@
+
+                                        D((ZZ         )/ (Abeta           ))[ln    (((2m   beta           gamma            T   )/ (*
+ *I   )))- beta        @
+                                                                                        e                                   c      *
+ *                     @
+                                             inc
+
+                                                                                                                            (4)
+
+
+where,
+
+
+
+                             2    2                         2     -1
+    D            2pi    N   r   mc    = 0. 000153537 GeV  cm     g                                                                 *
+ *           Z         @
+                         A
+                             e
+
+
+    A            mass  number                                                                                                      *
+ *           rho       @
+
+
+
+    T            min     (T         , T         )                                                                                  *
+ *           m         @
+     c                     cut         max                                                                                         *
+ *            e
+
+
+
+and  I  is  the  average  ionisation  potential  of  the
+atom  in  question.  There  exists  a  variety  of
+phenomenological  approximations  for  this.  In
+former  versions  of  GEANT  the  formula  quoted  by
+
+                    0.9
+was  used  (I = 16 Z           eV).  At  present  the  values
+recommended  by    are  used.  The  ionisation
+
+
+
+potential  I  only  enters  into  the  logarithmic  term
+of  the  energy  loss  formula,  but  it  has  been
+verified  that  the  new  parameterisation  gives
+better  accuracy  especially  in  the  case  of  high  Z.
+It  should  be  noted  that  this  is  not  the  value  of  I
+which  is  stored  in  the  material  data  structure  by
+
+                                                   0.9
+GPROBI,  which  is  still  calculated  as  I = 16 Z
+eV.
+
+
+Note:  the  ionisation  potential  I  must  not  be
+changed  blindly,  hoping  that  the  most  up-to-date
+values  give  the  better  results.  The  value  of  I  is
+closely  connected  to  the  shell  correction  term
+(see  later).
+
+
+delta           is  a  correction  term  which  takes  account  of
+the  reduction  in  energy  loss  due  to  the  so-called
+density  effect.  This  becomes  important  at  high
+energy  because  media  have  a  tendency  to  become
+polarised  as  the  incident  particle  velocity
+increases.  As  a  consequence,  the  atoms  in  a
+medium  can  no  longer  be  considered  as  isolated.
+To  correct  for  this  effect  the  formulation  of
+Sternheimer    is  used:
+
+
+
+                      0                                                                  if           X<X
+                                                                                                         0
+                                              m
+delta          = -    4. 606X + C + a(X   - X)                                           if           X   < =    X<X             .
+
+                                       1                                                               0            1
+
+
+                      4. 606X + C                                                        if           X> =    X
+                                                                                                               1
+
+                                                                                                                            (5)
+
+
+where  the  medium-dependent  constants  are
+calculated  as  follows:
+
+
+                                                                                                                                   *
+ *                     @
+
+                                                                                            2              2                       *
+ *                     @
+    X               =         log       (gamma         beta        ) = ln    (gamma            beta           )/ 4. 606            *
+ *                     @
+                                10                                                                                                 *
+ *                     @
+
+
+                                                                         -3
+    N               =         ((rho      ZN      )/ (A))    electrons  cm                                                          *
+ *                     @
+     el                                    Av                                                                                      *
+ *                     @
+                                                                  m
+    a               =         ((4. 606(X   - X   ))/ ((X   - X   )   ))                                                            *
+ *                     @
+                                        a     0         1     0                                                                    *
+ *                     @
+
+
+
+For  condensed  media  we  have:
+
+
+
+                                                                    0. 2                                    if          - C< =    3*
+ *. 681
+                                        X            =         -                                                                   *
+ *                    .
+                                         0                          - 0. 326C- 1. 0                         if          - C>3. 681
+
+    I<100 eV                       -                                                                                               *
+ *                     @
+
+                                        X            =         2. 0
+                                         1
+
+
+                                        m            =         3. 0
+
+
+
+                                                                    0. 2                                    if          - C< =    5*
+ *. 215
+                                        X            =         -                                                                   *
+ *                    .
+                                         0                          - 0. 326C- 1. 5                         if          - C>5. 215
+
+    I> =    100 eV                 -                                                                                               *
+ *                     @
+
+                                        X            =         3. 0
+                                         1
+
+
+                                        m            =         3. 0
+
+
+
+and  in  the  case  of  gaseous  media  m = 3  and:
+
+
+
+    X    = 1. 6                                    X    = 4            for                                 C < =    9. 5
+     0                                              1
+
+
+    X    = 1. 7                                    X    = 4            for                     9. 5<       C < =    10
+     0                                              1
+
+
+    X    = 1. 8                                    X    = 4            for                        10<      C < =    10. 5
+     0                                              1
+
+
+    X    = 1. 9                                    X    = 4            for                  10. 5<         C < =    11
+     0                                              1
+
+
+    X    = 2.                                      X    = 4            for                        11<      C < =    12. 25
+     0                                              1
+
+
+    X    = 2.                                      X    = 5            for               12. 25<           C < =    13. 804
+     0                                              1
+
+
+    X    = 0. 326C- 2. 5                           X    = 5            for            13. 804<             C
+     0                                              1
+
+
+
+C   / Z  is  a  so-called  shell  correction  term  which
+ e
+
+accounts  for  the  fact  that,  at  low  energies  for
+light  elements  and  at  all  energies  for  heavy
+ones,  the  probability  of  collision  with  the
+electrons  of  the  inner  atomic  shells  (K,  L,  etc.)
+is  negligible.  The  semi-empirical  formula  used  in
+GEANT,  applicable  to  all  materials,  is  due  to
+
+
+
+Barkas  :
+
+
+                                                             -2                      -4                       -6       -6     2
+C   (I, eta     )                =         (0. 42237eta            + 0. 0304eta            - 0. 00038eta            )10      I
+ e
+
+
+
+                                                           -2                      -4                       -6       -9     3
+                                 +         (3. 858eta            - 0. 1668eta            + 0. 00158eta            )10      I
+
+
+                  eta            =         gamma         beta
+
+
+C     is  a  dimensionless  constant,  but  as  I  in  the
+ e
+
+original  article  was  expressed  in  eV  and  in  GEANT
+it  is  expressed  in  GeV,  the  exponent  of  ten  in  the
+
+ 2               -6+2x9                12
+I   -term  is  10                  = 10      ,  and  that  of  the
+
+ 3               -9+3x9                18
+I   -term  is  10                  = 10      .)  This  formula  breaks
+down  at  low  energies,  and  it  only  applies  for
+values  of  eta     >0. 13  (i.e.  T>7. 9  MeV  for  a  proton).
+For  eta     < =    0. 13  the  shell  correction  term  is
+calculated  as:
+
+
+
+                                                                                                                      -3
+. C   (I, eta     )_                          = C   (I, eta      = 0. 13)((ln    (((T)/ (T      ))))/ (ln    (((7. 910      GeV)/ (*
+ *T      )))))
+   e                eta      <=   0.13           e                                        2l                                       *
+ * 2l
+
+
+
+i.e.  the  correction  is  switched  off
+logarithmically  from  T = 7. 9  MeV  to  T = T       = 2  MeV.
+                                               2l
+
+GDRELX  has  been  tested  for  protons  against  energy
+loss  tables    for  various  materials  in  the  energy
+range  50  MeV-25  GeV.  Typical  discrepancies  are  as
+follows:
+
+
+
+    Beryllium:                         1.1%  at  0.05  GeV                              0.02%  at  25  GeV
+
+
+
+    Hydrogen  :                        1.5%  at  0.05  GeV                              12.1%  at  25  GeV
+
+
+
+    Water  :                           8.1%  at  0.05  GeV                              4.4%  at  6  GeV
+
+
+
+The  mean  energy  loss  can  be  described  by  the
+Bethe-Bloch  formula  (??    )  only  if  the  projectile
+velocity  is  larger  than  that  of  orbital
+electrons.  In  the  low-energy  region  where  this  is
+not  verified,  a  different  kind  of
+
+
+
+parameterisation  has  been  chosen  :
+
+
+                                                                      ((1)/(2))
+                                           I :           C   tau                                                                   *
+ *           for       @
+                                                          1                                                                        *
+ *                     @
+
+((1)/ (rho      ))((dE)/ (dx)) = -       II :            ((S    x S   )/ (S   - S   ))                                             *
+ *           for       @
+
+                                                            L      H       L     H                                                 *
+ *                     @
+
+
+                                      III :              -Bethe-Bloch                    "(1 + ((nu    )/ (T)))                    *
+ *           for       @
+                                                                                                                                   *
+ *                     @
+
+
+
+where
+
+
+
+                                          0.45
+    S              =         C   tau                                             S            =         ((C   )/ (tau      )) ln   *
+ *[1 + ((C   )/ (tau   @
+     L                        2                                                   H                        3                       *
+ *        4            @
+
+
+    tau            =         ((T)/ (M   ))                                       M            =         proton  mass
+                                     p                                            p
+
+
+
+The  formula  used  in  the  region  T>T        ensures  the
+                                        2l
+
+continuity  of  the  energy  loss  function  at  T = T
+                                                      2l
+
+when  the  Bethe-Bloch  formula  and  the
+parameterisation  meet.  The  parameter  nu     is  chosen
+in  such  a  way  that:
+
+
+
+                                II                                                      III
+((1)/ (rho      )). ((dE)/ (dx))      _               = ((1)/ (rho      )). ((dE)/ (dx))         _
+                                       T=T                                                        T=T
+                                          2l                                                         2l
+
+
+
+The  routine  GDRELP  calculates  the  stopping  power
+or  restricted  energy  loss  only  for  T>T      ;  below
+                                            2l
+
+this  kinetic  energy  it  gives  the  stopping  power
+(i.e.  total  energy  loss)  irrespectively  of  the
+value  of  T         .  This  approximation  does  not
+            cut
+
+introduce  a  serious  source  of  error  since,  in  the
+case  of  a  proton,  at  T = T        the  maximum  energy
+                               2l
+
+transferable  to  the  atomic  electron  is  T          ss 4
+                                              max
+
+keV,  and  the  restricted  loss  should  be  calculated
+only  if  T         <T         .
+           cut        max
+
+
+GDRELP  has  been  tested  against  experimental  data
+
+
+
+                                                               calculated                                 measured
+                                                   ((dE)/ (dx))                             - ((dE)/ (dx))
+
+___________________________________________________________________________________________________________________________________*
+ *_____________________@
+                                          |                                                                    |                   *
+ *                     @
+    experiment                            |                                         A                          |                   *
+ *      B              @
+__________________________________________|____________________________________________________________________|___________________*
+ *_____________________@
+                                          |                                                                    |                   *
+ *                     @
+    projectile                            |                                          p                         |                   *
+ *       p             @
+                                          |                                                                    |                   *
+ *                     @
+                                                  |                                               |                                *
+ *                     @
+    T  (MeV)                                      ||                       0.03-0.6               ||                               *
+ * 0.4-1               @
+                                              |   |                                               |              |                 *
+ *                     @
+                                              |                H   ,  He,  N   ,  O   ,                          |                 *
+ *                     @
+    material                                  |                 2           2      2                             |  Cu,  Ge,  Sn,  *
+ *Pb                   @
+                                              |                                                                  |                 *
+ *                     @
+                                            | |                Ne,  Ar,  Xe                                 |    |                 *
+ *                     @
+                                            |                                                               |                      *
+ *                     @
+    exp  err  (%)                           |                                       3                       |                      *
+ *   2.5               @
+____________________________________________|_______________________________________________________________|______________________*
+ *_____________________@
+
+            o                                ||                                                            ||                      *
+ *                     @
+    tot  N       of  pts                     |                                    121                      |                       *
+ *     52              @
+_____________________________________________|_____________________________________________________________|_______________________*
+ *_____________________@
+       o                                          ||                                                             ||                *
+ *                     @
+    N       of  pts                               |                                                              |                 *
+ *                     @
+                                              |   |                                                          |   |                 *
+ *                     @
+                                              |                                                              |                     *
+ *                     @
+    with  _Delta         _<1sigma             |                                    94                        |                     *
+ *     50              @
+                                              |      |                                                     | |                     *
+ *                     @
+                                                     |                                                     |                       *
+ *                     @
+                 _Delta         _<2sigma             |                            114                      |                       *
+ *     52              @
+                                                     ||                                                    ||                      *
+ *                     @
+                                                     |                                                     |                       *
+ *                     @
+                 _Delta         _<3sigma             |                            119                      |                       *
+ *     52              @
+                                                     ||                                                    ||                      *
+ *                     @
+                                                     |                                                     |                       *
+ *                     @
+                 _Delta         _<4sigma             |                            121                      |                       *
+ *     52              @
+_____________________________________________________|_____________________________________________________|_______________________*
+ *_____________________@
+
+
+Table  0.1:  Test  of  GDRELP  with  low  energy
+protons.
+
+
+
+               1  keV  < =   T< =     100  MeV,  31  pts  per  element
+      _________________________________________________________________________________________________________________________mean
+                                  |              (r.m.s.)                             |   max  (r.m.s.)
+             Z         element    ||             deviation  in                        ||  deviation  in
+                                  |                                                   |   %
+      ____________________________|______________%____________________________________|________________________________________
+                                             |                                   |
+             1         H                     ||               0.4                ||                    1.1
+                        2                    ||                                  ||
+                                             |                                   |
+             6         O                     |                0.5                |                     1.6
+                                           | |                                   ||
+                                           |                                     |
+          13           Al                  |                  0.6                |                     2.1
+                                           ||                                    ||
+                                           |                                     |
+          29           Cu                  |                  0.7                |                     2.0
+                                           ||                                    ||
+                                           |                                     |
+          82           Pb                  |                  0.7                |                     2.3
+      _____________________________________|_____________________________________|_____________________________________________
+
+
+Table  0.2:  Test  of  GDRELP  against  stopping  power
+tables.  Stated  accuracy  of  the  tables  is        5%  for
+T>0. 5  MeV  and   10%  for  T<0. 5  MeV
+
+
+
+and  energy  loss  tables.  Some  of  the  test  results
+are  summarised  in  tables  ??    ,  ??     and  ??    .
+
+
+The  energy  lost  due  to  the  soft  delta         -rays  is
+tabulated  during  initialisation  as  a  function  of
+the  medium  and  of  the  energy  by  routine  GDRELA
+
+
+The  tables  are  filled  with  the  quantity  dE/ dx  in
+
+       -1
+GeV  cm        (formula  (??    )  above).  For  a  molecule  or  a
+mixture  the  following  formula  is  used:
+
+           ((dE)/ (dx)) = rho      sum        p   (((dE)/ (dX)))                                                            (6)
+                                       i       i                i
+
+
+
+                                   -2
+where  x  is  in  cm,  X  in  g  cm        and  p     is  the
+                                                 i
+
+                                  th
+proportion  by  weight  of  the  I        element.
+
+
+The  energy  loss  of  all  charged  particles  other
+than  electrons,  positrons  and  muons  is  obtained
+from  that  of  protons  by  calculating  the  kinetic
+energy  of  a  proton  with  the  same  beta       ,  and  using
+this  value  to  interpolate  the  tables:
+
+                                      T                  = ((M   )/ (M))T                                                   (7)
+                                       proton                 p
+
+
+
+</PRE>
+
+
+
+                                   min                       min                            min
+    Delta          = ((((dE)/ (dx))            - ((dE)/ (dx))               )/ (((dE)/ (dx))               ))(%)
+
+
+                                   calc                      table                          table
+
+
+                                                                                    Data  from
+___________________________________________________________________________________________________________________________________*
+ *_____________________@
+|                |                                      |    |                  |                                        |    |    *
+ *              |      @
+|    material    |               Delta           (%)    |    |      material    |                 Delta           (%)    |    |    *
+ *  material    |      @
+|________________|______________________________________|____|__________________|________________________________________|____|____*
+ *______________|______@
+|                            |                        |    |                               |                           |    |      *
+ *                     @
+|    H                       |                -0.4    |    |        Na                     |                   -0.4    |    |      *
+ *  Sn                 @
+|                            |                        |    |                               |                           |    |      *
+ *                     @
+|     2                      |                        |    |                               |                           |    |      *
+ *                     @
+|                            |                        |    |                               |                           |    |      *
+ *                     @
+|    D                       |                -0.3    |    |        Al                     |                   -0.6    |    |      *
+ *  Xe                 @
+|                            |                        |    |                               |                           |    |      *
+ *                     @
+||    2                     ||                        | |  | |                             ||                          | |  | |    *
+ *                     @
+|                           |                           |    |                             |                             |    |    *
+ *                     @
+|    He                     |                    0.0    |    |      Si                     |                      0.5    |    |    *
+ *  W                  @
+||                          ||                          ||   ||                            ||                            ||   ||   *
+ *                     @
+|                           |                           |    |                             |                             |    |    *
+ *                     @
+|    Li                     |                    3.1    |    |      Ar                     |                      0.4    |    |    *
+ *  Pt                 @
+||                          ||                        | |  | |                             ||                          | |  | |    *
+ *                     @
+|                           |                         |    |                               |                           |    |      *
+ *                     @
+|    Be                     |                 -0.2    |    |        Ti                     |                   -1.4    |    |      *
+ *  Pb                 @
+||                          ||                        ||   ||                              ||                          ||   ||     *
+ *                     @
+|                            |                        |    |                               |                           |    |      *
+ *                     @
+|    C                       |                -0.1    |    |        Fe                     |                   -0.4    |    |      *
+ *  U                  @
+|                            |                        |    |                               |                           |    |      *
+ *                     @
+|                            |                        |    |                               |                           |    |      *
+ *                     @
+|    N                       |                -0.2    |    |        Cu                     |                   -0.9    |    |      *
+ *                     @
+|                            |                        |    |                               |                           |    |      *
+ *                     @
+|     2                      |                        |    |                               |                           |    |      *
+ *                     @
+|                            |                        |    |                               |                           |    |      *
+ *                     @
+|    O                       |                -1.2    |    |        Ge                     |                   -0.8    |    |      *
+ *                     @
+|                            |                        |    |                               |                           |    |      *
+ *                     @
+|_____2______________________|________________________|____|_______________________________|___________________________|____|______*
+ *_____________________@
+
+
+Table  0.3:  The  minimum  stopping  power  calculated
+from  the  formula  used  is  compared  with  values
+from  the  tables.
+
+
+
+<H3>Total  cross-section</H3>
+
+
+<PRE>
+
+
+The  integration  of  formula  (??    )  gives  the  total
+cross-section  :
+
+
+                                                2                     2                         2
+                                        2pi    r   m((Z)/ (beta           ))((1- Y + beta          Y ln    Y)/ (T         ))       *
+ *                     @
+                                                                                                                 cut
+sigma         (Z, E, T         ) = -            0                                                                                  *
+ *                     @
+                      cut               2pi    r2  m((Z)/ (beta       2   ))(((1- Y + beta       2  Y ln    Y)/ (T         )) + ((T*
+ *         - T         @
+
+                                                                                                                  cut              *
+ *max         cut
+                                                0
+
+                                                                                                                            (8)
+
+
+The  mean  free  path  is  tabulated  during
+initialisation  as  a  function  of  the  medium  and  of
+the  energy  by  the  routine  GDRSGA  for  leptons
+only.
+
+
+The  cross-section  (??    )  is  strongly  dependent  on
+the  mass  of  the  incident  particle,  and  cannot  be
+tabulated  in  a  general  way  for  any  charged
+hadrons.  Therefore,  for  such  particles,  the
+cross-section  is  computed  at  tracking  time  in  the
+routine  GTHADR.
+</PRE>

@@ -1,0 +1,77 @@
+#!/usr/local/bin/bash
+#
+# Compile a set of directories for PAW chapters by breaking
+# up main document
+#
+# SPQRahtz 3.10.93
+#
+M=pawmain.tex
+#
+# PAW.tex will be the master document
+#
+cp $M PAW.tex
+#
+# we want separate documents; look for \include in the main file
+# 
+# comment out all the includes and copy
+#
+sed 's/^.include/\%\\include/'  < $M \
+| sed '/^.part/s/^/\%/' \
+| sed '/\\appendix/d' \
+| sed 's/\\bibliography{/\\cernbibliography{/' \
+| sed 's/\\input{\\jobname.ind}/\\printindex/' \
+> dummy.tmp
+#
+# go through include files
+#
+for i in `egrep '^.include' pawmain.tex | sed 's/.*{\(.*\)}/\1/'`
+do
+ echo "Trying $i"
+#
+# uppercase name to make it clean
+#
+	U=`echo $i | tr '[a-z]' '[A-Z]'`
+# uncomment this one
+	sed 's/^\%\\include{'$i'}/\\include{'$i'}/' < dummy.tmp > $U.tex
+#
+# wipe out old HTML directory
+#
+	rm -rf $U
+#
+	/user/goossens/latex2html/latex2html $U.tex >& $U.logger
+#
+# note the chapter titles
+#
+	grep '^\\chapter' $i.tex | sed 's/{/{*'$U'*/' >$U.titles
+#
+# and put them into the master file
+#
+	sed 's/^\\include{'$i'}/\\input '$U'.titles/' < PAW.tex > tmp.tex
+	mv tmp.tex PAW.tex
+	rm $U.tex
+#
+# change Up: reference to point to master document
+#
+	sed '/Up:/s/HREF=[^>]*/HREF=..\/..\/paw\/PAW\/PAW.html/g' < $U/$U.html  > tmp.html
+	mv tmp.html $U/$U.html	
+	echo made $U
+done
+rm dummy.tmp
+#
+# process master document
+#
+rm -rf PAW
+/user/goossens/latex2html/latex2html PAW.tex >& PAW.logger
+#
+# dump dummy rubbish
+#
+rm PAW/[a-z]*.html
+#
+# make the chapters point at the real sections in separate files
+#
+sed 's/HREF=.*\*\(.*\)\*\(.*\)/HREF=..\/..\/paw\/\1\/\1.html>\2/' \
+	< PAW/PAW.html \
+| sed 's/\<A NAME.*HREF=part.*\>\(.*\)\<.*/\1/' \
+> tmp.html
+mv tmp.html PAW/PAW.html
+

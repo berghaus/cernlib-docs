@@ -1,0 +1,2001 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%   ZEBRA User Guide -- LaTeX Source                              %
+%                                                                 %
+%   Chapter DZDOC                                                 %
+%                                                                 %
+%   The following external EPS files are referenced:              %
+%   dzddiv, dzdflow, dzdirz, dzdisp, dzmctree, dzprsc             %
+%                                                                 %
+%   Editor: Michel Goossens / CN-ASD                              %
+%                                                                 %
+%   Last Mod.: 17 Feb 1995   17:30 os                             %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\fboxsep0.5cm
+ 
+\chapter{DZDOC -- Bank Documentation and Display}
+\label{sec:dzdocdescription}
+ 
+This chapter describes at set of programs
+to generate and maintain documentation of ZEBRA data structures.
+Documentation is entered by the user in the form of card image files which
+describe the contents and the structure of the data (section~\ref{sec:dzdocformat}).
+A template of this file may be generated for an existing data structure
+in memory by one subroutine call (section~\ref{sec:dzdocdzdtmp}.
+The system puts this information into an RZ~file~\cite{bib-ZEBRARZ}
+to allow fast access to the documentation. 
+This file can then be used in the following applications:
+ 
+\begin{UL}
+\item produce documentation of bank trees in graphical and alphanumeric
+      form;
+\item make the documentation available in an interactive session;
+\item generate Fortran code with calls to \Rind{MZBOOK}/\Rind{MZLIFT}
+      to build the documented bank trees and with \break
+      \Lit{PARAMETER} statements 
+      for link and dataword offsets including the needed type declarations.
+\end{UL}
+ 
+Figure~\ref{fig:DZDOCFIG1} shows the data flow through the 
+system and where the different parts of the package are needed.
+ 
+\begin{Fighere}
+  \begin{center}
+     \mbox{\epsfig{figure=dzdflow.eps,height=13cm}}
+    \caption{Dataflow within \protect\Pind{DZEDIT} -- \protect\Pind{DZDISP}}
+    \label{fig:DZDOCFIG1}
+  \end{center}
+\end{Fighere}
+ 
+Section~\ref{sec:dzdocdzedit} 
+describes the interactive program \Pind{DZEDIT} which is used to
+generate and maintain the RZ~file and to produce documentation in
+various forms. 
+It can also check the completeness and consistency of the documentation.
+Fortran code generation is also controlled by this program, details
+are found in the description of the command \Cind{MAKECODE}.
+ 
+Section~\ref{sec:dzdocdzdisp} 
+explains the application of the package to display ZEBRA bank
+structures in an interactive session.
+This package can be used independently from the documentation parts 
+to display data structures and the contents of data and system words.
+ 
+Section~\ref{sec:dzdocexamples} 
+contains examples of bank descriptions and calling sequences.
+ 
+\section{Format of the bank descriptor cards}
+\label{sec:dzdocformat}
+ 
+\begin{Note}
+All cards start by \Lit{"*B"} (all other cards are ignored), explanations
+are put inside braces \Lit{\lcb\ \rcb}.
+\end{Note}
+ 
+\subsection{General information about the bank}
+\index{bank!general information!documentation}
+\label{sec:dzdocgeneral}
+ 
+\begin{XMP}
+*B..BKID  Short description of bank with hollerith Id BKID
+*B.AU     Author1, Author2
+*B.VE     5.12         \lcb version number\rcb 
+*B.ST     ISTOR        \lcb mnemonic of the store\rcb 
+*B.DV     IRODIV       \lcb mnemonic of the division\rcb 
+*B.NI     NUMID        \lcb numerical identifier\rcb 
+*B.ND     NDATA        \lcb number of data words\rcb 
+*B.IO     IOCHAR       \lcb IO characteristics\rcb 
+*B.NZ     NZERO        \lcb number of data words preset to zero\rcb 
+*B.NL     NLINKS       \lcb total number of links\rcb 
+*B.NS     NSLINKS      \lcb number of structural links\rcb 
+*B.NX     NXID         \lcb NXID: Id of a possible next bank\rcb 
+*B.UP     UPID  -JB    \lcb UPID: Id of Up-bank,
+                        JB is the link offset of bank BKID\rcb 
+*B.OR     ORID         \lcb ORID: Id of Origin-bank\rcb 
+\end{XMP}
+ 
+\begin{Notes}
+\item The text on the title card \Lit{*B..} is displayed by DZDISP
+      (see figure \ref{fig:DZDOCFIG2})
+      in the big box representing the data part of a bank. Sometimes  a
+      meaningful title is contained as data in the bank itself.
+      To display this one may use the syntax:
+\begin{XMP}
+*B..BKID  TITLE@D(N1:N2)
+  or
+*B..BKID  TITLE@D(N1:N2) FORMZ
+\end{XMP}
+      where N1:N2 describes the range of datawords with hollerith text.
+      If \Lit{FORMZ} is specified the text is first converted by ZITOH
+      from ZEBRA internal character to hollerith format. 
+      
+      Similiarly the fields where the hollerith Id, the numerical Id,
+      and the number of data words are displayed may be filled with text
+      actually contained in the bank itself using the syntax:
+\begin{XMP}
+*B..BKID  HID@D(N1:N2)
+*B..BKID  NID@D(N1:N2)
+*B..BKID  ND@D(N1:N2)
+\end{XMP}
+ 
+A picture showing a Monte Carlo decay tree 
+in figure \ref{fig:DZDOCFIG7} was produced using this feature.
+ 
+\item The cards: \Lit{*B..} and \Lit{*B.UP} are mandatory, all others are optional. 
+\item \Lit{NDATA}, \Lit{NLINKS} or \Lit{NSLINKS} may also be given as integer numbers. 
+\item When generating Fortran code,
+      defaults are assumed as described in section~\ref{sec:makecode}.
+\end{Notes}
+ 
+\subsection{Link part of the bank}
+\index{bank!link!documentation}
+\index{link!bank documentation}
+ 
+\begin{XMP}
+*B.LINK            \lcb indicate start of link description\rcb 
+*B.1      D1ID     Short description of D1ID  \lcb D1ID: Id of first down bank\rcb 
+*B.2      D2ID     ....
+*B/LINK            \lcb indicate end of link description\rcb 
+\end{XMP}
+ 
+If a link is not (yet) defined  the mnemonic \Lit{NOTU} should be used
+to avoid that DZDOC produces a diagnostic message.
+ 
+\subsubsection*{Reference links of the bank}
+\index{bank!reference link!documentation}
+\index{link!bank documentation}
+\index{reference link!bank documentation}
+ 
+\begin{XMP}
+*B.RLINK            \lcb indicate start of Rlink description\rcb 
+*B.1      D1ID     Short description of D1ID  \lcb D1ID: Id of referenced bank\rcb 
+*B.2      D2ID     ....
+*B/RLINK            \lcb indicate end of Rlink description\rcb 
+\end{XMP}
+ 
+\subsection{Status word of bank}
+\index{bank!status word!documentation}
+\index{status word!bank documentation}
+ 
+\begin{XMP}
+*B.BI                \lcb indicates start of status word bits description\rcb 
+*B.1      NOAUTH     no authorisation to modify directory
+*B.2      MODIFIED   directory has been modified
+*B.3      LOCKED     file locked by 'RZFILE'
+*B.4      ORGREL     ORGANIZATION='RELATIVE' on VAX
+*B.5      CACCESS    C file access routine used
+*B.11-17  LOGLEVEL   11-17 LOG level (default taken from MZ)
+*B/BI                \lcb indicates end of status word bits description\rcb 
+\end{XMP}
+ 
+\subsection{Data words of the bank}
+\index{bank!data word!documentation}
+\index{data word!bank documentation}
+ 
+\begin{XMP}
+*B.DATA              \lcb indicates start of data word description\rcb 
+*B.1      DATAWOR1   Description of data word 1
+*B.REP    5
+*B.1      DATAWOR2   Description of data words 2 - 6
+*B/REP
+*B/DATA              \lcb indicates end of data word description\rcb 
+\end{XMP}
+ 
+\Lit{DATAWOR1} .. \Lit{DATAWOR7} are (upto) {\bf 8 characters} mnemonics
+which can be selected by the user.
+ 
+The data type and range may optionally be given in the description.
+The format is as given in the following examples:
+\begin{XMP}
+*B.DATA 
+*B.1    EVENTTYP    IO:I [1,200] Event type, Integer, range: 1-200
+*B.2    ENERGY      IO:F [0.,100.] Energy
+*B/DATA 
+\end{XMP}
+Allowed IO specifiers are \Lit{B, I, F, D, H, R ,U} corresponding to the
+ZEBRA IO characteristics, \Lit{R} is the same as \Lit{F},
+\Lit{U} the same as \Lit{B}.
+ 
+\subsubsection*{Special mnemonics}
+ 
+The following special mnemonics are used to specify the content of
+a data word in more detail.
+They are interesting not only for documentation
+purposes but even more when using the documentation within the 
+interactive bank display: They allow to selectively print lines of
+the documentation depending on values of data words or byte portions
+of them. They must appear on cards following one with a general 
+description whereby the dataword number has to be be repeated 
+(i.e. the 3 in \Lit{*B.3}). This is to clearly distinuish them from 
+normal continuation cards, for which the sequence number and the 
+mnemonic field is left blank. The different types may be mixed for 
+one data word.
+ 
+\paragraph{\underline{\bf A choice with wildcard characters}}
+ 
+The mnemonic \Lit{WILDCHAR} or \Lit{MASK} allows to describe a choice
+depending on the {\bf printed} value of the dataword allowing
+wildcard characters. The mask is taken from the first characters of
+the comment field separated by a blank from the description.
+An asterix is used to represent one wild character. 
+In the following example it assumed that ATTRIBUT describes the
+attributes of a graphic object. They may be decimal coded in the
+following manner:  ATTRIBUT = 10000*TYPE + 100*SIZE + COLOR
+ 
+\begin{XMPt}{Example of a choice with wildcard characters}
+*B.3   ATTRIBUT  Graphics attributes: 
+*B.3   MASK        1****  line,
+*B.3   MASK        2****  box,
+*B.3   MASK       11****  circle,
+*B.3   MASK       ****01  black
+*B.3   MASK       ****02  red
+*B.3   MASK       ****03  green
+\end{XMPt}
+If the value of ATTRIBUT happens to be 20503 the documented
+printout is:
+ 
+\Lit{3  ATTRIBUT 20503  Graphics attributes: box, green}
+ 
+If hexadecimal coding is appropriate one can force hexadecimal 
+formatting of the printout by preceeding the mnemonic be \Lit{B:}
+like in this example (Note: Only 6 characters are left for the name):
+ 
+\begin{XMPt}{Example with hexadecimal formatting}
+*B.4   B:TRTYPE   Trigger type: 
+*B.4   MASK       *******1 energy,
+*B.4   MASK       *******F multiplicity,
+*B.4   MASK       ******1* tracks,
+*B.4   MASK       ******2* clusters,
+\end{XMPt}
+ 
+\paragraph{\underline{\bf An integer choice value}}
+ 
+The mnemonic \Lit{C1234567}, where \Lit{1234567} can be any 7-digits integer
+number, describes a variable with a choice value. 
+If a data word is described like this, 
+then in an interactive session, where values of
+datawords together with their documentation can be shown,
+only the line for which the choice applies will be displayed.
+Leading zeros may be left out or replaced by underscores. 
+Negative values are possible.
+ 
+\begin{XMPt}{Example of an integer choice value}
+*B.8      MYCHOICE   The following applies
+*B.8      C0000010   Meaning of 8. word, if it has value the 10
+*B.8      C____111   Meaning of 8. word, if it has value the 111
+*B.8      C-10       Meaning of 8. word, if it has value the -10
+*B.8      C12        Meaning of 8. word, if it has value the 12
+\end{XMPt}
+ 
+\paragraph{\underline{\bf A bit mask}}
+ 
+The memonic \Lit{BITVAL12}, where \Lit{12} stands for any 2-digits integer
+between 0 and 31, describes a data word where single bits are significant. 
+In an interactive session only those lines are shown
+for which the corresponding bit is set in the dataword.
+ 
+\begin{XMPt}{Example of a bit mask}
+*B.9      YOURBITS  Single bits are significant
+*B.9      BITVAL01  Significance of bit 1
+*B.9      BITVAL15  Significance of bit 15
+\end{XMPt}
+ 
+\paragraph{\underline{\bf Description of any bit portion}}
+ 
+The memonic \Lit{BITS0309}, where \Lit{03} and \Lit{09} 
+stand for any 2-digits integers between \Lit{0} and \Lit{31}, 
+describes the bit portion of a data word.
+When datawords are dumped with documentation the value
+of the bit portion will be printed.
+ 
+\begin{XMPt}{Example of a bit description}
+*B.9      IZCODE     Coded hit value
+*B.9      BITS0007   Wire number
+*B.9      BITS0815   Charge
+*B.9      BITS1623   Theta value
+\end{XMPt}
+ 
+\paragraph{\underline{\bf ZEBRA exchange formatted Holleriths,
+dates, binaries}}
+ZEBRA provides and uses a Hollerith format, which is transportable.
+These words should be documented with a mnemonic starting with
+\Lit{Z:}. In this case DZDOC will call \Rind{ZITOH} and \Rind{UHTOC} to print
+it as a character. A mnemonic starting with \Lit{B:} forces DZDOC
+to print the value in hexadecimal. \Lit{D:} assumes that the upper
+bits of the word contain a packed date and time which is decoded
+by the RZ routine \Rind{RZDATE}.
+ 
+\paragraph{\underline{\bf Pointers, labels and repetition counts}}
+\index{bank!documentation!pointer}
+\index{bank!documentation!label}
+\index{bank!documentation!repetition}
+\label{pointer (bank documentation)}
+\index{label (bank documentation)}
+\label{repetition (bank documentation)}
+ 
+The mnemonic \Lit{P:ABCDEF}, where \Lit{ABCDEF} can be any name,
+describes a variable used as a pointer within the current bank. 
+If during the display of 
+the contents of a bank the word number to which the variable points, 
+is reached, the documentation for this section of data is expected
+at \Lit{L:ABCDEF} and is tagged in the output with the string \Lit{--Label:}.
+The string \Lit{N:ABCDEF} may be used to flag a variable when 
+used later as a repetition count (see below). 
+The description of the RZ top bank in Section~\ref{sec:dzdocexamples}
+contains extended applications of pointers, labels etc.
+\begin{XMPt}{Example of the use of a pointer}
+*B.4      P:LDIR     Pointer to subdirectories
+*B.5      N:NSDIR    Number of subdirectories
+     ...
+*B.1      L:LSDIR    Subdirectory structure
+*B.REP    N:NSDIR    Loop through subdirectories
+*B.1      Z:NAME     Name
+*B.2      IRECSD     Record number
+*B.3      D:DATE     creation date and time
+*B/REP
+\end{XMPt}
+Pointers and repetition counts can also be bitportions of a variable.
+Assume that the lower 16 bits of a word contain a pointer, the upper
+16 are the repetition count.
+In this case the syntax is as given in the following example:
+Note that the name of the pointer  is taken from the first 6 characters
+of the comment field or until a blank is encountered.
+\pagebreak[3]
+ 
+\begin{XMPt}{Pointer, count which is a bitportion}
+*B.4      SUBDIR     pointer to, and number of subdirs
+*B.4      P:BI0015   LDIR     Pointer to subdirectories
+*B.4      N:BI1631   NSDIR    Number of subdirectories
+\end{XMPt}
+ 
+{\bf Note:} When generating FORTRAN code the prefixes N: etc. will
+            be removed.
+ 
+\subsection{Repetitions}
+\index{bank!documentation!repetition}
+If the same kind of data words or links are repeated several times
+they may be described within a \Lit{*B.REP} .. \Lit{*B/REP} clause. 
+Repetitions may include groups of data words or links. 
+The repetition count may be fixed, variable
+(indefinite) or calculated from a data word or taken from a previous
+data word as shown above.
+ 
+\subsubsection*{Fixed number of repetitions}
+ 
+\begin{XMP}
+*B.LINK
+*B.REP    25
+*B.1      DXID     Short description of DXID
+*B/REP
+*B.26     DYID     ....
+*B.27     DZID     ....
+*B/LINK
+\end{XMP}
+ 
+\subsubsection*{Variable number of repetitions}
+ 
+\begin{XMP}
+*B.LINK
+*B.REP    NREPS    Comment
+*B.1      DXID     Short description of DXID
+*B/REP
+*B/LINK
+\end{XMP}
+ 
+\subsubsection*{Repetition counts in a data word}
+\index{bank!data word!documentation}
+\index{data word!bank documentation}
+\begin{minipage}{\textwidth}
+ 
+Repetition counts given as a simple expression of the current data
+word are decoded by routine \Rind{DZDDWD}.
+ 
+\begin{XMPt}{Example of repetition counts for documenting data words}
+*B.DATA
+*B.REP  NUMH
+*B.1    IHEAD      Header word for a hit
+*B.1    BITS0007   IWNUM   wire number
+*B.1    BITS0819   IT0     start of scanner pulse
+*B.1    BITS2031   LENH    number of samples for this scanner pulse
+*B.REP  BITS2031+1 / 2     ! =(LENH+1)/2
+*B.1    IHIT       Coded FADCs Samples
+*B.1    BITS2429   1st sample HV side
+*B.1    BITS1621   1st sample signal side
+*B.1    BITS0813   2nd sample HV side
+*B.1    BITS0005   2nd sample signal side
+*B/REP  (LENH+1)/2
+*B/REP  NUMH
+*B/DATA
+\end{XMPt}
+\end{minipage}
+ 
+In this case the outer loop runs over a indefinite number \Lit{NUMH} of
+hits each of which is preceeded by a header word \Lit{IHEAD}.
+The 12 most significant bits of \Lit{IHEAD}
+are used to calculate the repetition count of the inner loop describing
+the individual samples of one hit.
+Note that in the present example 2 samples fit into one 32-bit word).
+ 
+ 
+For specifying a repetition count the allowed operators are:
+\Lit{BITSnnmm} indicating the bit portion, \Lit{+}, \Lit{-}, \Lit{/} and
+\Lit{*} with constant parameters.
+The evaluation is strictly left to right, no brackets are allowed.
+Blanks are not significant, comments are separated by `!'.
+The decoding is triggered by the keyword \Lit{BITSnnmm}.
+In the simplest case the current word could be directly the repetition
+count:
+ 
+\begin{XMPt}{Example of how to specify a repetition count}
+*B.1     NSAMPLES
+*B.REP   BITS0031      ! current word = repetition count
+*B.1     IPULSE1        Pulseheight of Channel 1
+*B.2     IPULSE2        Pulseheight of Channel 2
+*B/REP
+\end{XMPt}
+ 
+\subsection{Banks with identical descriptions}
+ 
+It may happen (especially for detectors which are split into two
+sides) that the description of data words and links of two banks are
+identical only differing in the linkage 
+(I.e. only the Up-bank is different).
+In this case the tag \Lit{*B.IDEM} may be used to avoid
+duplication of the documentation.
+ 
+\begin{XMPt}{Example of the use of the \Lit{IDEM} keyword}
+  *B..DEHR   Header bank of right side
+  ...
+  *B.LINK
+  *B.1    DEDA   Bank containing actual data
+  ..
+  *B/
+  --------------------------------------------------------
+  *B..DEHL   Header bank of left side
+  ...
+  *B.LINK
+  *B.1    DEDA   Bank containing actual data
+  ..
+  *B/
+  --------------------------------------------------------
+  *B..DEDA  Bank containing actual data
+  ..
+  *B.UP    DEHR
+  ....
+  full description of bank DEDA (possibly including links)
+  ....
+  *B/
+  --------------------------------------------------------
+  *B..DEDA
+  *B.UP      DEHL
+  *B.IDEM    DEHR
+  *B/
+\end{XMPt}
+ 
+The bank which is fully described (in this example \Lit{DEDA} with
+Up-bank \Lit{DEHR}) must preceed the description containing the 
+\Lit{IDEM} tag.
+ 
+ 
+\subsection{Terminating the bank description}
+ 
+The documentation for a bank must be terminated by:
+\begin{verbatim}
+  *B/
+\end{verbatim}
+
+\begin{Notes}
+\item Continuation cards should start with \Lit{*B. } with the 
+      sequence number and mnemonic field
+      left blank. (Note however the special mnemonics like 
+      \Lit{BITVALnn}, \Lit{BITSnnmm} etc. described above.)
+\item The program will try to put as many characters on an output line 
+      as will fit, embedded multiple blanks are removed unless the last 
+      character is a \Lit{"/"}, in
+      which case no formatting is done, except for the removal of 
+      {\bf leading blanks}.
+\item The pair \Lit{BKID} and \Lit{UPID}, i.e. the identifiers of a 
+      bank and its up-bank should be unique in one \RZfile. 
+      \index{link!up}%
+      The system recognises the structure of the banks by looking for 
+      \Lit{BKID}s, \Lit{UPID}s and \Lit{ID}s of the banks described 
+      in the links. 
+\item \Lit{JB} on the card \Lit{"*B.UP UPID-JB"}
+      is not used to recognise the structure but is printed only.
+\item Repetitions can be nested (3 levels maximum), 
+      each \Lit{"*B.REP"} requiring a \Lit{"*B/REP"}.
+\end{Notes}
+ 
+\subsection{An example of a bank description}
+ 
+\begin{XMPt}{Card image File describing the bank \Lit{EV}}
+*B..EV  Event header bank.
+*B.AU    S.Holmes
+*B.VE    402
+*B.ND    10
+*B.NL    2
+*B.NS    2
+*B.NX    None
+*B.UP    None
+*B.OR    None
+*B.IO    '3H 3I -F'
+*B.LINK
+*B.1   VX       Vertex bank
+*B/LINK
+*B.DATA
+*B.1   LABNA     Name of laboratory
+*B.2   EXPTNA    Name of experiment
+*B.3   DAQNA     Initials of shift crew 
+*B.4   IHDAT     Data type
+*B.4   C1        Experiment data
+*B.4   C3        Test beam data
+*B.4   C4        Cosmic ray data
+*B.4   C5        Monte-carlo data
+*B.5   IIEVT     Trigger number
+*B.6   IIFITY    Filter type (Bit string)
+*B.6   BITVAL00  Sum E(clus) > 2 GeV
+*B.6   BITVAL01  E(EB cls/blk) > 200MeV
+*B.6   BITVAL04  Lumi Event
+*B.7   IITHRU    Thrust * 10000
+*B.8   IICTHR    Cosine of the thrust axis * 10000
+*B.9   IIECAL    Total Electromagnetic Energy
+*B.              (in units of MeV)
+*B.10  IIHCAL    Total Hadronic Energy
+*B/DATA
+*B/
+\end{XMPt}
+ 
+\section{Generation a template for the bank descriptor file}
+\label{sec:dzdocdzdtmp}  
+ 
+A subroutine is provided to generate a template of the bank
+description for an existing
+data structure in memory which is not yet documented.
+ 
+\Shubr{DZDTMP}{(ISTOR, LTOP, LUN, CHOPT)}
+ 
+\Idesc
+\begin{DLtt}{123456}
+\item[ISTOR] Index of the store containing the datastructure
+\item[LTOP]  Link to the top bank
+\item[LUN]   Unit number of an (open) file to receive the documentation
+\item[CHOPT] CHARACTER variable specifying the desired option:
+\begin{DLtt}{123}
+\item['T'] Treat the tree below \Lit{LTOP} 
+           (default is bank at \Lit{LTOP} only).
+\item['L'] Follow next links
+\item['A'] Generate Author tag: \Lit{*B.AU nomen nescio}
+\item['V'] Generate Version tag: \Lit{*B.VE   1.00}
+\item['S'] Generate Store tag:   \Lit{*B.ST   Storename}
+\item['D'] Generate division tag: \Lit{*B.DV Divname}
+\end{DLtt} 
+\end{DLtt} 
+ 
+The routine recognizes when all down banks of a bank have the same
+Hollerith identifier and in that case a repetition section is generated
+and only the first down link is followed, i.e. it assumes that
+the other substructures are identical.
+ 
+This routine can be called interactively from \Rind{DZDISP}.
+ 
+%\finalnewpage
+
+\section[{\tt DZEDIT}, a program to maintain documentation]%
+        {\Pind{DZEDIT}, a program to maintain documentation}
+\label{sec:dzdocdzedit}  
+ 
+\Pdef{DZEDIT} is an interactive program to manipulate the documentation
+database.
+The program can handle one \RZfile{} and one input
+cards file in the same session. 
+All file handling (\Lit{OPEN}, \Lit{CLOSE} and \Lit{FILDEF}) 
+are done by the program. 
+The \RZfile{} is opened with \Lit{STATUS = `NEW'} 
+if it should by created, the other files
+(Listing, plotfiles) are opened with \Lit{STATUS='UNKNOWN'},
+i.e. they will be overwritten if they exist.
+It allows to create the \RZfile,  to update it and
+produce printed documentation of all or selected entries.
+Documentation including graphical representation of the bank trees
+may be produced in various formats:
+ 
+\begin{ULc}
+\item Pure PostScript~\cite{Adobe:red2} output on a file \Lit{xxxx.ps} can be
+      directly printed on a PostScript laser printer.
+      The \Ropt{P} option should be used with the appropriate commands.
+\item Pure \LaTeX~\cite{bib-LATEX} formatted output on a file \Lit{xxxx.tex} 
+      is obtained with the \Ropt{L} option.
+\item The command \Lit{HTML} produces output in HTML format.
+      ZEBRA links are translated into hypertext links that allow one
+      to step through the data structure with a WWW browser. 
+\end{ULc}
+ 
+\Pind{DZEDIT} uses \Pind{KUIP}~\cite{bib-KUIP} as command interface. 
+ 
+\subsection[{\tt DZEDIT} command overview]{\Pind{DZEDIT} command overview}
+The program remembers the names of the \RZfile{} and the card image
+file in a file called \Lit{dzedit.las}.
+ 
+\SKUIP{CREATEDOC}{chcard chrzf}
+ 
+\begin{verbatim}
+chcard     C 'Input card image file'            D=' '
+chrzf      C 'Output RZ-file'                   D=' '
+\end{verbatim}
+ 
+Create a new \RZfile{} from documentation card image file
+ 
+\SKUIP{UPDATEDOC}{chcard chrzf [ chsubd ]}
+ 
+\begin{verbatim}
+chcard     C 'Input card image file'            D=' '
+chrzf      C 'Output RZ-file'                   D=' '
+chsubd     C 'Subdirectory name (blank=topdir)' D=' '
+\end{verbatim}
+ 
+Update an existing \RZfile{} with new documentation, this option
+is also used to put the documentation into any subdirectory
+of an existing \RZfile.
+ 
+\SKUIP{EXPORTFILE}{chfzf}
+ 
+\begin{verbatim}
+chfzf      C 'FZ-file name'                     D=' '
+\end{verbatim}
+ 
+Write currently open \RZfile{} as a \FZfile{} in Alpha exchange mode for
+transport to a different computer.
+ 
+\SKUIP{IMPORTFILE}{chfzf chrzf}
+ 
+\begin{verbatim}
+chfzf      C 'FZ-file name'                     D=' '
+chrzf      C 'RZ-file name'
+\end{verbatim}
+ 
+Read a \FZfile{} in Alpha exchange mode previously exported via the
+command \Cind{EXPORTFILE} on different (or same) computer. 
+A new \RZfile{} will be generated.
+ 
+\SKUIP{OPENRZFILE}{chrzf [ choopt ]}
+ 
+\begin{verbatim}
+chrzf      C 'Input RZ-file'                    D=' '
+choopt     C 'Option for RZFILE (U=Update)'
+\end{verbatim}
+ 
+Open an existing \RZfile{} for later use with \Lit{list/draw/export} 
+commands
+(the file will be \Lit{READONLY} unless the \Lit{'U'=update} option is given)
+ 
+\SKUIP{PURGEKEY}{[ nkeep ]}
+ 
+\begin{verbatim}
+nkeep      I 'Number of cycles to be kept'      D=-1
+\end{verbatim}
+ 
+Purge cycles of all keys keeping the last \Lit{nkeep}.
+If \Lit{nkeep < 0} keep just the highest cycle.
+ 
+\SKUIP{DELETEKEY}{chbsbk chbsup [ icycle chdopt ]}
+ 
+\begin{verbatim}
+chbsbk     C 'Hollerith Id of selected bank'
+chbsup     C 'Hollerith Id of its up-bank'
+icycle     I 'Cycle number'                     D=0
+             > highest: delete highest cycle,
+             =0:        delete lowest cycle,
+             =-1, -2 :  delete highest-1, -2..
+chdopt     C 'Delete option'                    D='C'
+             'C': delete all cycles
+             'K': delete all keys,
+             'S': delete all cycles smaller ICYCLE.
+                  (See ZEBRA users guide: RZDELK)
+\end{verbatim}
+ 
+Delete a key specifying \Lit{BankId} and \Lit{UpBankId} and cycle number.
+ 
+\SKUIP{LISTDIRECTORY}{chrzf}
+ 
+\begin{verbatim}
+chrzf      C 'Input RZ-file'                    D=' '
+\end{verbatim}
+ 
+List directory of an existing \RZfile.
+
+%\finalnewpage 
+\SKUIP{LISTONEBANK}{chbsbk chbsup [ chlist chlopt choyno idatch ]}
+ 
+\begin{verbatim}
+chbsbk     C 'Hollerith Id of selected bank'    D=' '
+chbsup     C 'Hollerith Id of its up-bank'      D='****'
+chlist     C 'File for listing'                 D=' '
+chlopt     C 'List option:                      D=' '
+             'P' PostScript file (default: simple text file)
+             'I' use format of the bank descriptor cards
+                 (i.e. Input to CREATEDOC)   
+ 
+choyno     C 'List all cycles'                  D='NO' R='NO,YES'
+idatch     I 'List only after date'             D=0
+\end{verbatim}
+ 
+List documentation for a selected bank or a group of banks.
+An \Lit{'*'} (asterix) may be used as wild card character.
+Exactly two times 4 characters are needed to define bank and up-bank.
+only the last cycle of one entry is listed regardless of its date.
+List of all cycles or selection by date of entering the \RZfile{} may
+also be choosen. The date is an integer of the form \Lit{YYMMDD}.
+ 
+\SKUIP{LISTALL}{[ chlist chlopt choyno idatch ]}
+ 
+\begin{verbatim}
+chlist     C 'File for listing'                 D=' '
+chlopt     C 'List option:                      D=' '
+             'P' PostScript file (default: simple text file)
+             'I' use format of the bank descriptor cards
+                 (i.e. Input to CREATEDOC)   
+choyno     C 'List all cycles'                  D='NO' R='NO,YES'
+idatch     I 'List only after date'             D=0
+\end{verbatim}
+ 
+List documentation for all banks
+ 
+\SKUIP{HTML}{ chbsbk chbsup [ chopt ]}
+
+\begin{verbatim}
+chbsbk     C 'Hollerith Id of selected bank'
+chbsup     C 'Hollerith Id of its up-bank'
+chopt      C 'Option: number of output files written D=' '
+              default: a different file is written for each bank
+              = 1 all output is written into a single file
+\end{verbatim}
+
+Generate documentation in HTML format suitable for a WWW browser. 
+One should use a \Lit{chbsbk} equal to \Lit{'****'} 
+and \Lit{chbsup} equal to \Lit{'NONE'} to generate a description
+for all banks.
+
+\SKUIP{DRAWONETREE}{chbsbk chbsup [chmeta chtext chpost chopt ctitle]}
+ 
+\begin{verbatim}
+chbsbk     C 'Hollerith Id of selected bank'
+chbsup     C 'Hollerith Id of its up-bank'
+chmeta     C 'Name of plotfile'                 D=' '
+chtext     C 'Name of text file'                D=' '
+chpost     C 'Name of PostScript file'          D=' '
+chopt      C 'Option (P=PostScript L=Latex)'    D=' ' R=' ,P,C,L,PC,LC'
+              'P' PostScript file
+              'L' Latex file
+              'Q' do not produce output files
+              'C' check consistency
+ctitle     C 'Global title'                     D='ZEBRA-Datastructures'
+\end{verbatim}
+ 
+Draw tree below a selected bank. 
+All banks belonging to the tree will be
+actually lifted in memory each with three data words. 
+Word 1, 2, 3 are the number of data words, links and structural links
+as described in the documentation, a $-1$ indicates a variable number.
+A global title may be given which appears on the front page of
+thge document.
+ 
+\SKUIP{DRAWALL}{[ chmeta chtext chpost chopt ctitle ]}
+ 
+\begin{verbatim}
+chmeta     C 'Name of plotfile'                 D=' '
+chsgml     C 'Name of text file'                D=' '
+chpost     C 'Name of PostScript file'          D=' '
+chopt      C 'Output:                           D='S'
+             'P' PostScript file
+             'L' Latex file
+             'N' do not check consistency
+             'Q' do not produce output files (check only)
+ctitle     C 'Global title'                     D='ZEBRA-Datastructures'
+\end{verbatim}
+ 
+Draw tree below all top banks (i.e. banks having \Lit{"None"} as
+up-bank. This also checks the consistency and completeness
+of the documentation if option \Copt{N} is not given.
+ 
+\SKUIP{DZDISP}{[ chopt ]}
+\begin{verbatim}
+chopt      C 'Option:                           D=' ' 
+             'C' use color
+\end{verbatim}
+ 
+Display the last generated tree if graphics is available. 
+Note that the number of data words is three for each bank. 
+Their
+contents indicates the documented number of data words and links.
+ 
+\SKUIP{DZDDIV}{[ chopt ]}
+\begin{verbatim}
+chopt      C 'Option:                           D=' ' 
+             'C' use color
+\end{verbatim}
+ 
+Call subroutine \Rind{DZDDIV}.
+ 
+\SKUIP{DZDIRZ}{[ chopt ]}
+\begin{verbatim}
+chopt      C 'Option:                           D=' ' 
+             'C' use color
+\end{verbatim}
+ 
+Call subroutine \Rind{DZDIRZ}, display RZ-directory tree
+ 
+\subsection{Preparing Fortran code}
+\label{sec:makecode}
+\enlargethispage{\baselineskip}
+ 
+\Pdef{MAKECODE} generates \Pind{PATCHY} \Lit{KEEP} sequences 
+containing Fortran code.  
+With option \Copt{S} only the selected bank is treated, 
+with option \Copt{T} all banks in the selected tree are treated. 
+The \Lit{KEEP} sequences are named
+with the hollerith Identifiers of the bank(trees) prefixed by mnemonics
+like \Lit{BOOK}, \Lit{LKOFF}, \Lit{DAOFF} etc.
+ 
+\SKUIP{DATAOFFSETS}{chbsbk chbsup [ chlist chpfix  choptd ]}
+ 
+\begin{verbatim}
+chbsbk     C 'Hollerith Id of selected bank'
+chbsup     C 'Hollerith Id of its up-bank'
+chlist     C 'File for listing'                 D=' '
+chpfix     C 'Prefix to mnemonic'               D=' '
+choptd     C 'Option'                           D='T'
+             'S' One selected bank
+             'T' Complete tree
+\end{verbatim}
+Generate sequences of data word offsets for a selected bank
+or a complete tree. The mnemonics given in the documentation can be
+prefixed by a (upto 8 char) string like: \Lit{DO_}
+ 
+\begin{XMPt}{Example of data word documentation}
+         *B.4 IIDAT4     This is the 4th data word
+ {\rm would produce:}
+         INTEGER IIDAT4
+         PARAMETER (IIDAT4=4)
+\end{XMPt}
+ 
+\SKUIP{LINKOFFSETS}{chbsbk chbsup [ chlist chpfix choptl ]}
+ 
+\begin{verbatim}
+chbsbk     C 'Hollerith Id of selected bank'
+chbsup     C 'Hollerith Id of its up-bank'
+chlist     C 'File for listing'                 D=' '
+chpfix     C 'Prefix to BankId'                 D='LO'
+choptl     C 'Option'                           D='T'
+             'S' One selected bank
+             'T' Complete tree
+\end{verbatim}
+ 
+Generate sequences of link offsets for a selected bank or tree.
+Exactly two times 4 characters are needed to define bank and up-bank.
+The variable generated is named \Lit{chpfix} concatenated with the
+bank Identifier.
+ 
+%\finalnewpage
+
+\begin{XMPt}{Example of the description of a link}
+         *B.LINK
+         ...
+         *B.7 IDBK  Bank containing anything
+ {\rm would produce:}
+         INTEGER LOIDBK
+         PARAMETER (LOIDBK=7)
+\end{XMPt}
+ 
+\SKUIP{LINKASSIGNMENT}{chbsbk chbsup [ chlist chpfix choptl ]}
+ 
+\begin{verbatim}
+chbsbk     C 'Hollerith Id of selected bank'
+chbsup     C 'Hollerith Id of its up-bank'
+chlist     C 'File for listing'                 D=' '
+chpfix     C 'Prefix to BankId'                 D='LO'
+choptl     C 'Option'                           D='T'
+             'S' One selected bank
+             'T' Complete tree
+\end{verbatim}
+ 
+Generate sequences of link assignment statements for selected
+bank or tree.
+Exactly two times four characters are needed to define bank and up-bank.
+The assumed linkoffset is named \Lit{chpfix} concatenated with the
+bank identifier.
+Example: if a 
+\par
+\begin{XMPt}{Example of link to bank \Lit{IDBK} with Up-bank \Lit{IDUP}}
+         *B.UP IDUP
+         *B.LINK
+         ...
+         *B.7  IDBK  Bank containing anything
+ {\rm would produce:}
+         INTEGER LOIDBK
+         LOIDBK=LQ(LOIDUP-7)
+\end{XMPt}
+ 
+\SKUIP{BOOK}{chbsbk chbsup [ chlist choptb ]}
+ 
+\begin{verbatim}
+chbsbk     C 'Hollerith Id of selected bank'
+chbsup     C 'Hollerith Id of its up-bank'
+chlist     C 'File for listing'                 D=' '
+choptb     C 'Option'                           D='TB'
+             'S' One selected bank
+             'T' Complete tree
+             'B' Generate call to MZBOOK
+             'L' Generate call to MZLIFT
+\end{verbatim}
+ 
+Generate code to book a bank or bank tree with \Rind{MZBOOK}
+or \Rind{MZLIFT}.
+For \Rind{MZLIFT} the bank parameters are put into arrays
+\Lit{MMIDBK}, which go into their own \Lit{KEEP} sequence.
+The link to the bank \Lit{"BANK"} is named \Lit{LBANK}, 
+the uplink is assumed \Lit{LUPBK} if the up-bank is called \Lit{"UPBK"}.
+For \Lit{LBANK} the declaration \Lit{"INTEGER LBANK"} is generated, 
+for \Lit{LUPBK} it is assumed to be done already. 
+A call to \Rind{MZFORM} is generated if not all data
+words are of the same type. The IO-char may be given expicitely for
+each data word or in line like: \Lit{*B.IO  3I 4F}.
+The link offset (\Lit{JBIAS}) is taken from the card \Lit{*B.UP UPBK -JBIAS}, 
+if \Lit{JBIAS} is given. 
+If it is not given it is searched for in the documentation of the Up-bank. 
+If the string specified for \Lit{UPBK} is \Lit{"NONE"},
+it is set to \Lit{+1}.
+ 
+\begin{XMPt}{Defaults for non explicitly documented parameters}
+  IXDIV:  0 (i.e. div 2 in store 0)
+  JBIAS:  no default
+  NL:     0
+  NS:     0
+  ND:     0
+  IOChar: no default, if not given with the data word description
+  NZERO:  0
+\end{XMPt}
+ 
+\SKUIP{LIFT}{chbsbk chbsup [ chlist choptb ]}
+ 
+\begin{verbatim}
+chbsbk     C 'Hollerith Id of selected bank'
+chbsup     C 'Hollerith Id of its up-bank'
+chlist     C 'File for listing'                 D=' '
+choptb     C 'Option'                           D='TL'
+             'S' One selected bank
+             'T' Complete tree
+             'B' Generate call to MZBOOK
+             'L' Generate call to MZLIFT
+\end{verbatim}
+ 
+Generate code to lift a bank or bank tree.
+See the description of \Cind{BOOK} above.
+ 
+\subsection*{Remarks on \Pind{DZEDIT}}
+ 
+\begin{itemize}
+\item In all \Pind{DZEDIT} commands \Lit{CHBSBK} and \Lit{CHBSUP} can contain 
+      the wildcard character \Lit{*}, e.g. \Lit{"CV**"} for \Lit{CHBSBK} 
+      and \Lit{"****"} for \Lit{CHBSUP} would select all banks starting
+      with \Lit{"CV"} (\Lit{CV}, \Lit{CVRA}, ...). 
+\item The command \Cind{DRAWALL} will scan the \RZfile{}
+      for all banks having as Up-bank \Lit{"None"} (or \Lit{"NONE"}) 
+      and generate the graphical documentation. 
+      At the same time it checks whether all banks in the file are connected 
+      in a tree and are not used more than once
+      (i.e., the pair \Lit{BankId}  and \Lit{UpBankId} is not unique).
+\end{itemize}
+ 
+\subsection*{Remarks on updating}
+ 
+When the update option is specified, the input Cards file is
+first read and new keys (or a new cycle of a key if it is already present)
+are produced. 
+It then checks for the cases where a new cycle has been added, if the data
+in the new cycle are identical to the one in the previous cycle.
+If so, it deletes the newly created cycle. 
+So the update can be done
+with a Cards file containing documentation on all banks or just
+those which should be added or modified. 
+Thus old cycles of the updated banks are kept and can be listed on request.
+(See option ``list all cycles'')
+ 
+%\finalnewpage
+
+\section{The interactive bank display tool}
+\label{sec:dzdocdzdisp} 
+ 
+The following routines are provided to visualise the bank structure,
+the layout of banks in divisions or the contents of RZ~directories 
+in an interactive session. 
+The routine \Rind{DZDISP}
+is used to step through bank trees, display the contents of system
+words, links and datawords together with the documentation contained
+in an \RZfile{} if available.
+Since ZEBRA provides forward and backward linkage of banks,
+the routine can reach each bank of a datastructure if it is provided
+with the link to any bank of the structure. 
+Any picture may be written to a plotfile 
+(GKS, PostScript, LaTeX) to get a hardcopy of it.
+ 
+Routine \Rind{DZDDIV} is used to graphically display the bank layout
+in a division. 
+Banks are marked with their hollerith Identifier.
+One can interactivley select any division of any store and
+zoom out regions of divisions. 
+By clicking on a bank in the division
+one can directly enter \Rind{DZDISP} to display the corresponding bank tree.
+Both routines assume that the graphics package (\cite{bib-GKS1} or
+\cite{bib-HIGZ}) and a workstation
+have been opened by the appropriate calls.
+ 
+\Rind{DZDIRZ} is used to display and step through RZ~directories.
+
+\finalnewpage
+
+\subsection[{\tt DZDISP} -- Display bank trees in an interactive session]%
+           {\Rind{DZDISP} -- Display bank trees in an interactive session}
+\begin{Fighere}
+\begin{center}
+    \fbox{\epsfig{figure=dzdisp.eps,height=12cm}}
+\caption{Example of output generated by DZDISP}
+\label{fig:DZDOCFIG2}
+\end{center}
+\end{Fighere}
+ 
+\Shubr{DZDISP}{(ISTOR,*LTREE*,RZPATH,CHOPT,IWDISP,IWMETA,ILOCNR,IWKTYP)}
+ 
+\Idesc
+\begin{DLtt}{123456}
+\item[ISTOR]  Index of the store with the bank tree to be analyzed
+\item[LTREE]  Entry address into the bank tree structure
+\item[RZPATH] Character variable specifying the path name of a RZ-directory
+              containing the DZDOC bank descriptions.
+              If no RZ-file is available one sets \Lit{RZPATH = ' '}.
+\item[CHOPT]  Character variable specifying the desired options:
+  \begin{DLtt}{123}
+      \item['N'] Do not activate and deactivate workstation,
+                 assumed to be done by caller
+      \item['M'] write on plotfile also the menu boxes
+      \item['L'] return link of selected bank to caller in \Lit{LTREE}
+      \item['R'] handle ``Modify data'' as ``Quit''
+  \end{DLtt}
+\item[IWDISP] Workstation identifier for the display
+\item[IWMETA] Workstation identifier for a possible plotfile, 
+              a value of \Lit{0} means no plotfile.
+\item[ILOCNR] Locator number (normally = 1)
+\item[IWKTYP] The workstation type (display screen)
+\end{DLtt}
+\Odesc 
+\begin{DLtt}{123456}
+\item[LTREE]  Address of the selected  bank, if \Ropt{'L'} option is given.
+\end{DLtt}
+ 
+\subsubsection*{Interaction with \Rind{DZDISP}}
+ 
+Routine \Rind{DZDISP} activates the workstation (\Lit{IWDISP}) if
+the \Ropt{`N'} option is not given, clears
+the screen and draws the bank tree. 
+Then it adds menu boxes on the picture allowing the user 
+to choose one of the following options
+\begin{DLtt}{1234567890}
+\item[Quit]       Return to caller
+\item[Cont]       Continue to draw down banks which did not fit on page
+\item[=>plotfile] Output onto plotfile (if \Lit{IWMETA > 0})
+\item[Drop bank(tree) IDBK\ ]
+                  Drop the currently selected top bank with hollerith 
+                  Identifier \Lit{IDBK} and its dependents. 
+                  A possible next bank is not dropped.
+\item[Modify data in bank IDBK\ ]
+                  Modify data words in the currently selected top bank. 
+                  It asks for the first and last word to be modified. 
+                  If the first and last word are the same only one word 
+                  is affected, otherwise all selected words will be set
+                  to the same value. 
+                  System words may be modified by choosing offsets less
+                  or equal zero.
+                  Only INTEGER values are allowed in this case.
+                  A \Lit{$} in front of an INTEGER allows hexadecimal input.
+\item[Help]       Print instructions
+\item[=>LaTeX]    Print current picture in \LaTeX{} format to \Lit{UNIT} (see below)
+\item[CHOPT]      Character options for \Rind{DZSHOW} with the
+                  following extensions: 
+                  \Lit{'W'} bitwise dump of data words with
+                  modifiers \Lit{'1'}, \Lit{'2'}, \Lit{'3'} giving the field width, 
+                  \Lit{'0'} forces also the bits with zero value to be shown as \Lit{0}, 
+                  the default is blank. 
+                  The option \Lit{'C'} forces only the data content to be shown 
+                  without any other text like sequence numbers etc., 
+                  this is useful if the dump should be read by another
+                  program (e.g. \Pind{PAW}).
+\item[FIRST]      First word to show (with \Rind{DZSHOW})
+\item[LAST]       Last word to show (with \Rind{DZSHOW})
+\item[UNIT]       Unit for printed output (\Rind{DZSHOW}, \LaTeX, etc.,  (6 = terminal).
+                  If a number $\neq 6$ is specified, then a file
+                  \Lit{forxxx}, where \Lit{xxx} is set equal to \Lit{UNIT} 
+                  will be opened and used. 
+                  Whenever \Lit{UNIT} changes the old file is closed.
+\end{DLtt}
+ 
+It then requests activation of the locator (mouse) and takes the
+following actions  according to its location:
+ 
+\begin{enumerate}
+\item If it is inside the (shaded) bank center or in the
+      arrow indicating a possible next bank or in the box at top of
+      the picture indicating the Up-bank it calls \Rind{DZDRAW}
+      for the selected bank, i.e. it draws the tree for the selected
+      bank.
+\item If it is inside the data box it displays the selected datawords
+      by a call to \Rind{DZSHOW} for this bank.
+\item If it just above the data box it lists the selected datawords
+      together with the documentation (if it is provided in the \RZfile).
+      (See also routine: \Rind{DZDDWD})
+\item If it is inside the link region (or just left of the bank
+      center if there are no links) it outputs the system words
+      and links of the bank to the selected unit.
+\item If the cursor is just above the shaded bank center the documentation
+      for the bank as contained in the \RZfile{} is displayed. 
+      If it does not exist a template of the documentation is written to the selected
+      output stream (see \Lit{UNIT} above).
+\end{enumerate}
+ 
+\begin{Note}
+The link \Lit{LTREE} pointing to the data structure should be in a
+link area.
+On some graphics terminals (e.g. PERICOM GRAPH) the alpha screen
+is used for the printed output. 
+It needs input of any character
+followed by RETURN to switch back to the graphics screen.
+\end{Note}
+ 
+\subsection[{\tt DZDDWD} -- display contents of data words with documentation]%
+           {\Rind{DZDDWD} -- display contents of data words with documentation} 
+ 
+\Shubr{DZDDWD}{(ISTOR, LBANK, CHOPT, IFIRST, LAST, LUNPRT)}
+ 
+\Idesc
+ 
+\begin{DLtt}{123456}
+\item[ISTOR]  Index of the store with the bank tree to be analyzed
+\item[LBANK]  Address of the bank about which information has to be displayed
+\item[CHOPT]  Character variable specifying the following options:
+  \begin{DLtt}{123}
+     \item['C'] short display, show contents of data words only,
+                useful if data should subsequently read by a program again.
+     \item['U'] do not display if mnemonic is \Lit{UNDEFIND}.
+     \item['Z'] force hexadecimal
+     \item['T'] force one line of output/4 characters in case of
+                hollerith text. By default text is assembled in lines
+                of 60 characters, no formatting is attempted.
+     \item['E'] Check if values are within allowed range (Examine), if
+                a range is defined in documentation.
+  \end{DLtt}
+\item[IFIRST] First word to show
+\item[LAST]   Last word to show
+\item[LUNPRT] Unit number for output
+\end{DLtt}
+ 
+\finalnewpage
+
+\begin{Notes}
+\item \Lit{IFIRST} and \Lit{LAST} may be 0, in this case all datawords
+      of a bank will be listed. 
+\item If no documentation for the bank exists, only the contents of the 
+      datawords will be shown (\Rind{DZSHOW}).
+\item Only two levels of repetitions are supported, the inner level
+      must be given explicitly except for cases where the repetition count
+      is a simple expression of the current data word.
+\end{Notes}
+ 
+\subsection[Examples of {\tt DZDISP} output]{Examples of \Rind{DZDISP} output}
+ 
+\begin{XMPt}{Documentation for a bank (click above bank center)}
+------------------------------------------------------------------------------
+| EV   | Event header bank.
+ ---------------------------------------------- entered file at 19-Oct-92  9: 3
+ Bank IDH  EV       Event header bank.
+ Author             S.Holmes
+ Version            402
+ NL               2
+ NS               2
+ ND              10
+ Next      None
+ Up        None
+ Origin    None
+ IO-Charac          3H 3I -F
+              ---------- Description of the links  ----------
+ 1         VX       Vertex bank
+              ---------- Description of the data words   ----------
+ 1         LABNA    Name of laboratory
+ 2         EXPTNA   Name of experiment
+ 3         DAQNA    Initials of shift crew
+ 4         IHDAT    Data type
+ 4         C1       Experiment data
+ 4         C3       Test beam data
+ 4         C4       Cosmic ray data
+ 4         C5       Monte-carlo data
+ 5         IIEVT    Trigger number
+ 6         IIFITY   Filter type (Bit string)
+ 6         BITVAL00 Sum E(clus) > 2 GeV
+ 6         BITVAL01 E(EB cls/blk) > 200MeV
+ 6         BITVAL04 Lumi Event
+ 7         IITHRU   Thrust * 10000
+ 8         IICTHR   Cosine of the thrust axis * 10000
+ 9         IIECAL   Total Electromagnetic Energy
+ 10        IIHCAL   Total Hadronic Energy
+\end{XMPt}
+ 
+\finalnewpage
+%\bigskip
+ 
+\begin{XMPt}{Display of Undocumented data (click in data box)}
+ DZSHOW ---  DZSHOW called from DZDISP
+ 
+EV  .     1     8781(QDIV2   ) SY/US/IO    1/    0/2153 
+NL/NS/ND    7/    7/      10 N/U/O/@O       0/       0/       1/
+   8781
+ --------  DATA part of bank  --------
+ 
+       1 /       "Cern       "Mars       "McKi           5      123456
+                         3   9945.       8678.       .9120E+05   1300.
+\end{XMPt}
+ 
+\bigskip
+ 
+\begin{XMPt}{Display of documented data (\Rind{DZDDWD})(click above data box)}
+ -------- Data of Bank/UpBank: EV  /NONE Doc Version: 402 ----------
+     1    1  LABNA          "Cern  Name of laboratory
+     2    2  EXPTNA         "Mars  Name of experiment
+     3    3  DAQNA          "McKi  Initials of shift crew
+     4    4  IHDAT              5  Data type
+     4    4                        Monte-carlo data
+     5    5  IIEVT         123456  Trigger number
+     6    6  IIFITY             3  Filter type (Bit string)
+     6    6                        Sum E(clus) > 2 GeV
+     6    6                        E(EB cls/blk) > 200MeV
+     7    7  IITHRU     9945.      Thrust * 10000
+     8    8  IICTHR     8678.      Cosine of the thrust axis * 10000
+     9    9  IIECAL     .9120E+05  Total Electromagnetic Energy
+    10   10  IIHCAL     1300.      Total Hadronic Energy
+\end{XMPt}
+ 
+\bigskip
+ 
+\begin{XMPt}{List system words (click in link area)}
+ System words + links
+ Offset to Bank-Centre              20
+ I/O characteristic          3H 3I -F
+ Bank status word (HEX)          40000
+ Link to the bank                 8781
+ Hollerith ID                     EV
+ Numerical ID                        1
+ Total number of links               7
+ Number of structural links          7
+ Number of data words               10
+ Next link                           0
+ Up - link                           0
+ Origin link                         1
+     1. down link                 8595 VX
+     2. down link                    0 
+     3. down link                    0
+     4. down link                    0
+     5. down link                    0
+     6. down link                    0
+     7. down link                    0
+\end{XMPt}
+ 
+\finalnewpage
+ 
+\subsection[{\tt DZDDIV} -- Display the layout of stores and divisions]%
+           {\protect\Rind{DZDDIV} -- Display the layout of stores and divisions}
+ 
+\Rind{DZDDIV} does a sequential search through the specified division and
+displays the location of the banks graphically. 
+Hence it displays all banks (also dropped ones) regardless of their
+linkage. 
+In this respect it is principally different from \Rind{DZDISP}.
+Active banks are marked by one horizontal line in the box
+representing the bank, dropped banks are shaded. 
+The program tries to fit the hollerith identifier of the bank into the box.
+Characters which do not fit in a box are truncated from the end of the string.
+The whole division is represented by about 30 horizontal boxes.
+To the left of each box the \Lit{LQ-}address in the store is shown.
+The length of the box is adjusted to represent an integer multiple
+of powers of ten (e.g. 200 or 3000) words.
+In addition to the selected division the layout of the store
+containing the division is displayed at top of the picture
+showing the locations and printing names of all divisions in the store.
+\Rind{DZDISP} may be directly entered by clicking on a bank in the display.
+ 
+\begin{minipage}{\textwidth}
+\begin{Fighere}
+  \begin{center}
+    \fbox{\epsfig{figure=dzddiv.eps,height=132mm}}
+    \caption{Example of a display of \protect\Rind{DZDDIV}}
+  \end{center}
+\end{Fighere}
+\end{minipage}
+ 
+%\finalclearpage
+ 
+\Shubr{DZDDIV}{(IXDIV,L,RZPATH,CHOPT,IWDISP,IWMETA,ILOCNR,IWKTYP)}
+ 
+\Idesc
+ 
+\begin{DLtt}{123456}
+\item[IXDIV]  Index of the division to be displayed, if just the store index
+              is given division 2 is taken as default.
+\item[L]      not used at present.
+\item[RZPATH] CHARACTER variable specifying the pathname of the \RZfile{} containing
+              the bank documentation, if no \RZfile{} is available one sets 
+              \Lit{RZPATH= ' '}.
+\item[CHOPT]  CHARACTER variable specifying the desired option:
+  \begin{DLtt}{123}
+     \item['I']  Interactive (i.e. request cursor input after display)
+     \item['N']  Do not activate and deactivate workstation, assumed to be done
+                 by caller
+     \item['P']  print addresses of banks to terminal (or file)
+  \end{DLtt}
+\item[IWDISP] workstation Identifier for the display, 
+              \Lit{IWDISP} must be open, activation and deaction is done by the routine
+              if the \Lit{'N'} option is not given.
+\item[IWMETA] Workstation Id for a possible Meta file (0 means no plotfile)
+\item[ILOCNR] locator number (normally = 1)
+\item[IWKTYP] the workstation type (display screen)
+\end{DLtt}
+ 
+\subsubsection*{Interaction with \Rind{DZDDIV}}
+ 
+If the interactive option has been choosen additional menu
+boxes are drawn and the program expects input
+of the locator with the following choices.
+ 
+\begin{DLtt}{123456789012345}
+\item[QUIT]       Return to caller
+\item[=>Plotfile] Write current picture on GKS--plotfile
+\item[ZOOM]       Show enlarged part of division.
+                  The program expects then 2 inputs by the locator
+                  indicating the area to be enlarged. 
+                  It chooses the start of the bank with the lower address and the end
+                  of the bank with the higher address.
+\item[In division list] Allows selection of a division.
+\item[In store list]    Allows selection of a store.
+\end{DLtt}
+ 
+If the locator is activated on a division in the box at the top
+representing the store then  the picture is erased and redrawn
+with the selected division expanded.
+ 
+If the locator is activated on a bank in the division display
+\Rind{DZDISP} is called with the corresponding bank selected.
+This allows to acces and display any bank tree in a store
+without prior knowledge of its entry address.
+ 
+\finalnewpage
+ 
+\subsection[{\tt DZDIRZ} display RZ directory trees in an interactive session]%
+           {\Rind{DZDIRZ} display RZ directory trees in an interactive session}
+ 
+This routine displays RZ--directories and the keys in a similiar manner as
+\Rind{DZDISP} does it for bank trees. 
+A bank structure reflecting the \RZfile{}
+structure is lifted and displayed by  the routines of \Lit{DZDISP}.
+To distinguish the output from bank trees the boxes are
+drawn like diamonds rather then rectangular. 
+The keys are indicated with rectangular boxes. 
+By default only the 10 most recent keys in a directory are displayed. 
+This might be overwritten by specifying a parameter \Ropt{NKnnn}
+in the \Rarg{CHOPT} argument where \Lit{nnn} represents an integer number.
+Additional keys (of the selected working directory) 
+may be shown using the menu option \Lit{"more keys"}.
+The first 4 keywords are shown in the box. 
+To the left of the box the sequence
+and cycle number of the key are displayed.
+If there are more they may be shown by clicking above the box (see below).
+The data of the key can be brought into memory by clicking into the
+box representing the key and subsequently examined by calls to \Rind{DZDISP}.
+Optionally the contents of the key vector is returned in a next bank (Option \Ropt{'K'}).
+At the upper left corner the full name of the current working directory
+is displayed which remains selected when returning to the caller.
+So this routine may be used to select interactively a working directory.
+The routine needs about 20 words/directory or key depending on
+the length of the name or number of keywords in division 2 of the
+selected store. 
+On return from \Rind{DZDIRZ} the datastructure is dropped
+by default, if the \Ropt{'S'}-option is given it is kept and must be dropped
+explicitly (\Lit{"drop+quit"}). 
+This is useful for very big \RZfile s to save time building the datastructure. 
+Note however if a directory tree which is
+not part of the current one in memory should be shown
+one needs to do a \Lit{"drop+quit"}.
+before the change of \Rarg{RZPATH} containing the directory
+to be displayed has an effect.
+ 
+A simple implementation of a documentation scheme for RZ-directories is
+supported. 
+The documentation is contained in a formatted text file,
+where a line starting with \Lit{'/'} gives the directory name followed by
+any number of comment lines not starting with \Lit{'/'} in the first column. 
+The  directory name should be unique, i.e. leading directories may be 
+omitted. 
+The first  comment line is put into the box representing the
+directory on the display. 
+Clicking above this box shows all lines.
+The file must be open when \Rind{DZDIRZ} is called, the logical unit is passed
+in the \Rarg{CHOPT} argument as \Ropt{LUnn} where \Lit{nn} is the unit number. 
+ 
+ 
+\subsubsection*{Interaction with \Rind{DZDIRZ}}
+ 
+The following actions can be triggered by clicking the mouse at the
+following places:
+ 
+\begin{enumerate}
+\item If it is inside the (shaded) center or in the
+      box at top of the picture indicating the mother directory
+      it changes the current working directory to the selected one
+      and calls \Rind{DZDIRZ} again, i.e. one steps down or up the directory tree.
+\item If it is inside the big box of a directory, which shows the number of
+      keys and its quota, it lists the contents of this directory (\Rind{RZLDIR}).
+\item If it is above a rectangular box representing a key all keywords will be shown.
+\item If it is inside a rectangular
+      box representing a key, this key is read into memory (\Rind{RZIN}) at link
+      \Rarg{LDATA} with offset \Rarg{JBIAS} (or as top bank if \Lit{JBIAS=1}).
+\end{enumerate}
+ 
+\finalnewpage
+ 
+\begin{Fighere}
+\begin{center}
+    \fbox{\epsfig{figure=dzdirz.eps,height=14cm}}
+\end{center} 
+\caption[Example of output generated by {\tt DZDIRZ}]{Example of output generated by \Rind{DZDIRZ}}
+\end{Fighere}
+ 
+\Shubr{DZDIRZ}{(ISTOR, LD*, JB, RZPATH, CHOPT, IWDISP, IWMETA, ILOCNR)}
+ 
+\Idesc
+ 
+\begin{DLtt}{123456}
+\item[ISTOR]  Index of the store to be used
+%\item[LD]     Link where to put read in data structure
+\item[JB]     The link offset (or 1 if top link)
+\item[RZPATH] Character variable specifying the path name of a RZ-directory
+\item[CHOPT]  Character variable specifying the options desired:
+  \begin{DLtt}{12345}
+    \item['N']    Do not activate and deactivate workstation,
+                  assumed to be done by caller
+    \item['A']    Show all keys (default 10)
+    \item['S']    Save (time) i.e. do not drop banks containing
+                  the RZ-structure on return.
+    \item['K']    Return the keyvector in a next bank if the data for
+                  a key a read into a bank (\Rind{RZIN}). 
+                  In this case control is immediatly returned to the caller.
+    \item['DUnn'] \Lit{nn} is the logical unit number of an open file
+                  containing documentation. This (an the following 2)
+                  must follow the previous options (\Lit{NASK}).
+    \item['LUnn'] \Lit{nn} is the logical unit number of an open file
+                  receiving printed output.
+    \item['NKnn'] Maximum number of keys to show on display.
+  \end{DLtt}
+\item[IWDISP] Workstation identifier for the display
+\item[IWMETA] Workstation identifier for a possible plotfile,
+              a value of 0 means no plotfile
+\item[ILOCNR] Locator number (normally = 1)
+\end{DLtt}
+ 
+\Odesc
+ 
+\begin{DLtt}{123456}
+\item[LD]  Link to a possibly read in data structure or bank containing 
+           a vector
+\end{DLtt}
+ 
+\section{DZDOC with the Motif interface of KUIP}
+Large parts of the DZDOC and DZDISP package described in the previous
+sections have been implemented using the Motif % \cite{bib-Motif} 
+interface of the new KUIP \cite{bib-KUIP}. One single subroutine 
+call
+ 
+\Shubr{ZBRDEF}{ }
+ 
+gives access to the features briefly described in the following two
+sections which are taken from the HELP available interactivley.
+ 
+\subsection{The Zebra-Browser}
+ 
+Selecting "Zebra" from the KUIP object browser will display
+an icon for each Zebra store, for each open Fzfile and each
+open Rzfile. A store is named with its number plus the name
+given to MZSTOR with slashes (/) replaced by underscores (\_).
+A Fzfile is named with the logical unit number, a Rzfile with
+the top directory given to it by RZFILE.
+ 
+Double click in the store symbol will display icons for the
+divisions in this store, clicking the divisions will display
+the banks im this divisions, clicking a bank will show the
+tree for this bank in the graphics window (see DZDISP).
+Popup menus (use right mouse key) are provided which allow to
+print information on stores, divisions and banks (DZSTOR,
+DZSNAP, DZSURV). The layout of banks in divisions can be
+shown graphically by the command 'Display\_division'.
+ 
+Double click in the FZfile symbol will read the next data
+structure from the file into division 1 of store 0 and
+display the bank tree for the top bank in the graphics
+window. A popup menu allows to read the User header only,
+to display information (see FZINFO) on the file or close the
+file. Trying to read beyond End of Data will force the
+file to be rewound to avoid exit via ZFATAL.
+ 
+Double click in the RZfile symbol will display directories
+and/or keys contained in the file. Double click on a key
+symbol will read the data structure for this key into
+division 1 of store 0 and display the bank tree for the
+top bank in ths graphics window. Show status (RZSTAT) and
+close are accessible by a popup menu.
+ 
+Several parameters used by the browser may be set by commands
+found in the menu \Lit{DZDOC/SET_PAR}. These allow to choose
+if workstations should be actived, if a new window should be opened
+to receive printed output, if colors should be used in the 
+bankdisplay etc.
+ 
+\subsection{Embedded DZDOC}
+ 
+The Zebra browser popup menus give access to parts of the
+DZDOC package. DZDOC allows to describe Zebra banks (linkage
+and data words) with a defined format.
+It puts this description into a Rzfile for direct access
+and makes it available to DZDISP which can then display the
+data words of a bank together with their meaning.
+ 
+Opening, updating and using of the Rzfile can be done in the
+same session. The file is opened via the menu item
+'Open\_bank\_doc\_Rzfile', one has to choose if it should be
+opened 'New' for 'Update' or 'Readonly'.
+Information can put into the file using the item
+'Put\_doc\_into\_Rzfile', for more information see help for this
+command. This menu is invoked pressing the right mouse key on 
+the item ZEBRA in the list of browsables.
+ 
+An alternative way is to use the item 'Edit\_documentation' in
+the popup menu associated with each bank (in the browser or
+graphics window). In this case the editor is called with the
+documentation contained in an (open) Rzfile if it is there.
+If not a template with the documentation generated from the
+selected bank in memory is presented in the editor.
+If the file gets modified the documentation will be put into
+the Rzfile if it is open for update. Note that the file
+naming convention uses the hollerith Id of a bank
+concatinated with the Id of its up-bank ('none' for a top
+bank) with the extension '.dzdoc'.
+ 
+\subsection{Interactive Ntuple filling}
+ 
+A simple facility is provided to mark words in a data structure
+read from an FZ-file for filling into a Ntuple. The entries may
+be scalar variables (i.e. one value of a bank) or arrays. 
+Marking of data words may be done explicitly giving the absolute
+offset in a bank (a range in case of an array) or symbolically
+if a (correct) documentation for the bank is available. In the
+second case all values of a variable (max 100) in a bank are 
+extracted and filled into the Ntuple. 
+The marking is done from the popup menu associated to banks in
+the graphics display, the system finds and remembers the links
+to the bank.
+Filling is controlled from the pop menu for the FZ-file icon.
+For further details consult the Help items for these commands.
+ 
+\begin{figure}[p]
+  \begin{center}
+     \mbox{\epsfig{figure=dzprsc.eps,height=21.5cm}}
+     \vspace{-1.5cm}
+    \caption{Example of screen layout for the Motif interface}
+    \label{fig:DZDOCFIG6}
+  \end{center}
+\end{figure}
+\clearpage 
+\section{Examples}
+\label{sec:dzdocexamples} 
+ 
+\subsection[Example session with {\tt DZEDIT}]{Example session with \Rind{DZEDIT}}
+ 
+The following example shows how to get the (graphical) bank
+documentation for a subtree of banks. 
+It assumes that the \RZfile{} previously created by \Rind{DZEDIT} 
+is available and the command 
+\Ucom{dzedit} (\Lit{DZEDIT EXEC} on IBMVM, 
+\Lit{RUN DZEDIT} on VAXVMS or \Lit{dzedit} on Unix) is defined. 
+ 
+Comment in the example below are put between /* .. */.
+Help is available by typing \Ucom{help commandname}.
+ 
+\begin{XMPt}{Example session with \Rind{DZEDIT}}
+\Ucom{dzedit}                                         /* Invoke DZEDIT                         */
+Workstation type (?=HELP) <CR>=0 :             /* Answer 0 if not a graphics terminal   */
+\Ucom{OPEN dztest.rzbank}                             /* Open RZ-file                          */
+\Ucom{DRAWONE EV NONE}                                /* Draw bank tree below CT (UpBank CD)   */
+   Draw tree below: EV                         
+   Total # of banks in tree:       3       
+   # of documented banks           3       
+ 3 banks documented with  1 pictures on  2 pages
+ PostScript output on: ev.ps                  
+ 
+                                               /* The ZEBRA bank tree corresponding     */
+                                               /* to the document is still in memory    */
+                                               /* It is thus possible to visualize it   */
+                                               /* on a workstation or graphics terminal */
+\Ucom{DZDISP}                                         /* Display bank tree                     */
+                                               /* All banks have ND=3 at this moment    */
+\Ucom{DZDDIV}                                         /* Draw physical layout of Division      */
+\Ucom{DZDIRZ}                                         /* Show structure of RZ-directory of     */
+                                               /* documentation file.                   */
+\Ucom{QUIT}                                           /* end of DZEDIT session                 */
+\end{XMPt}
+ 
+\subsection[Example of code calling {\tt DZDDIV}]{Example of code calling \Rind{DZDDIV}}
+ 
+The following code fragment assumes that  ZEBRA is initialized and
+some banks are booked (or read in via \Rind{FZIN}). 
+Routines \Rind{DZDDIV} (or \Rind{DZDISP}) can be called without providing 
+a bank descriptor file. 
+For details on the graphics package HIGZ please consult the user guide \cite{bib-HIGZ}.
+ 
+\begin{XMPt}{Using routine \Rind{DZDDIV}}
+      INTEGER NWPAW,NWHIGZ
+      PARAMETER (NWPAW=100000,NWHIGZ=30000)
+      REAL PAW(NWPAW)
+      COMMON/PAWC/PAW(NWPAW)
+      CHARACTER*9 CHRZDD
+      INTEGER LUNRZD,ISTAT,IXDIV,LDUMMY,IWMETA,IWKTYP
+      INTEGER IERFIL,LUNMET,ILOCNR,IWKID
+      PARAMETER (IERFIL=6, LUNMET=10,ILOCNR=1,IWKID=1)
+ 
+C--   Open HIGZ and workstations
+ 
+      CALL MZPAW(NWPAW,' ')
+      CALL IGINIT(NWHIGZ)
+ 
+C--   query workstation type
+ 
+      CALL IGWKTY(IWKTYP)
+      IF(IWKTYP .GT. 0)THEN
+          CALL IGSSE(IERFIL,IWKTYP)
+      ELSE
+          WRITE(*,*)'Illegal workstation type'
+          GOTO 99
+      ENDIF
+ 
+C--   open a plot file (if needed) otherwise put: IWMETA=0
+ 
+      CALL KUOPEN(LUNMET,'myplot.ps','UNKNOWN',ISTAT)
+      IF(ISTAT.NE.0)THEN
+         WRITE(*,*)' Error opening plotfile',ISTAT
+         IWMETA=0
+      ELSE
+ 
+C--      initialize a PostScript plotfile
+ 
+         CALL IGMETA(LUNMET,-111)
+         IWMETA=2
+ 
+C--      deactivate output to plot file at start, it will be
+C        activated by DZDDIV if requested
+ 
+         CALL IGMETA(0,-111)
+      ENDIF
+ 
+C     Open the RZ file for bank descriptors.
+C     If you do not have a descriptor file (yet) just put:
+C     CHRZDD=' ' to notify it to DZDDIV
+ 
+      CALL RZOPEN(LUNRZD,CHRZDD,'mydoc.rzdoc',' ',0,ISTAT)
+ 
+*     specify directory name to be used or signal error
+ 
+      IF(ISTAT.EQ.0)THEN
+         CHRZDD = '//BANKDOC'
+         CALL RZFILE(LUNRZD, CHRZDD(3:),' ')
+      ELSE
+         CHRZDD = ' '
+         WRITE(*,*)' Error opening descriptor file',ISTAT
+      ENDIF
+ 
+C--   now display division layout
+ 
+      CALL DZDDIV(IXDIV, LDUMMY, CHRZDD,'I',
+     &            IWKID, IWMETA, ILOCNR, IWKTYP)
+99    CONTINUE
+      .....
+\end{XMPt}
+ 
+%%%% \begin{landscapebody}
+ 
+%%%% \begin{minipage}[t]{.49\textwidth}
+ 
+\finalnewpage
+
+\subsection{Description of the banks used in previous examples}
+\begin{XMPt}{Description of \Lit{EV} bank (see chapter \ref{sec:h1dzexamples})}
+*B..EV  Event header bank.
+*B.AU    S.Holmes
+*B.VE    402
+*B.ND    10
+*B.NL    2
+*B.NS    2
+*B.NX    None
+*B.UP    None
+*B.OR    None
+*B.IO    '3H 3I -F'
+*B.LINK
+*B.1   VX       Vertex bank
+*B/LINK
+*B.DATA
+*B.1   LABNA     Name of laboratory
+*B.2   EXPTNA    Name of experiment
+*B.3   DAQNA     Initials of shift crew 
+*B.4   IHDAT     Data type
+*B.4   C1        Experiment data
+*B.4   C3        Test beam data
+*B.4   C4        Cosmic ray data
+*B.4   C5        Monte-carlo data
+*B.5   IIEVT     Trigger number
+*B.6   IIFITY    Filter type (Bit string)
+*B.6   BITVAL00  Sum E(clus) > 2 GeV
+*B.6   BITVAL01  E(EB cls/blk) > 200MeV
+*B.6   BITVAL04  Lumi Event
+*B.7   IITHRU    Thrust * 10000
+*B.8   IICTHR    Cosine of the thrust axis * 10000
+*B.9   IIECAL    Total Electromagnetic Energy
+*B.10  IIHCAL    Total Hadronic Energy
+*B/DATA
+*B/
+\end{XMPt}
+%%%% \end{minipage}
+%%%% \hfill
+%%%% \begin{minipage}[t]{.49\textwidth}
+\begin{XMPt}{Description of \Lit{VX} bank (see chapter \ref{sec:h1dzexamples})}
+*B..VX     VerteX bank (V0)
+*B.AUTH    S.Holmes 
+*B.VERS    403
+*B.ND      12
+*B.NL      1
+*B.NS      1
+*B.UP      EV
+*B.OR      EV
+*B.NX      VX
+*B.IO      '3I -F'
+*B.LINK
+*B.1   TK       Track bank
+*B/LINK
+*B.DATA
+*B.1   JVTYPE   Vertex type
+*B.2   JVALGO   Algorithm
+*B.3   JVNCTR   Number of tracks associated with this vertex
+*B.4   JVCSRP   Cos(r.p) in the x-y plane
+*B.5   JVD0     Abs(d0) w.r.t. event vertex            [cm]
+*B.6   JVFLEN   Flight length w.r.t. event vertex      [cm]
+*B.7   JVSD0    Sum of abs(d0) w.r.t. event vertex     [cm]
+*B.8   JVCSVP   Cosine of opening angle at vertex point
+*B.9   JVDXY    Separation in x-y at vertex point      [cm]
+*B.10  JVDZ     Separation in z at vertex point        [cm]
+*B.11  JVMPP    Invariant mass assuming pi+pi-        [GeV]
+*B.12  JVMPPR   Invariant mass assuming pi+ p-bar     [GeV]
+*B/DATA
+*B/
+\end{XMPt}
+%%%% \end{minipage}
+%%%% \newpage
+%%%% \begin{minipage}[t]{.49\textwidth}
+\begin{XMPt}{Description of \Lit{TK} bank (see chapter \ref{sec:h1dzexamples})}
+*B..TK     Track bank
+*B.AUTH    Watson
+*B.VERS    3.13
+*B.ND      12
+*B.NL      0
+*B.NS      0
+*B.UP      VX
+*B.OR      VX
+*B.NX      TK
+*B.IO      F
+*B.DATA
+*B.1      JCPX       best value for px at primary vertex    [GeV]
+*B.2      JCPY       best value for py at primary vertex    [GeV]
+*B.3      JCPZ       best value for pz at primary vertex    [GeV]
+*B.4      JCQ        charge                                 [e]
+*B.5      JCKAPP     Kappa=1/2rho                           [1/cm]
+*B.6      JCPHI0     phi0                                   [rad]
+*B.7      JCD0       d0 = phi x d.z                         [cm]
+*B.8      JCTLAM     TAN(lambda) = COT(theta) track polar angle
+*B.9      JCZ0       z at p.c.a of track                    [cm]
+*B.10     JCCHIR     Chisq/DGF in r-phi
+*B.11     JCCHI3     Chisq/DGF in s-z
+*B.12     JCEM11     <kappa0 kappa0>                    [1/cm**2]
+*B/DATA
+*B/
+\end{XMPt}
+%%%% \end{minipage}
+%%%% \hfill
+%%%% \begin{minipage}[t]{.49\textwidth}
+
+\finalnewpage
+
+\subsection{Example using pointers, repetition counts etc.}
+\begin{XMPt}{Description of RZ top bank (for output see page \pageref{xmp:rztop})}
+*B..RZ  RZ system top bank
+*B.AU   R.Brun
+*B.ST   0
+*B.DV   SYSTEM
+*B.UP   NONE
+*B.NX   RZ0
+*B.ND   *
+*B.NL   10
+*B.NS   9
+*B.IO   I
+*B.LINK
+*B.1    LSDIR      Pointer to first subdirectory
+*B.2    LFREE      Pointer to list of free records
+*B.3    LUSED      pointer to list of used records
+*B.4    LFROM      Pointer to copied directory
+*B.5    LPURG      Pointer to list of purged records
+*B.6    LROUT      Pointer to output buffer
+*B.7    LRIN       Pointer to input buffer
+*B.8    LCORD      Pointer to ordered cycles (RZCOPY)
+*B.9    LSNUSED    Free 
+*B/LINK
+*B.RLINK
+*B.1    LRNUSED    Free reference link                     *
+*B/RLINK
+*B.DATA
+*B.1     Z:IDNAME1     Directory name  (up to 16 characters)    
+*B.2     Z:IDNAME2                 "                              
+*B.3     Z:IDNAME3                 "                              
+*B.4     Z:IDNAME4                 "                              
+*B.5     RECPT1        Record number of the mother directory,   
+*B.6     RECPT2        or C file pointer (words 5 and 6)        
+*B.7     B:IWPW1       Write password (1st part)                
+*B.8     B:IWPW2                      (2nd part)                
+*B.9     NCHDRW        No. of char. DIR(1:5),WPW(6:10), 
+*B.                    and  bit 12 eX mode   
+*B.10    D:IDATEC      Creation date/time                       
+*B.11    D:IDATEM      Last mod date/time                       
+*B.12    NQUOTA        Maximum number of records QUOTA          
+*B.13    N:NRUSED      Number of used records                   
+*B.14    NWUSED        Number of words used MOD 1000000         
+*B.15    NMEGA         Number of megawords used                 
+*B.16    RESERVED      Reserved                        
+*B.17    IRIN          Record number currently in LRIN          
+*B.18    IROUT         Record number currently in LROUT         
+*B.19    IRLOUT        Number of the last record written        
+*B.20    IP1           Pointer to first free word in IRLOUT     
+*B.21    ICONT         Record number continuation               
+*B.22    NFREE         Number of words free in F                
+*B.23    N:NSD         Number of subdirectories                 
+*B.24    P:LD          Pointer to directory records             
+*B.25    P:LB          Pointer to file descriptor (only for TOP)
+*B.26    P:LS          Pointer to first subdirectory S          
+*B.27    P:LK          Pointer to first KEY   K                 
+*B.28    P:LF          Pointer to free space  F                 
+*B.29    LC            Pointer to last cycle  C                 
+*B.30    LE            Pointer to end of directory              
+*B.31    N:NKEYS       Number of keys in that directory         
+*B.32    N:NWKEY       Number of elements in one key 
+*B.REP                 N:NWKEY + 9 / 10           
+*B.1     B:KDES        KEYS descriptor (3 bits per el. ,
+*B.                    10 keys per word) 
+*B/REP    
+*B.REP               N:NWKEY           
+*B.1     Z:TAG1       First part of CHTAG(1) 4 characters      
+*B.2     Z:TAG2       Second part                              
+*B/REP    
+*B.1     L:LD          Directory records structure
+*B.1     N:NRD         Number of records to describe this dir.  
+*B.REP               N:NRD           
+*B.1     IREC(I)       Record number I of directory             
+*B/REP
+*B.1     L:LB          file descriptor (only for TOP)
+*B.1     N:NWREC       Number of words for bitmap descriptor      
+*B.2     LREC          Physical record length (in words)          
+*B.3     D:IDATE       Creation date of the file                  
+*B.REP               N:NWREC            
+*B.1     B:BITMAP      1 bit per record on the file                       
+*B/REP
+*B.1     L:LS          Subdirectory  structure
+*B.REP               N:NSD            
+*B.1     Z:NAM1        Name of subdirectory                   
+*B.2     Z:NAM2        "                                          
+*B.3     Z:NAM3        "                                          
+*B.4     Z:NAM4        "                                          
+*B.5     NCHSD         Number of characters in subdirectory name  
+*B.6     IRECSD        Record number of this subdirectory         
+*B.7     D:IDTIME      Date and Time of creation of subdirectory  
+*B/REP
+*B.1     L:LK          KEYS structure
+*B.REP               N:NKEYS        ! I=1,NKEYS   
+*B.1     P:LCYC        Pointer to highest cycle in C for key I
+*B.REP               N:NWKEYS       ! K=1,NWKEYS 
+*B.1     KEYS(I,K)     Element K of key I                     
+*B/REP
+*B/REP
+*B.1     L:LF          Start of free space
+*B.REP   NFREE
+*B.1     EMPTY         Free space
+*B/REP
+*B.1     L:LCYC        Cycles structure
+*B.1     PTOCYCLE       
+*B.1     P:BI0015      LCYC Pointer to prev cycle of KEY (0 if no)
+*B.1     P:BI1631      SECREC Second record (if there)
+*B.2     D:CREATD      Creation date/time relative to 1986
+*B.2     BITVAL04      RZKEEP
+*B.2     BITVAL03      Append mode
+*B.2     BITS0002      Vector format (if RZVOUT)
+*B.3     PTODATA       Pointer to the data
+*B.3     BITS1631      Record number where data str. starts
+*B.3     BITS0015      Offset in record
+*B.4     CYWORD4       
+*B.4     BITS0019      Number of words in data structure
+*B.4     BITS2031      Cycle number
+*B/
+\end{XMPt} 
+%%%% \end{minipage}
+ 
+\subsection{Example where titles are contained in the bank itself}
+\begin{XMPt}{Fragment of the bank description}
+*B..EXTR HID@D(23:24) TITLE@D(25:30) NID@D(31:34) ND@D(35:39)
+*B.ND    40
+*B.NX    None
+*B.UP    EXTR -1
+*B.OR    EXTR -1
+*B.IO    10I 12F -H
+\end{XMPt} 
+ 
+\begin{XMPt}{Data values of the actual bank}
+    11  TRPX          4.940      Px
+    12  TRPY          26.85      Py
+    13  TRPZ         -36.53      Pz
+    14  TRE           45.64      Energy
+    15  TRM           1.784      Mass
+    16  TRCH         -1.000      Charge
+    17  TRSX          .5641E-01  Start x
+    18  TRSY          .5541E-01  Start y
+    19  TRSZ          .3131      Start z
+    20  TREX          .8039E-01  End x
+    21  TREY          .1857      End y
+    22  TREZ          .1357      End z
+    23  NAME              "[t^-
+    24  NAME              "
+    25  START             "Prim
+    26  START             " Par
+    27  START             "t ->
+    28  END               " Dca
+    29  END               "yed_
+    30  END               "in_G
+    31  P                 "p= 4
+    32  P                 "5.60
+    33  P                 "5 Ge
+    34  P                 "V
+    35  RANGE             "R:
+    36  RANGE             " .1-
+    37  RANGE             ">
+    38  RANGE             ".2 c
+    39  RANGE             "m
+\end{XMPt} 
+ 
+\finalnewpage
+
+\begin{figure}[thb]
+  \begin{center}
+     \mbox{\epsfig{figure=dzmctree.eps,width=\textwidth}}
+     \vspace{-1.5cm}
+    \caption{Picture produced using the above indicated documentation
+    and data values. Note: The escape characters defined in HIGZ to
+    produce greek characters are recognized.}
+    \label{fig:DZDOCFIG7}
+  \end{center}
+\end{figure}
+ 
+%%%% \end{landscapebody} 
+    

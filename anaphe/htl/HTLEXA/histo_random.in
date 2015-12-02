@@ -1,0 +1,73 @@
+<![CDATA[/* histo_random.cpp */
+#include <iostream.h>
+#include "CLHEP/Random/Randomize.h"
+#include "HTL/PHistograms.h" // Persistent histograms.
+typedef PHisto1D PHisto;
+class Histo_App : public HepDbApplication {
+public:
+  Histo_App( const char *a_db_name = 0 )
+  { db_name_ = ( a_db_name == 0 ) ? "Default_DB" : a_db_name; }
+  // If no database name is provided then the default one is 
+  // "Default_DB".
+public:
+	void run();
+	void init();
+private:
+	ooHandle(ooDBObj) db_; // Handle on the database.
+	const char *db_name_; // Name of the database.
+};
+//
+// Implementation:
+//
+void Histo_App::init()
+{
+	Init();
+	startUpdate();
+	db_ = db(db_name_);
+}
+void Histo_App::run()
+{
+  const int Nbin = 10;
+  Init();        // initialise the db session
+  startUpdate(); // start an update transaction
+  HepRef(PHisto) histo = new (db_) PHisto( "Histo_1D", 20., 0.0, 20.0 );
+  HepRef(PHisto) xhist = new (db_) PHisto(" Random Numbers ",40,0.0,20.0);
+  // Clone histogram
+  HepRef(PHisto) x2hist = xhist->clone(); 
+  x2hist->set_name("Two Gaussians");
+  /* -----Start of histogram manipulation-------------------------------- */
+  // Fill histograms with random number 
+  for(int i = 1;i <= 100000;i++)
+    {
+      double x  = RandFlat::shoot(20.);       // fnum  ]0,20[
+      double n1 = RandGauss::shoot(5.,1.6);   // (mean=5, stDev=1.6)
+      double n2 = RandGauss::shoot(15.2,0.7); // (mean=15.2, stDev=.7)
+      xhist->fill(x,1.);
+      x2hist->fill(n1,1.);
+      x2hist->fill(n2,0.5);
+    }
+  cout << "Graphical Histogram Printout" << endl;
+  
+  HPrinter p(cout);
+  
+  p.print(*xhist); cout << endl; 
+  p.print(*x2hist); 
+  // Add x2hist to xhist, then divide by 2 
+  
+  x2hist->add(*xhist);
+  x2hist->div(2.);      
+  cout << endl 
+       << "Graphical Histogram Printout of xhist2 after operations"
+       << endl;
+  x2hist->set_name("Two Gaussians + Random divided by 2");
+  p.print(*x2hist);
+  
+  
+}
+int main( int argc, char **argv )
+{
+	Histo_App app;
+	app.init();
+	app.run();
+	app.commit();
+}]]>

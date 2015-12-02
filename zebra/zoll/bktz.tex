@@ -1,0 +1,948 @@
+% file : bktz.tex
+\thispagestyle{empty}     % empty head
+\markboth{}{25 Sept 91}   % empty foot
+\vspace*{-20mm}
+\begin{center} {\large\bf Zebra Reference Manual} \vspace{8mm} \end{center}
+\begin{center} {\LARGE\bf book TZ} \vspace{2mm} \end{center}
+\begin{center} {\Large\bf Title Handling} \vspace{4mm} \end{center}
+\begin{center}
+  {\large\bf Zebra version 3.67 \vspace{2mm} \\
+             June 1991          \vspace{2mm} \\
+             J. Zoll}
+\end{center}
+\vspace*{20pt}
+\begin{description}
+  \in{30mm}
+  \item[Chapter 1] User specifications for the TZ package
+  \begin{itemize}
+     \in{30mm}
+     \item[1.1] TZFIND -- access to title banks
+     \item[1.2] TZINIT -- creating title banks from a text file
+     \item[1.3] TZUSER -- editing title banks during input
+     \item[1.4] TZSHUN -- insert banks into a title structure
+     \item[1.5] TZINQ  -- inquire about the title d/s
+  \end{itemize}
+  \item[Chapter 2] Formats for the text input to TZINIT
+  \begin{itemize}
+     \in{30mm}
+     \item[2.1] Out-line
+     \item[2.2] Control-lines
+     \item[2.3] Title header lines
+     \item[2.4] Free-field input
+     \item[2.5] Fortran formatted input
+  \end{itemize}
+\end{description}
+\newpage
+\vspace*{40pt}
+{\large\bf Acknowledgement} \vspace{4mm}
+
+This package is derived from the HYDRA package TQ
+
+V.Frammery, U.Herbst-Berthon, J.Zoll,\\
+HYDRA Topical Manual, book TQ, CERN Program Library
+\cleardoublepage  % continue on next odd page
+\markboth{Principles}{Principles}
+\vspace*{20pt}
+\lile{10mm}
+\begin{center} {\large\bf{Principles}} \end{center}
+
+The TZ linear data-structure of easy-creation and easy-access
+banks has been provided primarily to satisfy the need of
+programs for run-dependent control-information
+(called 'titles').
+
+There may be one title structure for each Zebra store.
+The title stucture normally resides in some
+long-range division of the user.
+
+To give a means of creating into the TZ structure banks which
+can easily be changed from run to run,
+the routine TZINIT is provided.
+This reads a text file provided by the user,
+containing the instructions of which title banks to create
+and also the data to be placed into these banks.
+
+Access by the user program to a given bank in the TZ structure
+in store designated by IXSTOR is obtained with :
+
+\verb"      CALL TZFIND (IXSTOR, L, IDH, IDN, IFLAG)"
+
+This finds the title bank with the Hollerith bank identifier IDH
+and the numeric identifier IDN (if non-zero);
+it returns in L the pointer to the title bank found.
+The last parameter controls the action to be taken
+in case of missing title.
+
+Some applications need different versions of a given title bank
+as a function of the data they are processing.
+TZVERS has been provided for this problem; it receives a selection
+integer as one of its parameters, and it will scan the different
+versions of the title bank until it finds one whose validity range
+matches the selector.
+The validity range must be specified on the first two words of
+all the versions of all title banks to be handled with TZVERS.
+
+\vspace*{20pt}
+\begin{center} {\large\bf Conventions} \end{center}
+
+In this manual we flag output parameters in subroutine calls,
+i.e. parameters which return values to the caller,
+by an asterisk "*".
+
+If the input value of such a parameter is also significant
+this is marked by prefixing a second asterisk "*".
+
+A parameter which is a link is marked by an exclamation mark "!".
+
+The types of variables follow from the Fortran default typing
+convention, except that variables beginning with the letters
+"{\tt ch}" are of type {\tt CHARACTER}.
+
+\lile{-10mm}
+\chapter{Using the TZ package}
+
+\section{TZFIND - access to title banks}
+\smark{TZFIND - TZVERS}
+
+The banks in the linear TZ structure are identified by their
+normal Hollerith and numeric bank identifiers.
+To find a particular title bank, one calls :
+
+\ROUTA{CALL TZFIND (IXSTOR, !L*, IDH, IDN, IFLAG)}
+\bvb
+
+with
+
+    IXSTOR  index of the store holding the title-structure
+            (or index of any division in this store);
+            = zero for the primary store
+
+       !L*  output parameter to contain the link pointing
+            to the title bank found; = zero if not found
+
+       IDH  the Hollerith identifier,  either
+            an integer variable of the form 4Hxxxx, or
+            a literal character string 'xxxx' of 4 characters exactly
+
+       IDN  the numeric identifier,
+            if zero the first bank matching IDH is returned,
+            otherwise the search continues to find the bank IDH
+            which has the numeric identifier IDN;
+
+     IFLAG  indicating the action to be taken for a missing title:
+
+            IFLAG = 0 :  return with L=0
+
+            IFLAG > 0 :  TZFIND shall take the error-exit
+                         CALL ZTELL (n,1)  with n :
+
+                         n = 61    for IFLAG=1,
+                         n = IFLAG for IFLAG > 99.
+\end{verbatim} \lspa
+
+TZFIND returns the first bank with IDH / IDN in the linear structure.
+If there are other banks with the same IDH / IDN further down,
+they cannot be reached with TZFIND;
+but they could be reached with TZVERS
+or with LZFIND (cf. book MZ).
+
+\cleardoublepage  % continue on next odd page
+\vspace*{8mm}
+TZVERS is similar to TZFIND, but it allows one also to select
+a particular version from a set of title banks all having the
+same IDH (and IDN, maybe).
+
+The use of TZVERS requires that the first two words of the title banks
+to be selected contain two integers specifying the validity range
+of the bank.
+
+\ROUTA{CALL TZVERS (IXSTOR, !LR*, IDH, IDN, ISELECT, IFLAG)}
+\bvb
+
+with
+
+    IXSTOR  index of the store holding the title-structure
+            (or index of any division in this store);
+            = zero for the primary store
+
+      !LR*  output parameter to contain the link pointing
+            to the title data; = zero if not found
+
+       IDH  the Hollerith identifier,  either
+            an integer variable of the form 4Hxxxx, or
+            a literal character string 'xxxx' of 4 characters exactly
+
+       IDN  the numeric identifier,
+            if zero the first bank matching IDH is returned,
+            otherwise the search continues to find the bank IDH
+            which has the numeric identifier IDN;
+
+   ISELECT  selector to find the bank whose validity range
+            matches this integer inclusively
+
+     IFLAG  indicating the action to be taken for a missing title:
+
+            IFLAG = 0 :  return with LR=0
+
+            IFLAG > 0 :  TZVERS shall take the error-exit
+                         CALL ZTELL (n,1)  with n :
+
+                         n = 62    for IFLAG=1,
+                         n = IFLAG for IFLAG > 99.
+\end{verbatim} \lspa
+\newpage
+\section{TZINIT - creating title banks from a text file}
+\smark{TZINIT}
+
+The data to be read by TZINIT are prepared on a formatted file,
+where they can easily be changed.
+Typically normal free-field format titles on this file
+look like this :
+
+\bvb
+      *DO MEDI
+          3                    #. this is a trailing comment
+          1.      217.5993     #. MEDIUM 1 : AIR PATH
+          1.5259    7.496      #.        2 : VAC TANK WINDOW
+          1.5324   17.0278     #.        3 : MAIN WINDOW
+          1.1005   50.54       #. HYDROGEN
+
+      *DO FZO 21 -ACW
+          4  0  :TLO3  :/dev/mt12    #. FZ option and file name
+\end{verbatim} \lspa
+
+The data for the title banks are given one after the other.
+Each title starts with the 'title header line',
+marked by *DO in col. 1,
+giving the Hollerith identifier (like MEDI or FZO) and
+possibly the numeric identifier (like 21),
+possibly followed by options valid for this title (like {\tt -ACW}),
+selecting the way in which the data are to read.
+
+Full specifications for the formats are given in chapter 2.
+
+With these data TZINIT will create in the title structure a bank
+with the Hollerith ID 'MEDI' and with 9 data words,
+and also a bank FZO / 21.
+If this resides in the primary store, the program may
+{\tt CALL~TZFIND~(0,L,'MEDI',0,1)} to get access to the bank MEDI
+with the following contents :
+\bvb
+         IQ(L+1)     3
+          Q(L+2)     1.
+          Q(L+3)     217.5993
+          Q(L+4)     1.5259
+            ...
+          Q(L+9)     50.54
+\end{verbatim} \lspa
+
+If, after digesting the data, the program no longer needed
+the bank it could remove it with  {\tt CALL MZDROP (0,L,'.')}
+
+\newpage
+To read the title data from a file connected to the logical
+unit number LUN one calls :
+
+\ROUTA{CALL TZINIT (LUN, IXDIV)}
+\bvb
+with    LUN :  logical unit number,
+               if =  0 :  Zebra 'card reader' IQREAD
+                  = -1 :  Zebra 'terminal input' IQTTIN
+
+      IXDIV :  division into which the title structure is to be stored;
+               if = IXSTOR :    division 2 of store IXSTOR
+               if = zero :      division 2 of the primary store
+               if = IXSTOR+24 : system division of store IXSTOR
+               if = 24 :        system division of the primary store
+\end{verbatim} \lspa
+
+TZINIT may be called several times in succession for different files,
+thus building up the title structure from different sources;
+on the second or later calls for the same store the division
+part of IXDIV is ignored.
+
+New title banks are always linked by TZINIT to the end
+of the title structure;
+thus this linear structure reflects the chronological order
+in which the banks have been read.
+This allows to over-ride a title bank from one file
+by a title bank from a file read earlier.
+Take this common example :
+\bvb
+      CALL TZINIT (0,IXTITL)
+      CALL TZINIT (7,IXTITL)
+\end{verbatim} \lspa
+Giving the same title with different contents on the 'card reader'
+over-rides the one from LUN=7.
+
+Note the following problem:
+as explained in book MZ, section {\tt MZXREF},
+Zebra assumes by default that banks in any division do not have
+links pointing into the system division.
+Thus, if one puts the title structure into the system division
+one must not also make links in banks point to title banks,
+because such a link would not be updated for a garbage collection
+in the system division.
+The same is true if the user sends the titles into
+a 'package' division (cf. book MZ, section {\tt MZDIV}).
+This problem does not exist for links in link areas.
+\newpage
+\section{TZUSER - editing title banks during input}
+\smark{TZUSER}
+
+Sometimes it is inconvenient to have to prepare
+a given title on the input file in just the way in which
+it is expected by the program.
+Therefore TZINIT allows for a transformation of the data read,
+to be done by the user routine TZUSER
+at the level of individual titles.
+
+This transformation by TZUSER is requested either globally
+for all titles by the control-line  *USER  (cf. para.~2.2)
+or individually for particular titles by giving
+option --U or --Un on the header line for the title bank.
+This causes TZINIT to transfer control to TZUSER as soon
+as the input of the data for the particular title is complete,
+and before starting to handle the next title.
+
+Communication between TZINIT and TZUSER is as follows :
+
+\ROUTA{CALL TZUSER (!LOLD)}
+\bvb
+with  COMMON /TZUC/ JSTOR,IXTITL, NPARA, LNEW,NWOCC, NAME(20)
+
+      !LOLD :  address of the original bank filled with the input data
+
+      JSTOR :  the number of the store = 0, 1, 2, ... currently being
+               used, in case TZUSER has to cope with several structures
+
+     IXTITL :  the index of the title division for convenience
+
+      NPARA :  the value "n" from the option -Un
+               = zero  if n not given
+
+      LNEW* :  adr of the replacement bank lifted by the user, if any,
+               initialized to zero by TZINIT;
+               set to  -1 :  skip this title bank
+                      -99 :  kill this run
+
+    *NWOCC* : the number of useful words available in the bank at LOLD,
+              this may be reduced or increased by TZUSER, but not
+              above NAME(4).  (TZINIT lifted the bank with
+              NAME(4) words and has read NWOCC words into it.)
+
+       NAME :  the 'name' used by TZINIT to lift the bank at LOLD :
+
+               NAME(1)    Hollerith identifier
+               NAME(2/3)  NL / NS - number of links = 0
+               NAME(4)    ND - maximum number of data words
+               NAME(5->)  I/O characteristic
+\end{verbatim} \lspa
+\newpage
+By programming TZUSER, the user may do one of 4 things :
+\bvb
+      - change the information and the size of the original bank;
+      - create a new bank to replace the old one;
+      - simply suppress this title altogether by setting LNEW=-1;
+      - kill the run by setting LNEW=-99.
+\end{verbatim} \lspa
+\vspace*{4mm}
+{\large\bf Change the information}
+
+Modify the data as necessary, set NWOCC to the number of useful
+words in the bank if this has changed (without exceeding NAME(4)!),
+and return.
+
+When control returns to TZINIT it will take the appropriate action
+according to the content of LNEW and maybe NWOCC.
+
+\vspace*{4mm}
+{\large\bf Lift a replacement bank}
+
+To avoid problems in case of garbage collection,
+get the address of the original bank as follows :
+\bvb
+      SUBROUTINE TZUSER (LPARA)
+      DIMENSION    LPARA(9)
+      LOLD = LPARA(1)
+\end{verbatim} \lspa
+Set NAME(4) to the wanted size of the replacement bank,
+and maybe also NAME(5-) for the I/O characteristic,
+and call :
+\bvb
+      CALL MZLIFT (IXTITL,LNEW,LPARA,0,NAME,-1)
+      LOLD = LPARA(1)
+\end{verbatim} \lspa
+This second statement re-loads the local variable LOLD with
+the address of the old bank, which might have changed.
+Copy the information, possibly modified, from the bank at LOLD
+into the bank at LNEW, and return.
+
+TZINIT relies on the replacement bank having been
+linked as the 'next' bank to the original.
+
+\vspace*{4mm}
+{\large\bf Kill execution}
+
+If TZUSER discovers problems it can signal to TZINIT
+that the job should be killed by setting --99 into LNEW.
+TZINIT will still read to the end of the file to find other
+problems, maybe, and then call ZFATAL.
+
+\vspace*{4mm}
+{\large\bf Loading TZUSER}
+
+As always with user routines called from a general library
+routine, there is the problem of getting the right TZUSER loaded.
+If it is sent through the compiler to the linker there is no
+problem. But if it is compiled and then put onto a user
+library one must force its loading from this library,
+either by loader directives, if available, or more simply
+by having a {\tt CALL TZUSER} in one's MAIN program.
+In this latter case this must be a conditional
+call which will never be executed.
+
+For the applications which do not need TZUSER there is a dummy
+version on the Zebra library. It will cause the job to fail
+in case it is reached by accident.
+\cleardoublepage  % continue on next odd page
+\section{TZSHUN - insert banks into a title structure}
+\smark{TZSHUN}
+
+Although most commonly the banks in the TZ structure
+are created by TZINIT,
+it may sometimes be handier
+to set-up some titles directly in the program,
+rather than taking them from an external text file.
+The main advantage of introducing the titles via TZINIT is
+that they are easily changed without re-compilation of the program.
+But for a title which never changes one can lift a bank
+in the right division and hand it to TZSHUN to re-link
+it into the TZ structure :
+
+\ROUTA{CALL TZSHUN (IXSTOR, !L, IFLAG)}
+\bvb
+with  IXSTOR :  index of the store holding the title structure
+                (or index of any division in this store);
+
+          !L :  address of the (linear structure of) new bank(s)
+
+       IFLAG :  if = 1 :  insert at the start,
+                   = 0 :  insert at the end of the structure.
+\end{verbatim} \lspa
+
+Example : create a default title bank TRAN in the system division
+of store IXSTOR if it does not already exist:
+
+\bvb
+      DIMENSION    NAME(5)
+      DATA NAME /4HTRAN, 0, 0, nd, 3/
+
+      CALL TZFIND (IXSTOR,L,NAME,0,0)
+      IF (L.EQ.0)  THEN
+          CALL MZLIFT (IXSTOR+24, L, 0,2, NAME)
+          Q(L+1) =  title word 1
+          Q(L+2) =  title word 2
+           ...       ...
+          Q(L+nd)=  title word nd
+          CALL TZSHUN (IXSTOR,L,0)
+        ENDIF
+\end{verbatim} \lspa
+
+Note: the system division of store IXSTOR is specified
+symbolically as IXSTOR+24.
+
+Note: if L points in fact to a linear structure  all banks are taken.
+\newpage
+\section{TZINQ - inquire about the title d/s}
+\smark{TZINQ}
+
+The title d/s is supported by a system link not directly accessible
+to the user.
+To get access to this structure as such, not to a particular bank,
+one can use this routine.
+
+\ROUTA{CALL TZINQ (IXSTOR, IXTITL*, !L*, IFLAG)}
+\bvb
+with  IXSTOR :  index of the store holding the title structure
+                (or index of any division in this store);
+
+     IXTITL* :  returns the index of the division holding
+                the title structure
+
+         !L* :  returns the address of the first or the last bank
+                = zero if there are no titles
+
+       IFLAG :  if = 1 :  get the adr of the first bank
+                   = 0 :  get the adr of the  last bank
+                other values are reserved for future extensions
+\end{verbatim} \lspa
+
+{\large\bf Example}
+
+Suppose for a particular program one has a considerable volume of titles,
+such that one spends too much time in TZINIT for every individual
+execution of this program.
+One could have a separate job to translate most of the text titles
+into a binary FZ file whenever they have been updated.
+The job which needs these titles reads them from the FZ file
+and appends them to any titles which it has already read with TZINIT.
+
+{\bf Job to translate text titles to binary}
+\bvc
+      PROGRAM TTXTFZ
+
+      CHARACTER    NAME*(*)
+      PARAMETER   (NAME = 'cba1990')
+
+      CHARACTER    FIN*(*), FOUT*(*)
+      PARAMETER   (FIN = NAME // '.ttx',  FOUT = NAME // '.tfz')
+
+      PARAMETER   (LIM2Q=60000, NNQ=80000)
+      DIMENSION    LQ(NNQ), IQ(NNQ), Q(NNQ)
+      EQUIVALENCE (Q(1),IQ(1),LQ(9))
+      COMMON //    FENCE(4), LQ, LASTQ
+
+      PRINT 9001, FIN, FOUT
+ 9001 FORMAT (/' TTX to TFZ executing'
+     F/' with  input file = ',A /'      output file = ',A)
+
+      CALL MZEBRA (-1)
+      CALL MZVERS
+      CALL MZSTOR (IXST,'/DYN/','.',FENCE,LQ,LQ,LQ,LQ(LIM2Q),LASTQ)
+
+      OPEN (11, FILE=FIN, FORM='FORMATTED', STATUS='OLD')
+      CALL TZINIT (11, 1)          { read into forward division 1
+      CLOSE (11)
+
+      OPEN (11, FILE=FOUT, FORM='UNFORMATTED', STATUS='UNKNOWN')
+      CALL FZFILE (11, 0, 'O')
+
+      CALL TZINQ  (0, IXTITL, LGO, 1)
+      CALL FZOUT  (11, 1, LGO, 0, 'LDI', 0,0,0)
+      CALL FZENDO (0, 'T')
+      CALL MZEND
+      END
+\end{verbatim}
+{\bf Piece of code loading the binary titles}
+\bvc
+      CHARACTER    FIN*(*)
+      PARAMETER   (FIN  = 'cba1990.tfz')
+
+C--       first read the variable titles from the 'card reader'
+
+      IXTITL = set the title division
+      CALL TZINIT (0,IXTITL)
+
+C--       then append the binary titles
+
+      OPEN (49, FILE=FIN, FORM='UNFORMATTED',STATUS='OLD')
+      CALL FZFILE (49, 0, '.')
+
+      CALL TZINQ  (IXSTOR, IXTT, LTT, 0)
+      IF (LTT.EQ.0)  THEN
+          L     = 0
+          JBIAS = 1
+        ELSE
+          L     = LTT
+          JBIAS = 0
+        ENDIF
+
+      CALL FZIN   (49, IXTITL,L,JBIAS, '.', 0,0)
+      IF (IQUEST(1).NE.0)          GO TO trouble
+      IF (LTT.EQ.0)  CALL TZSHUN (IXTITL,L,0)
+      CALL FZENDI (49, 'TXQ')
+\end{verbatim} \lspa
+\chapter{Formats for the text input to TZINIT}
+\section{Out-line}
+\smark{Format out-line}
+
+The input to TZINIT is presented on a formatted text file
+of 80-column card-images,
+giving the titles one after the other,
+as shown by the example on the next page.
+
+Each title starts with the 'title header line'
+{\tt  *DO ...} (see para.~2.3)
+which selects mode and options for the reading of its
+associated 'title data'.
+These have to come immediately and completely after the
+title header line.
+
+Normal mode is 'free-field format' where the data are read line-by-line
+and the text is interpreted.
+The mode of each data word is taken from the way it is written :
+integer data have neither the decimal point nor an exponent,
+floating data have either or both,
+Hollerith data start with : or ' or ",
+octal data are pre-fixed with \#O;
+see para.~2.4 for full details.
+
+With 'Fortran format' the data are read by a single
+Fortran READ statement with the FORMAT taken from the --F option on
+the title header line.
+This is useful for computer generated titles.
+
+'Control lines' to TZINIT may be given interspersed
+with the titles.
+Global options are selected with control lines;
+other examples are the comment line with  {\tt *--}  in column 1,
+and the input terminator *FINISH;
+see para.~2.2 for details.
+
+Control lines to TZINIT, including title-header lines starting
+with *DO, are handled case-insensitive, ie. they are converted
+to upper case before processing.
+
+\newpage
+\bvc
+*-------            TITLE VERSION A3
+*PRINT
+*.-------1---------2---------3---------4---------5---------6---------7
+*DO  RTBC  -iF                   #. 810127     CERN  ROLL 103
+13.       1100.
+            .99999  +.00042  +.00302
+           -.00042   .99993  -.0023
+           -.00302  +.0023    .99993     0.     +.015     1.963
+
+*DO  CAM1  -e -n27 -c11 -iF      #. 810121 17.27  ROLL 103
+ 1 CAM       3.  12.    9.067    11.8516   75.6561     25.    -75.6561
+ 1 MED       2.        1.51      1.5       1.458     2.382     1.57
+             4.06      1.0884
+ 1 DIST       -.00169     -.00004      .015        .0011      -.0001
+               .00394     -.00245      .00378      .051        .0023
+               .033        .09
+
+*DO  FID1  -c11 -iF              #. 810121 17.27  ROLL 103  ERASME
+            12.
+ 1 4   1     1.  -17.2475  -18.6369
+ 1 4   2     2.  -17.2595   -4.2708
+ 1 4   3     3.    -.7761   -4.3177
+ 1 1   1    11.  -13.8081  -15.9118
+ 1 1   2    12.  -13.7343   -7.5253
+ 1 1   3    13.   -4.8669   -7.5898
+ 1 1   4    14.   -4.8931  -15.9473
+ 1 2   1    21.  -13.0353  -15.6000
+ 1 2   2    22.  -12.8979   -7.3464
+ 1 2   4    24.   -3.7895  -15.6767
+ 1 3   3    33.   -2.6674  -17.2822
+ 1 3   4    34.   -3.1636  -17.8522
+
+*DO  CAM2  -e -n27 -c11 -iF      #. 810121 17.27  ROLL 103
+ 2 CAM       3.  12.    9.1488  -10.3208   75.673      25.    -75.673
+ 2 MED       2.        1.51      1.5       1.458     2.382     1.57
+             4.06      1.0884
+ 2 DIST       -.0017       .00005      .015       -.0011      -.0001
+               .00043     -.00443     -.00278      .0065      -.0024
+               .033        .05
+
+*DO  FID2  -c11/40 -iF           #. 810121 17.27  ROLL 103  ERASME
+            13.
+ 2 4   1     1.  -17.4350    3.9107     examples of other representations
+ 2 4   2     2.  -17.4786   18.2503     integer    15  -24  0
+ 2 4   3     3.    -.8612   18.2306     floating   -.123E-7  1E-12
+ 2 1   1    11.  -13.8891    7.4810     octal      #0731244600
+ 2 1   2    12.  -13.8296   15.8810     hex        #xffff
+ 2 1   3    13.   -4.9569   15.7810     Hollerith  :PISA :BARI
+ 2 1   4    14.   -4.9724    7.4133                :K*(1430)
+ 2 2   1    21.  -13.1122    7.3163                'text with blanks'
+ 2 2   3    23.   -3.7338   15.3468                "text with ' and blank"
+ 2 2   4    24.   -3.8710    7.1994
+ 2 3   1    31.  -15.4499    4.5935
+ 2 3   2    32.  -15.8947    5.0865
+ 2 3   4    34.   -3.2437    4.4470
+*.-------1---------2---------3---------4---------5---------6---------7
+\end{verbatim} \lspa
+\newpage
+\section{Control-lines}
+\smark{Control-lines to TZINIT}
+
+Control-lines carry special instructions to TZINIT;
+they may only be given between titles,
+and not within the data-body of a particular title.
+An option selected by a control line is switched on or off
+at the moment the line is read, and stays in effect until
+changed by the inverse selection,
+but the effect does not carry from one call to TZINIT to the next.
+
+\bvb
+   *---        normal comment line
+   *.--        non-printing comment line
+               blank lines are allowed and ignored
+
+   *LOG        logging information to be printed by TZINIT;
+   *LOG  OFF   switch off  (default : according to the log level of
+                                      the store, normally 'on')
+
+                  If LOG is 'on' TZINIT will echo on the log-file
+                  each control line and each title header line read.
+
+   *PRInt      echo data lines for free-field format titles;
+   *PRInt OFF  switch off  (default : 'off')
+
+                  *PRINT implies *LOG
+
+   *USer       call TZUSER for every title bank;
+   *USer OFF   switch off  (default : 'off')
+
+   *KIll       kill the run also for slight trouble;
+   *KIll OFF   switch off  (default : 'off')
+
+   *ANYWAY     TZINIT is to return to the caller even for fatal errors,
+               IQUEST(1) = number of errors, =0 normally
+
+   *FINish     end of input data
+\end{verbatim} \lspa
+
+One gives *FINISH only to terminate titles on
+the 'standard input file' (the 'card reader') in order to
+separate from further input data.
+For stand-alone files this is not necessary, as the EOF will
+terminate correctly.
+On the IBM it could even be harmful with concatenated title files.
+\newpage
+\section{Title header lines}
+\smark{Title header lines}
+
+A title-header line signals the start of data for a new title bank;
+it specifies the ID of the title bank,
+the way the data are to be read, and further options.
+Its format is :
+\bvb
+   *DO  <idh> [idn]  [-<opt><option text>]   [#. comment ]
+
+      *DO    in cols 1/4 marks the header line;
+      <idh>  is the 4 character Hollerith bank ID;
+      <idn>  is the numeric bank ID, integer, if any;
+      <opt>  is a single option letter,
+      <otx>  is the option text, if needed.
+
+The following options are available :
+
+   -F(format)  read the data with a single formatted Fortran
+               READ statement, using the FORMAT given, which must
+               not contain blanks, the brackets must be present.
+
+   -Itext  set the I/O characteristic for the bank, with :
+           text = B or I or F or D  if the bank is all bits, integer,
+                                       floating, or double precision;
+           text = (string) with "string" the I/O characteristic,
+                           cf. book MZ, section MZFORM et al.
+           default : type undefined
+
+    -Nn  expect n data words, for -F this must be exact; for free-field
+         format this may be omitted if less than 2000 words are to be
+         read and if the size is not to be changed by TZUSER.
+         A bank will initially be lifted to accomodate <n> data words to
+         be read and will be shortened when input processing is complete.
+
+    -U[n] call TZUSER for this bank, passing n as NPARA, zero if absent.
+
+   For free-field format only :
+
+     -C[a][/e]  use columns a/e only on each line,
+                defaults :  1 for a,   80 for e
+
+                Ex.:  -C11/72   use only the text on columns 11 to 72
+                      on each line, except: '*' in col. 1 is forbidden
+
+         -E[n]  expect exactly <n> words [as given by -Nn].
+                If less or more data words are found, TZINIT will
+                print a message and go to ZFATAL on end of input.
+
+         -S[n]  true size of the bank is <n> words [as given by -Nn].
+                The bank is not reduced to the number of data words
+                actually read.
+
+   -A[n][C][W]  initialize Hollerith handling as though the control-item
+                #A[n][C][W]  had been read; see next paragraph.
+\end{verbatim} \lspa
+\newpage
+\section{Free-field input}
+\smark{Free-field input}
+
+In free-field format the data-items are given one after the other,
+separated by blanks.
+The mode of each data-item is recognized from the way it
+has been written by the user;
+thus 12 is an integer,
+\#012 is an octal integer (of value 10),
+12. is a floating-point number,
+and :ABC is Hollerith.
+The rules for writing the data items try to strike a balance
+between freedom and catching mistakes; they are the following :
+
+{\bf Integer} :  a string of digits, maybe preceded by + or --
+\bvb
+      Examples:    123  +123  -123  1  0
+\end{verbatim}
+{\bf Floating} : a number containing a decimal dot and/or an exponent
+\bvc
+      Examples:       12.     +12.34  -.34   1.  .1  -12.34
+                      12E     +12.34E -.34E  1E  .1E -12.34E
+                     -12.34E5  12.E5  12E5  12E+5  12E-5
+                     -12.34+5  12.+5  12+5  12+5   12-5
+\end{verbatim}
+{\bf Double precision} : a number containing an exponent letter D
+\bvb
+      Examples:       12D     +12.34D -.34D  1D  .1D -12.34D
+                     -12.34D5  12.D5  12D5  12D+5  12D-5
+\end{verbatim} \lspa
+{\bf Binary -- Octal -- Hexadecimal} :  a number preceded
+by \#B or \#b,
+or by \#O or \#o or \#0,
+or by \#X or \#x,
+which will be stored right-justified with zero-fill;
+bits beyond the capacity of a computer word are truncated on the left.
+\bvc
+      Examples :  #B10001  #b11101  #b1111111000111000011111111
+                  #017777  #O17777  #o33211234567 (32 bits!)
+                  #X177AB  #x17cde  #xffffFFFF    (32 bits!)
+\end{verbatim} \lspa
+{\bf BCD} :  must start with  ' or " or : thereby
+selecting the delimiting character, followed by the Hollerith string,
+terminated with the delimiter (which is "blank" for ":").
+\bvb
+      Examples :    :ABCD    :PI+   :K*   :K(1430)   :RATHERLONGSTRING
+                    'AB CD'  :it's        "'ab' 'cd'"
+\end{verbatim} \lspa
+{\bf Repeat count} :  indicates the number of times which the data item which
+follows immediately is to be stored.
+It is an unsigned integer larger than 1 followed by '*'.
+\bvb
+      Examples :  100*0   4* -.0379   3*:PI-   2* :K(1430)  2*:LONGSTRING
+\end{verbatim} \lspa
+{\bf Comment} :    can be either trailing or interspersed.
+A comment starts with  \#.  and stops with the next  \#  or the end-of-line.
+\bvb
+      Example :   12  #. any text, but not a number-sign  #  13
+\end{verbatim} \lspa
+\newpage
+{\bf Hollerith handling}
+
+Hollerith text is by default stored in A4 format,
+thus the data-item {\tt ":ABCDEF"} gives on all machines 2 words
+containing {\tt "ABCD"} and \verb'"EF  "' with blank-fill.
+If this is not what is needed it can be changed either with
+the 'control item' \#A or with the title header line option --A,
+which have the same syntax.
+
+Variable length strings could be awkward to handle,
+therefore one can ask TZINIT to store the Hollerith string preceded
+by a word count as an extra integer word,
+optionally preceded in turn by a character count :
+\bvb
+Header-line option :   -A[n][C][W]
+      Control item :   #A[n][C][W]
+
+   with   n :  if given it selects An representation,
+               if absent or if n is larger than the maximum number
+               of characters per word, the data are stored continuous
+               without trailing blanks in each word.
+
+          C :  if given an extra word is stored specifying the
+               number of characters in the string, not counting
+               trailing blanks in any word.
+
+          W :  if given an extra word is stored specifying the
+               number of words occupied by the BCD string,
+               excluding itself and the character count, if present.
+
+Example:  #A4CW  :LONGSTRING
+
+          would give 5 words :
+          IQ(L)   = 10       character count
+          IQ(L+1) = 3        word count
+          IQ(L+2) = 4HLONG
+          IQ(L+3) = 4HSTRI
+          IQ(L+4) = 4HNG
+\end{verbatim} \lspa
+{\bf Other control items}
+
+{\bf \#Double } instructs TZINIT to read and store all floating-point
+numbers that follow as double-precision numbers.
+
+{\bf \#Normal } reverts to normal, cancelling the effect
+of a previous \#D for the numbers that follow the \#N.
+
+Control-items must be blank-terminated like data items
+and may be freely mixed with data items.
+They must not occur between a multiplier and its data item.
+
+The option selected by a control item applies to all following
+data until changed again by a new control item.
+\newpage
+\bvb
+Example of usage :  suppose we have this title bank :
+
+      *DO FZO 21  -i(3I *H 1I *H)
+      #. mode nwrec  opt    name #   #ACW
+            4     0  :TLO3  :/dev/mt12
+
+giving the parameters for a file to be used by FZ of Zebra.
+(The I/O characteristic is only useful if one wanted Zebra
+ to print this bank, which is unlikely in this case.)
+
+The program could digest this as follows :
+
+      CHARACTER    CHOPT*8, CHNAM*80
+
+      LUN = 21
+      CALL TZFIND (0, LT, 'FZO ', LUN, 0)
+      IF (LT.EQ.0)                 GO TO no output
+      MODE   = IQ(LT+1)
+      NWREC  = IQ(LT+2)
+      LOPT   = LT+3
+      LNAM   = LOPT + IQ(LOPT+1) + 2
+      NCHOPT = IQ(LOPT)
+      NCHNAM = IQ(LNAM)
+      CALL UHTOC (IQ(LOPT+2),99, CHOPT, NCHOPT)
+      CALL UHTOC (IQ(LNAM+2),99, CHNAM, NCHNAM)
+      CALL MZDROP (0,LT,'.')
+
+      IF (MODE ...
+               ...
+        ELSEIF (MODE.EQ.4)  THEN
+          IF (NWREC.EQ.0)  NWREC = 5760
+          CALL CFOPEN (IQUEST(1),1,NWREC,'w',0,CHNAME(1:NCHNAM),ISTAT)
+          CALL FZFILE (LUN,NWREC,CHOPT(1:NCHOPT))
+        ELSEIF (MODE ...
+                     ...
+        ENDIF
+\end{verbatim} \lspa
+\newpage
+\section{Fortran formatted input}
+\smark{Fortran formatted input}
+
+With Fortran formatted input all the data for the complete title bank
+are read with a single READ statement using the format given
+on the header line.
+For this to be possible the exact number of words to be read
+must be specified with the --N option.
+
+\bvb
+   Example :
+
+       *DO  FIDU 1 -IF -N37 -F(10X,F10.0/(10X,3F10.0))
+                   12.
+        1 4   1     1.     -17.2475  -18.6369
+        1 4   2     2.     -17.2595   -4.2708
+        1 4   3     3.       -.7761   -4.3177
+        1 1   1    11.     -13.8081  -15.9118
+        1 1   2    12.     -13.7343   -7.5253
+        1 1   3    13.      -4.8669   -7.5898
+        1 1   4    14.      -4.8931  -15.9473
+        1 2   1    21.     -13.0353  -15.6000
+        1 2   2    22.     -12.8979   -7.3464
+        1 2   4    24.      -3.7895  -15.6767
+        1 3   3    33.      -2.6674  -17.2822
+        1 3   4    34.      -3.1636  -17.8522
+       *.-------1---------2---------3---------4---------5
+\end{verbatim} \lspa
+
+The option {\tt -IF} specifying the I/O characteristic
+is important in this case.
+It causes the execution of a Fortran READ statement with an I/O list
+of type REAL;
+on some machines Fortran is not able to read acting solely under
+FORMAT control, ignoring the type of the I/O list.

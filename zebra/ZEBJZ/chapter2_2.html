@@ -1,0 +1,412 @@
+<HEAD>
+<TITLE> Basic calling sequences</TITLE>
+</HEAD>
+<BODY><P>
+ <HR> <A NAME=tex2html29 HREF=chapter2_3.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/next_motif.gif"></A> <A NAME=tex2html27 HREF=ZEBJZ.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/up_motif.gif"></A> <A NAME=tex2html21 HREF=chapter2_1.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/previous_motif.gif"></A>  <A NAME=tex2html31 HREF=tex2htmlindex2_5.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/index_motif.gif"></A><BR>
+<B> Next:</B> <A NAME=tex2html30 HREF=chapter2_3.html> Extra features</A>
+<B>Up:</B> <A NAME=tex2html28 HREF=ZEBJZ.html>No Title</A>
+<B> Previous:</B> <A NAME=tex2html22 HREF=chapter2_1.html> The JZ91 Package-Principles</A>
+<HR> <P>
+<H1><A NAME=SECTION0020000000000000000> Basic calling sequences</A></H1>
+<P>
+<H1><A NAME=SECTION0021000000000000000> JZIN/JZOUT - simplest use</A></H1>
+<P>
+Processor AA transfers control to processor BB with
+a simple Fortran <tt>CALL BB</tt>,
+having readied the contents of its down call-bank
+at <tt>LQDW</tt>:
+<PRE><TT>. . .
+          LQ(LQDW-1) =     load parameters of the link type
+          LQ(LQDW-2) =
+          . . .
+          IQ(LQDW+1) =     load parameters of the data type
+          IQ(LQDW+2) =
+          . . .
+          CALL BB          transfer control
+          . . .</TT></PRE> 
+In the simplest case the processor BB does
+not call itself another processor,
+does not have processor constants,
+and does not use processor flags.
+It would then look like this:
+<PRE><TT>SUBROUTINE BB
+
+    +CDE, Q.       this is supposed to declare the store and also /JZUC/
+         +,   links, data, last
+
+          CALL JZIN ('BB  ',0,0,0)
+          CALL MZWORK (0,data(1),last,0)
+
+              processor body
+
+          CALL JZOUT ('BB  ')
+          RETURN
+          END</TT></PRE> 
+By calling <A HREF=../../zebra/ZEBJZ/chapter2_2.html#JZIN>JZIN</A> the processor causes switching of the environment,
+gaining access to its own data,
+in particular to its call-bank via the system link <tt>LQUP</tt>,
+thus <tt>LQ(LQUP-1)</tt> is its first link parameter.
+<P>
+The inverse switching is done by <A HREF=#JZOUT>JZOUT</A>.
+The processor name has to be given to <A HREF=#JZOUT>JZOUT</A> explicitely.
+This handshake is a check against forgotten calls.
+<P>
+The call to <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZWORK>MZWORK</A> must come after the call to <A HREF=../../zebra/ZEBJZ/chapter2_2.html#JZIN>JZIN</A>
+because <A HREF=../../zebra/ZEBJZ/chapter2_2.html#JZIN>JZIN</A> saves the working space parameters of AA,
+and hence they must still be intact.
+<P>
+For efficiency, <A HREF=../../zebra/ZEBJZ/chapter2_2.html#JZIN>JZIN</A> and <A HREF=#JZOUT>JZOUT</A>, and also other routines,
+expect to receive the processor name with 4 characters exactly,
+with blank-fill if necessary.
+<P>
+<H1><A NAME=SECTION0022000000000000000> JZIN - processor entry, general use</A></H1>
+<P>
+<A NAME=secJZbasicJZIN><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<P>
+Processor AA transfers control to processor BB with
+a simple Fortran <tt>CALL BB</tt>,
+having readied the contents of its down call-bank
+at <tt>LQDW</tt>.
+To trigger swopping of the processor environment,
+the first executable statement in the processor BB should be
+<P>
+<P><A NAME=JZIN>CALL JZIN (chIAM, IFDOWN, NAN, 0)</A><P>
+<P>
+<PRE><TT>with  chIAM  processor ID, a text string of 4 characters exactly
+                           of type CHARACTER*4
+
+     IFDOWN  flag indicating whether this processor does or does not
+             call other processors:  = 0 no  / = 1 yes
+
+        NAN  number of processor constants used
+
+          0  zero; non-zero gives access to the extra features
+                   described in section~\ref{sec:JZextraJZIN}.</TT></PRE>
+<P>
+<A HREF=../../zebra/ZEBJZ/chapter2_2.html#JZIN>JZIN</A> saves the environment of the upper processor
+and then sets up the environment of the
+new processor.
+If this does not yet exist,
+it calls the internal service routine 
+<A HREF=#JZLIFT>JZLIFT</A> to create the bank of support variables,
+digesting the titles for this processor, if any.
+<A HREF=../../zebra/ZEBJZ/chapter2_2.html#JZIN>JZIN</A> returns the initialisation status thus:
+<P>
+<PRE><TT>IQUEST(1) =  -ve : just initialized without JZAN title
+                  0 : just initialized with    JZAN title
+                +ve : normal running</TT></PRE>
+<P>
+Thus a processor using processor constants can check
+this condition like in the following example:
+<P>
+<PRE><TT>SUBROUTINE BB
+
++CDE, Q.                     declaring the store and /JZUC/
+
+      CHARACTER    chIAM*4
+      PARAMETER   (chIAM = 'BB  ')
+
+      CALL JZIN (chIAM,0,3,0)
+      IF (IQUEST(1))         11, 17, 21
+
+C--       Initialize constants if and only if not set from title
+   11 Q(LQAN+1) = .0025
+      Q(LQAN+2) = .3
+
+C--       Complete initialization calculating derived constants
+   17 Q(LQAN+3) = .5 * SIN (Q(LQAN+2))
+
+   21 CALL MZWORK (...)
+
+          ...    processor body
+
+      CALL JZOUT (chIAM)
+      RETURN
+      END</TT></PRE>
+<P>
+The 3rd and the 4th parameter to <A HREF=../../zebra/ZEBJZ/chapter2_2.html#JZIN>JZIN</A> are looked at only on first
+contact for each processor.
+<P>
+Note that over-ruling with the JZAN title only works
+if the processor is programmed to handle it.
+This is done in this example where statement 11
+is reached only if there is no title.
+<P>
+<A HREF=../../zebra/ZEBJZ/chapter2_2.html#JZIN>JZIN</A> readies for the new processor these links:
+<P>
+<PRE><TT>COMMON /JZUC/LQJZ,LQUP,LQDW,LQSV,LQAN, JQLEV,JQFLAG(10)
+
+          LQJZ  the header bank supporting the JZ91 data-structure
+
+          LQUP  the upper call bank
+
+          LQDW  the  down call bank, if needed, else = zero.
+
+          LQSV  the bank of support variables;
+                IQ(LQSV+1) contains system information,
+                IQ(LQSV+2) is 1 for first entry, 2 for second, etc.
+
+          LQAN  the processor constants inside the SV bank:
+                IQ(LQAN)   number of constants
+                 Q(LQAN+1)  first constant
+                 Q(LQAN+2) second constant
+                        . . .
+      and also:
+
+          JQLEV       is the current call depth level, = zero for the root
+
+          JQFLAG(10)  receives a copy of the flags for this processor.</TT></PRE>
+<P>
+Note that the data in this common <tt>/JZUC/</tt> must not be changed
+by the user, <tt>JQFLAG</tt> excepted.
+<P>
+<A HREF=../../zebra/ZEBJZ/chapter2_2.html#JZIN>JZIN</A> goes to <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZFATAL>ZFATAL</A> if <tt>IFDOWN</tt> is non-zero and
+the lowest possible call-depth has been reached.
+<P>
+There are always 10 flag words.
+Words not explicitely initialized with a <tt>JZFL</tt> title
+for a given processor are always zero.
+This feature is only available with the program development version,
+in the production version of ZEBRA the flags are
+all initialized to zero and never change,
+JZFL titles are dropped by <A HREF=../../zebra/ZEBJZ/chapter2_2.html#JZINIT>JZINIT</A> and are otherwise ignored.
+<P>
+If you need the working space also in the initialization
+part of the processor, look out:
+you cannot place the <tt>CALL <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZWORK>MZWORK</A></tt> before the
+<tt>CALL <A HREF=../../zebra/ZEBJZ/chapter2_2.html#JZIN>JZIN</A></tt>,
+nor immediately after, because <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZWORK>MZWORK</A> destroys <tt>IQUEST</tt>.
+<P>
+<H1><A NAME=SECTION0023000000000000000> JZINIT - initialize the JZ91 package</A></H1>
+<P>
+The highest processor level,
+at call depth zero, is called the ``root''.
+The <tt>MAIN</tt> program is necessarily at this level.
+The root level is handled as a processor,
+with the <tt>ID</tt> given in <tt>chIAMR</tt> to <A HREF=../../zebra/ZEBJZ/chapter2_2.html#JZINIT>JZINIT</A>.
+This is used to associate the titles <tt>JZAN</tt> and <tt>JZFL</tt>, if any.
+The root gets 10 processor constants and 10 <A HREF=../../zebra/ZEBJZ/chapter2_2.html#JZTELL>JZTELL</A> counters,
+unless the extra features described in 
+section <A HREF=chapter2_3.html#secJZextraJZINIT>22.2</A> are used.
+<P>
+Before using the JZ91 package one has to initialize it with
+<P>
+<P><A NAME=JZINIT>CALL JZINIT (IXSTOR, chIAMR, chOPT, MAXLEV, NLCALL, NDCALL, 0)</A><P>
+<P>
+<DL COMPACT>
+<DT>IXSTOR
+<DD> the index of the processing store,
+             (or the index of any division in this store)
+             may be zero if the primary store is used
+<DT>chIAMR
+<DD> the processor <tt>ID</tt> of the root,
+             type <tt>CHARACTER*4</tt>, string of 4 characters
+<DT>chOPT
+<DD>  character string of options:
+      <DL COMPACT>
+           <DT>E
+<DD>  error messages only
+           <DT>Q
+<DD>  quiet, no log output
+           <DT>T
+<DD>  timing selected
+      </DL><DT>MAXLEV
+<DD> maximum call-depth number,<BR>eg. =1 if only the root calls processors
+<DT>NLCALL
+<DD>  maximum number of links in all call banks
+<DT>NDCALL
+<DD>  maximum number of data words in all call banks
+<DT>0
+<DD>       zero; non-zero gives access to the extra features
+                   described in section <A HREF=chapter2_3.html#secJZextraJZINIT>22.2</A>.
+</DL><A HREF=../../zebra/ZEBJZ/chapter2_2.html#JZINIT>JZINIT</A> will create the long-range division JZ91 in the store
+signalled by <tt>IXSTOR</tt> for holding the JZ91 data structure,
+which contains all JZ data, like the call banks, the <tt>SV</tt> banks, etc.
+This store must be the store where the user does his processing;
+the links <tt>LQJZ</tt>, <tt>LQUP</tt>,... will be declared by 
+<A HREF=../../zebra/ZEBJZ/chapter2_2.html#JZINIT>JZINIT</A> to be a link-area for this store.
+Links in call banks can only point into this store.
+<P>
+Titles <tt>JZAN</tt> and <tt>JZFL</tt>, if any, must have been read into the
+title-structure of this same store before <A HREF=../../zebra/ZEBJZ/chapter2_2.html#JZINIT>JZINIT</A> is called,
+because it will re-format or re-link them for use.
+<P>
+All call banks are pre-lifted by <A HREF=../../zebra/ZEBJZ/chapter2_2.html#JZINIT>JZINIT</A>,
+all of the same maximum size as specified by <tt>NLCALL</tt> and <tt>NDCALL</tt>,
+one call bank for each of the <tt>MAXLEV</tt> levels.
+They are permanent banks,
+being continously re-used.
+<P>
+Accounting the execution time of the processors individually
+is an option which could be expensive in real time
+on some computers.
+<P>
+<A HREF=../../zebra/ZEBJZ/chapter2_2.html#JZINIT>JZINIT</A> returns <tt>IQUEST(1)</tt> just like <A HREF=../../zebra/ZEBJZ/chapter2_2.html#JZIN>JZIN</A>.
+<P>
+<H1><A NAME=SECTION0024000000000000000> JZTELL - count processor conditions</A></H1>
+<P>
+To signal condition <tt>J</tt> in the current processor one may
+<P>
+<P><A NAME=JZTELL>CALL JZTELL (J)</A><P>
+<P>
+which bumps the counter <tt>J=1,2,...,NCD</tt> contained
+in the support variables.
+The first or the last counter are bumped for
+underflow or overflow in <tt>J</tt>.
+<P>
+<tt>NCD</tt>, the number of counters available in the <tt>SV</tt> bank,
+is normally 10.
+If more are needed the extra features of JZIN have
+to be used,
+as explained in section <A HREF=chapter2_3.html#secJZextraJZIN>22.1</A>.
+<P>
+<H1><A NAME=SECTION0025000000000000000> JZZERO - zero the down call bank</A></H1>
+<P>
+When filling the down call bank for the next processor to be
+called it is safer to clear the unused part of this bank to zero,
+with
+<P>
+<P><A NAME=JZZERO>CALL JZZERO (NL, ND)</A><P>
+<P>
+<PRE><TT>with     NL  leave the links 1 to NL untouched and reset links
+             NL+1 to the end to zero;
+         ND  same for the data words, words 1 to ND untouched.</TT></PRE>
+<P>
+Note that <A HREF=../../zebra/ZEBJZ/chapter2_2.html#JZIN>JZIN</A> does already clear the new down call bank to zero.
+<P>
+<H1><A NAME=SECTION0026000000000000000> JZROOT - reset processor level to root</A></H1>
+<P>
+If recovery to ``next event'' is done with transfer to <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#QNEXT>QNEXT</A>
+(see the description of routine <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZTELL>ZTELL</A>),
+<A HREF=../../zebra/ZEBMZ3/chapter2_1.html#QNEXT>QNEXT</A> should reset the processor level to ``root'' with:
+<P>
+<P><A NAME=JZROOT>CALL JZROOT </A><P>
+<P>
+No harm is done by calling <A HREF=../../zebra/ZEBJZ/chapter2_2.html#JZROOT>JZROOT</A> on first entry to <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#QNEXT>QNEXT</A>,
+when the level is already zero.
+<P>
+<H1><A NAME=SECTION0027000000000000000> JZEND - print processor usage statistics</A></H1>
+<P>
+To get this printed on the log file, one calls from <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZEND>ZEND</A>:
+<P>
+<P><A NAME=JZEND>CALL JZEND </A><P>
+<P>
+The  apparent number of calls to the root reflects the
+number of times that <A HREF=../../zebra/ZEBJZ/chapter2_2.html#JZROOT>JZROOT</A> did actually have to unwind
+the processor stack,
+except for the initial entry with <A HREF=../../zebra/ZEBJZ/chapter2_2.html#JZINIT>JZINIT</A>.
+<P>
+<H1><A NAME=SECTION0028000000000000000> Titles JZAN - processor constants</A></H1>
+<P>
+See routine <A HREF=../../zebra/ZEBTZ/chapter2_2.html#TZINIT>TZINIT</A> for input of titles into
+the dynamic store.
+For each processor whose constants are to be initialized
+via the titles,
+thus over-ruling the default in the processor itself,
+one title should be given:
+<P>
+<PRE><TT>word 1  processor ID in A4 format
+        2  constant 1
+        3  constant 2
+      ...  ...
+      n+1  constant n</TT></PRE>
+<P>
+The number of constants given should agree with
+the number given as <tt>NAN</tt> to <A HREF=../../zebra/ZEBJZ/chapter2_2.html#JZIN>JZIN</A>.
+A discrepancy causes a diagnostic message.
+If some constants are derived by the processor from other
+constants,
+as in the example in section <A HREF=chapter2_2.html#secJZbasicJZIN>21.2</A>,
+their places have to be kept open by giving dummy zeros.
+<P>
+If several titles are given for the same processor,
+the first title coming in the title input stream is taken,
+later ones are dropped. For example:
+<P>
+<PRE><TT>*DO  JZAN  -E11 -C21/72    #. Constants for central detector decoding
+       MAIN               :CDRC
+       GLOBAL T0             0.
+       DE/DX SCALE           4.
+       MAX BASE              15.
+       S-SAMPL LENGTH        8.
+       A-COEFF               0.89
+       MIN P-LENGTH          2.
+       T-SLEW CONSTANT       1000.
+       AV INV RAW E1         0.00585
+       DEDXOFFSET             68.0
+       T-COR FOR S/W         -35.0
+
+      *DO  JZAN  -C11/72
+                :V0FI
+       DPPMAX        30.0    #.  maximum DELTA P / P
+       Y2TMAX         6.0
+       ETAMAX        99.0
+       AMBFLG         1.0    #.  do not remove ambiguities
+       DISVMN         0.0
+       DISZMX         0.3
+       STDIMP         1.0
+       PENALT         0.1
+
+      *DO  JZAN  -E11 -C21/72
+                          :SERC
+       DUMMY (RUN NO.)         0.
+       TBIN TRAK+BGR           2.
+       CDIN TRAK+DIGIT+BGR     3.
+       FDIN NOT CALLED         0.
+       DUMMY                   6* 0.</TT></PRE>
+<P>
+<H1><A NAME=SECTION0029000000000000000> Titles JZFL - processor flags</A></H1>
+<P>
+Zero, one or several titles may be given,
+each containing flags for one or several processors,
+given as one data group for one processor which looks thus:
+<P>
+<PRE><TT>word  a  processor ID in A4 format
+        a+1  flag word 1
+        a+2  flag word 2
+          . . .                 (n=0 is possible,
+                                     it blocks later settings)
+        a+n  flag word n
+      a+n+1  :END    - the termination literal,
+                       may be omitted for the last group.</TT></PRE>
+<P>
+Any <tt>JZFL</tt> title looks then like this:
+<P>
+<PRE><TT>word  1  first word of first group of n1 words
+                           ie. n1-2 flags
+       n1+1  first word of second group
+          . . .</TT></PRE>
+<P>
+If several flag settings are given for the same processor,
+the first one is taken and further are dropped, e.g.
+<P>
+<PRE><TT>*DO  JZFL
+    :IMRE   0   0   0   0   0   1   0   0   :END
+    :VEFI  99   5   0   0   0   1   1   0   :END
+    :V0FI   0   0   0   0   0   0   0   0   :END
+    :TMER   0   0   0   0   0   0   0       :END
+    :VEMO   0   0   0   0   0   1           :END
+    :XCAL   0             :END
+    :TFIT   #B1110110001  :END
+
+      For single-group titles it is more economic to omit
+      the end terminator (no re-formatting needed) :
+
+*DO  JZFL
+    :VEMO   0   0   0   0   0   1
+*DO  JZFL
+    :XCAL   0
+*DO  JZFL
+    :TFIT   #B1110110001</TT></PRE>
+<P>
+<HR> <A NAME=tex2html29 HREF=chapter2_3.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/next_motif.gif"></A> <A NAME=tex2html27 HREF=ZEBJZ.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/up_motif.gif"></A> <A NAME=tex2html21 HREF=chapter2_1.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/previous_motif.gif"></A>  <A NAME=tex2html31 HREF=tex2htmlindex2_5.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/index_motif.gif"></A><BR>
+<B> Next:</B> <A NAME=tex2html30 HREF=chapter2_3.html> Extra features</A>
+<B>Up:</B> <A NAME=tex2html28 HREF=ZEBJZ.html>No Title</A>
+<B> Previous:</B> <A NAME=tex2html22 HREF=chapter2_1.html> The JZ91 Package-Principles</A>
+<HR> <P>
+<HR>
+
+</BODY>
+<P><ADDRESS>
+goossens@cern.ch
+</ADDRESS>

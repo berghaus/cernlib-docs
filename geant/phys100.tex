@@ -1,0 +1,254 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%  GEANT manual in LaTeX form                              %
+%                                                                 %
+%  Michel Goossens (for translation into LaTeX)                   %
+%  Version 1.00                                                   %
+%  Last Mod. Jan 24 1991  1300   MG + IB                          %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\Origin{R. Brun}
+\Revision{F.Carminati}
+\Submitted{30.05.86}\Revised{15.12.93}
+\Version{Geant 3.16}\Routid{PHYS100}
+\Makehead{Steering routine for physics initialisation}
+ 
+\Shubr{GPHYSI}{}
+ 
+The routine \Rind{GPHYSI} is called at initialisation time by the user
+usually from the \Rind{UGINIT} routine (see example in {\tt [BASE100]}). 
+The purpose of \Rind{GPHYSI} is twofold:
+\begin{itemize}
+\item print the parameters of the current run
+\item compute the cross-section and energy loss tables and fill the
+{\tt JMATE} data structure {\tt [CONS199]}.
+\end{itemize}
+\section {Print the run definitions }
+ 
+\Rind{GPHYSI} prints the {\tt GEANT} version number and the 
+{\tt ZEBRA}~\cite{bib-ZEBRA} version number stored
+in the {\tt JRUNG} data structure {\tt [BASE299]} 
+ 
+\Rind{GPHYSI} also prints the tracking and physics
+parameters for the current run, which are stored in
+the {\tt JTMED} data structure.
+See the description of the {\tt JTMED} 
+data structure in {\tt [CONS210]} and {\tt [CONS299]}.
+ 
+A summary table like below will be output by \Rind{GPHYSI}
+\begin{verbatim}
+ ************************************************************
+ *                                                          *
+ *    G E A N T  Version 3.1600      DATE/TIME 930727/1135  *
+ *                                                          *
+ *                      R U N      1                        *
+ *                                                          *
+ ************************************************************
+ *                                                          *
+ *      Data structure   Date   Time    GVERSN    ZVERSN    *
+ *      --------------   ----   ----    ------    ------    *
+ *                                                          *
+ *           INIT       930727  1135    3.1600     3.71     *
+ *                                                          *
+ *           KINE       930727  1135    3.1600     3.71     *
+ *                                                          *
+ *           HITS       930727  1135    3.1600     3.71     *
+ *                                                          *
+ *           DIGI       930727  1135    3.1600     3.71     *
+ *                                                          *
+ *     Random number seeds:          9876        54321      *
+ *     --------------------                                 *
+ *                                                          *
+ *----------------------------------------------------------*
+ *                                                          *
+ *              Standard TPAR for this run are              *
+ *              ------------------------------              *
+ *                                                          *
+ *  CUTGAM=100.00 keV  CUTELE=100.00 keV  CUTNEU=100.00 keV *
+ *  CUTHAD=100.00 keV  CUTMUO=  1.00 MeV                    *
+ *  BCUTE =100.00 keV  BCUTM =100.00 keV                    *
+ *  DCUTE =100.00 keV  DCUTM =100.00 keV  PPCUTM= 10.00 MeV *
+ *  IPAIR =        1.  ICOMP =        1.  IPHOT =        1. *
+ *  IPFIS =        1.  IDRAY =        1.  IANNI =        1. *
+ *  IBREM =        1.  IHADR =        1.  IMUNU =        1. *
+ *  IDCAY =        1.  ILOSS =        1.  IMULS =        1. *
+ *  IRAYL =        0.  ILABS =        0.  ISYNC =        0. *
+ *  ISTRA =        0.                                       *
+ *                                                          *
+ *                                                          *
+ *     Special TPAR for TMED   5   GAS                      *
+ *     -------------------------                            *
+ *  CUTGAM=100.00 keV  CUTELE=100.00 keV  CUTNEU=100.00 keV *
+ *  CUTHAD=100.00 keV  CUTMUO=  1.00 MeV                    *
+ *  BCUTE =100.00 keV  BCUTM =100.00 keV                    *
+ *  DCUTE = 10.00 GeV  DCUTM =100.00 keV  PPCUTM= 10.00 MeV *
+ *  IPAIR =        1.  ICOMP =        1.  IPHOT =        1. *
+ *  IPFIS =        1.  IDRAY =        1.  IANNI =        1. *
+ *  IBREM =        1.  IHADR =        1.  IMUNU =        1. *
+ *  IDCAY =        1.  ILOSS =        1.  IMULS =        1. *
+ *  IRAYL =        0.  ILABS =        0.  ISYNC =        0. *
+ *  ISTRA =        1.                                       *
+ *                                                          *
+ *                                                          *
+ ************************************************************
+\end{verbatim}
+The meaning of the printed values is described in the documentation of the
+commons \FCind{/GCCUTS/} and \FCind{/GCPHYS/} in {\tt [BASE030]}.
+Different values of the parameters can be assigned by the user to each
+tracking medium (see {\tt [BASE100]}). The parameter definition in 
+{\tt GEANT} proceeds as follows:
+\begin{enumerate}
+\item
+a default set of {\it global} values of the parameters is defined for 
+all tracking media by the routine {\tt GINIT};
+\item
+the default values can be changed by the user via the data records read 
+by the routine \Rind{GFFGO}. A summary of all valid data records is given 
+in {\tt [BASE040]};
+\item
+after having defined tracking media and materials, the user can
+redefine the parameters for
+{\bf each medium} via the routine \Rind{GSTPAR} {\tt [CONS210]};
+\item
+if the data structures are read from an external file
+(see {\tt IOPA} section),
+all the parameters are taken from this file. In this case the user can
+still modify them, but this should be done {\bf before} calling the
+routine \Rind{GPHYSI}.
+\end{enumerate}
+\section{Compute cross-section and energy loss tables}
+ 
+\Rind{GPHYSI} is the steering routine to compute the cross-section
+and energy loss tables for all materials used as tracking media.
+\Rind{GPHYSI} builds and fills the {\tt JMATE} data structure described in
+{\tt [CONS199]}. Here, we give the flow chart of this process.
+The description of the specialised routines can be found in the
+rest of the section {\tt PHYS}.
+ 
+{\bf Note}:
+     if  several tracking media are using the same material
+(for instance a calorimeter and a chamber support can be both in steel)
+the energy cuts must be the same. If this is not possible,
+the user must define materials with different numbers.
+%
+\begin{tabbing}
+MM \= M \= M \= MMMMMMMMMMM \= \kill
+\Rind{GPHYSI}     \> \> \> \> \parbox[t]{10cm}{Initialisation of physics
+processes. This routine should be called by the user before the tracking
+starts, but after all the material, {\it mechanism} flags and energy
+cuts have been defined. \Rind{GPHYSI} should also be called whenever
+a new initialisation data structure is read from disk.} \rule{0cm}{.45cm} \\
+ \>  \Rind{GRNDMQ}   \> \> \> 
+\parbox[t]{10cm}{Initialises the value of the
+seeds of the random number generator. See {\tt [BASE420]} for more 
+information} \rule{0cm}{.45cm} \\
+ \>  \Rind{GEVKEV}   \> \> \> 
+\parbox[t]{10cm}{Routine to format energy
+values for printout. See {\tt [BASE410]} for more details.} \rule{0cm}{.45cm} \\
+ \>  \Rind{GPHINI}   \> \> \> 
+\parbox[t]{10cm}{Initialisation of the
+constants for photoelectric effect (see {\tt [PHYS230]}).} \rule{0cm}{.45cm} \\
+\rule[-.1cm]{6cm}{.05cm} Loop on tracking media 
+\rule[-.1cm]{6cm}{.05cm} \rule{0cm}{.45cm} \\
+ \>  \Rind{GPHXSI}   \> \> \> \parbox[t]{10cm}{Initialisation of the cross
+section coefficients for the photoelectric effect in a tracking medium, see
+{\tt [PHYS230]}.}
+\rule{0cm}{.45cm} \\
+ \>  \Rind{GPROBI}   \> \> \> \parbox[t]{10cm}{Initialisation
+of constants for various physical effects.} \rule{0cm}{.45cm} \\
+ \> \>  \Rind{GMOLI}    \> \> \parbox[t]{10cm}{Initialises constants for
+Moli\`ere scattering, see {\tt [PHYS325]}.} \rule{0cm}{.45cm} \\
+\rule[-.1cm]{6cm}{.05cm} Loop on energy bins 
+\rule[-.1cm]{6cm}{.05cm} \rule{0cm}{.45cm} \\
+ \>  \Rind{GDRELA}   \> \> \> \parbox[t]{10cm}{Initialises the ionisation
+energy loss tables
+$dE/dx$ for protons, $\mu$ and \Pep, \Pem, see {\tt [PHYS430]}.} 
+\rule{0cm}{.45cm} \\
+ \> \>  \Rind{GDRELP}   \> \> \parbox[t]{10cm}{Calculates ionisation
+energy loss for protons, see {\tt [PHYS430]}.} \rule{0cm}{.45cm} \\
+ \> \>  \Rind{GDRELM}   \> \> \parbox[t]{10cm}{Calculates ionisation
+energy loss for $\mu$, see {\tt [PHYS430]}.} \rule{0cm}{.45cm} \\
+ \> \>  \Rind{GDRELE}   \> \> \parbox[t]{10cm}{Calculates ionisation
+energy loss for \Pem/\Pep, see {\tt [PHYS330]}.} \rule{0cm}{.45cm} \\
+ \>  \Rind{GBRELA}   \> \> \> \parbox[t]{10cm}{Adds the contribution of
+bremsstrahlung to continuous energy loss tables for protons, $\mu$
+and \Pem/\Pep, see {\tt [PHYS440]}.} \rule{0cm}{.45cm} \\
+ \>  \Rind{GPRELA}   \> \> \> \parbox[t]{10cm}{Adds the contribution
+of direct pair production and $\mu$-nucleus interactions to the
+$\mu$ continuous energy loss tables, see {\tt [PHYS450]}.} \rule{0cm}{.45cm} \\
+ \>  \Rind{GPHOTI}   \> \> \> \parbox[t]{10cm}{Calculates the
+cross section for photoelectric effect, see {\tt [PHYS230]}.}\rule{0cm}{.45cm}\\
+ \>  \Rind{GRAYLI}   \> \> \> \parbox[t]{10cm}{Initialises the tables
+of cross sections for the Rayleigh effect, see {\tt [PHYS250]}.} 
+\rule{0cm}{.45cm} \\
+ \>  \Rind{GANNII}   \> \> \> \parbox[t]{10cm}{Initialises the cross 
+section for positron annihilation, see {\tt [PHYS350]}.} \rule{0cm}{.45cm} \\
+ \>  \Rind{GCOMPI}   \> \> \> \parbox[t]{10cm}{Initialises the cross section 
+tables for Compton effect, see {\tt [PHYS220]}.} \rule{0cm}{.45cm} \\
+ \>  \Rind{GBRSGA}   \> \> \> \parbox[t]{10cm}{Initialises the cross
+section tables for discrete bremsstrahlung of \Pem/\Pep and
+$\mu$, see {\tt [PHYS340]}, {\tt [PHYS440]}.} \rule{0cm}{.45cm} \\
+ \>  \Rind{GPRSGA}   \> \> \> \parbox[t]{10cm}{Initialises cross
+section tables for pair production by photons and direct
+pair production by muons, see {\tt [PHYS210]}, {\tt [PHYS450]}.} 
+\rule{0cm}{.45cm} \\
+ \>  \Rind{GDRSGA}   \> \> \> \parbox[t]{10cm}{Initialises the
+cross section tables for delta rays production by $\mu$ and
+electrons, see {\tt [PHYS330]}, {\tt [PHYS430]}.} \rule{0cm}{.45cm} \\
+ \>  \Rind{GMUNUI}   \> \> \> \parbox[t]{10cm}{Initialises the cross section
+tables for $\mu$-nucleus interactions, see {\tt [PHYS460]}.} 
+\rule{0cm}{.45cm} \\
+ \>  \Rind{GPFISI}   \> \> \> \parbox[t]{10cm}{Initialises the cross section
+tables for photo-fission and photo-absorption, see {\tt [PHYS240]}.} 
+\rule{0cm}{.45cm} \\
+\rule[-.1cm]{6cm}{.05cm} End of loop on energy bins 
+\rule[-.1cm]{6cm}{.05cm} \rule{0cm}{.45cm} \\
+ \>  \Rind{GRANGI}   \> \> \> \parbox[t]{10cm}{Calculates the stopping
+range integrating the $dE/dx$ tables, see {\tt [PHYS010]}.} \rule{0cm}{.45cm} \\
+ \>  \Rind{GCOEFF}   \> \> \> \parbox[t]{10cm}{Calculation of the coefficients
+of the interpolating parabolas for the range tables, see {\tt [PHYS010]}.} 
+\rule{0cm}{.45cm} \\
+ \>  \Rind{GSTINI}   \> \> \> \parbox[t]{10cm}{Initialisation of the
+energy loss tables for the thin layers, see {\tt [PHYS334]}.} 
+\rule{0cm}{.45cm} \\
+ \> \>  \Rind{GFCNRM}   \> \> \parbox[t]{10cm}{Calculation of
+mean ionisation potentials and normalisation factors for
+oscillator functions.} \rule{0cm}{.45cm} \\
+ \> \>  \Rind{GSREE0}   \> \> \parbox[t]{10cm}{Calculation of the real
+part of the refractive index.} \rule{0cm}{.45cm} \\
+ \> \>  \Rind{GSDNDX}   \> \> \parbox[t]{10cm}{Calculation of number of
+collisions for a given value of $\beta$.} \rule{0cm}{.45cm} \\
+ \>  \Rind{GMULOF}   \> \> \> \parbox[t]{10cm}{Calculation of the
+{\tt STMIN tables}, see {\tt [PHYS325]}.} \rule{0cm}{.45cm} \\
+ \> \>  \Rind{GMOLIO}   \> \> \parbox[t]{10cm}{Calculation of the
+constants of Moli\`ere scattering to estimate the step limitation
+due to multiple scattering simulation, see {\tt [PHYS325]}.} 
+\rule{0cm}{.45cm} \\
+\rule[-.1cm]{5.5cm}{.05cm} End of loop on tracking media 
+\rule[-.1cm]{5.5cm}{.05cm} 
+\rule{0cm}{.45cm} \\
+\end{tabbing}
+{\bf Notes}:
+\begin{enumerate}
+\item
+The $\mu$-nucleus interactions are treated
+{\bf either} as a continuous energy loss by the muon ({\tt IMUNU}$=0$)
+{\bf or} as a discrete process ({\tt IMUNU}$\geq$1),
+{\bf in an exclusive way} i.e.:
+\begin{itemize}
+\item If {\tt IMUNU}$=0$, the $dE/dx$ due to the interactions is added
+to that coming from direct ($ e^+/e^-$) pair production in the routine 
+\Rind{GPRELA}.
+\item
+If {\tt IMUNU}$\geq 1$, the total cross section is computed in 
+\Rind{GMUNUI}.
+\end{itemize}
+\item
+The total cross sections for hadronic interactions cannot be tabulated at
+initialisation time, as they are dependent on the nature
+of the incident particle. They are computed at tracking time by the function
+\Rind{FLDIST} in case of {\tt FLUKA} {\tt [PHYS520]}, \Rind{GHESIG} 
+in case of {\tt GHEISHA} {\tt [PHYS510]} or \Rind{FMDIST} in case of {\tt MICAP}
+{\tt [PHYS530]}.
+\end{enumerate}
+ 

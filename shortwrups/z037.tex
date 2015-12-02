@@ -1,0 +1,74 @@
+% 18 jan 1995  ksk
+\Version {VAXAST}                    \Routid{Z037}
+\Keywords{CONTROL INTERRUPT VAX VMS}
+\Author{C. Mekenkamp}                  \Library{KERNLIB}
+\Submitter{R. Veenhof}                \Submitted{10.03.1988}
+\Language{Fortran, Vax Macro}                \Revised{}
+\Cernhead {Routines to Handle Control-C Interrupts on Vax}
+These routines allow you to write a program that, when interrupted
+with a {\it control-}{\tt C}, resumes execution in a routine that you
+specify, which is higher up in the calling tree.
+\Structure
+Vax Macro and Vax Fortran routines \\
+User Entry Names: \Rdef{ASTINT}, \Rdef{ASTXIT}, \Rdef{ASTDCC},
+\Rdef{ASTECC}, \Rdef{ASTSCS}, \Rdef{ASTECS} \\
+Internal Entry Names: \Rdef{ASTCCH}
+\Usage
+{\tt VAXAST} should be initialised at the beginning of the program by
+\begin{verbatim}
+    CALL ASTINT
+\end{verbatim}
+The routine to which control should be returned after a
+{\it control-}{\tt C}
+has been typed, should have in its header
+\begin{verbatim}
+    EXTERNAL ASTCCH
+    CALL LIB$ESTABLISH(ASTCCH)
+\end{verbatim}
+When a {\it control-}{\tt C} is typed on the terminal, {\tt ASTCCH} is
+called. This routine is part of {\tt VAXAST}, its main job is to unwind
+the stack of routine calls until the routine is found in which the
+{\tt LIB\$ESTABLISH} was issued.
+Your program then continues execution just after the call to the routine
+that was interrupted. You may have several routines with the header
+shown above. Only the last call to {\tt LIB\$ESTABLISH} has effect.
+\par
+When you no longer wish to make use of the {\tt VAXAST} routines:
+\begin{verbatim}
+    CALL ASTXIT
+\end{verbatim}
+You may not wish to have {\it control-}{\tt C} trapped all the time,
+for instance when the program is waiting for input.
+To suspend trapping for a short while, do the following:
+\begin{verbatim}
+       CALL ASTDCC
+       ...
+       CALL ASTECC
+\end{verbatim}
+Between {\tt ASTDCC} and {\tt ASTECC} a {\it control-}{\tt C} typed on
+the terminal has the same effect as a {\it control-}{\tt Y}, i.e.
+stopping the program and returning to {\tt DCL}.
+Execution can, as with {\it control-}{\tt Y}, be resumed at the point it
+was interrupted, via the {\tt CONTINUE} command.
+\par
+Not all programs survive the stack unwind {\tt ASTCCH} performs.
+A classical example is the set of I/O routines in the Vax
+Fortran run time library (RTL). {\tt VAXAST} replaces those routines by
+variants that are stack unwind proof but perform otherwise identical
+tasks. You will see 29 messages about multiply defined symbols
+when you {\tt LINK} your program, you can safely ignore them.
+\newpage
+If there is a part in your own program where the stack should not
+be unwound but during which you would like a {\it control-}{\tt C} to be
+stored, do the following:
+\begin{verbatim}
+    CALL ASTSCS
+    ...
+    CALL ASTECS
+\end{verbatim}
+A {\it control-}{\tt C} typed between the {\tt ASTSCS} and {\tt ASTECS}
+calls remains 'dormant' and takes effect only at the {\tt ASTECS} call.
+\Notes
+1988 C.A.J. Mekenkamp. All Rights Reserved. \\
+Carlo Mekenkamp, President Krugerstraat 42, NL-1975 EH IJmuiden.
+\\ $\bullet$

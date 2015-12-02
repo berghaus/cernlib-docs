@@ -1,0 +1,176 @@
+%  20 feb 95   ksk
+\Version {CFIO}                              \Routid{Z310}
+\Keywords{FIXED LENGTH UNIX STREAMS RECORD}
+\Author{J. Zoll}          \Library{KERNLIB, UNIX and VMS}
+\Submitter{}                                 \Submitted{19.09.1991}
+\Language{Fortran + C}                       %\Revised{}
+\Cernhead {Handle Fixed-length Records on Unix Streams}
+The routines of this package are an interface to the
+C library functions open, read, write, lseek, close,
+to permit a Fortran program to handle an unstructured
+Unix file as a string of fixed-length binary records.
+Both sequential and direct-access READ / WRITE can be simulated.
+ 
+These routines are simple little interface routines,
+there is no book-keeping done of the files which have been
+opened, the properties of the file have to be specified
+on each call, and the user is responsible for the consistency
+of all his calls for a particular file.
+ 
+Processing has to be different for a disk file or for a tape file;
+therefore the medium must be indicated in the calls. Also, a user
+could take the source of these routines and modify them to add other
+branches for special processing.
+ 
+New files are opened with the default permissions 644;
+one may set different permissions by calling {\tt CFPERM}
+just before calling {\tt CFOPEN}, which resets to the
+default after every call.
+ 
+Three parameters are common to almost all routines :
+\begin{verbatim}
+      LUNDES  is the file-descriptor of C to identify the file;
+              with CFOPEN this is an output parameter,
+              for all other routines it is an input parameter.
+ 
+      MEDIUM  = 0  for disk file, normal
+                1      tape file, normal
+                2      disk file, user coded I/O
+                3      tape file, user coded I/O
+ 
+      NWREC   is the number of machine words for each one
+              of the fixed-length records.
+\end{verbatim}
+In the examples below it is assumed that for a given file these
+three parameters are available in something like {\tt COMMON} storage.
+\Structure
+{\tt SUBROUTINE} subprograms \\
+User Entry Names:
+\Rdef{CFOPEN}, \Rdef{CFGET}, \Rdef{CFPUT},
+\Rdef{CFSIZE}, \Rdef{CFTELL}, \Rdef{CFSEEK}, \Rdef{CFREW},
+\Rdef{CFCLOS}, \Rdef{CFPERM} \\
+Files Referenced: Parameter
+ 
+\Usage
+Note: the symbol {\tt *} designates output parameters. \\[2mm]
+\newpage
+{\bf Open a file}
+\begin{verbatim}
+    CALL CFOPEN(LUNDES,MEDIUM,NWREC, CHMODE, NBUF, CHNAME, ISTAT)
+ 
+        LUNDES* file-descriptor returned
+ 
+        CHMODE  CHARACTER string selecting the IO mode :
+ 
+                = 'r'   open for reading
+                  'r+'  open for read/write
+                  'w'   create or truncate for writing
+                  'w+'  open for write/read, create or truncate
+                  'a'   append
+                  'a+'  open for append/read
+ 
+                [ add the letter "l" if labeled tape,
+                  action on this is not yet implemented ]
+ 
+        NBUF    not used for the time being, always give zero
+        CHNAME  name of the file, CHARACTER variable
+        ISTAT*  status, =zero if success
+\end{verbatim}
+   For example, create a new file in the current directory :
+\begin{verbatim}
+        MEDIUM = 0
+        NWREC  = 900
+        CALL CFOPEN(LUNDES,MEDIUM,NWREC, 'w', 0, 'run201.dat', ISTAT)
+        IF(ISTAT .NE. 0)          GO TO trouble
+\end{verbatim}
+ 
+{\bf Read next record}
+\begin{verbatim}
+    CALL CFGET(LUNDES,MEDIUM,NWREC, NWTAK, MBUF, ISTAT)
+ 
+       *NWTAK*  input:  number of words to be read
+                output: number of words actually read
+ 
+        MBUF*   vector to be read into
+        ISTAT*  status, = zero if success,
+                = -1   if end-of-file
+\end{verbatim}
+   To simulate direct-access reading one has to call {\tt CFSEEK} first.
+ 
+   For example:
+\begin{verbatim}
+     << if the 7th record of the file is to be read:
+        CALL CFSEEK(LUNDES,MEDIUM,NWREC, 6, ISTAT)
+        IF(ISTAT .NE. 0)              GO TO trouble   >>
+ 
+        NWTAK = NWREC
+        CALL CFGET(LUNDES,MEDIUM,NWREC, NWTAK, MBUF, ISTAT)
+        IF(ISTAT .EQ.-1)         GO TO eof
+        IF(ISTAT .NE. 0)         GO TO trouble
+\end{verbatim}
+ 
+\newpage
+{\bf Write next record}
+\begin{verbatim}
+    CALL CFPUT(LUNDES,MEDIUM,NWREC, MBUF, ISTAT)
+ 
+        MBUF    vector to be written, NWREC words
+        ISTAT*  status, =zero if success
+\end{verbatim}
+ 
+{\bf Get the size of the file}
+\begin{verbatim}
+    CALL CFSIZE(LUNDES,MEDIUM,NWREC, NRECT, ISTAT)
+ 
+        NRECT*  number of records on the file
+        ISTAT*  status, =zero if success
+ 
+    Careful : this will position the file to the end.
+\end{verbatim}
+ 
+{\bf Get the current file position}
+\begin{verbatim}
+    CALL CFTELL(LUNDES,MEDIUM,NWREC, NRECC, ISTAT)
+ 
+        NRECC*  number of records before current
+        ISTAT*  status, =zero if success
+\end{verbatim}
+ 
+{\bf Set the current file position}
+\begin{verbatim}
+    CALL CFSEEK(LUNDES,MEDIUM,NWREC, NRECC, ISTAT)
+ 
+        NRECC   number of records before current
+        ISTAT*  status, =zero if success
+\end{verbatim}
+   For example :
+\begin{verbatim}
+    CALL CFSEEK(..., 0, ISTAT)    position to start-of-file
+    CALL CFSEEK(..., 6, ISTAT)    position to 7th record
+    use CFSIZE to position to end-of-file
+\end{verbatim}
+ 
+{\bf Rewind the file}
+\begin{verbatim}
+    CALL CFREW(LUNDES,MEDIUM)
+\end{verbatim}
+ 
+{\bf Close the file}
+\begin{verbatim}
+    CALL CFCLOS(LUNDES,MEDIUM)
+\end{verbatim}
+ 
+{\bf Set the permissions for the next open}
+\begin{verbatim}
+    CALL CFPERM(IPERM)
+ 
+        IPERM   the permissions as a decimal integer,
+                as returned by STATF (Z265) for example
+\end{verbatim}
+   For example (using {\tt NCOCTI} of {\tt M432)} :
+\begin{verbatim}
+    CALL CFPERM(NCOCTI('660'))
+ 
+          set read and write for owner and group only.
+\end{verbatim}
+$\bullet$

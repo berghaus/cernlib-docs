@@ -1,0 +1,1139 @@
+<PRE>
+
+
+
+
+<H2>Geant  3.16  Routine  PHYS325</H2>
+
+
+<PRE>
+
+
+Origin:  M.S.  Dixit                               Submitted:  17.06.85
+Revision:  G.Lynch                                       Revised:  16.12.93
+Documentation:  F.Carminati
+
+
+</PRE>  <HR>  <H2>Moliere  scattering</H2>
+
+
+<PRE>
+
+
+</PRE>
+
+
+<H2>Subroutines</H2>
+
+
+<PRE>
+
+
+</PRE>
+
+
+<H3>Initialisation</H3>
+
+
+<PRE>
+
+
+
+       CALL  GMULOF
+
+
+
+GMULOF  calculates  the  table  of  maximum  steps
+corresponding  to  the  energies  in  the  array  ELOW
+for  electrons  and  muons.  It  is  called  during
+initialisation  by  GPHYSI.  For  hadrons  and  ions
+the  computation  is  performed  during  tracking  in
+the  routines  GTHADR  and  GTHION.
+
+
+
+       CALL  GMOLI                       (AC,ZC,WMAT,NLM,DENS,OMC*,CHC*)
+
+
+
+AC                        REAL  array  of  dimenstion  NLM  containing
+                          the  mass  numbers;
+ZC                        REAL  array  of  dimenstion  NLM  containing
+                          the  atomic  numbers;
+WMAT                      REAL  array  containing  the  proportions
+                          by  weight  of  the  component  of  a
+                          mixture/compound.  1  in  case  of  a  single
+                          component;
+NLM                       INTEGER  number  of  the  elements  in  the
+                          mixture/compound;
+
+                                                  -3
+DENS                      REAL  density  in  g  cm      ;
+OMC                       REAL  b     constant  of  Moliere  theory;
+                                 c
+
+
+
+CHC                       REAL  chi             constant  of  Moliere  theory.
+                                        cc
+
+
+
+GMOLI  calculates  the  two  material-dependent
+constants  (OMC  and  CHC).  These  are  needed  during
+initialisation  by  GMULOF  and  during  tracking  to
+sample  the  scattering  angle,  as  explained  below.
+It  is  called  at  initialisation  time  by  the
+routine  GPROBI  which  initialises  some  material
+constants  and  computes  the  probabilities  for
+various  processes.
+
+
+</PRE>
+
+
+<H3>Sampling  of  the  multiple  scattering
+angle</H3>
+
+
+<PRE>
+
+
+
+       CALL  GMULTS
+
+
+
+GMULTS  is  the  steering  routine  for  the  sampling
+of  the  multiple  scattering  angle  when  the
+variable  IMULTS  in  common  /GCPHYS/  is  1  or  2.  This
+variable  can  be  controlled  by  the  MULT  data
+record.  The  routine  decides  if  the
+material-dependent  constant  OMC  computed  by
+GMOLI  during  initialisation  has  to  be  corrected
+due  to  its  dependence  on  beta         and  Z         ,  and
+                                                 inc
+
+selects  Moliere  theory  (GMOLIE)  or  single  Coulomb
+scattering  (GMCOUL).  It  updates  the  direction  of
+the  particle  in  the  array  VECT  (COMMON  GCTRAK).
+It  is  called  by  the  tracking  routines  GTELEC,
+GTHADR,  GTHION  and  GTMUON.
+
+
+
+       CALL  GMOLIO                         (AC,ZC,WMAT,NLM,DENS,BETA2,CHARG2,OMC*)
+
+
+
+                                           2
+BETA2                     REAL  beta            of  the  particle;
+CHARG2                    REAL  charge  squared  of  the  particle  in
+
+                                                    2
+                          electron  charge  unit  (Z           in  the
+
+
+                                                    inc
+
+                          following).
+
+
+All  the  other  arguments  are  routine  GMOLI.  GMOLIO
+
+
+
+re-evaluates  the  material-dependent  constant
+OMC.  It  is  called  by  GMULTS,  if  needed.
+
+
+
+       CALL  GMOLIE                         (OMEGA,BETA2,DIN*)
+
+
+
+OMEGA                     REAL  Omega              of  the  Moliere  theory;
+                                              0
+
+                                           2
+BETA2                     REAL  beta            of  the  particle;
+DIN                       REAL  array  of  dimension  3  containing  the
+                          new  direction  cosines  with  respect  to
+                          the  original  direction  of  the  particle.
+
+
+GMOLIE  samples  the  multiple  scattering  angle
+according  to  Moliere  theory,  as  explained  in  the
+next  section.  It  is  called  by  the  multiple
+scattering  steering  routine  GMULTS,
+
+
+
+       CALL  GMOL4                       (Y*,X,VAL,ARG,EPS,IER*)
+
+
+
+Y                         REAL  value  of  the  interpolated
+                          function;
+X                         REAL  value  at  which  the  function  should
+                          be  interpolated;
+VAL                       REAL  array  of  four  values  of  the
+                          function  to  interpolate;
+ARG                       REAL  array  of  four  values  of  the
+                          argument  of  the  function  to  which  the
+                          values  contained  in  VAL  correspond;
+EPS                       REAL  required  precision  for  the
+                          interpolation;
+IER                       INTEGER  error  flag;
+
+
+GMOL4  inverts  the  integral  of  Moliere
+distribution  function  using  four-points
+continued-fraction  interpolation.  It  is  called
+by  GMOLIE.
+
+
+</PRE>
+
+
+<H2>Method</H2>
+
+
+<PRE>
+
+
+</PRE>
+
+
+<H3>Introduction</H3>
+
+
+<PRE>
+
+
+
+ When  traversing  ordinary  matter,  elementary
+ particles  undergo  deflection  from  their
+ originary  trajectory  due  to  the  interaction  with
+ the  atoms.  This  effect  is  rather  large  for
+ charged  particles,  which  are  deflected  by  the
+ electric  field  of  nuclei  and  electrons  via  a
+ large  number  of  small  elastic  collisions.  To
+ simulate  precisely  the  transport  of  particles  in
+ matter,  it  is  important  to  provide  a  precise
+ description  of  this  effect.  Considerable  effort
+ has  gone  over  the  years  into  the  formulation  of  a
+ theory  of  Coulomb  multiple  scattering.  In  GEANT
+ we  follow  the  theory  originally  formulated  by
+ Moliere      and  then  elaborated  by  Bethe  .  A  review
+ of  this  theory  can  be  found  in  .
+
+
+ It  should  be  noted  that  this  is  not  the  only
+ theory  which  describes  multiple  Coulomb
+ scattering,  and  a  thorough  analysis  of  the
+ problem  has  been  performed  by  Goudsmit  and
+ Saunderson    .
+
+
+ A  complete  account  of  the  Moliere  theory  is
+ outside  the  scope  of  this  manual.  For  more
+ information  the  interested  reader  could  refer  to
+ the  works  cited  above  and  to  the  EGS4  manual  ,
+ from  which  the  notation  used  in  the  present
+ chapter  has  been  derived.
+
+
+ The  principal  limitations  of  Moliere  theory  are
+ the  following:
+
+
+1.      the  angular  deflection  is  small.  Effectively
+        this  constraint  provides  the  upper  limit  for
+        the  step-size;
+2.      the  theory  is  a  multiple  scattering  theory;
+        that  is,  many  atomic  collisions  participate  in
+        causing  the  incident  particle  to  be  deflected.
+        In  some  implementations,  this  constraints
+        provides  a  lower  limit  on  the  step  size.  In
+        GEANT,  when  the  number  of  scatters  is  below  the
+        limit  of  applicability  of  Moliere  single
+        Coulomb  scatterings  are  simulated,  so  that
+        there  is  no  effective  minimum  step  size  below
+        which  multiple  scattering  is  switched  off;
+3.      the  theory  applies  only  in  semi-infinite
+        homogeneous  media.  This  constraint  calls  for  a
+        very  careful  handling  of  particles  near  to  a
+        medium's  boundary;
+4.      there  is  no  energy  loss  built  into  the  theory.
+        This  again  introduces  the  necessity  to  take
+        small  steps;
+
+
+ In  Moliere  theory  corrected  for  finite  angle
+ scattering  (sin      theta          6= theta         )  as  described  by
+
+
+
+Bethe  ,  the  angular  distribution  is  given  by:
+
+
+
+                                                                       p  ==========================================================
+
+f(theta         ) theta         dtheta                       =            ((sin      theta         )/ (theta         ))            *
+ * f   (eta      ) eta @
+                                                                                                                                   *
+ *  r
+
+
+
+where  for  f   (eta      )  we  use  the  first  three  terms  of
+             r
+
+Bethe's  expansion:
+
+
+
+                                      (0)                     (1)                  -1        (2)                  -2
+f   (eta      )            =         f         (eta      ) + f         (eta      )B       + f         (eta      )B                 *
+ *(2)
+ r
+                                      r                       r                              r
+
+
+
+                                                                     p  ===
+
+            eta            =         ((theta         )/ (chi            B ))
+                                                                  c
+
+
+eta       is  called  the  reduced  angle.
+
+
+</PRE>
+
+
+<H3>Calculation  of  the  reduced  angle</H3>
+
+
+<PRE>
+
+
+In  formula  (??    )  above  chi          the  critical
+                                      c
+
+scattering  angle  defined  as:
+
+
+         2               4                       2               2   2              2               2      2                2      *
+ *        4
+chi          = ((4pi    e   Z   rho      N      Z         t)/ (Wc   p   beta           )) = chi           Z         ((t)/ (E   beta*
+ *           ))
+                             s            Av
+         c                                       inc                                                cc     inc
+
+                                                                                                                            (3)
+
+
+
+with
+
+
+
+    Z                 incident  particle  charge
+     inc
+
+
+    Z                 defined  below
+     s
+
+
+    N                 Avogadro's  number
+     Av
+
+
+    rho               density
+
+
+                          N
+    W                 sum        n   A           molecular  weight
+                       i=1        i   i
+
+
+
+    E                 particle  energy  in  MeV
+
+                       2       2
+    r                 e   / (mc   )          classical  electron  radius
+     0
+
+
+    t                 total  path  length  in  the  scatterer  (and  not  its  thickness).
+
+
+
+The  variable  chi          is  factorised  into  two  parts.
+                       c
+
+The  first  part,  chi           ,  is  a  constant  of  the  medium
+                           cc
+
+for  a  given  incident  particle.  The  second  part
+depends  on  the  incident  particle  energy  and  on
+the  path  length  in  the  medium.
+
+
+
+         2                 4                                          4   2   2                                            -3     2*
+ *                     @
+chi            = ((4pi    e   Z   rho      N      )/ (W)) = ((4pi    c   r   m   Z   rho      N      )/ (W)) ss (0. 3961210      ) *
+ *  Z   ((rho      )/ (@
+                               s            Av                                    s            Av                                  *
+ *   s
+         cc                                                               0   e
+
+                                                                                                                            (4)
+
+
+The  variable  CHC  or  CHCMOL  stored  in  Q(JPROB+25)
+corresponds  to  chi           .  B  is  defined  by  the
+                         cc
+
+equation
+                                            B- ln    B = ln    Omega            ,                                           (5)
+                                                                             0
+
+
+
+where  Omega              can  be  interpreted  as  the  number  of
+                     0
+
+collisions  in  the  step:
+
+
+
+                               2       2gamma         -1              2                        2                          2
+Omega             = ((chi         )/ (e                       chi                    )) = b   Z         ((t)/ (beta           ))
+              0                                                                            c
+                               c                                      alpha                    inc
+
+                                                                                                                            (6)
+
+
+Here  gamma           is  Euler's  constant
+(gamma          = 0. 57721. . .)  and  chi                      the  atomic
+                                               alpha
+
+electron  screening  angle.  For  a  single  element
+this  is  given  by:
+
+
+
+         2                                                            2                                                            2
+chi                     = (((lambda              )/ (2pi    r      )))   [1. 13+3. 76(((alpha         ZZ         )/ (beta       )))*
+ *   ]
+                                              0              TF                                         inc
+         alpha
+
+
+
+where
+
+
+
+((lambda              )/ (2pi    ))                     =       h     / p        Compton  wavelength  of  the  electron
+                   0
+
+
+
+                                                                             -((1)/(3))
+                                        r               =         0. 885a   Z                                    Thomas-Fermi  radi*
+ *us  of  the  atom
+                                         TF                              0
+
+
+
+                                                                        2         2
+                                           a            =         ((h       )/ (me   ))        Bohr's  radius
+                                            0
+
+
+
+                                   alpha                =         1/ 137. 035. . .        the  fine-structure  constant
+
+
+
+so  that  we  have
+
+
+
+         2                   2   4            2       2          2     ((2)/(3))                                                   *
+ *                    2
+chi                     = ((m   e   1. 13)/ (p h         (0. 885)   ))Z                          [1+3. 34(((alpha         ZZ       *
+ *  )/ (beta       ))) @
+                                                                                                                            inc
+         alpha
+
+
+
+For  a  compound/mixture  the  following  rule  holds:
+
+
+
+                2                                        N                                        2                         N      *
+ *                     @
+ln    (chi                    )          =         ((sum        n   Z   (Z    + 1) ln   (chi                       ))/ (sum        *
+ *n   Z   (Z    + 1))) @
+                                                      i=1        i   i    i                                              i=1       *
+ * i   i    i          @
+                alpha                                                                             alpha         i                  *
+ *                     @
+
+
+
+                                                         N                                             2   4            2       2  *
+ *        2     ((2)/(3@
+                                         =         ((sum       ((p   )/ (A   ))Z   (Z    + 1) ln   -((m   e   1. 13)/ (p h         *
+ *(0. 885)   ))Z       @
+                                                      i=1         i       i     i    i                                             *
+ *                     @
+                                                                                                                                   *
+ *              i
+
+
+
+                                                             2   4            2       2          2             N                   *
+ *                     @
+                                         =         ln    (((m   e   1. 13)/ (p h         (0. 885)   )))- ((sum       ((p   )/ (A   *
+ *))Z   (Z    + 1) ln  @
+                                                                                                            i=1         i       i  *
+ *   i    i            @
+                                                                                                                                   *
+ *                     @
+
+
+
+                                                          N                                                                        *
+ *                     @
+                                                   +((sum       ((p   )/ (A   ))Z   (Z    + 1)[1 + 3. 34(((alpha         Z   Z     *
+ *    )/ (beta       ))@
+                                                       i=1         i       i     i    i                                   i   inc  *
+ *                     @
+
+
+
+To  understand  the  transformations  in  the  above
+formulae,  the  following  should  be  noted.  Let  n
+                                                     i
+
+be  the  number  of  atoms  of  type  i  in  a
+compound/mixture,  that  is  the  number  of  moles  of
+element  i  in  a  mole  of  material,  and  p     the
+                                              i
+
+proportion  by  weight  of  that  element.  We  have  the
+following  relation:
+
+
+
+                         N                                                                                                         *
+ *     N
+p    = ((n   A   )/ (sum        n   A   ))                                that  is                                          n    = *
+ *(sum        n   A   )@
+ i        i   i       j=1        j   j                                                                                       i     *
+ *  j=1        j   j   @
+
+
+
+so  that  we  can  simplify  expressions  in  the
+following  way:
+
+
+
+                         N                              N
+                   ((sum        n   . . . )/ (W)) = sum       (p   / A   ). . .
+                      i=1        i                   i=1        i     i
+
+
+
+If  now  we  set
+
+
+
+                N                                                                                                                  *
+ *                     @
+    Z     =  sum       n   Z   (Z    + 1)                                                                                          *
+ *                     @
+     s       i=1        i   i    i                                                                                                 *
+ *                     @
+
+
+
+                N                                -2/3                                                                              *
+ *                     @
+    Z     =  sum       n   Z   (Z    + 1) ln    Z                                                                                  *
+ *                     @
+     E       i=1        i   i    i                                                                                                 *
+ *                     @
+                                                 i                                                                                 *
+ *                     @
+
+                N                                                                                         2
+    Z     =  sum       n   Z   (Z    + 1) ln   [1 + 3. 34(((alpha         Z   Z         )/ (beta       )))   ]
+     x       i=1        i   i    i                                         i   inc
+
+
+
+                  N                                                                                                     2
+          =  W sum       ((p   )/ (A   ))Z   (Z    + 1) ln   [1 + 3. 34(((alpha         Z   Z         )/ (beta       )))   ]       *
+ *                     @
+                i=1         i       i     i    i                                         i   inc                                   *
+ *                     @
+
+
+
+we  can  write:
+
+
+
+                2                                            2   4            2       2          2
+ln    (chi                    )          =         ln    (((m   e   1. 13)/ (p h         (0. 885)   ))) + ((Z   - Z   )/ (Z   ))
+                                                                                                             x     E       s
+                alpha
+
+
+
+                    2                                 2   4            2       2          2     (Z   -Z   )/Z                      *
+ *2   4            2   @
+           chi                           =         ((m   e   1. 13)/ (p h         (0. 885)   ))e  x    E     s                = ((m*
+ *   e   1. 13)/ (p h  @
+
+
+                    alpha
+
+
+
+and  finally:
+
+
+
+                                             2       2gamma         -1              2
+Omega                    =        ((chi         )/ (e                       chi                    ))
+              0
+                                             c                                      alpha
+
+
+
+                                                            4                       2               2   2              2        2  *
+ *     2          2    @
+                         =        ((1)/ (1. 167)) ((4pi    e   Z   rho      N      Z         t)/ (Wc   p   beta           )) ((p h *
+ *        (0. 885)   )/@
+                                                                s            Av
+                                                                                    inc
+
+
+
+                                       2                          2
+                         =        b   Z         ((t)/ (beta           ))
+                                   c
+                                       inc
+
+
+
+                                                      2       2   2              2                                     (Z   '-Z   '*
+ *)/Z   '              @
+           b             =        ((4pi    N    h        )/ (m   c   ))(((0. 885)   )/ (1. 13 x 1. 167))rho      Z   'e  E     x   *
+ *   s                 @
+            c                               Av                                                                    s                *
+ *                     @
+
+
+
+The  quantity  b     is  calculated  during
+                c
+
+initialisation  by  the  routine  GMOLI  setting
+beta        = 1  and  Z          = 1.  This  variable  is  called  OMC
+                       inc
+
+or  OMCMOL  and  it  is  stored  in  Q(JPROB+21).  It  has,
+
+                                                      2
+via  the  atomic  electron  screening  angle  chi                    ,
+
+
+                                                      alpha
+
+a  small  dependence  on  beta         and  Z           in  the  term
+                                             inc
+
+Z   .  The  quantity  b   rho      Z   '  is  re-evaluated  during
+ x                     c            s
+
+tracking  by  the  routine  GMOLIO,  called  by  GMULTS,
+only  when  necessary.
+
+
+The  dependence  of  Z     on  beta         and  Z           is  via  a
+                      x                           inc
+
+                                                                    -1     2
+term  of  the  form:  1 + 3. 34(alpha         ZZ         beta             )   ,  so
+                                                inc
+
+it  is  not  necessary  to  recalculate  it  as  long  as
+
+                                              -1     2                                2
+1 + 3. 34(alpha         ZZ         beta             )    ss 1 + 3. 34(alpha         Z)
+                          inc
+
+that  is:
+
+
+
+                          2                                  2                                                                     *
+ *                     @
+    3. 34(Zalpha         )   [(((Z         )/ (beta       )))   - 1]                                            <<           1     *
+ *                     @
+                                  inc
+                                                                                                                                   *
+ *                     @
+                                                                 2    2                     2                                      *
+ *       2
+                                                                Z   (Z         - beta          )               < =           50beta
+
+
+                                                                      inc
+
+
+
+For  mixtures/compounds  this  condition  should  be
+checked  for  every  component  and  this  would  be
+unacceptable  from  the  point  of  view  of  computer
+time.  So  we  simply  make  the  condition  more
+restrictive  multiplying  the  first  term  by  the
+number  of  elements  in  the  mixture/compound.
+
+
+</PRE>
+
+
+<H3>Sampling  of  the  distribution  function</H3>
+
+
+
+ <PRE>
+
+
+ The  component  distribution  functions  (??    )  are
+ given  by
+
+
+
+                                                             2
+        (0)                                        -eta                                                      2
+       f         (eta      )           =         2e                          =         2D   (1, 1, - eta        )
+                                                                                         0
+        r
+        (1)                                                                                                  2
+       f         (eta      )                                                 =         2D   (2, 1, - eta        )
+                                                                                         1
+        r
+        (2)                                                                                                 2
+       f         (eta      )                                                 =         D   (3, 1, - eta        ),
+                                                                                        2
+        r
+
+
+
+                         n                                   n
+ where  D   (a, b, z) = d   [Gamma         (a)M(a, b, z)]/ da   ,  with
+         n
+
+ M(a, b, z)  the  Kummers  hypergeometric  function.
+
+
+
+                                 (1)              (2)
+ Integrals  of  the  functions  f           and  f           needed
+
+                                 r                r
+
+ for  the  Monte  Carlo  can  be  written  down  directly
+ in  terms  of  the  D  functions
+
+
+    1                  (1)                                                                  2                          2           *
+ *               2
+ R           eta      f          eta     deta                =         D   (2, 1, - eta        )- D   (1, 1, - eta        )- D   (1*
+ *, 1, - eta        )
+                                                                        1                          1                          0
+    eta                r
+
+
+
+    1                  (2)                                                                            2                          2 *
+ *                      @
+ R           eta      f          eta     deta                =         ((1)/ (2))D   (3, 1, - eta        )- D   (2, 1, - eta       *
+ * )- D   (2, 1, - eta  @
+                                                                                  2                          2                     *
+ *     1
+    eta                r
+
+
+
+ We  note  that  the  first  term  is  just  the  Gaussian
+ part  and  it  dominates  for  large  B,  that  is,  for
+ large  number  of  scatters,  as  it  has  to  be
+ expected.  Recalling  the  definition  of  eta       in  (??    )
+ we  can  say  that  the  half-width  of  the  Gaussian
+ part  of  the  Moliere  distribution  is
+
+               2             2
+ sigma             = chi         B/ 2.  Routine  GMOLIE  performs  the
+
+                             c
+
+ sampling  of  the  Moliere  distribution  via  the
+ following  steps:
+
+
+1.      the  value  of  B  is  calculated  recursively.  If  we
+
+
+
+        set  f(B) = B  with  f(B) = ln    Omega             + ln    B  the
+                                                        0
+
+        relation  used  is  B    = B          + Delta         B =
+                             n      n-1
+
+        B          + (f(B         )- B         )/ (1- 1/ B         ).  Convergence
+         n-1             n-1          n-1                 n-1
+
+                                                     -4
+        is  assumed  when  _Delta         B_< =    10      .
+2.      a  random  number  r     is  sampled  and  a  table  of
+                            1
+
+        four  values  F   (eta         )  is  built  with
+                       r            i
+
+        i = j- 2, j- 1, j, j + 1  and  F   (eta         )> =    r   .  F  is  the
+                                        r            j           1
+
+        distribution  function  derived  from  (??    ):
+
+
+                                                eta                                 eta       (0)             (1)          -1      *
+ *  (2)          -2
+        F   (eta      )            =         R           f   (t) dt            = R           f         (t) + f         (t)B       +*
+ * f         (t)B       @
+         r                                                r
+                                                0                                   0         r               r                    *
+ *  r
+
+
+
+                                                eta       (0)                          -1       eta        (1)                     *
+ *    -2       eta      @
+                                   =         R           f         (t) dt           + B       R           f         (t) dt         *
+ * + B       R          @
+
+
+                                                0         r                                     0          r                       *
+ *             0        @
+
+
+
+                                              (0)                     -1     (1)                     -2     (2)
+                                   =         F         (eta      ) + B      F         (eta      ) + B      F         (eta      )
+
+                                              r                              r                              r
+
+
+                                         (n)
+        40  values  of  the  functions  F           are  tabulated.
+
+                                         r
+
+3.      using  a  four-points  continued-fraction
+
+                                                              2
+        interpolation  method  (GMOL4)  a  table  of  eta
+
+
+                                                              i
+
+        is  interpolated  using  the  values  of  r     and  F
+                                                   1
+
+        tabulated  in  the  previous  step.  This  is  similar
+        to  the  inversion  of  the  distribution  function,
+        but  instead  of  obtaining  directly  the  random
+        variable,  we  interpolate  a  table  of  its
+        squares.  This  provides  a  better  fit  to  the
+        inverse  function;
+
+                                                     p ===============
+
+                                                                 2
+4.      the  value  of  theta          = chi           Beta            is  calculated;
+                                                 c
+
+5.      a  random  number  r     is  extracted,  and  the
+                            2
+
+
+
+                                                 p  =========================================
+
+        rejection  function  g(theta         ) =    sin      theta         / theta
+        is  computed.  If  r   >g(theta         )  resampling  begins
+                            2
+
+        from  step  2,  otherwise  the  value  is  accepted.
+
+
+ The  Moliere  distribution  gives  the  space
+ scattering  angle.  A  similar  expression  may  be
+ written  for  the  lateral  displacement  of  the
+ scattered  particles.  However,  the  problem  of
+ joint  angle  lateral  displacement  in  the  Moliere
+ approximation  has  not  been  solved,  and,  for  small
+ step  size,  lateral  displacement  is  of  second
+ order  and  may  be  neglected.  This  introduces  a
+ problem  when  large  step  sizes  are  taken.  The  step
+ size  can  be  artificially  limited  via  the  use  of
+ the  variable  STEMAX,  which  is  an  argument  to  the
+ routine  GSTMED.  For  more  information  on  this
+ point  the  user  is  invited  to  consult  chapter
+ [CONS200].
+
+
+ </PRE>
+
+
+ <H2>Path  and  step  length</H2>
+
+
+ <PRE>
+
+
+ </PRE>
+
+
+ <H3>Restrictions  on  the  step  length</H3>
+
+
+ <PRE>
+
+
+ Restrictions  on  the  length  of  the  step  arise
+ from:
+
+
+1.      the  number  of  scatters  Omega            > =    20  to  stay
+                                                 0
+
+        within  the  multiple  scattering  regime.  When
+        Omega             <20,  an  appropriate  number  of  single
+                      0
+
+        scatterings  is  used.  See  routine  GMCOUL
+        [PHYS328].
+
+                 2
+2.      chi         B< =    1  i.e.  the  width  of  the  Gaussian  part
+
+                 c
+
+        of  the  distribution  should  be  less  than  one
+        radian.  This  condition  induces  a  maximum  step
+        length  for  the  multiple  scattering  called
+        t               .  In  order  to  find  this  value  we  write
+         Bethe
+
+        the  limiting  condition  as
+
+
+
+         2
+chi         (t               )B(t               ) = 1,  that  is
+              Bethe              Bethe
+         c
+
+                                 2
+B(t               ) = 1/ chi        (t               ).  Now  using  equation
+   Bethe                              Bethe
+                                 c
+
+(??    )  we  take  the  exponential  of  both  members
+B(t               )Omega            (t               ) =
+   Bethe                         0    Bethe
+
+                       2
+exp        (1/ chi        (t               )).  Dividing  the  two  last
+                            Bethe
+                       c
+
+equalities  we  obtain:
+
+
+                                              2                       2                                                            *
+ *        2     @
+Omega             (t               ) = ((b   Z         )/ (beta           ))t                                            =         *
+ *chi        (t @
+              0     Bethe                 c                                  Bethe                                                 *
+ *             B@
+                                              inc                                                                                  *
+ *        c     @
+
+
+
+                                                                                                                                   *
+ *           2  @
+                                                                                                                         =         *
+ *((chi         @
+                                                                                                                                   *
+ *              @
+                                                                                                                                   *
+ *           cc @
+
+
+
+                                 2              4               2      2                                                           *
+ *       2      @
+                    exp       [(E   beta           )/ (chi            Z         t               )]                       =         *
+ *((b   E   beta@
+                                                                                 Bethe                                             *
+ *   c
+                                                                cc     inc                                                         *
+ *              @
+
+
+
+                                                                                                                                   *
+ *   2          @
+                                                                                                t                        =         *
+ *((E   beta    @
+                                                                                                 Bethe                             *
+ *              @
+                                                                                                                                   *
+ *              @
+
+
+For  electrons  and  muons  this  constraint  on  the
+step-length  is  tabulated  at  initialisation
+time  in  the  routine  GMULOF  [PHYS201].  For
+hadrons  this  formula  can  be  approximated  as:
+
+
+                                  -3         2                               2
+t               ss (((1)/ (14. 110      ))((E   beta        )/ (Z         )))   X   ,
+ Gauss                                                           inc             0
+
+
+where  E  is  in  GeV  and  X     is  the  radiation  length
+                             0
+
+in  centimeters  and  the  formula  has  been  taken
+from  the  Gaussian  approximation  to  multiple
+scattering  (see  [PHYS320]).  This  condition  is
+more  restrictive,  because  it  is  equivalent  to
+require  that  the  width  of  the  Gaussian  part  of
+the  distribution  be  less  than  0. 5,  but  it  has
+been  found  that  the  two  conditions  are
+numerically  equivalent;
+
+
+
+3.      limitation  due  to  the  path  length  correction
+        algorithm  used  (see  below).
+
+
+ </PRE>
+
+
+ <H3>Path  Length  Correction</H3>
+
+
+ <PRE>
+
+
+ A  path  length  correction  may  be  applied  in  an
+ approximate  manner.  We  have  from  the  Fermi-Eyges
+ theory
+
+                                                  t                2
+                            t = S + ((1)/ (2)) R     theta            (t)      dt                                            (7)
+
+
+                                                  0
+
+ where
+
+
+                   2
+     theta            (t)             the  mean  square  angle  of  scattering;
+
+
+
+     S                                step  size  along  a  straight  line;
+
+
+
+     t                                actual  path  length.
+
+
+
+ We  have  further:
+
+
+                2                                                    2
+  theta            (t)      = (0. 0212((Z         )/ (pbeta       )))   ((t)/ (X   ))
+
+                                         inc                                    0
+
+                                                                                                                             (8)
+ X     is  the  radiation  length.  From  (??    )  and  (??    )  we
+  0
+
+ get
+
+
+          2                                                                           -4       2             2              2
+ S = t- Kt                            with                                K = 1. 12x10      ((Z         )/ (p   beta           X   *
+ *))
+                                                                                                                                0
+                                                                                               inc
+
+                                                                                                                             (9)
+ Equation  (??    )  may  be  used  to  make  the  path  length
+ correction.  Solving  equation  (??    )  with  respect  to
+ t  implies  that,  in  order  to  obtain  real
+ solutions:
+
+
+                                                                                     2              2       2
+ S< =    ((1)/ (4K))                 i.e.                         S< =    2232((X   p   beta           )/ (Z         ))
+                                                                                 0
+                                                                                                            inc
+
+                                                                                                                          (10)
+ This  condition  provides  an  additional  constraint
+ to  the  maximum  step  length  for  multiple
+
+
+
+scattering  (variable  TMXCOR  in  routine  GMULOF).
+The  corrected  step  can  be  approximated  as:
+
+
+                                     t ss S(1 + KS) = S(1 + CORR       )
+
+
+where  CORR  < =   0. 25  due  to  condition  (??    ).
+</PRE>

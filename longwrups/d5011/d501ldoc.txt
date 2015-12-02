@@ -1,0 +1,854 @@
+
+                          CERN Program Library Long Writeup D501
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                   Constrained Non-Linear Least Squares
+
+                    and Maximum Likelihood Estimation
+
+
+
+                             Reference Manual
+
+
+
+
+                        Version 93.1 (April 1993)
+
+
+
+
+
+
+                        Application Software Group
+
+
+                     Computing and Networks Division
+
+
+
+
+
+
+                         CERN Geneva, Switzerland
++------------------------------------------------------------------------##
+|                            Copyright Notice                            ##
+|                                                                        ##
+| LEAMAX -- Constrained Non-Linear Least Squares and Maximum             ##
+| Likelihood Estimation                                                  ##
+|                                                                        ##
+| CERN Program Library Entry D501                                        ##
+|                                                                        ##
+| (C) Copyright CERN, Geneva 1993                                        ##
+|                                                                        ##
+| Copyright and any other appropriate legal protection of these          ##
+| computer programs and associated documentation reserved in all         ##
+| countries of the world.                                                ##
+|                                                                        ##
+| These programs or documentation may not be reproduced by any method    ##
+| without prior written consent of the Director-General of CERN or his   ##
+| delegate.                                                              ##
+|                                                                        ##
+| Permission for the usage of any programs described herein is granted   ##
+| apriori to those scientific institutes associated with the CERN        ##
+| experimental program or with whom CERN has concluded a scientific      ##
+| collaboration agreement.                                               ##
+|                                                                        ##
+| Requests for information should be addressed to:                       ##
+|                                                                        ##
+|                 CERN Program Library Office                            ##
+|                 CERN-CN Division                                       ##
+|                 CH-1211 Geneva 23                                      ##
+|                 Switzerland                                            ##
+|                 Tel. +41 22 767 4951                                   ##
+|                 Fax. +41 22 767 7155                                   ##
+|                 Bitnet: CERNLIB@CERNVM                                 ##
+|                                                                        ##
+|                 DECnet: VXCERN::CERNLIB (node 22.190)                  ##
++-----------------Internet:-CERNLIB@CERNVM.CERN.CH-----------------------##
+
+
+
+Trademark notice: All trademarks appearing in this guide are acknowledged
+as such.
+  Contact Person:             K.S. Koelbig /CN     (KSK@CERNVM.CERN.CH)
+
+  Technical Realization:      Michel Goossens /CN  (GOOSSENS@CERNVM.CERN.CH)
+
+
+  First Edition -- April 1993
+This program was developed by W. Moench (Bergakademie Freiberg, Germany)
+when spending six months at CERN during 1992/3. An earlier version had
+been written by B. Schorr (CERN).
+
+The present document was produced using LaTeX with the cernman style file,
+developed at CERN. A compressed PostScript file d501l.ps.Z, containing a
+complete printable version of this manual, can be obtained at CERN by
+anonymous ftp as follows (commands to be typed by the user are
+underlined):
+
+
+      ftp asis01.cern.ch
+      ------------------
+      Trying 128.141.201.136...
+      Connected to asis01.cern.ch.
+      220 asis01 FTP server (SunOS 4.1) ready.
+      Name (asis01:username): anonymous
+                              ---------
+      Password: your-mailaddress
+                ----------------
+      ftp> cd doc/cernlib
+           --------------
+      ftp> get d501l.ps.Z
+           --------------
+      ftp> quit
+           ----
+
+
+Table of Contents
+
+
+
+1 The Problem                                                            1
+
+
+2 Method                                                                 3
+
+  2.1  Solution of Unconstrained Problems . . . . . . . . . . . . . .    3
+
+  2.2  Minimization subject to Bounds on the Variables  . . . . . . .    8
+
+  2.3  Calculation of an Approximation to the Covariance Matrix . . .   10
+
+  2.4  Examples and Numerical Tests . . . . . . . . . . . . . . . . .   10
+
+3 Remarks on the Usage of LEAMAX                                        18
+Chapter 1: The Problem
+
+
+LEAMAX is conceived as a tool to find an approximation to the solution of
+a simple bound constrained minimization problem
+                                       n
+varphi(a)->min!    a = (a ,.. .,a ) 2 R ,                                      (*)
+                         1       n
+
+      subject to bounds on the variables of the form
+               a < =a < =a-bar     (j =1,. .., n),
+                j    j        j
+
+for the following three cases of objective functions varphi which occur
+very often in scientific research:
+
+(S)  The general non-linear least squares problem
+
+
+                   varphi (a)    =    ((1)/(2)) sum [f (a)]2
+                         S                      i=1   i
+
+
+                                     n   1
+     with non-linear functions fi : R ->R  (i =1, ... ,m).
+
+(F)  The least squares data fitting problem
+
+                                       m                            2
+         varphi (a)    =    ((1)/(2)) sum [((y -f(x , a))/(sigma ))] ,
+               F                      i=1     i    i            i
+
+                                     k   n   1
+     with a non-linear function f : R x R ->R  , a set of observations
+     {(x  ,y ),. .., (x ,y )},
+        1   1          m  m
+     and their corresponding weights {sigma  ,.. .,sigma } ,
+                                           1            m
+            k       1           1
+     (x  2 R ,y  2 R ,sigma  2 R ,i = 1,.. .,m).
+       i       i           i
+(M)  The maximum likelihood estimation
+
+                                           m
+                     varphi (a)    =    -sum  ln(f(x ,a)),
+                           M              i=1       i
+                                    1
+                                     k   n   1
+     with a non-linear function f : R x R ->R  and a set of data points
+     {x  ,.. .,x },
+       1        m
+            k
+     (x  2 R ,i = 1,.. .,m).
+       i
+Chapter 2: Method
+
+
+The developed subprograms are based on ideas described by Mor'e [1] for
+finding the solution of a general non-linear least squares problem by
+using the Levenberg-Marquardt algorithm. The method is completed by an
+active set strategy for handling simple box constraints to the unknown
+parameters.
+
+We begin with a short description of the underlying principle for solving
+unbounded problems. In particular, we explain the basic algorithm, the
+adaptive quadratic modeling used for the objective function varphi(a) in
+the three cases (S), (F), (M), and finally, the solution of the quadratic
+problem.
+
+We also give information on the minimization which is subject to bounds on
+the variables and the approximative calculation of the covariance matrix,
+and some numerical tests.
+
+For general information on the numerical solution of nonlinear least
+squares and data fitting problems see the monograph of Bjoerck [3]. For
+the statistical background of maximum likelihood estmations, see Eadie et
+al. [7].
+
+2.1 Solution of Unconstrained Problems
+
+
+Basic Algorithm
+
+                                  0   n
+Step 0 : Choose an initial guess a 2 R  .
+Step 1 : Approximate varphi by a quadratic model:
+
+                               0    T    0                 0 T       0
+varphi(a)# varphi(a):= varphi(a )+ g (a-a  )+((1)/ (2))(a-a )  H (a-a )
+                                    0                           0
+
+                           n                    0    n
+with an approximation g 2 R  to the gradient g(a )2 R  of varphi :
+                       0
+
+  g  # g(a0)= (((partial varphi)/ (partial a ))(a0))          ,
+   0                                        j       j=1,...,n
+
+                            n  n                           0      n   n
+and an approximation H 2 L(R ,R ) to the Hessian matrix H(a ) 2L(R  ,R )
+                      0             3
+of varphi :
+
+       0              2                                   0
+H # H(a )= (((partial  varphi )/ (partial a partial a ))(a ))            .
+ 0                           S             j         l       j,l=1,...,n
+
+                               0   n
+Step 2 : Compute the solution p 2 R  of the linear system of equations
+   0
+H p  =-g .
+ 0      0
+
+               1    0   0
+Step 3 : Set  a  = a + p .
+
+                                    1             0
+Repeat the above Steps 1 to 3 with a  instead of a  and so on until a
+suitable stopping criterion is fulfilled.
+
+                                                       0   0
+Remark: The gradient g(a) of varphi(a) vanishes at a= a + p  with the
+          0                     0   0
+solution p  of Step 2, i.e. a= a + p  is a local minimum point of the
+quadratic approximation varphi to varphi.
+
+It is necessary to compute approximations to the gradient and to the
+Hessian matrix of varphi in each iteration step.
+
+Computing of Approximations to the Derivatives of First and Second Order
+
+(S)  In this case the first and second derivatives are
+
+
+                                                               m
+                 ((partial varphi )/(partial a ))(a)    =    sum  f (a)((partial f )/(partial a ))(a)    (j =1, ... ,n),
+                                 S            j               i=1  i              i            j
+
+
+               2                                               m                                                                                 2
+     ((partial   varphi )/(partial a partial a ))(a)    =    si=1 [((partial f )/(partial a ))(a)((partial f )/ (partial a ))(a)+ f (a)((partial  f )/(partial a partial a ))(a)],
+                       S            j         l                               i            j                i             l        i               i            j         l
+
+     The LEAMAX package uses an approximation to the second derivative of
+     varphi which neglects the second term of the Hessian matrix, which
+     involves second derivatives of f  . This is a commonly used
+                                     i
+     technique especially for problems with small residuals. Let
+
+                                f (a)
+                                 1         m
+        b    :=    F(a)  :=  (    .    )2 R ,
+                                f (a)
+                                 m
+
+
+                                 ((partial f )/(partial a ))(a). ..((partial f  )/(partial a ))(a)
+                                            1            1  .        .        1             n             n   m
+     J(a)    :=    DF(a)  :=  (                             .        .                              ) 2L(R , R )
+                                 ((partial f )/(partial a ))(a). ..((partial f  )/(partial a ))(a)
+                                            m            1                    m             n
+
+     where J(a) = DF(a) is the Jacobian matrix of F at a.
+     Then
+
+                                     T           T
+                    g(a)    =    J(a) b  =  DF(a) F(a),
+                                     T              T
+                    H(a)    #    J(a) J(a)  =  DF(a) DF(a).
+
+                                            0
+     Further, denote by J   the Jacobian J(a ) or an appropriate
+                         0
+                                                0
+     approximation by divided differences to J(a  ), then the
+     approximations
+
+                           T         0              T          0
+              g     :=    J  b #  g(a ),    H   := J  J  #  H(a )
+               0           0                 0      0  0
+
+                        0                      0
+     to the gradient g(a  ) and the Hessian H(a ), respectively, are used
+     in Step 2 of the algorithm. The calculation of F(a) and of the
+     partial derivatives DF(a) (if the latter is not computed by
+     approximation) has to be performed by a user-supplied subroutine
+     subprogram.
+(F)  The function varphi   is a special case of the more general function
+                        F
+     varphi   with
+           S
+
+           f  (a)    =    ((y -f(x ,a))/ (sigma ))    (i= 1,. .., m)
+            i                i    i            i
+     and the first derivatives
+
+     ((partial fi )/(partial aj))(a)    =    -((1)/ (sigmai))((partial f)/(partial aj))(xi, a),    (i =1,. .., m;j = 1,.. .,n).
+
+     The calculation of f(. ,a) and of the partial derivatives
+     partial f(. ,a)/partial a  (j= 1,. .., n) (if the latter are not
+                              j
+
+     computed by approximation) has to be performed by a user-supplied
+     subroutine subprogram.
+(M)  In this case the objective function and their first and second
+     derivatives are
+
+                                                                m
+                                          varphi (a)    =    - sum ln(f (a)) ,    f (a)  := f(x , a),    (i =1, ... ,m),
+                                                M              i=1     i           i           i
+
+
+                                                                m
+                 ((partial varphi )/(partial a ))(a)    =    - sum ((1)/(f (a)))# ((partial f )/(partial a ))(a),     (j= 1,.. .,n),
+                                 M            j                i=1        i                  i            j
+
+
+
+     ((partial 2 varphi )/(partial a partial a ))(a)    =    sum ((1)/ ([f (a)]2))[((partial f )/(partial a ))(a)((partial f )/ (partial a ))(a)-f (a)((partial 2f )/ (partial a par
+                       M            j         l               i=1         i                   i            j                i             l       i               i             j
+
+
+     As in the cases (S) and (M), the approximation to the second
+     derivative in LEAMAX neglects the second term of the Hessian matrix,
+     which involves second derivatives of f  .
+                                           i
+     Let
+
+                                                    ln(f (a))
+                          .      m                      .          m
+          b    :=    - (  .  )2 R ,    F(a)  :=  (      .      )2 R ,
+                          1                         ln(f (a))
+                                                        m
+
+     and the Jacobian of F at a
+
+                                 ((1)/(f (a)))# ((partial f )/(partial a ))(a) ... ((1)/(f (a))) #((partial f )/ (partial a ))(a)
+                                        1                  1           .1                .1                  1             n             n  m
+     J(a)    :=    DF(a)  :=  (                                        .                 .                                         )2 L(R ,R ).
+                                 ((1)/(f (a)))# ((partial f )/(partial a ))(a) ... ((1)/(f (a))) #((partial f )/ (partial a ))(a)
+                                        m                  m            1                 m                  m             n
+     Then
+                                   T                   T
+                  g(a)    =    J(a) b,     H(a) #  J(a) J(a).
+
+                                            0
+     Further, denote by J   the Jacobian J(a ) or an appropriate divided
+                         0
+                                     0
+     differences approximation to J(a  ), then the following
+     approximations
+                           T         0              T          0
+              g     :=    J  b #  g(a ),    H   := J  J  #  H(a )
+               0                             0         0
+                           0                        0
+                        0                      0
+     to the gradient g(a  ) and the Hessian H(a ), respectively, are used
+     in Step 2 of the algorithm.
+     The calculation of f(. ,a) and of the partial derivatives
+     partial f(#, a)/partial a  (j= 1,.. .,n) (if the latter is not
+                              j
+     computed by approximation) has to be performed by a user-supplied
+     subroutine subprogram.
+
+
+Solution of the System of Linear Equations in Step 2
+
+In all three cases (S), (F) and (M), the linear system of equations in
+Step 2
+               T              T             T
+              J  Jp    =    -J  b    or    J (b +J p) =  0,
+
+which is the system of normal equations to the linear least squares
+problem
+                                                        n
+              psi(p)    :=    ||b +J p||-> min!    (p 2R  )
+
+where ||#|| denotes the l2 vector norm, has to be solved in each
+
+iteration step. In nearly rank deficient cases the above problem is
+replaced by the following restricted linear least squares problem
+                                       n
+psi(p)    :=    ||b+J p||-> min!  (p 2R  )    subjectto    ||Dp|| <=Delta,
+where D is a diagonal matrix which takes into account the scaling of the
+problem. The details of choosing suitable scaling matrices D and bounds
+Delta are described in Mor'e [1]. He also gives further details of the
+implementation of the above basic algorithm.
+2.2 Minimization subject to Bounds on the Variables
+
+
+If the unconstrained minimization of the objective function varphi leads
+to a local minimum point which is not acceptable to the given problem it
+is often necessary to take constraints to the unknown parameters a into
+account. We give a short description how box constraints
+                a <=a < =a-bar     (j = 1,.. .,n)
+                 j   j        j
+
+are handled in LEAMAX .
+
+Variables which are not on their bounds are called free variables. Let p
+
+                                                         *
+denote the number of free variables at a solution point a  of problem
+               n  p
+(*), let P2 L(R ,R ) denote the matrix whose colums are the colums of the
+                                                        *
+identity matrix corresponding to the free variables at a , and let
+
+           I    :=    { j| 1<=j< =n,  a*  = a   _ a*= a-bar  }
+                                                           j
+                                       j    --     j
+                                             j
+
+                                                    *
+denote the set of indices of non-free variables at a .
+
+                                            *
+Sufficient conditions for a feasible point a  to be a solution of the
+constrained problem (*) are as follows:
+           *                 *
+  (i)     g  = 0,    if  a <a <a-bar ,
+                                    j
+           j             --  j
+            *             *
+  (ii)     g >0,     if  a = a ,
+
+            j             j  --
+            *             *   j
+  (iii)    g <0,     if  a = a-bar ,
+            j             j       j
+               *
+  (iv)     H (a )      is positive definite,
+            P
+       *     *    n
+where g = g(a )2 R  is the gradient of varphi(a), and
+    *    T   *        p  p
+H (a )= P H(a ) P2 L(R ,R ) is the Hessian matrix of varphi(a) with
+ P
+respect to the free variables.
+
+In the case of box constraints the Lagrange multipliers corresponding to
+the active constraints, i.e. to the non-free variables are given by
+
+                                      *
+                     lambda     =    g ,     (j2 I).
+                           j          j
+
+The used method for handling box-constraints is an active set method.
+Bounds on the variables are dealt with by fixing some of the variables on
+their bounds and adjusting the remaining free variables to minimize the
+function varphi. By examining estimates of the Lagrange multipliers it is
+possible to adjust the set of variables fixed on their bounds so that
+
+eventually the bounds active at a solution a* should be correctly
+identified.
+2.3 Calculation of an Approximation to the Covariance Matrix
+
+
+In the case of data fitting problems, approximations to the covariance
+matrix C and the standard deviations s of the estimated parameters with
+respect to the free variables are also provided by LEAMAX.
+                                                               *
+Let p denote the number of free variables at a solution point a . The
+                                              p  p                 p
+expressions used to approximate C= (c   )2 L(R ,R ) and s =(s  )2 R  are
+                                     i,j                     j
+                           2   T T    -1         2      *  -1
+            C    =    sigma  (P J  JP)   #  sigma (H  (a ))
+                                                    P
+
+with the estimated residual variance
+
+                   2                       m              2
+              sigma     =    ((1)/(m- p))sum [y -f(x  ,a)]
+                                          i=1  i    i
+
+
+and s = c   (j =1, ... ,p), respectively.
+     j   j,j
+
+2.4 Examples and Numerical Tests
+
+
+LEAMAX runs correctly for some selected problems from the
+Mor'e-Garbow-Hillstrom test set [2], for the test problem from the User's
+guide to the NAG Library, Chapter E04, and for other constrained problems.
+
+We now demonstrate the usage of DSUMSQ, DFUNFT and DMAXLK by three
+examples.
+
+(S)  Objective function (Powell function, n = 4,m =4, see [2, p. 23] and
+     [9, Chapter E04]):
+
+                                        2          2         4           4
+     varphi  (a) =  ((1)/(2))[(a +10a  ) +5(a -a  ) +(a -2a )  +10(a -a )  ],
+           S                    1    2       3  4      2   3        1  4
+
+     with the constraints: 1< =a < =3, -2< =a <=0, 1< =a <=3. Initial
+                                1            2          4
+             0              T
+     guess: a  = (3,-1, 0,1) .
+                       Example of the use of DSUMSQ
+
+
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      PARAMETER (NC = 4, NF = 20, MAXIT = 50)
+      PARAMETER (NW = 9*NC+4*NF+2*NF*NC+3*NC*NC)
+      DIMENSION A(NC),AL(NC),AU(NC),DPHI(NC),COV(NC,NC),STD(NC)
+      DIMENSION IAFR(2*NC),W(NW)
+      EXTERNAL SUBS
+
+      DATA M,N,MODE,IPRT,EPS / 4,4,1,-5,1D-12 /
+      DATA AL,AU,A / 1D0,-2D0,-1D30,1D0, 3D0,0D0,1D30,3D0, 3D0,-1D0,0D0,1D0 /
+
+      CALL DSUMSQ(SUBS,M,N,NC,A,AL,AU,MODE,EPS,MAXIT,IPRT,MFR,IAFR,
+     +            PHI,DPHI,COV,STD,W,NERR)
+      END
+      SUBROUTINE SUBS(N,A,M,F,DF,MODE,NERROR)
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      PARAMETER (Z0 = 0, Z1 = 1, Z2 = 2, Z5 = 5, Z10 = 10)
+      DIMENSION A(*),F(*),DF(M,*)
+      NERROR=0
+      F(1)=A(1)+Z10*A(2)
+      F(2)=SQRT(Z5)*(A(3)-A(4))
+      F(3)=(A(2)-Z2*A(3))**2
+      F(4)=SQRT(Z10)*(A(1)-A(4))**2
+      IF(MODE .EQ. 0) RETURN
+      CALL DMSET(M,N,Z0,DF(1,1),DF(1,2),DF(2,1))
+      DF(1,1)=Z1
+      DF(1,2)=Z10
+      DF(2,3)=SQRT(Z5)
+      DF(2,4)=-DF(2,3)
+      DF(3,2)=Z2*(A(2)-Z2*A(3))
+      DF(3,3)=-Z2*DF(3,2)
+      DF(4,1)=Z2*SQRT(Z10)*(A(1)-A(4))
+      DF(4,4)=-DF(4,1)
+      RETURN
+      END
+
+
+
+
+
+                             Output Generated
+
+               MATHLIB PACKAGE   D501   VERSION 15.03.93
+               PACKAGE LEAMAX  ****  ROUTINE DSUMSQ ****
+   MINIMIZATION OF A SUM OF SQUARES   ANALYTICAL DERIVATIVES (MODE = 1)
+
+INPUT  OF  DSUMSQ :
+M :  4     N :  4     NC:  4    MAXIT :  50    MODE :  1    IPRT :  -5
+EPS :  1.0D-12
+AL :   1.00000D+00   -2.00000D+00   -1.00000D+30    1.00000D+00
+AU :   3.00000D+00    0.00000D+00    1.00000D+30    3.00000D+00
+A  :   3.00000D+00   -1.00000D+00    0.00000D+00    1.00000D+00
+
+ITERATION
+
+    PHI = VALUE OF OBJECTIVE FUNCTION          GNO = NORM OF GRADIENT
+
+       ITERATION   0   PHI =  1.07500D+02      GNO =  2.29388D+02
+       PARAMETER       PARAMETER         GRADIENT          LAGRANGE
+         NUMBER          VALUE                            MULTIPLIER
+            1          3.00000D+00      1.53000D+02      0.00000D+00
+            2         -1.00000D+00     -7.20000D+01      0.00000D+00
+            3          0.00000D+00     -1.00000D+00      0.00000D+00
+            4          1.00000D+00     -1.55000D+02      0.00000D+00
+
+       ITERATION   5   PHI =  1.24395D+00      GNO =  2.30084D-01
+       PARAMETER       PARAMETER         GRADIENT          LAGRANGE
+         NUMBER          VALUE                            MULTIPLIER
+            1          1.16011D+00      2.29108D-01      0.00000D+00
+            2         -1.01310D-01     -2.04628D-02      0.00000D+00
+            3          4.02675D-01     -5.41128D-03      0.00000D+00
+            4          1.00000D+00      2.90453D+00      2.90453D+00
+
+      . . .
+
+ END:  ITERATION  25   PHI =  1.21689D+00      GNO =  3.02266D-06
+       PARAMETER       PARAMETER         GRADIENT          LAGRANGE
+         NUMBER          VALUE                            MULTIPLIER
+            1          1.00000D+00      1.47674D-01      1.47674D-01
+            2         -8.52326D-02      1.35178D-06      0.00000D+00
+            3          4.09303D-01     -2.70355D-06      0.00000D+00
+            4          1.00000D+00      2.95348D+00      2.95348D+00
+(F)  Objective function (Bard function, n = 3,m =15, k =3, see [2, p.
+     22]):
+
+
+     varphi  (a) =  ((1)/(2)) sum [y -(a  +((x   )/ (x   a  +x   a )))]2,
+           F                  i=1   i   1     1,i     2,i 2   3,i 3
+
+
+     without constraints to the unknown parameters a  , a , a .
+                                                    1    2   3
+     The chosen data set {x    ,x   ,x   , y }          is that of the
+                           1,i   2,i  3,i   i i=1,...,m
+     original paper [2] with weights sigma  = 1(i =1,. .., m). Initial
+                                          i
+             0          T
+     guess: a  = (1,1,1) .
+
+
+
+                       Example of the use of DFUNFT
+
+
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      PARAMETER (NC = 3, NX = 3, NF = 15, MAXIT = 50)
+      PARAMETER (NW = 9*NC+4*NF+2*NF*NC+3*NC*NC)
+      DIMENSION X(NX,NF),Y(NF),SY(NF),A(NC),AL(NC),AU(NC),DPHI(NC)
+      DIMENSION COV(NC,NC),STD(NC),IAFR(2*NC),W(NW)
+      EXTERNAL SUBF
+      DATA K,N,M,MODE,IPRT,EPS / 3,3,15,0,1,1D-12 /
+      DATA AL,AU,A,SY / 3 * -1D30 , 3 * 1D30 , 3 * 1D0 , 15 * 1D0 /
+      DATA Y / 0.14D0, 0.18D0, 0.22D0, 0.25D0, 0.29D0, 0.32D0, 0.35D0, 0.39D0,
+     +         0.37D0, 0.58D0, 0.73D0, 0.96D0, 1.34D0, 2.10D0, 4.39D0 /
+      DO  10 I = 1,M
+      X(1,I)=I
+      X(2,I)=16-I
+   10 X(3,I)=MIN(X(1,I),X(2,I))
+
+      CALL DFUNFT(SUBF,K,M,N,NX,NC,X,Y,SY,A,AL,AU,MODE,EPS,MAXIT,IPRT,
+     +            MFR,IAFR,PHI,DPHI,COV,STD,W,NERR)
+      END
+      SUBROUTINE SUBF(K,X,N,A,F,DF,MODE,NERROR)
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DIMENSION A(*),X(*),DF(*)
+      T=X(2)*A(2)+X(3)*A(3)
+      IF (T .EQ. 0) THEN
+       NERROR=3
+      ELSE
+       NERROR=0
+       F=A(1)+X(1)/T
+      ENDIF
+      RETURN
+      END
+                             Output Generated
+
+
+   . . .
+       ITERATION 0 PHI =  2.08408D+01  GNO =  4.23154D+01
+       PARAMETER   PARAMETER     GRADIENT    LAGRANGE
+        NUMBER       VALUE                  MULTIPLIER
+          1      1.00000D+00  2.18829D+01  0.00000D+00
+          2      1.00000D+00 -2.59356D+01  0.00000D+00
+          3      1.00000D+00 -2.52800D+01  0.00000D+00
+
+       ITERATION 1 PHI =  6.32350D-01  GNO =  4.20952D+00
+       PARAMETER   PARAMETER     GRADIENT    LAGRANGE
+         NUMBER      VALUE                  MULTIPLIER
+          1      8.26475D-02  2.39601D+00  0.00000D+00
+          2      1.18349D+00 -2.45108D+00  0.00000D+00
+          3      1.66615D+00 -2.44365D+00  0.00000D+00
+     . . .
+  END: ITERATION 6 PHI =  4.10744D-03  GNO =  2.88843D-10
+       PARAMETER   PARAMETER     GRADIENT    LAGRANGE    STANDARD
+         NUMBER      VALUE                  MULTIPLIER   DEVIATION
+          1      8.24106D-02 -2.29064D-10  0.00000D+00  1.23742D-02
+          2      1.13304D+00  1.64057D-10  0.00000D+00  3.07900D-01
+          3      2.34370D+00  6.36029D-11  0.00000D+00  2.96278D-01
+(M)  Objective function (n = 1,m =50, k =1):
+
+                                                                                 2
+     varphi  (a) = -sum  ln{((1)/(a  sqrt(pi)))exp [- ((1)/(2))(((x   -1)/ (a ))) ]},
+           M         i=1           1                               1,i       1
+
+
+     with the bounds 0. 3<=a < =10. The data points {x   }          are
+                            1                         1,i i=1,...,m
+                                           0
+     pseudorandom-numbers. Initial guess: a  = 1.
+                                           1
+
+
+                       Example of the use of DMAXLK
+
+
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      PARAMETER (NC = 1, NX = 1, NF = 50, NW = NC*(2*NC+7), MAXIT = 50)
+      DIMENSION X(NX,NF),AL(NC),AU(NC),A(NC),DPHI(NC),IAFR(NC),W(NW)
+      EXTERNAL SUBM
+
+      DATA K,N,M,MODE,IPRT,EPS / 1,1,50,0,5,1D-12 /
+      DATA AL,AU,A / 1D-1,1D1,5D-1 /
+
+      IR=13846
+      DO 10 I=1,M
+      IR=MOD(31416*IR+13846,46261)
+   10 X(1,I)=0.5D0-IR/46260D0
+
+      CALL DMAXLK(SUBM,K,M,N,NX,X,A,AL,AU,MODE,EPS,MAXIT,IPRT,
+     +            MFR,IAFR,PHI,DPHI,W,NERR)
+      END
+      SUBROUTINE SUBM(K,X,N,A,F,DF,MODE,NERROR)
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DIMENSION A(*),X(*),DF(*)
+      PARAMETER (PIR = 0.56418 95835 47756 287D0)
+      NERROR=3
+      IF(A(1) .EQ. 0) RETURN
+      T=0.5D0*((X(1)-1)/A(1))**2
+      F=PIR*EXP(-T)/A(1)
+      IF(F .GT. 0) NERROR=0
+      RETURN
+      END
+                             Output Generated
+
+
+       ITERATION   0   PHI =  1.02696D+02      GNO =  3.34941D+02
+       PARAMETER       PARAMETER         GRADIENT          LAGRANGE
+         NUMBER          VALUE                            MULTIPLIER
+            1          5.00000D-01     -3.34941D+02      0.00000D+00
+
+       ITERATION   5   PHI =  5.57153D+01      GNO =  8.03750D-01
+       PARAMETER       PARAMETER         GRADIENT          LAGRANGE
+         NUMBER          VALUE                            MULTIPLIER
+            1          1.03420D+00     -8.03750D-01      0.00000D+00
+. . . . .
+  END: ITERATION  15   PHI =  5.57119D+01      GNO =  3.60421D-07
+       PARAMETER       PARAMETER         GRADIENT          LAGRANGE
+         NUMBER          VALUE                            MULTIPLIER
+            1          1.04276D+00      3.60421D-07      0.00000D+00
+Chapter 3: Remarks on the Usage of LEAMAX
+
+  * Default values.
+    Default values have been specified in LEAMAX for the arguments EPS, A,
+    and SY. In particular:
+    EPS= 10varepsilon , if EPS 2[varepsilon , 0.1], where varepsilon  is
+                     0                     0                        0
+    an approximation to the machine constant varepsilon, i.e. the greatest
+    real number with 1+varepsilon =1;
+    A(I)= AU(I) if a >a-bar ,  A(I) = AL(I) if a <a ;   SY(I)= 1 if
+                    i      i                    i ##
+                                                  #i
+
+    sigmai<=0.
+
+  * Automatic output.
+    LEAMAX offers, in addition to the initial and final summary prints, an
+    intermediate print option (see Examples).
+  * Computation of the derivatives.
+    The derivatives which are necessary in each step can be computed
+    either by a user-supplied subroutine subprogram (see Examples), which
+    must calculate them from their analytic expressions, or by instructing
+    LEAMAX to do this internally by finite differences. In general, the
+    results obtained in both ways differ only slightly.
+  * Starting values.
+                                          0    0       0  T
+    The user must supply starting values a = (a ,.. .,a  )  for the
+                                               1       n
+    unknown parameters a ,.. .,a . Good initial approximations to a
+                        1       n
+    solution point can significantly decrease the number of iterations
+    required to find a solution. On the other hand, a poor initial guess
+    may even prevent a solution from being found.
+  * Bounds on the Variables. It is recommended to use only constraints
+    which are really necessary. LEAMAX allows that one or more of the
+    unknowns are treated as constants (a = a-bar  =a  =const.) This fact
+                                                l   l
+                                       --
+                                        l
+    allows the user to examine models with fewer parameters without
+    rewriting the model subprogram.
+
+
+
+
+
+                                    18
+Bibliography
+
+ 1. J.J. Mor'e: The Levenberg - Marquardt algorithm: Implementation and
+    theory. In: Numerical Analysis, G.A.Watson (Ed.), Lecture Notes in
+    Mathematics 630, Springer-Verlag, New York, 1977, 105-116.
+ 2. J.J. Mor'e, B.S. Garbow, K.E. Hillstrom: Testing unconstrained
+    optimization software. ACM Trans. Math. Software 7 (1981), 17-41.
+                                          n
+ 3. A. Bjoerck: Solution of Equations in R  (Part 1: Least Squares
+    Methods). In: Handbook of Numerical Analysis, P.G. Ciarlet, J.L. Lions
+    (Eds.), North-Holland, Amsterdam, New York, Oxford, Tokyo, 1990,
+    467-636.
+ 4. R. Fletcher: Practical Methods of Optimization. John Wiley and Sons,
+    Chichester, 2nd Edition, 1987.
+ 5. J.E. Dennis Jr., R.B. Schnabel: Numerical Methods for Unconstrained
+    Optimization and Nonlinear Equations. Prentice-Hall, Englewood Cliffs,
+    NJ, 1983.
+ 6. J.R. Donaldson, R.B. Schnabel: Computational experience with
+    confidence regions and confidence intervals for non-linear least
+    squares. Technometrics 29 (1987), 67-82.
+ 7. W.T. Eadie, D. Dryard, F.E. James, M. Roos, B. Sadoulet: Statistical
+    Methods in Experimental Physics. North-Holland, Amsterdam, London,
+    1971.
+ 8. E. Anderson et al.: LAPACK - User's Guide. SIAM, Philadelphia, 1992.
+ 9. NAG Library, Mark 15 - User's Guide, 1992.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                                    19

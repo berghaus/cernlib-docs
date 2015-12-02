@@ -1,0 +1,308 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%   KUIP  - Reference Manual -- LaTeX Source                      %
+%                                                                 %
+%   Chapter 6: KUIP Programming example                           %
+%                                                                 %
+%   External EPS files referenced: none                           %
+%                                                                 %
+%   Editor: Michel Goossens / CN-AS                               %
+%   Last Mod.:  6 Dec  1991   mg                                  %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{KUIP Programming example}
+
+As an example of how to implement a user interface with KUIP the code
+for a simple Reverse Polish Notation pocket calculator is presented.
+%
+%---------------------------------------------------------------------------
+%
+\section{The Command Definition File}
+\begin{XMPt}{The CDF for the RPN calculator}
+>Name RPNDEF
+ 
+>Menu RPN
+>Guidance
+Reverse Polish Notation sub-pocket calculator
+using KUIP for the user interface.
+ 
+>Command ENTER
+>Parameters
++
+NUM 'Enter a number' R D=0.
+>Guidance
+Push the number(s) given as parameter(s) into the stack.
+If none push a zero.
+>Action RPENT
+ 
+>Command ADD
+>Guidance
+Push the number(s) given as parameter(s) into the stack.
+Add the two upper-most numbers of the stack and shift it up.
+>Action RPOPER
+ 
+>Command SUBTRACT
+>Guidance
+Push the number(s) given as parameter(s) into the stack.
+Subtract the two upper-most numbers of the stack and shift it up.
+>Action RPOPER
+ 
+>Command MULTIPLY
+>Guidance
+Push the number(s) given as parameter(s) into the stack.        
+Multiply the two upper-most numbers of the stack and shift it up.
+>Action RPOPER
+\condbreak{5\baselineskip} 
+>Command DIVIDE
+>Guidance
+Push the number(s) given as parameter(s) into the stack.
+Divide the two upper-most numbers of the stack and shift it up.
+>Action RPOPER
+ 
+>Command PRINT
+>Guidance
+Print the content of the stack.
+>Action RPRINT
+ 
+>Command CLEAR
+>Guidance
+Clear the stack.
+>Action RPCLR
+\end{XMPt}
+%
+%---------------------------------------------------------------------------
+%
+\section{The application program}
+
+\begin{XMPt}{FORTRAN code for the RPN calculator application program}
+      PROGRAM RPN
+      COMMON/PAWC/PAW(50000)
+      COMMON/RPNSTK/ISTACK,STACK(100)
+*---> Initialize ZEBRA and the store /PAWC/
+      CALL MZEBRA(-3)
+      CALL MZPAW(50000,' ')
+*---> Initialize KUIP with 5000 words as minimum division size
+      CALL KUINIT(5000)
+*---> Create user command structure from definition file (command
+*---> definition routine name RPNDEF defined in CDF 
+*---> with '>Name RPNDEF')
+      CALL RPNDEF
+*---> Change the prompt by executing the command SET/PROMPT
+      CALL KUEXEC('SET/PROMPT ''RPN >''')
+*---> Initialize the stack in /RPNSTK/
+      CALL RPCLR
+*---> Give control to KUIP (with no 'STYLE G', call KUWHAG 
+*---> to get 'STYLE G')
+      CALL KUWHAT
+*---> Typing 'QUIT' or 'EXIT' we return here
+      END
+ 
+      SUBROUTINE RPCLR
+      COMMON/RPNSTK/ISTACK,STACK(100)
+      DO 10 I=1,100
+        STACK(I)=0.
+10    CONTINUE
+      ISTACK=50
+      CALL RPRINT
+      END
+ 
+      SUBROUTINE RPENT
+      COMMON/RPNSTK/ISTACK,STACK(100)
+      CHARACTER*32 CMD
+      CALL KUPATL(CMD,NPAR)
+      IF(CMD.EQ.'ENTER' .AND. NPAR.EQ.0) NPAR=1
+      DO 10 I=1,NPAR
+        CALL KUGETR(R)
+        ISTACK=ISTACK+1
+        IF(ISTACK.GT.100) THEN
+          PRINT *,'ERROR: Stack overflow'
+          GOTO 20
+        ENDIF
+        STACK(ISTACK)=R
+10    CONTINUE
+20    CONTINUE
+      IF(CMD.EQ.'ENTER') CALL RPRINT
+      END
+ 
+      SUBROUTINE RPOPER
+      COMMON/RPNSTK/ISTACK,STACK(100)
+      CHARACTER*32 CMD
+      CALL KUPATL(CMD,NPAR)
+      CALL RPENT
+      IF(ISTACK.LT.2) THEN
+        PRINT *,'ERROR: Stack underflow'
+        GOTO 10
+      ENDIF
+      IF(CMD.EQ.'ADD') THEN
+        STACK(ISTACK-1)=STACK(ISTACK)+STACK(ISTACK-1)
+      ELSEIF(CMD.EQ.'SUBTRACT') THEN
+        STACK(ISTACK-1)=STACK(ISTACK)-STACK(ISTACK-1)
+      ELSEIF(CMD.EQ.'MULTIPLY') THEN
+        STACK(ISTACK-1)=STACK(ISTACK)*STACK(ISTACK-1)
+      ELSEIF(CMD.EQ.'DIVIDE') THEN
+        IF(STACK(ISTACK).EQ.0) THEN
+          PRINT *,'ERROR: Divide by zero'
+        ELSE
+          STACK(ISTACK-1)=STACK(ISTACK-1)/STACK(ISTACK)
+        ENDIF
+      ENDIF
+      ISTACK=ISTACK-1
+10    CONTINUE
+      CALL RPRINT
+      END
+
+      SUBROUTINE RPRINT
+      COMMON/RPNSTK/ISTACK,STACK(100)
+      PRINT *,(STACK(I),I=ISTACK,ISTACK-3,-1)
+      IF(STACK(ISTACK).GT.0) THEN
+        PRINT *,'********'
+      ELSE\condbreak{4\baselineskip} 
+        PRINT *,'*********'
+      ENDIF
+      END
+\end{XMPt}
+\Rind[KUPATL]{}
+\Rind[KUGETR]{}
+%
+%---------------------------------------------------------------------------
+%
+%\newpage
+\section{Example of a run}
+
+\begin{XMPt}{Example of a session using the RPN calculator}
+$ rpn
+ 0.0000000 0.0000000 0.0000000 0.0000000
+ *********
+ RPN > \underline{style an}
+ 
+ From  /...
+ 
+  1:   KUIP          Command Processor commands.
+  2:   MACRO         Macro Processor commands.
+  3:   VECTOR        Vector Processor commands.
+  4:   RPN           Reverse Polish Notation sub-pocket calculator
+ 
+ Enter a number ('Q'=command mode): \underline{4}
+ 
+ From  /RPN/...
+ 
+  1: * ENTER         Push the number(s) given as parameter(s) into the stack.
+  2: * ADD           Push the number(s) given as parameter(s) into the stack.
+  3: * SUBTRACT      Push the number(s) given as parameter(s) into the stack.
+  4: * MULTIPLY      Push the number(s) given as parameter(s) into the stack.
+  5: * DIVIDE        Push the number(s) given as parameter(s) into the stack.
+  6: * PRINT         Print the content of the stack.
+  7: * CLEAR         Clear the stack.
+ 
+ Enter a number ('\'=one level back, 'Q'=command mode): \underline{1}
+ 
+  * /RPN/ENTER  [ NUM ]
+ 
+ Add parameters or just <CR> to the command line
+ ('#'=cancel execution, '?'=help) :
+
+ /RPN/ENTER \underline{1 2 3}
+ 3.000000 2.000000 1.000000 0.0000000
+ ********
+ 
+ From  /RPN/...
+ 
+  1: * ENTER         Push the number(s) given as parameter(s) into the stack.
+  2: * ADD           Push the number(s) given as parameter(s) into the stack.
+  3: * SUBTRACT      Push the number(s) given as parameter(s) into the stack.
+  4: * MULTIPLY      Push the number(s) given as parameter(s) into the stack.
+  5: * DIVIDE        Push the number(s) given as parameter(s) into the stack.
+  6: * PRINT         Print the content of the stack.
+  7: * CLEAR         Clear the stack.
+ 
+ Enter a number ('\'=one level back, 'Q'=command mode): \underline{2}
+
+  * /RPN/ADD
+ 
+ Add parameters or just <CR> to the command line
+ ('#'=cancel execution, '?'=help) :
+
+ /RPN/ADD
+ 5.000000 1.000000 0.0000000 0.0000000
+ ********
+ From  /RPN/...
+ 
+  1: * ENTER         Push the number(s) given as parameter(s) into the stack.
+  2: * ADD           Push the number(s) given as parameter(s) into the stack.
+  3: * SUBTRACT      Push the number(s) given as parameter(s) into the stack.
+  4: * MULTIPLY      Push the number(s) given as parameter(s) into the stack.
+  5: * DIVIDE        Push the number(s) given as parameter(s) into the stack.
+  6: * PRINT         Print the content of the stack.
+  7: * CLEAR         Clear the stack.
+ 
+ Enter a number ('\'=one level back, 'Q'=command mode): \underline{q}\vspace{7pt}
+ RPN > \underline{print}
+ 5.000000 1.000000 0.0000000 0.0000000
+ ********
+ RPN > \underline{enter 1 2 3}
+ 3.000000 2.000000 1.000000 5.000000
+ ********
+ RPN > \underline{add}
+ 5.000000 1.000000 5.000000 1.000000
+ ********
+ RPN > \underline{add}
+ 6.000000 5.000000 1.000000 0.0000000
+ ********
+ RPN > \underline{add}
+ 11.00000 1.000000 0.0000000 0.0000000
+ ********
+ RPN > \underline{add 5}
+ 16.00000 1.000000 0.0000000 0.0000000
+ ********
+ RPN > \underline{add 10 20}
+ 30.00000 16.00000 1.000000 0.0000000
+ ********
+ RPN > \underline{usage rpn/}
+ 
+  * RPN/ENTER  [ NUM ]
+  * RPN/ADD
+  * RPN/SUBTRACT
+  * RPN/MULTIPLY
+  * RPN/DIVIDE
+  * RPN/PRINT
+  * RPN/CLEAR
+ 
+ RPN > \underline{help clear}
+ 
+  * /RPN/CLEAR
+ 
+    Clear the stack.
+ 
+ RPN > \underline{c}
+ *** Ambiguous command. Possible commands are :
+ 
+ /KUIP/ALIAS/CREATE
+ /KUIP/SET_SHOW/COMMAND
+ /KUIP/SET_SHOW/COLUMNS
+ /MACRO/SYNTAX/Branching/CASE
+ /VECTOR/CREATE
+ /VECTOR/COPY
+ /RPN/CLEAR
+ 
+ RPN > \underline{r/c}
+ 0.0000000 0.0000000 0.0000000 0.0000000
+ *********
+ RPN > \underline{help rpn/print}
+ 
+  * /RPN/PRINT
+ 
+    Print the content of the stack.
+
+ RPN > \underline{help en}
+ 
+  * /RPN/ENTER  [ NUM ]
+ 
+    NUM        R 'Enter a number' D=0
+ 
+    Push the number(s) given as parameter(s) into the stack.
+    If none push a zero.
+ 
+ RPN > \underline{q}
+$
+\end{XMPt}

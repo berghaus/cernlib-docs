@@ -1,0 +1,215 @@
+<TITLE>HEPDB -- H2hdbtutr-Conversion-of-existing-databases </TITLE>
+<P>
+<H2><A NAME=H2hdbtutr-Conversion-of-existing-databases.html>Conversion of existing databases</A></H2>
+<P>
+Having created a database and the required directory structure, we now
+procede to add the data.
+<P>
+As we already know in our example the data is held in RZ files in the form
+of ZEBRA banks. As the object type used by HEPDB is the ZEBRA bank the
+conversion of the old CPLEAR database is fairly simple. The only
+modification to the original data will be the addition of the new special
+user key 10 as discussed above.
+<P>
+The code below shows the conversion of the original RZ geometric database
+to HEPDB format. After the code follows a brief explanation although the
+comments within the code tell of its operation.
+<P>
+<PRE>
+                  <B>Conversion of GEOMETRY database</B>
+                                  </PRE>
+<P>
+<PRE>
+      PROGRAM GEOCONV
+c     ===============
+c+---------------------------------------------------------+
+c|    Program to convert    RZ  geo database -> HEPDB      |
+c|------------------------------+--------------------------|
+c|    RZGEO keys: VAL_STAR (I)  |  For all directories     |
+c|                VAL_STOP (I)  +--------------------------|
+c|                DETECTOR (H)                             |
+c|                POINTER  (H)                             |
+c|    insertion time = RZ date/time                        |
+c|----------------------------------------+----------------|
+c|    HEPDB keys: NPAIR    = 1            |                |
+c|                VAL_STAR = KEYS(11) (I) | For all        |
+c|                VAL_STOP = KEYS(12) (I) | geometry       |
+c|                NUSER    = 2            | directories    |
+c|                DETECTOR = KEYS(13) (H) |                |
+c|                POINTER  = KEYS(14) (H) |                |
+c|    insertion time = KEYS(IDHINS)                        |
+c|---------------------------------------------------------|
+c|    Output pathnames:                                    |
+c|    //CDGE/GEOMETRY                                      |
+c|    //CDGE/GEOMETRY/PC                                   |
+c|    //CDGE/GEOMETRY/DC                                   |
+c|    //CDGE/GEOMETRY/ST                                   |
+c|    //CDGE/GEOMETRY/PID                                  |
+c|    //CDGE/GEOMETRY/CAL_WIRE                             |
+c|    //CDGE/GEOMETRY/CAL_STRI                             |
+c+---------------------------------------------------------+
+c
+      PARAMETER     (NWPAW=200000)
+      COMMON/PAWC/   PAW(NWPAW)
+      COMMON/USRLNK/ IDIV,LADDR
+      CHARACTER*4    CHTOP
+      CHARACTER*80   CHFILE
+      EXTERNAL       CPGEOC
+c|
+c|    Initialise Zebra, HBOOK and HEPDB
+c|
+      CALL CDPAW(NWPAW,NHBOOK,IDIV,'USR-DIV',10000,150000,'ZPU',IRC)
+      CALL MZLINK(IDIV,'/USRLNK/',LADDR,LADDR,LADDR)
+      LUNCD  = 1
+      LUNFZ  = 2
+      LUNRZ  = 3
+c|
+c|    Open RZ geometry database (RZGEO.DATA)
+c|
+      LRECL  = 0
+      CALL RZOPEN(LUNRZ,'RZGEO','rzgeo.data',' ',LRECL,IRC)
+      CALL RZFILE(LUNRZ,'RZGEO',' ')
+c|
+c|    Find the database file and construct the top directory name
+c|    Open the database file
+c|
+      CALL CDPREF(10,'GE',CHTOP,CHFILE,IRC)
+      LRECL  = 0
+      CALL CDOPEN(LUNCD,LUNFZ,CHTOP,CHFILE,LRECL,IDIV,' ',IRC)
+c|
+c|    Loop over all sub-directories in RZGEO.DATA
+c|
+      CALL RZSCAN('//RZGEO',CPGEOC)
+c|
+c|    Terminate
+c|
+      CALL CDEND(' ','A',IRC)
+      CALL RZCLOS(' ','A')
+      END
+      SUBROUTINE CPGEOC(CHDIR)
+c
+c+---------------------------------------------------------+
+c|    Routine to retrieve,convert and store old RZ objects |
+c|    under HEPDB                                          |
+c+---------------------------------------------------------+
+c
+      COMMON /USRLNK/   IDIV,LADDR
+      COMMON /QUEST/    IQUEST(100)
+      PARAMETER         (NRZKS=5)
+      PARAMETER         (MAXKEY=1000)
+      PARAMETER         (IOBJECTS=18)
+      INTEGER            HDBKEYS(15),RZKYTOGET(NRZKS)
+      INTEGER            NKEYRET,KEYSARR(NRZKS,MAXKEY)
+      CHARACTER*(*)      CHDIR
+      CHARACTER*255      CHSAVE,DEST
+      CHARACTER*(NRZKS)  CHFORM
+      CHARACTER*8        CHTAG(NRZKS)
+      CHARACTER*4        CTEMP(3)
+      DATA               NENTRY/0/
+      SAVE               NENTRY
+c|
+c|    Check for exit from RZSCAN loop
+c|
+      LADDR=0
+      IF (NENTRY.EQ.0) THEN
+         NENTRY=1
+         RETURN
+      ENDIF
+c|
+c|    Set Current RZ directory
+c|
+      LDIR    = LENOCC(CHDIR)
+      CHSAVE  = CHDIR(1:LDIR)
+      CALL RZCDIR(CHSAVE(1:LDIR),' ')
+      PRINT *,'-- RZ Directory Change -----------------------'
+      PRINT *,' ', CHSAVE(1:30)
+      PRINT *,'----------------------------------------------'
+c|
+c|    Get CWD key definitions
+c|
+      CALL RZKEYS(NRZKS,MAXKEY,KEYSARR,NKEYRET)
+      PRINT *,' No of objects in CWD          :',NKEYRET
+      CALL RZKEYD (NWKEY,CHFORM,CHTAG)
+      PRINT *,' Key Format for this directory :',CHFORM
+c|
+c|    Now loop over all objects in CWD, display and convert
+c|
+      DO I=1,NKEYRET
+           PRINT*,' - OBJECT No. ',I,' ------------------'
+           PRINT*,' ',CHTAG(1),':',KEYSARR(1,I),'  '
+     +           ,' ',CHTAG(2),':',KEYSARR(2,I),'  '
+           CALL UHTOC(KEYSARR(3,I),4,CTEMP(1),4)
+           CALL UHTOC(KEYSARR(4,I),4,CTEMP(2),4)
+           CALL UHTOC(KEYSARR(5,I),4,CTEMP(3),4)
+           PRINT*,' ',CHTAG(3),':',CTEMP(1),'  '
+     +           ,' ',CHTAG(4),':',CTEMP(2),'  '
+           PRINT*,' ',CHTAG(5),':',CTEMP(3),'  '
+c|
+c|         Load object ,I, into zebra store
+c|
+           ICYCLE=9999
+           JBIAS=2
+           DO J=1,NRZKS
+                RZKYTOGET(J)=KEYSARR(J,I)
+           ENDDO
+           CALL RZIN(IDIV,LADDR,JBIAS,RZKYTOGET,ICYCLE,' ')
+c|
+c|         Now set HEPDB keys, and pack time stamp
+c|
+           CALL RZDATE(IQUEST(14),IDATE,ITIME,1)
+           CALL CDPKTM(IDATE,ITIME,IPACK,IRC)
+           HDBKEYS(4)=IPACK
+c|
+           DO J=1,5
+                HDBKEYS(10+J)=RZKYTOGET(J)
+           ENDDO
+c|
+c|         Set key 10 to 0 (Our new key!)
+c|
+           HDBKEYS(10)=0
+c|
+c|         Now store object at LADDR under HEPDB
+c|
+           DEST='//CDGE/GEOMETRY/'//CHDIR(9:LDIR)
+           PRINT*,' Destination path        :',DEST
+           CALL CDSTOR(DEST,LADDR,LKYBK,IDIV,HDBKEYS,'H',IRC)
+           IF (IRC.NE.0) THEN
+               PRINT*,' Error! CDSTOR IRC=',IRC
+               STOP
+           ENDIF
+           CALL RZCDIR(CHSAVE(1:LDIR),' ')
+           CALL MZDROP(IDIV,LADDR,' ')
+           LADDR=0
+           PRINT*,' Object ',I,' Stored under HDB'
+           PRINT *,' '
+      ENDDO
+      CALL CDSTSV(' ',0,IRC)
+      CALL RZCDIR(CHSAVE(1:LDIR),' ')
+      PRINT *,' '
+      END
+</PRE>
+<P>
+The flow of the above program starts by opening both the source RZ file
+and the destination HEPDB database file. It then makes a call to the RZ
+routine <A NAME=RZSCAN76> RZSCAN</A> which visits each directory of the RZ file in turn passing
+execution to subroutine CPGEOC.
+<P>
+Once inside this routine the current RZ directory is set by the routine
+<A NAME=RZCDIR77> RZCDIR</A>. The RZ key definitions and their values are retrieved via calls to
+<A NAME=RZKEYS79> RZKEYS</A> respectively. The objects within the directory are then
+looped over one at a time , each being brought into ZEBRA store and then
+output to HEPDB via the <A HREF=H2hdbuser-Storing-information-in-the-database.html#CDSTOR NAME=CDSTOR80> CDSTOR</A> routine. Note that the special user key 10
+we now wish to add is simply given a 0 value in this case as we assume all
+current data to be from the off-line source. (This is for our example
+although other code could be introduced to set this key accordingly) Once
+all objects in the RZ directory have been processed the update file is
+sent to the HEPDB database server. This procedure is then repeated for
+each subdirectory of the RZ file.
+<P>
+An important point to be noted at this time is the manipulation of a
+system key. This is key 4 insertion time (IDHINS). As we would like to
+keep the information regarding the original insertion time of the RZ
+objects we suppress HEPDB from re-writing this key and force it to honor
+the original RZ insertion time by the option `H' in our call to <A HREF=H2hdbuser-Storing-information-in-the-database.html#CDSTOR NAME=CDSTOR81> CDSTOR</A>.
+This is the only legitimate way in which a system key should be altered.
+<P>

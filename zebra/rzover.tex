@@ -1,0 +1,289 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%   ZEBRA RZ - Reference Manual -- LaTeX Source                   %
+%                                                                 %
+%   Overview                                                      %
+%                                                                 %
+%   Original: Michel Goossens (from SGML source)                  %
+%   Additions: Jamie Shiers                                       %
+%                                                                 %
+%   Last Mod.:  7 Jun 1993 07:30 mg                               %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\Filename{H1rzover-direct-access-input-output}
+
+\chapter{Direct access input-output}
+
+\Filename{H2rzover-main-goals}
+\section{Main goals}
+
+\subsection{General}
+
+The ZEBRA RZ package permits the storage and retrieval of 
+ZEBRA data structures or FORTRAN vectors 
+in random access files. Files may reside on standard
+direct access devices such as magnetic disk, or be
+mapped to virtual memory. 
+RZ files can be accessed by several users simultaneously,
+even across networks.
+Remote file access and transfer is provided for RZ files
+using standard tools, such as NFS and ftp. In the heterogeneous
+environment, the tools provided in the CSPACK~\cite{bib-CSPACK} 
+package may be used.
+
+The RZ package is not a relational database management system,
+but organises data in a hierarchical manner which is suitable
+for many applications in High Energy Physics, and probably outside.
+
+\subsection{Pathnames}
+
+The basic unit of information addressed in an RZ file
+is a ZEBRA data structure, in the simplest case a single ZEBRA bank.
+We call this an RZ
+{\bf data object}.
+Each data object is referred to by a unique object name.
+Object names are composed of a
+{\bf pathname}, and one or more identifiers known as {\bf keys}.
+\index{pathname}
+\index{key}
+
+The pathnames used by the RZ package were inspired by
+\index{Unix}
+the Unix file naming syntax and hence they typically 
+carry mnemonic meanings and show the relationships
+between different objects.
+Unlike Unix, however, RZ pathnames are {\bf not} case sensitive, i.e.
+upper and lower case are both treated as upper case.
+
+As in the Unix file system, one may have directories and subdirectories
+seperated by slash characters ``{\tt/}''.
+An interrelated set of objects may be grouped together in a directory.
+
+When an RZ file is opened, a user specified name is associated with it.
+This name is known as the {\bf top directory} and is not
+part of the file itself. This allows the user to have simultaneous
+access to multiple files with the same RZ directory structure.
+
+At the very highest level in the RZ tree is the root, referred
+to by a double slash, ``{\tt //}''.
+
+The directory above a given subdirectory is known as the
+{\bf parent directory} and may be referred to by a backslash
+character ``\bs'' .
+
+Two other concepts are also provided, namely the {\bf current working directory},
+or {\tt CWD} and the {\bf naming directory}. Objects are retrieved
+and stored relative to the current working directory. The naming directory
+is a mechanism for referring to a frequently used directory. 
+It is initially set to the top directory, but may be reset at any time.
+The naming directory may be referred to by the symbol ``{\tt\~{}}''.
+
+The following FORTRAN program provides examples of the above
+terms. For simplicity, the code to initialise the ZEBRA system
+and open the RZ files (via the routine \Rind{RZOPEN}) has
+been omitted.
+
+\newpage
+\begin{XMPt}{Example of RZ pathnames and terms}
+*
+*     Initialise RZ files on FORTRAN units LUN1, LUN2
+*     with top directory names TOP1 and TOP2
+*
+      CALL RZFILE(LUN1,'TOP1',' ')
+      CALL RZFILE(LUN2,'TOP2',' ')
+*
+*     Print the current naming directory
+*     (It will have been set to TOP2 by RZFILE)
+*
+      CALL RZNDIR(' ','P')
+*
+*     Set the current working directory
+*
+      CALL RZCDIR('//TOP1/SUB1/SUB2/SUB3',' ')
+*
+*     Set the naming directory
+*
+      CALL RZNDIR('//TOP1/SUB1/SUB2/SUB3',' ')
+*
+*     Change directory relative to current working directory
+*     (to parent directory in this case)
+*
+      CALL RZCDIR('\bs ',' ')
+*
+*     Change directory to naming directory
+*
+      CALL RZCDIR('\~{}',' ')
+\end{XMPt}
+\index{object}
+\index{naming!tree}
+
+\subsection{Keys and Cycles}
+\index{key}
+\index{cycle}
+
+Data objects are identified beyond the pathname by {\bf keys},
+which may be a single word of information
+(integer, bit string or Hollerith)
+or a vector of such words. The keys are not part of the pathname itself.
+
+For example, in the case of HBOOK histograms a single integer
+key, the histogram ID, may be used. Histograms relating to different
+information could be stored in separate subdirectories and referred
+to in a unique and clear manner by the associated pathname and
+key, e.g. {\tt//HISTOS/CUT1}, keys (or IDs) 1--10.
+
+Successive versions of objects with identical
+pathname/key combination may exist simultaneously.
+They are distinguished by a {\bf cycle number},
+which is incremented automatically upon creation of successive data
+objects. Cycles may be referred to explicitly,
+the usual default is the highest cycle number.
+The concept of cycles for successive versions of data objects with
+identical names was taken from the VAX/VMS file system.
+\index{VAX/VMS}
+
+\newpage
+\Filename{H2rzover-practical-examples}
+\section{Practical examples of usage of the RZ package}
+\subsection{HBOOK}
+\index{HBOOK}
+
+The RZ package is probably most widely used to store HBOOK 
+histograms and ntuples, e.g. for subsequent analysis
+with PAW. 
+In such cases, shared write access is not normally
+required. The file is typically created by a single user
+or job and subsequently read a small number of times.
+
+\begin{XMPt}{Example of storing HBOOK histograms in an RZ file}
+PAW > \underline{ldir}
+
+ ************** Directory ===> //LUN1 <===
+
+                  Created 911030/1215  Modified 911030/1215
+
+ ===> List of objects 
+     HBOOK-ID  CYCLE   DATE/TIME   NDATA   OFFSET    REC1    REC2     
+          1       1   911030/1215    103       1       3    
+          2       1   911030/1215    104     104       3    
+          3       1   911030/1215    107     208       3    
+          4       1   911030/1215    106     315       3    
+          5       1   911030/1215    106     421       3    
+          6       1   911030/1215     56     527       3    
+
+  Number of records =    2  Number of megawords =  0 +  1606 words
+  Per cent of directory quota used =    .050
+  Per cent of file used            =    .050
+  Blocking factor                  =  28.418
+ PAW >
+\end{XMPt}
+
+The above output from the PAW command LDIR shows the contents
+of an RZ file which has no subdirectories and a few histograms.
+The objects are accessed using the top directory name {\tt //LUN1}
+and the histogram ID. 
+
+One could of course have used a more complex directory structure,
+but the number of directories and objects in such a file is typically
+rather small.
+
+\newpage
+\subsection{CMZ}
+\index{CMZ}
+
+The CMZ code management system provides a good example of the use
+of the cycle facility of the RZ package. In a CMZ file, code is
+stored in the familiar two level structure of PATCHY, namely
+{\bf patches} and {\bf decks}. Each patch is a directory immediately
+below the top level directory of the file. Each deck is a FORTRAN
+vector in the directory corresponding to the appropriate
+patch, as is shown in the following example.
+
+\begin{XMPt}{Example of the directory structure of a CMZ file}
+fatmen [0] \underline{ls}
+ Current Working Directory = //FATMEN
+ Following subdirectories :
+  HISTORY           FATFLAGS          FATDOC            *FATCAT         
+  *DSYIBM           *GSIIBM           *SHIFT            *CERNVM         
+  *CERNVMB          *FRCPN11          *LEPICS           *APOL3          
+  *FAT2SQL          *FATSQL           *FATUSER          *FATO2Z         
+  *FATO2F           *FATNEW           *FATSRV           *FATSEND        
+  *FMCDF            *FMKUIP           *FATLIB           *SQL            
+  *FODEL            *FOGET            *FOPUT            FFATMEN         
+  FATHEAD           FATCDES           FATBODY           FATUTIL         
+  FMTMS             FATUSER           FATSRV            FMUTIL          
+  FMINT             FATUOUS           FATASM            L3UTIL          
+  SQLCOM            FMLOGI            FODEL             FOGET           
+  FOPUT             FMZTOR            FATO2F            FMOTOZ          
+  FATNEW            FMKUIP            FMCDF             FATSQL          
+  FMORAC            FMH               FMC               FATSTAT         
+  TAPELOAD          NAMES             REXX              FATTEST         
+  UNREF             DCL               SCRIPT            FATULOK         
+  FATCAT            EXAMPLE           SQLINT            JCL             
+  FAT2SQL           SQL               FATSEND           FMVAX
+Following DECKS :
+ TITLE;22    TITLE;21    
+ Number of DECKS =   1 Number of CYCLES =  2
+ fatmen [1] \underline{cd fmtms}
+ fatmen/fmtms [2] \underline{ls}
+ Current Working Directory = //FATMEN/FMTMS
+ 00_PATCH;1  FMALLO;1    FMGTMS;1    FMLOCK;1    FMPOOL;2    FMPOOL;1    
+ FMQTMS;1    FMSREQ;1    FMULOK;1    FMPREF;1    FMXVID;1    FMTAGS;1    
+ FMPROT;1    FMUTMS;1    FMUALL;1    FMQVOL;2    FMQVOL;1    FMUVOL;1    
+ FMEDIA;1    
+ Number of DECKS =  17 Number of CYCLES =  19
+ fatmen/fmtms [3]
+\end{XMPt}
+
+A listing of a given directory in 'ZEBRA' format shows that each deck
+is identified by a single Hollerith key, namely the deckname.
+RZ cycles are used to identify different versions of a deck. Each
+time it is editted and changed, a new cycle is automatically 
+created.
+
+\condbreak{8cm}
+
+\begin{XMPt}{Example of the keys and cycles structure in a CMZ file}
+ fatmen/fmtms [5] \underline{ldir}
+
+ ************** Directory ===> //FATMEN/FMTMS <===
+
+                  Created 910923/1423  Modified 911028/1628
+
+ ===> List of objects 
+     DECKNAME      CYCLE   DATE/TIME   NDATA OFFSET   REC1    REC2     
+
+     00_PATCH         1   910923/1423     19      1    471    
+     FMALLO           1   910923/1423   1145     20    471     472 ==> 480   
+     FMGTMS           1   910923/1423    441     13    480     481 ==> 483   
+     FMLOCK           1   910923/1423    455     70    483     484 ==> 487   
+     FMPOOL           2   911021/1503    906     19    541    5669 ==> 5675   
+     FMPOOL           1   910923/1423    905     13    487     488 ==> 494
+ ...
+\end{XMPt}
+
+\subsection{FATMEN}
+\index{FATMEN}
+
+The FATMEN system uses the ZEBRA RZ package in a more complex manner.
+In this case the RZ files are read by many jobs simultaneously,
+often over the network. Much more complex object names are used,
+with pathnames such as the following example from the DELPHI 
+collaboration. 
+
+\begin{XMPt}{Example of an RZ pathname in FATMEN}
+FM> \underline{pwd}
+Current Working Directory = //CERN/DELPHI/P01_ALLD/CDST/PHYS/Y90V03/E093.3/L0312
+FM>
+\end{XMPt}
+
+A single RZ file that is used by FATMEN may well
+contain in excess of one hundred thousand 
+entries in several thousand directories.
+In addition, these RZ files are constantly updated and must
+retain consistancy to long running batch jobs.
+
+These goals are met by ensuring that only a single process ever
+has write access to a FATMEN RZ file. All updates are performed
+by dedicated servers.

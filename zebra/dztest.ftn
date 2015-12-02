@@ -1,0 +1,110 @@
+      PROGRAM ZEXAM
+
+      COMMON//IFENCE(2),LEV,BLVECT(10000)
+      COMMON/MYLINK/LLVX(10),LLTK(10,10)
+      COMMON/QUEST/IQUEST(100)
+
+      DIMENSION LQ(999),IQ(999)
+      DIMENSION  Q(999)
+      EQUIVALENCE (IQ(1),Q(1),LQ(9)),(LQ(1),LEV)
+ 
+      DIMENSION MMEV(5),MMTK(5),MMVX(5)
+      DIMENSION NTK(3)
+      DIMENSION ISUM(6)
+*       Bank lift parameters for three kind of banks 
+      DATA MMEV/4HEV  ,7,7,10,0/
+      DATA MMTK/4HTK  ,0,0,15,3/
+      DATA MMVX/4HVX  ,1,1,12,0/
+*       Number of VX and EV banks to be created 
+      DATA NTK/3,2,2/ , NVX/3/
+ 
+C--     Initialize ZEBRA store
+ 
+      CALL MZEBRA(0)
+ 
+C--     Initialize store in blank common //
+ 
+      CALL MZSTOR(IXBLST,'//',' ',IFENCE,LEV,BLVECT(1),BLVECT(1),
+     X            BLVECT(2000),BLVECT(10000)                )
+ 
+C--     Initialize link area with reference pointers to all banks
+ 
+      CALL MZLINK(0,'/MYLINK/',LLVX(1),LLVX(1),LLTK(10,10))
+
+C****** Create tree structure in default division (2) *********
+ 
+C--       Bank format descriptions for EV and VX banks
+ 
+      CALL MZFORM('EV  ','3H 3I -F',MMEV(5))
+      CALL MZFORM('VX  ','3I -F',MMVX(5))
+ 
+C--       Lift top event bank (EV) of structure and fill with data
+ 
+      CALL MZLIFT(0,LEV,LEV,1,MMEV,0)
+ 
+      IQ(LEV+1) = MMEV(1)
+      IQ(LEV+2) = MMTK(1)
+      IQ(LEV+3) = MMVX(1)
+      DO 1 I=4,6
+    1 IQ(LEV+I) = I
+      DO 2 I=7,MMEV(4)
+    2 Q(LEV+I) = FLOAT(I)
+ 
+C--       Create linear chain of vertex (VX) banks hanging from EV
+ 
+      DO 20 IVX=1,NVX
+          CALL MZLIFT(0,LVX,LEV,-1,MMVX,0)
+          LLVX(IVX) = LVX
+          DO 7 I=1,3
+    7     IQ(LVX+I) = 10*IVX+I
+          DO 8 I=4,MMVX(4)
+    8     Q(LVX+I) = FLOAT(10*IVX+I)
+ 
+C--       Create linear chain of track (TK) banks hanging from
+C--              each VX bank
+ 
+          DO 10 ITK=1,NTK(IVX)
+              CALL MZLIFT(0,LTK,LVX,-1,MMTK,0)
+              LLTK(IVX,ITK) = LTK
+              DO 9 I=1,MMTK(4)
+    9         Q(LTK+I) = FLOAT(100*ITK+10*IVX+I)
+   10     CONTINUE
+   20 CONTINUE
+ 
+C--     Print the complete structure and the store, then verify complete
+ 
+      CALL DZSHOW('Dump EV structure',0,LEV,'BDLV',0,0,0,0)
+      CALL DZSHOW('Dump EV structure',0,LEV,'BSLV',0,0,0,0)
+      CALL DZSTOR('Dump of store //',0)
+      CALL DZSURV('Survey of the EV data structure',0,LEV)
+      CALL DZSNAP('Snap of //',2,'M')
+      CALL DZVERI('Verify default division in //',2,'CFLSU')
+
+C--     Drop the second VX bank and its descendants
+
+      CALL MZDROP(0,LLVX(2),'V')
+
+      CALL DZSURV('Survey of the EV data structure after drop',0,LEV)
+      CALL DZSNAP('Snap of // after drop',2,'M')
+
+C--     Check the contents of the data structure
+
+      CALL DZCHST('Check before',0,LEV,'L',ISUM)
+
+*         Change the data part and check again
+      IQ(LEV+4) = IQ(LEV+4) + 1  
+
+      CALL DZCHST('Check after 1',0,LEV,'LV',ISUM)
+      PRINT '(''Value of IQUEST(11)'',I5)', IQUEST(11)
+            
+*         Overwrite a link 
+
+      LQ(LLVX(1)-1) = -1
+
+      CALL DZCHST('Check after 2',0,LEV,'LV',ISUM)
+      PRINT '(''Value of IQUEST(12)'',I5)', IQUEST(12)
+
+      CALL DZSNAP('Snap of //',2,'M')
+      CALL DZVERI('Verify default division in //',2,'CFLSU')
+
+      END

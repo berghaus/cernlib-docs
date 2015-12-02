@@ -1,0 +1,591 @@
+<HEAD>
+<TITLE> Data structure utilities</TITLE>
+</HEAD>
+<BODY><P>
+ <HR> <A NAME=tex2html31 HREF=tex2htmlindex2_2.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/next_motif.gif"></A> <A NAME=tex2html29 HREF=ZEBMZ2.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/up_motif.gif"></A> <A NAME=tex2html23 HREF=ZEBMZ2.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/previous_motif.gif"></A>  <A NAME=tex2html33 HREF=tex2htmlindex2_2.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/index_motif.gif"></A><BR>
+<B> Next:</B> <A NAME=tex2html32 HREF=tex2htmlindex2_2.html>Index</A>
+<B>Up:</B> <A NAME=tex2html30 HREF=ZEBMZ2.html>No Title</A>
+<B> Previous:</B> <A NAME=tex2html24 HREF=ZEBMZ2.html>No Title</A>
+<HR> <P>
+<H1><A NAME=SECTION0010000000000000000> Data structure utilities</A></H1>
+<P>
+<A NAME=secH1Datastructureutilities><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<P>
+<H1><A NAME=SECTION0011000000000000000> MZFLAG <i>et al.</i> - logical walk through a data-structure</A></H1>
+<P>
+By following the structural links,
+<A HREF=../../zebra/ZEBMZ2/chapter2_1.html#MZFLAG>MZFLAG</A> sets the selected status-bit into the status words
+of all the banks of the data-structure supported
+by the down-links of the specified start bank.
+Optionally it can include into the marking
+also the banks of the linear structure supported
+by link 0 of the start bank and all their dependents.
+The start bank itself may or may not be marked.
+<P>
+The request is
+<P>
+<P><A NAME=MZFLAG>CALL MZFLAG (IXSTOR,!L,IBIT,chOPT)</A><P>
+<P>
+with
+<PRE><TT>IXSTOR  index of the store or of any division in this store,
+              zero for the primary store
+
+          !L  address of the start bank supporting
+              the partial data-structure; no action if L=0.
+
+        IBIT  the bit-number of the status-bit to be set
+
+       chOPT  character string of options:
+
+         default  mark the bank at L (and its down dependents),
+                  the 'next' link of this bank is not followed,
+                  status-bit ITBIT is set to one
+
+               L  mark the linear structure pointed to by L
+                  ie. the 'next' link of the bank at L is followed
+
+               V  mark only the partial data-structure
+                  dependent vertically downwards from the bank at L,
+                  but not the bank itself
+
+               Z  set to zero bit IBIT in each bank to be marked</TT></PRE>
+<P>
+<A HREF=../../zebra/ZEBMZ2/chapter2_1.html#MZFLAG>MZFLAG</A> will store into the two words of the common <A HREF=#ZLIMIT>ZLIMIT</A>
+the addresses of the lowest and of the highest bank marked
+during the scan, ready for use by the table-building routines
+of <A HREF=../../zebra/ZEBFZ2/chapter2_1.html#FZOUT>FZOUT</A> for example.
+<P>
+<A HREF=../../zebra/ZEBMZ2/chapter2_1.html#MZFLAG>MZFLAG</A> is not a routine commonly called directly by the users;
+its main current use is as a service routine to <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZDROP>MZDROP</A>.
+<P>
+Similarly, the routine <A HREF=../../zebra/ZEBMZ2/chapter2_1.html#MZMARK>MZMARK</A> described below
+is not normally needed by the users except for a special problem
+mentioned there.
+<A HREF=../../zebra/ZEBMZ2/chapter2_1.html#MZMARK>MZMARK</A> is also used as a service routine by <A HREF=../../zebra/ZEBFZ2/chapter2_1.html#FZOUT>FZOUT</A>.
+<P>
+The function <A HREF=../../zebra/ZEBMZ2/chapter2_1.html#MZVOLM>MZVOLM</A> walks through a data-structure to calculate
+the space occupied, returning the number of words as the function value.
+<P>
+<P><A NAME=MZVOLM>NWORDS = MZVOLM (IXSTOR,!L,chOPT)</A><P>
+<P>
+with
+<PRE><TT>IXSTOR  index of the store or of any division in this store,
+              zero for the primary store
+
+          !L  address of the start bank supporting
+              the partial data-structure; no action if L=0.
+
+       chOPT  character string of options:
+
+         default  the 'next' link of the bank at L is not followed
+
+               L  the 'next' link of the bank at L is followed</TT></PRE>
+<P>
+<P><B>Examples:</B><P><PRE><TT>CALL MZFLAG (0,LQMAIN,IQDROP,'L')</TT></PRE> 
+this will scan the banks of the data-structure supported by
+the bank at <tt>LQMAIN</tt> and its sisters (option L),
+setting the system bit <tt>IQDROP</tt> to be 'on' in each bank found.
+This is equivalent to <tt>CALL <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZDROP>MZDROP</A> (0,LQMAIN,'L')</tt>,
+except that it does not set the contents of the word <tt>LQMAIN</tt> to zero.
+<P>
+<PRE><TT>PARAMETER  (NID=3)
+      DIMENSION  IDLIST(NID)
+      DATA       IDLIST  /  4HBGO , 4HTEC  , 4HMUC  /
+
+      CALL MZMARK (0,LQMAIN,'L-',NID,IDLIST)</TT></PRE> 
+this will scan the banks of the data-structure supported by
+the bank at <tt>LQMAIN</tt> and its sisters (option L),
+but exclude (option <tt>-</tt>) from the scan any lower level linear structure
+starting with a bank whose <tt>IDH</tt> is any of <tt>BGO</tt>, 
+<tt>TEC</tt>, <tt>MUC</tt> (and its dependents),
+setting in each bank found system status bit <tt>IQMARK</tt> to be 'on'.
+<P>
+The primary purpose of <A HREF=../../zebra/ZEBMZ2/chapter2_1.html#MZMARK>MZMARK</A> is to give the user a possibility
+to select parts of a data-structure for output with <A HREF=../../zebra/ZEBFZ2/chapter2_1.html#FZOUT>FZOUT</A>.
+The selection works on <tt>IDH</tt>, the Hollerith <tt>ID</tt>, of the first bank
+of each linear sub-structure of the full data-structure.
+For convenience,
+one may give to <A HREF=../../zebra/ZEBMZ2/chapter2_1.html#MZMARK>MZMARK</A> either the list of the <tt>IDH</tt>'s to be included
+into the scan, or the list of the <tt>IDH</tt>'s to be excluded from the scan;
+hopefully one gets away with a short list by selecting the right
+mode.
+<P>
+<A HREF=../../zebra/ZEBMZ2/chapter2_1.html#MZMARK>MZMARK</A> is a modified version of <A HREF=../../zebra/ZEBMZ2/chapter2_1.html#MZFLAG>MZFLAG</A>, it is simpler in that
+the bit-number and the bit value are not parameterized:
+the bit is <tt>IQMARK</tt> and the value is 1, as needed by <A HREF=../../zebra/ZEBFZ2/chapter2_1.html#FZOUT>FZOUT</A>;
+it is more complex in that linear structures can be selected
+or anti-selected.
+<P>
+The request is
+<P>
+<P><A NAME=MZMARK>CALL MZMARK (IXSTOR,!L,chOPT,NID,IDLIST)</A><P>
+<P>
+with
+<PRE><TT>IXSTOR  index of the store or of any division in this store,
+              zero for the primary store
+
+          !L  address of the start bank supporting
+              the data-structure; no action if L=0.
+
+       chOPT  character string of options:
+
+         default  mark the bank at L (and its down dependents),
+                  the 'next' link of this bank is not followed,
+                  lower level linear structures are accepted only
+                     if they start with a bank whose IDH appears in
+                     the list IDLIST (or if NID=0)
+
+               L  mark the linear structure pointed to by L
+                  ie. the 'next' link of the bank at L is followed
+
+               V  mark only the partial data-structure
+                  dependent vertically downwards from the bank at L,
+                  but not the bank itself
+
+               -  accept a lower level linear structure only if
+                  it starts with a bank whose IDH does
+                  n o t  appear in IDLIST
+
+      NID       number of elements in the list IDLIST,
+                if =zero all banks are accepted ('-' option ignored)
+
+      IDLIST    list of the Hollerith ID for selection</TT></PRE>
+<P>
+On return |lit<tt>IQUEST</tt><A NAME=260><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=261><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=262><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=263><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>(2) contains the total number of words
+occupied by all the banks marked (unless L is zero on entry).
+<P>
+As for <A HREF=../../zebra/ZEBMZ2/chapter2_1.html#MZFLAG>MZFLAG</A>, the addresses of the lowest and the highest
+bank are stored into <A HREF=#ZLIMIT>ZLIMIT</A>, ready for <A HREF=../../zebra/ZEBFZ2/chapter2_1.html#FZOUT>FZOUT</A>.
+<P>
+<H1><A NAME=SECTION0012000000000000000> LZHEAD - find the first bank of a linear structure</A></H1>
+<P>
+This routine will try to find the first bank of the linear
+structure of which the bank at <tt>LGO</tt> is a member.
+It does this by following the path indicated by the &quot;origin&quot;
+link of the bank at <tt>LGO</tt>, and using its &quot;up&quot; link.
+<P>
+<P><A NAME=LZHEAD>!LF = LZHEAD (IXSTOR,!LGO)</A><P>
+<P>
+It returns the address of the first bank of the linear structure
+as the function value; or zero if there is trouble.
+<P>
+If the linear structure is not a top-level structure,
+ie. if the up-link <tt>LUP</tt> is non-zero, the path of origin-links should
+end in the link region of the bank at <tt>LUP</tt>, at a word whose
+off-set <tt>JBIAS</tt> can then be calculated. This is returned:
+<PRE><TT>IQUEST(1) negative:  = JBIAS</TT></PRE>
+ie. LQ(LUP+JBIAS) contains the address of the first bank of the
+linear structure.
+<P>
+If LUP is zero, the origin-path should end at a word outside
+the bank space of the store <tt>IXSTOR</tt>, which word
+should contain the address of the first bank of the linear structure.
+In this case <A HREF=../../zebra/ZEBMZ2/chapter2_1.html#LZHEAD>LZHEAD</A> returns:
+<PRE><TT>IQUEST(1) = 1: top-level structure
+      IQUEST(2) = LS, relative adr of the supporting link-area link,
+                      ie. LQ(LS) contains LF</TT></PRE>
+<P>
+If <tt>LUP</tt> is zero, and if the origin-link in the last bank in the path
+is zero, this is a stand-alone structure, in which case <A HREF=../../zebra/ZEBMZ2/chapter2_1.html#LZHEAD>LZHEAD</A> returns:
+<PRE><TT>IQUEST(1) = 2: stand-alone structure</TT></PRE>
+<P>
+If there is trouble, <A HREF=../../zebra/ZEBMZ2/chapter2_1.html#LZHEAD>LZHEAD</A> will return the function value zero,
+and set:
+<PRE><TT>IQUEST(3) = 1   if LGO is zero
+
+                  2   if LUP non-zero and the last origin-link
+                      points outside bank-space
+
+                  3   if LUP non-zero and LQ(LUP+JBIAS) does not
+                      point to the last bank in the origin-path
+
+                  4   if LUP zero, and LQ(LS) does not point to
+                      the last bank in the origin-path.</TT></PRE>
+<P>
+<H1><A NAME=SECTION0013000000000000000> ZSHUNT - change structural relation</A></H1>
+<P>
+Unlike in HYDRA, and because of the reverse pointers,
+the operation of moving a bank by re-linking from one data-structure
+to another one is a non-trivial operation.
+The routine <A HREF=../../zebra/ZEBMZ2/chapter2_1.html#ZSHUNT>ZSHUNT</A> is provided to execute such an operation.
+<P>
+<A HREF=../../zebra/ZEBMZ2/chapter2_1.html#ZSHUNT>ZSHUNT</A> may be used to extract either a single bank (<tt>IFLAG=0</tt>)
+or a whole linear structure (<tt>IFLAG=1</tt>) from the old context,
+for insertion into the new context as described by the parameters
+<tt>LSUP</tt> and <tt>JB</tt>, which have the same significance as in <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZLIFT>MZLIFT</A>.
+<P>
+<P><A NAME=ZSHUNT>CALL ZSHUNT (IXSTOR,!LSH, !LSUP,JB,IFLAG)</A><P>
+<P>
+with
+<PRE><TT>IXSTOR  index of the store, zero for the primary store;
+              IXDIV, the index of the division containing
+              the bank to be shunted, may be given instead
+
+        !LSH  address of the bank or of the linear structure
+
+       !LSUP  if JB &lt; 1:  address of the new supporting bank
+              if JB = 1:  the new supporting link*
+
+          JB  if JB &lt; 1:  link bias in the new supporting bank
+              if JB = 1:  LSUP is the new supporting link,
+                           the origin-link in the bank at LSH
+                           will be made to point to it
+              if JB = 2:  detach without insertion
+
+       IFLAG  if IFLAG = 0:  shunt the one single bank at LSH
+              if IFLAG = 1:  shunt the whole linear structure
+                              pointed to by LSH</TT></PRE> 
+If the bank or the structure to be re-linked is in fact inserted
+or added into an existing linear structure,
+both must be contained in the same division.
+<P>
+<P><B>Examples:</B><P>Suppose we have the following data-structures to start with:
+<P>
+<PRE><TT>______
+      |      |                         up
+      |  UA  | &lt;---.-------------.-------------.
+      |______|     |             |             |
+         |         |             |             |
+      -3 |         |             |             |
+         |       ______        ______        ______
+         |      |      |  &lt;-- |      |  &lt;-- |      |
+         `----&gt; |  A1  | ---&gt; |  A2  | ---&gt; |  A3  |
+                |______|      |______|      |______|
+
+and
+       ______
+      |      |                              up
+      |  UN  | &lt;---.-------------.-------------.
+      |______|     |             |             |
+         |         |             |             |
+      -7 |         |             |             |
+         |       ______        ______        ______
+         |      |      |  &lt;-- |      |  &lt;-- |      |
+         `----&gt; |  N1  | ---&gt; |  N2  | ---&gt; |  N3  |
+                |______|      |______|      |______|
+
+
+and
+                    ______        ______        ______
+              &lt;--- |      |  &lt;-- |      |  &lt;-- |      |
+      LQMAIN  ---&gt; |  X1  | ---&gt; |  X2  | ---&gt; |  X3  |
+                   |______|      |______|      |______|</TT></PRE> 
+Any bank may support further dependent partial data-structures,
+the corresponding structural down-links are not changed
+by <A HREF=../../zebra/ZEBMZ2/chapter2_1.html#ZSHUNT>ZSHUNT</A>.
+<P>
+In what follows the notation  <tt>Lxx</tt>  is used to designate
+a link pointing to bank <tt>xx</tt>.
+<P>
+<P><B>Examples:</B><P><PRE><TT>CALL ZSHUNT (0,LA2,LUN,-7,0)     gives:
+       ______
+      |      |
+      |  UA  | &lt;---.-------------.
+      |______|     |             |
+         |         |             |
+      -3 |       ______        ______
+         |      |      |  &lt;-- |      |
+         `----&gt; |  A1  | ---&gt; |  A3  |
+                |______|      |______|
+and
+       ______
+      |      |
+      |  UN  | &lt;---.-------------.-------------.-------------.
+      |______|     |             |             |             |
+         |         |             |             |             |
+      -7 |       ______        ______        ______        ______
+         |      |      |  &lt;-- |      |  &lt;-- |      |  &lt;-- |      |
+         `----&gt; |  A2  | ---&gt; |  N1  | ---&gt; |  N2  | ---&gt; |  N3  |
+                |______|      |______|      |______|      |______|</TT></PRE>
+<P>
+This moves a single bank (with is dependents, if any) out of
+a linear structure, and inserts it at the head of the linear
+structure supported by link <tt>-7</tt> of the bank <tt>UN</tt>.
+<P>
+<PRE><TT>CALL ZSHUNT (0,LA2,LUN,-7,1)     gives:
+       ______
+      |      |
+      |  UA  |
+      |______|
+         |
+      -3 |       ______
+         |      |      |
+         `----&gt; |  A1  |
+                |______|
+and   ______
+     |      |
+     |  UN  |  &lt;--.-------------.-------------.------------------.
+     |______|     |             |             |                  |
+        |         |             |             |                  |
+     -7 |       ______        ______        ______             ______
+        |      |      |  &lt;-- |      |  &lt;-- |      |  &lt;- ... - |      |
+        `----&gt; |  A2  | ---&gt; |  A3  | ---&gt; |  N1  | -- ... -&gt; |  N3  |
+               |______|      |______|      |______|           |______|</TT></PRE> 
+This is the same as example 1, except that the (partial) linear
+structure starting with bank <tt>A2</tt> is re-linked.
+<P>
+<PRE><TT>CALL ZSHUNT (0,LA2,LN2,0,0)      gives:
+       ______
+      |      |
+      |  UN  | &lt;---.-------------.-------------.-------------.
+      |______|     |             |             |             |
+         |         |             |             |             |
+      -7 |       ______        ______        ______        ______
+         |      |      |  &lt;-- |      |  &lt;-- |      |  &lt;-- |      |
+         `----&gt; |  N1  | ---&gt; |  N2  | ---&gt; |  A2  | ---&gt; |  N3  |
+                |______|      |______|      |______|      |______|</TT></PRE> 
+This is again like example 1, but the bank is inserted inside
+the linear structure, rather than ahead of it.
+<P>
+<PRE><TT>CALL ZSHUNT (0,LA2,LQMAIN,1,0)   gives:
+
+                  0             0             0             0
+                  ^             ^             ^             ^
+                  |             |             |             |
+                 ______        ______        ______        ______
+         &lt;----  |      |  &lt;-- |      |  &lt;-- |      |  &lt;-- |      |
+  LQMAIN -----&gt; |  A2  | ---&gt; |  X1  | ---&gt; |  X2  | ---&gt; |  X3  |
+                |______|      |______|      |______|      |______|</TT></PRE>
+<P>
+This relinks bank A2 to be the first in the top-level linear
+structure supported by <tt>LQMAIN</tt>.
+<P>
+<PRE><TT>L = LQMAIN
+          CALL ZSHUNT (0,LA2,L,1,0)</TT></PRE> 
+has exactly the same effect as Example 4 above because,
+<tt>LQMAIN</tt> not being zero initially,
+the origin-link of the bank pointed to by L
+(and the up-link, but this is zero)
+is used for the connection.
+<P>
+<PRE><TT>CALL ZSHUNT (0,LA1,LHEAD,1,1)     gives:
+       ______
+      |      |
+      |  UA  |
+      |______|
+         |
+      -3 |
+          ----&gt; zero
+
+and               0             0             0
+                  ^             ^             ^
+                  |             |             |
+                 ______        ______        ______
+         &lt;----  |      |  &lt;-- |      |  &lt;-- |      |
+  LHEAD  -----&gt; |  A1  | ---&gt; |  A2  | ---&gt; |  A3  |
+                |______|      |______|      |______|</TT></PRE>
+<P>
+supposing <tt>LHEAD=0</tt> initially; this connects the linear structure
+to the (structural) link <tt>LHEAD</tt>, ie. the origin-link of the header bank <tt>A1</tt>
+points back to the location of <tt>LHEAD</tt>.
+<P>
+<PRE><TT>CALL ZSHUNT (0,LA1,LDUMMY,2,1)    gives:
+       ______
+      |      |
+      |  UA  |
+      |______|
+         |
+      -3 |
+         `----&gt; zero
+
+and               0             0             0
+                  ^             ^             ^
+                  |             |             |
+                 ______        ______        ______
+         0 &lt;--  |      |  &lt;-- |      |  &lt;-- |      |
+  LA1    -----&gt; |  A1  | ---&gt; |  A2  | ---&gt; |  A3  |
+                |______|      |______|      |______|</TT></PRE> 
+This detaches the linear structure from its old context
+without inserting it into a new one.
+This should only be temporary, one should insert the floating
+structure into a new context by a second call to <A HREF=../../zebra/ZEBMZ2/chapter2_1.html#ZSHUNT>ZSHUNT</A>
+not too much later.
+<P>
+<H1><A NAME=SECTION0014000000000000000> ZSORT  - utility to sort the banks of a linear structure</A></H1>
+<P>
+These routines re-arrange the horizontal linking
+within a given linear structure such that the key-words contained in
+each bank increase monotonically when moving through the linear
+structure with <tt>L=LQ(L)</tt>.
+For equal key-words the original order is preserved.
+<P>
+Key-words may be either floating, integer or Hollerith.
+For Hollerith sorting a collating sequence
+inherent in the representation is used,
+thus the results will depend on the machine.
+<P>
+Sorting may be done either for a single key-word in every bank
+or for a key vector in every bank:
+<P>
+<P><A NAME=ZSORT>CALL ZSORT (IXSTOR,*!LLS*,JKEY)</A><P>
+<P>
+Sorts banks according to a single floating-point keyword
+<P>
+<P><A NAME=ZSORTI>CALL ZSORTI (IXSTOR,*!LLS*,JKEY)</A><P>
+<P>
+Sorts banks according to a single integer keyword
+<P>
+<P><A NAME=ZSORTH>CALL ZSORTH (IXSTOR,*!LLS*,JKEY)</A><P>
+<P>
+Sorts banks according to a single Hollerith keyword
+<P>
+<P><P><A NAME=ZSORV>CALL ZSORV (IXSTOR,*!LLS*,JKEY,NKEYS)</A><P>
+<P>
+Sorts banks according to a floating-point key vector
+<P>
+<P><A NAME=ZSORVI>CALL ZSORVI (IXSTOR,*!LLS*,JKEY,NKEYS)</A><P>
+<P>
+Sorts banks according to an integer key vector
+<P>
+<P><A NAME=ZSORVH>CALL ZSORVH (IXSTOR,*!LLS*,JKEY,NKEYS)</A><P>
+<P>
+Sorts banks according to a Hollerith key vector
+<P>
+<PRE><TT>with the parameters
+
+      IXSTOR  index of the store or of any division in this store,
+              zero for the primary store;
+
+      *!LLS*  the address of the first bank of the linear structure,
+              reset on return to point to the new first bank;
+
+        JKEY  in each bank at L, Q(L+JKEY) is the key word,
+                                 or the first word of the key vector;
+
+       NKEYS  the number of words in the key vector.</TT></PRE>
+<P>
+The execution time taken by these routines is a function
+of the re-ordering which needs to be done.
+For perfect order the operation is a simple verification pass
+through the structure.
+The maximum time is taken if the banks are initially arranged with
+decreasing key words.
+<P>
+Sorting re-links the banks such that the key-words are in
+increasing order.
+If one needs them in decreasing order on may use
+<tt>CALL <A HREF=../../zebra/ZEBMZ2/chapter2_1.html#ZTOPSY>ZTOPSY</A> (IXSTOR,LLS)</tt>
+which reverses the order of the banks in the linear structure
+pointed to be <tt>LLS</tt>.
+<P>
+<H1><A NAME=SECTION0015000000000000000> ZTOPSY <i>et al.</i> - utilities to operate on linear structures</A></H1>
+<P>
+These routines perform service operations
+on linear structures.
+The parameter <tt>LLS</tt> is the address of the first bank
+of the linear structure.
+<P>
+<P><A NAME=ZTOPSY>CALL ZTOPSY (IXSTOR,*!LLS*)</A><P>
+<P>
+reverses the order of the banks in the linear structure,
+ie. the first bank becomes the last, and the last the first,
+for walking through the structure with <tt>L=LQ(L)</tt>.
+Starting with Zebra version 3.67, <tt>LLS</tt> is updated to point to
+the first bank of the inverted structure on return.
+<P>
+<P><A NAME=ZPRESS>CALL ZPRESS (IXSTOR,!LLS)</A><P>
+<P>
+removes by bridging dead banks still present
+in the linear structure pointed to by <tt>LLS</tt>.
+<P>
+<H1><A NAME=SECTION0016000000000000000> LZFIND <i>et al.</i> - utilities to interrogate linear structures</A></H1>
+<P>
+These routines perform service functions for linear structures.
+The parameter <tt>LLS</tt> is the address of the first bank
+of the linear structure.
+<P>
+<P><A NAME=LZLAST>!LF = LZLAST (IXSTOR,!LLS)</A><P>
+<P>
+searches the linear structure pointed to by <tt>LLS</tt> for its end.
+It returns in <tt>LF</tt> the address of the last bank in the structure.
+<tt>LF = 0</tt> is returned if the structure is empty.
+<P>
+<P><A NAME=LZFIND>!LF = LZFIND (IXSTOR,!LLS,IT,JW)</A><P>
+<P>
+searches the linear structure pointed to by <tt>LLS</tt>
+for the first bank containing <tt>IT</tt> in word <tt>JW</tt>;
+it returns its address in <tt>LF</tt>.
+If none:  <tt>LF=0</tt>.
+<P>
+<P><A NAME=LZLONG>!LF = LZLONG (IXSTOR,!LLS,NW,ITV,JW)</A><P>
+<P>
+has the same function as <A HREF=../../zebra/ZEBMZ2/chapter2_1.html#LZFIND>LZFIND</A>,
+but <tt>ITV</tt> is a vector of <tt>NW</tt> words expected
+in words <tt>JW</tt> to <tt>JW+N-1</tt> of the bank.
+<P>
+<P><A NAME=LZBYT>!LF = LZBYT  (IXSTOR,!LLS,IT,JBIT,NBITS)</A><P>
+<P>
+has the same function as <A HREF=../../zebra/ZEBMZ2/chapter2_1.html#LZFIND>LZFIND</A>,
+but it looks for a bank having <tt>IT</tt> in byte <tt>(JBIT,NBITS)</tt>
+of the status word.
+<P>
+<P><A NAME=LZFVAL>!LF = LZFVAL (IXSTOR,!LLS,VAL,TOL,JW)</A><P>
+<P>
+has the same function as <A HREF=../../zebra/ZEBMZ2/chapter2_1.html#LZFIND>LZFIND</A>,
+but it looks for a bank having in word <tt>JW</tt> a floating point number
+which is equal to <tt>VAL</tt> within the tolerance <tt>TOL</tt>.
+<P>
+<P><A NAME=NZBANK>N  = NZBANK (IXSTOR,!LLS)</A><P>
+<P>
+counts the number of banks in the linear
+structure pointed to by <tt>LLS</tt>.
+<P>
+<P><A NAME=NZFIND>N  = NZFIND (IXSTOR,!LLS,IT,JW)</A><P>
+<P>
+searches like <A HREF=../../zebra/ZEBMZ2/chapter2_1.html#LZFIND>LZFIND</A>, but for all banks.
+It returns the number of such banks in <tt>N</tt>
+and stores the addresses of the first 100 such banks into <tt>IQUEST</tt><A NAME=270><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=271><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=272><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=273><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>,
+starting at <tt>IQUEST(1)</tt>.
+<P>
+<P><A NAME=NZLONG>N  = NZLONG (IXSTOR,!LLS,NW,ITV,JW)</A><P>
+<P>
+searches like <A HREF=../../zebra/ZEBMZ2/chapter2_1.html#LZLONG>LZLONG</A>, but for all banks.
+It returns the number of such banks in <tt>N</tt>
+and stores the addresses of the first 100 such banks into <tt>IQUEST</tt><A NAME=280><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=281><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=282><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=283><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>,
+starting at <tt>IQUEST(1)</tt>.
+<P>
+<H1><A NAME=SECTION0017000000000000000> LZFID <i>et al.</i> - utilities to find a bank by sequential scan</A></H1>
+<P>
+Unlike the routines of the previous paragraphs which access
+banks by following the links of the structure,
+the routines of this paragraph perform a scan over the memory,
+looking at each bank in turn in the order in which they happen
+to be in the dynamic store,
+to find the bank wanted.
+For large memories with many banks this is likely to be an expensive
+operation and should not be used unless there is no other way.
+<P>
+<P><A NAME=LZFID>!LF = LZFID (IXDIV, IDH,IDN, !LGO)</A><P>
+<P>
+searches the division indicated by <tt>IXDIV</tt>, either starting
+at its beginning if <tt>LGO=0</tt> or with the first bank after the bank
+at <tt>LGO</tt>, for the first bank with has the identifiers <tt>IDH</tt> and <tt>IDN</tt>.
+<P>
+<P><A NAME=LZFIDH>!LF = LZFIDH (IXDIV, IDH, !LGO)</A><P>
+<P>
+searches the division indicated by <tt>IXDIV</tt>, either starting
+at its beginning if <tt>LGO=0</tt> or with the first bank after the bank
+at <tt>LGO</tt>, for the first bank with has the Hollerith identifier <tt>IDH</tt>.
+<P>
+<P><A NAME=LZSCAN>!LF = LZSCAN (IXDIV, !LGO)</A><P>
+<P>
+searches the division indicated by <tt>IXDIV</tt>, either starting
+at its beginning if <tt>LGO=0</tt> or with the first bank after the bank
+at <tt>LGO</tt>, for the first bank.
+<P>
+<A HREF=../../zebra/ZEBMZ2/chapter2_1.html#LZSCAN>LZSCAN</A> returns <tt><tt>IQUEST</tt><A NAME=290><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=291><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=292><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=293><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>(1)</tt> containing zero 
+if the bank at <tt>LF</tt> is live, or one if the bank is dead.
+<P>
+ <H2>References</H2>
+<P><A NAME=BIBLIO HREF=../../general/biblio/bibliography.html>Global CERN library references</A><P>/user/goossens/cnasall/cnasbibl,/user/goossens/cnasall/textproc}    
+<HR> <A NAME=tex2html31 HREF=tex2htmlindex2_2.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/next_motif.gif"></A> <A NAME=tex2html29 HREF=ZEBMZ2.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/up_motif.gif"></A> <A NAME=tex2html23 HREF=ZEBMZ2.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/previous_motif.gif"></A>  <A NAME=tex2html33 HREF=tex2htmlindex2_2.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/index_motif.gif"></A><BR>
+<B> Next:</B> <A NAME=tex2html32 HREF=tex2htmlindex2_2.html>Index</A>
+<B>Up:</B> <A NAME=tex2html30 HREF=ZEBMZ2.html>No Title</A>
+<B> Previous:</B> <A NAME=tex2html24 HREF=ZEBMZ2.html>No Title</A>
+<HR> <P>
+<HR>
+
+</BODY>
+<P><ADDRESS>
+goossens@cern.ch
+</ADDRESS>

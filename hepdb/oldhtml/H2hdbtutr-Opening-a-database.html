@@ -1,0 +1,187 @@
+<TITLE>HEPDB -- H2hdbtutr-Opening-a-database </TITLE>
+<P>
+<H2><A NAME=H2hdbtutr-Opening-a-database.html>Opening a database</A></H2>
+Now we can check that a database exists via the HEPDB interactive
+interface. (Later we show how to open a database via a HEPDB-calling
+FORTRAN program).
+<P>
+The following section gives a little detail upon the invocation of the
+interactive interface.
+<P>
+<H3>Invoking the HEPDB interactive interface</H3>
+<P>
+The interactive interface is invoked by typing hepdb. Note that the
+variable CDSERV must be set, specifying the directory where the
+appropriate HEPDB configuration file is stored.
+<P>
+When you log on to the system you may notice messages saying that macros
+xxxSYS, xxxGRP, xxxUSR, and xxxLOGON are not present. This is a normal
+response and refers to a HEPDB facility which allows you to execute a
+standard set of macros on entry to the interactive interface. The
+following section explains how the use of these macros is envisaged.
+<P>
+<H3>Using start up macros</H3>
+<P>
+The use of a subroutine KULOGN is as follows:
+<P>
+<PRE>
+                 <B>Description of subroutine KULOGN</B>
+                                  </PRE>
+<P>
+<PRE>
+      SUBROUTINE KULOGN (CHPACK,CHOPT)
+*
+*    Execute logon kumacs for package `CHPACK' with options `CHOPT'
+*    KUMACs are xxxSYS, xxxGRP, xxxUSR and xxxLOGON
+*
+</PRE>
+<P>
+Depending on the platform you are running different ways of tailoring
+where the macros reside are available. The search methods used by the
+various platforms are as follows:
+<P>
+<OL>
+<LI>VAX/VMS
+   Look in directories defined in searchlist xxxPATH ,if xxxPATH not
+       defined, use SYS$LOGIN, SYS$DISK:[] (i.e. current and home
+       directories).
+<LI>Unix
+   Look in path xxx PATH (If not defined, use current and home
+       directories).
+<LI>VM/CMS
+   Check disks in xxxPATH. If this is not defined default to using the A
+       disk.
+</UL>
+<P>
+The standard set of macros currently supported by HEPDB are intended for
+the following use:
+<P>
+<OL>
+<LI>xxxSYS
+   This macro may contain a call to a monitoring program
+<LI>xxxGRP
+   This macro would contain commands specific to a particular group.
+<LI>xxxUSR and xxxLOGON
+   These two macros are intended to hold user specific information. As
+       the default search order is the current and then home directory,
+       one may use one macro, e.g. HDBUSR for general commands, e.g.
+       creation of standard aliases etc. and the other, e.g. HDBLOGON for
+       directory specific commands.
+</UL>
+<P>
+<H3>Opening a database interactively</H3>
+<P>
+HEPDB allows a database file to be opened via the OPEN command. The OPEN
+command must be given with the two character prefix of the database
+followed (optionally) by the databases' physical file name. The example
+below shows how to open a file interactively and the terminal output you
+can expect.
+<P>
+<PRE>
+                 <B>Opening a database interactively</B>
+                                  </PRE>
+<P>
+<PRE>
+HEPDB> open ge geo.dbs
+       ---------------
+HEPDB  1.02/14 921029 16:46 CERN PROGRAM LIBRARY HEPDB=Q180
+ This version created on 921029 at 1756
+CDOPNC. opened file GEO.DBS on unit  2 with top directory CDGE and record length 1024
+HEPDB>
+</PRE>
+<P>
+To demonstrate that the file has now been opened you can issue another
+HEPDB interactive command FILES, which shows a list of all files currently
+open to HEPDB.
+<P>
+<PRE>
+                <B>Checking a file is open with FILES.</B>
+                                  </PRE>
+<P>
+<PRE>
+HEPDB>files
+      -----
+ File #   1, unit:  2, top directory:             CDGE
+ CDFILC.           1  file(s) are attached
+HEPDB>
+</PRE>
+Finally the database should now be closed. This can be done in two ways,
+explicitly via the CLOSE command if you wish to do more work with HEPDB
+during the current session or implicitly via the QUIT command if you wish
+to terminate the current HEPDB session. An example of the first of these
+cases follows:
+<P>
+<PRE>
+                <B>Closing a HEPDB file interactively</B>
+                                  </PRE>
+<P>
+<PRE>
+HEPDB>close ge
+      --------
+CDCLSH. closing GEO on unit         2
+CDCLSH. closed            1  file(s)
+HEPDB>
+</PRE>
+<P>
+<H3>Opening a database from FORTRAN</H3>
+<P>
+Below is an example section of FORTRAN code showing how HEPDB's user
+callable routines can be used to open a database file. Notice how the two
+character id code of the database is used in the call to <A HREF=H2hdbuser-Initialisation-and-termination.html#CDPREF NAME=CDPREF67> CDPREF</A> to obtain
+the full file name and top directory name of the required database. This
+information is then used by the call to <A HREF=H2hdbuser-Initialisation-and-termination.html#CDOPEN NAME=CDOPEN68> CDOPEN</A> which then opens the file.
+Finally note the use of <A HREF=H2hdbuser-Initialisation-and-termination.html#CDEND NAME=CDEND69> CDEND</A> this is the method of closing the database
+file. (The character option `A' signifies that all files should be
+closed.)
+<P>
+<PRE>
+                  <B>Opening a database from FORTRAN</B>
+                                  </PRE>
+<P>
+<PRE>
+      PROGRAM EGOPEN
+*     ==============
+*
+*     Modify an existing database
+*
+      PARAMETER    (NWPAW=100000)
+      COMMON/PAWC/ PAW(NWPAW)
+      PARAMETER    (NKEYS=10)
+      PARAMETER    (MAXOBJ=1000)
+      CHARACTER*8  CHTAG(NKEYS)
+      CHARACTER*10 CHFOR
+      CHARACTER*4  CHTOP
+      CHARACTER*80 CHFILE
+*
+*     Initialise Zebra, HBOOK and HEPDB
+*
+      CALL CDPAW(NWPAW,NHBOOK,IDIV,'USR-DIV',5000,50000,'ZPHU',IRC)
+*
+*     Unit for database access
+*
+      LUNCD  = 1
+*
+*     Unit for database update (via journal files)
+*
+      LUNFZ  = 2
+*
+*     Find the database file and construct the top directory name
+*     Pass in 'GE' (two-char id code for database) as 2nd parameter
+*
+      CALL CDPREF(10,'GE',CHTOP,CHFILE,IRC)
+      IF(IRC.GT.4) THEN
+         PRINT *,'EGOPEN. STOPPING DUE TO FATAL ERROR FROM CDPREF'
+         STOP 16
+      ENDIF
+*
+*     Open the database file
+*
+      LRECL  = 0
+      CALL CDOPEN(LUNCD,LUNFZ,CHTOP,CHFILE,LRECL,IDIV,' ',IRC)
+*
+*     Do Nothing and Terminate
+*
+      CALL CDEND(' ','A',IRC)
+      END
+</PRE>
+<P>

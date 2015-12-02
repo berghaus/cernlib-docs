@@ -1,0 +1,199 @@
+%!PS-Adobe-2.0 EPSF-2.0
+%%Title: pkmf10.eps
+%%Creator: xpick Version 1.00  Rev: 22/03/93 - by Evgeni Chernyaev
+%%BoundingBox: 245 360 366 432
+%%EndComments
+%***********************************************************************
+%*                                                                     *
+%* Object: Image decoding PS-routine                                   *
+%* Author: Evgeni CHERNYAEV (chernaev@vxcern.cern.ch)                  *
+%*                                                                     *
+%* Function: Display a Lempel-Ziv Welch (LZW) encoded color image.     *
+%*           The image is displayed in color on viewers and printers   *
+%*           that support color Postscript, otherwise it is displayed  *
+%*           as grayscale.                                             *
+%*                                                                     *
+%***********************************************************************
+/CriticalSize 300000 def
+systemdict /colorimage known { /incr 3 def } { /incr 1 def } ifelse
+/Length 81 81 mul def
+/Table Length array def
+/Prefix Length array def
+/Length Length incr mul def
+/String Length string def
+%***********************************************************************
+/ReadCode                % Read next code from file                    *
+%***********************************************************************
+{
+  { currentfile read pop
+    dup dup 42 ge exch 123 lt and { exit } { pop } ifelse
+  } loop
+  42 sub 81 mul
+  currentfile read pop 42 sub add
+  /CurCode exch def
+} bind def
+%***********************************************************************
+/DecodeCodeA             % Decode CurCode (fast, but memory demanding) *
+%***********************************************************************
+{
+  ReadCode
+  CurCode Ncol eq {
+    ReadCode
+    /FreeCode Ncol 1 add def
+  }{
+    //Table FreeCode L incr add string
+    dup 0 Table OldCode get putinterval
+    dup L Table CurCode FreeCode lt { CurCode } { OldCode } ifelse get
+    0 incr getinterval putinterval put
+    /FreeCode FreeCode 1 add def
+  } ifelse
+  /OldCode CurCode def
+  Table CurCode get dup length /L exch def
+} bind def
+%***********************************************************************
+/DecodeCodeB         % Decode CurCode (not memory demanding, but slow) *
+%***********************************************************************
+{
+  /iout //Length //incr sub def
+  ReadCode
+  CurCode Ncol eq {
+    /FreeCode Ncol 1 add def
+    ReadCode
+    /OldCode CurCode def
+    /FinChar CurCode def
+    String iout Table CurCode get putinterval
+  }{
+    /InCode CurCode def
+    CurCode FreeCode eq {
+      /CurCode OldCode def
+      String iout Table FinChar get putinterval
+      /iout iout //incr sub def
+    } if
+    iout //incr neg 0 {
+      CurCode Ncol lt { exit } if
+      String exch Table CurCode get putinterval
+      /CurCode Prefix CurCode get def
+    } for
+    /iout exch def
+    /FinChar CurCode def
+    String iout Table FinChar get putinterval
+    Prefix FreeCode OldCode put
+    Table FreeCode Table FinChar get put
+    /FreeCode FreeCode 1 add def
+    /OldCode InCode def
+  } ifelse
+  String iout //Length iout sub getinterval
+}bind def
+%***********************************************************************
+/DisplayImage            % Display a LZW-encoded color image           *
+%***********************************************************************
+{
+  gsave
+  /buffer 72 string def
+  currentfile buffer readline pop
+  token { /degrees exch def pop } { } ifelse
+  degrees rotate
+  currentfile buffer readline pop
+  token { /x exch def } { } ifelse
+  token { /y exch def pop } { } ifelse
+  x y translate
+  currentfile buffer readline pop
+  token { /x exch def } { } ifelse
+  token { /y exch def pop } { } ifelse
+  x y scale
+  currentfile buffer readline pop
+  token { /columns exch def } { } ifelse
+  token { /rows exch def pop } { } ifelse
+  currentfile buffer readline pop
+  token { /Ncol exch def pop } { } ifelse
+  systemdict /colorimage known {
+    0 1 Ncol 1 sub {
+      Table exch
+      currentfile 3 string readhexstring pop put
+    } for
+    columns rows mul CriticalSize lt {
+      columns rows 8
+      [ columns 0 0 rows neg 0 rows ]
+      { DecodeCodeA } false 3 colorimage
+    }{
+      columns rows 8
+      [ columns 0 0 rows neg 0 rows ]
+      { DecodeCodeB } false 3 colorimage
+    } ifelse
+  }{
+    /color 3 string def
+    0 1 Ncol 1 sub {
+      Table exch
+      1 string dup 0
+      currentfile color readhexstring pop pop
+      color 0 get 0.299 mul
+      color 1 get 0.587 mul add
+      color 2 get 0.114 mul add
+      cvi put put
+    } for
+    columns rows mul CriticalSize lt {
+      columns rows 8
+      [ columns 0 0 rows neg 0 rows ]
+      { DecodeCodeA } image
+    }{
+      columns rows 8
+      [ columns 0 0 rows neg 0 rows ]
+      { DecodeCodeB } image
+    } ifelse
+  } ifelse
+  grestore
+} bind def
+%***********************************************************************
+%*                          Image decoding                             *
+%***********************************************************************
+DisplayImage
+0.00
+245.50 360.00
+121.00 72.00
+121 72
+256
+000000 fefefe b0c4de 0000fe f5deb3 18186f fe0000 5e9ea0 d3d3d3 747474
+a9a9a9 9cb4cc fefe00 586674 d7e1eb d3d7e7 a9acb9 74767f b3b7c4 770000
+fe7c7c 00fe00 add8e6 00fefe 000000 00003f 00007f 0000bf 0000fe 003f00
+003f3f 003f7f 003fbf 003ffe 007f00 007f3f 007f7f 007fbf 007ffe 00bf00
+00bf3f 00bf7f 00bfbf 00bffe 00fe00 00fe3f 00fe7f 00febf 00fefe 3f0000
+3f003f 3f007f 3f00bf 3f00fe 3f3f00 3f3f3f 3f3f7f 3f3fbf 3f3ffe 3f7f00
+3f7f3f 3f7f7f 3f7fbf 3f7ffe 3fbf00 3fbf3f 3fbf7f 3fbfbf 3fbffe 3ffe00
+3ffe3f 3ffe7f 3ffebf 3ffefe 7f0000 7f003f 7f007f 7f00bf 7f00fe 7f3f00
+7f3f3f 7f3f7f 7f3fbf 7f3ffe 7f7f00 7f7f3f 7f7f7f 7f7fbf 7f7ffe 7fbf00
+7fbf3f 7fbf7f 7fbfbf 7fbffe 7ffe00 7ffe3f 7ffe7f 7ffebf 7ffefe bf0000
+bf003f bf007f bf00bf bf00fe bf3f00 bf3f3f bf3f7f bf3fbf bf3ffe bf7f00
+bf7f3f bf7f7f bf7fbf bf7ffe bfbf00 bfbf3f bfbf7f bfbfbf bfbffe bffe00
+bffe3f bffe7f bffebf bffefe fe0000 fe003f fe007f fe00bf fe00fe fe3f00
+fe3f3f fe3f7f fe3fbf fe3ffe fe7f00 fe7f3f fe7f7f fe7fbf fe7ffe febf00
+febf3f febf7f febfbf febffe fefe00 fefe3f fefe7f fefebf fefefe c4b18f
+867a62 d0bd98 7e7e7e d6e0ea 270909 576573 a60909 9bb3cb fdfd00 c3b08e
+857961 f4ddb2 cfbc97 fdfdfd a8a8a8 550909 737373 8a0909 d2d2d2 e7e7e7
+ababab cfcfcf bc0000 dfd4be b8b09d 930000 ededd5 e6dbc4 b691aa b691ff
+b6b600 b6b655 b6b6aa b6b6ff b6da00 b6da55 b6daaa b6daff b6ff00 b6ff55
+b6ffaa b6ffff da0000 da0055 da00aa da00ff da2400 da2455 da24aa da24ff
+da4800 da4855 da48aa da48ff da6d00 da6d55 da6daa da6dff da9100 da9155
+da91aa da91ff dab600 dab655 dab6aa dab6ff dada00 dada55 dadaaa dadaff
+daff00 daff55 daffaa daffff ff0000 ff0055 ff00aa ff00ff ff2400 ff2455
+ff24aa ff24ff ff4800 ff4855 ff48aa ff48ff ff6d00 ff6d55 ff6daa ff6dff
+ff9100 ff9155 ff91aa ff91ff ffb600 ffb655 ffb6aa ffb6ff ffda00 ffda55
+ffdaaa ffdaff ffff00 ffff55 ffffaa ffffff
+-7+n-8-9-:-;-<-=->-?-@-A-B-C-D-E-F-G-H-I-J-K-@+o-L-O-P-Q-Q+o-N-R-V-W-X-=
+-T-U-8*.-^-_-`-a-b-c-d-e-f-g-h-i-j-d-[-\+n-k-p-q-r-s-t-l-[-:-u-y-z.*-z-m
+-x.+./.0.1-b.--9-a**.7**.2.7-_.;.;-r.>-d.8.B.9.@-t.4-].<.9*..E.*.@.=.J-q
+.L.6.P-`.R-q.G-o-^.E.O.K.P.B.Z.D.T.I.c.\.`.N.8.`.i.S.U.a.f.b-h.X.c.d.\.>
+.O.m.k.i.h.e/*.m.V.[/,.J.V-e.q.j.y/0.w/+-b.C/8.u/7.a/1.C.]/A/<-p/3/A.s/5
+._/C.x/B/6/F/;.h-c/./L._-k/E/R/C.L/J.l/G/L/5/^/-.T.t.o-j/E/N/6///^/F/[/H
+/]/m/8/K/]/J/r.T/e.].g/j/T/Z.r/q.^/P/v/M/400/+/w/f-`/u/Q/c.2090:-^06/908
+0;0@./0=/p0A0E0B-w.50F0J0K*.0C0L0O0G-T-:-m0T0U0V0W0X0Y0Z0[0\0]0^0H+n0_0b
+0c0d0e0f0V.H0P0j0;0R.Y0k0o.10m0p0s0G0i0t0w-s0r0x1*.W-U1+1./d1-0>.e.+/w/1
+-g160./I0?/U11/k/T140,/j-p18/`.*0z0*.j1?1J0-/k0+.I.g/s0>/[/<18-v0v1B/n/=
+04/K.v1Y04131M1N1X.p1=001^1L/z.n.z/M/X1l1L.l1k1^/D1e1X/o/v1j.o151n/i.v08
+/W/>1o1d1W/Y1Z1O1c1M/O2+/h1R/G1U-f1G.r1:291[27/>1g2*1c2.1[1Q051t.n/f1P0,
+1E/_2Q2T/4231S/g1A2C0<2M1/2^2L1W2_2b0M2]2c1/2?2f2_2h2i2g2e2l0x2k2o1*0m0g
+2u2v2w2w-Y2z3*-R2q2r0w3-3.0s30310o33340j36370O393:0K2h/:.A0/3=-y3?1;2;3C
+-u3E.x/b2=3H/21t2W1r3N0y3P/@0.1I3F3S3O22/c033M3Z.33U120/3_3`2`0n1f1m.y3f
+1<3\2A/m263l1V3h3r0F3<3u0u3t3x0@2?/:204*-r3w4/3D2n423y450A2t2x4:4;4<0W0a
+4=4@4A2x
+showpage
+%%Trailer

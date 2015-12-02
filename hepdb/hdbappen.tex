@@ -1,0 +1,3767 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%   HEPDB    - Reference Manual -- LaTeX Source                   %
+%                                                                 %
+%   Appendices - System dependencies                              %
+%              - Technical details                                %
+%                                                                 %
+%   Original: Jamie Shiers    (from HEPDB source)                 %
+%                                                                 %
+%   Last Mod.: 02 Sep 1991 11:30  mg                              %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\Filename{H1hdbappen-Conversion-of-existing-database-files}
+\chapter{Conversion of existing database files}
+
+Existing database files may be converted to {\tt HEPDB} format
+using a simple program. The following examples describe the
+conversion of a file that is already in {\tt Zebra RZ} format
+and the conversion of a file that does not use {\tt Zebra RZ}.
+
+\Filename{H2hdbappen-Conversion-of-the-CPLEAR-calibration-database}
+\section{Conversion of the {\tt CPLEAR} calibration database}
+
+The {\tt CPLEAR} calibration database consists of a single
+{\tt Zebra RZ} file containing a number of directories
+corresponding to the long term, medium term and short term
+calibration constants of the various subdetectors.
+
+Information is stored in these directories as individual {\tt Zebra}
+banks, identified by the directory name and four keys. These
+keys contain the following information:
+
+\begin{DLtt}{1234567890}
+\item[VAL\_STAR]Run number defining the lower bound of the validity range (integer)
+\item[VAL\_STOP]Run number defining the upper bound of the validity range (integer)
+\item[DETECTOR]Detector name to which the information corresponds (hollerith)
+\item[POINTER]Hollerith bank identifier of the {\tt Zebra} bank (hollerith)
+\end{DLtt}
+
+This corresponds to a {\tt HEPDB} database with one validity range pair.
+The {\tt detector} and {\tt pointer} information are stored as user keys.
+
+The first thing that must be performed is the creation of a new {\tt HEPDB}
+database file. This is performed by the following program.
+
+\begin{XMPt}{Creating a new {\tt HEPDB} database for {\tt CPLEAR}}
+*CMZ :          23/10/92  10.16.19  by  Jamie Shiers
+*-- Author :
+      PROGRAM CDEXA1
+*     ==============
+*
+*     Create a new, empty database
+*
+      PARAMETER   (NWPAW=100000)
+      COMMON/PAWC/PAW(NWPAW)
+*
+*     Initialise Zebra, HBOOK and HEPDB
+*
+      CALL CDPAW(NWPAW,NHBOOK,IDIV,'USR-DIV',5000,50000,'ZPHU',IRC)
+*
+*     Unit for database access
+*
+      LUNCD  = 1
+*
+*     Database parameters
+*
+      NPAIR  = 1
+      NREC   = 20000
+      NPRE   = 200
+      NTOP   = 1
+      NQUO   = 65000
+*
+*     Accept default record length (1024 words)
+*
+      LRECL  = 0
+      CALL CDNEW(LUNCD,'HEPDB','RZKAL.DBS',IDIV,NPAIR,NQUO,NREC,NPRE,NTOP,
+     +           LRECL,'F',IRC)
+*
+*     Set the log level
+*
+      CALL CDLOGL(' ',3,'A',IRC)
+*
+*     Terminate
+*
+      CALL CDEND(' ','A',IRC)
+
+      END
+\end{XMPt}
+
+The following program shows how the directory structure is created in
+the {\tt HEPDB} database. Note that the directory structure is somewhat
+simplified in the conversion, but this is of course optional.
+
+\begin{XMPt}{Creating the directory structure in the {\tt HEPDB} database}
+CDECK  ID>, KALCONV.
+      PROGRAM KALCONV
+*
+*     Program to convert CPLEAR calibration database
+*     to HEPDB format
+*
+*     RZKAL keys: VAL_STAR (I)
+*                 VAL_STOP (I)
+*                 DETECTOR (H)
+*                 BANK ID  (H)
+*     insertion time = RZ date/time
+*
+*     HEPDB keys: NPAIR    = 1
+*                 VAL_STAR = KEYS(11) (I)
+*                 VAL_STOP = KEYS(12) (I)
+*                 NUSER    = 2
+*                 DETECTOR = KEYS(13) (H)
+*                 BANK ID  = KEYS(14) (H)
+*     insertion time = KEYS(IDHINS)
+*
+*     Output pathnames:
+*
+*     //CDCD/CALIBRATION/DC_ST
+*     //CDCD/CALIBRATION/DC_LT
+*     //CDCD/CALIBRATION/DC_MT
+*
+*     //CDCD/CALIBRATION/PC_ST
+*     //CDCD/CALIBRATION/PC_LT
+*     //CDCD/CALIBRATION/PC_MT
+*
+*     //CDCD/CALIBRATION/PID_ST
+*     //CDCD/CALIBRATION/PID_LT
+*     //CDCD/CALIBRATION/PID_MT
+*
+*     //CDCD/CALIBRATION/ST_MT
+*
+*     //CDCD/CALIBRATION/CALO_LT
+*
+      PARAMETER    (NWPAW=100000)
+      COMMON/PAWC/ PAW(NWPAW)
+      COMMON/USRLNK/IDIV,LADDR
+      CHARACTER*4  CHTOP
+      CHARACTER*80 CHFILE
+      EXTERNAL     CPKALC
+*
+*     Initialise Zebra, HBOOK and HEPDB
+*
+      CALL CDPAW(NWPAW,NHBOOK,IDIV,'USR-DIV',5000,50000,'ZPHU',IRC)
+*
+*     Link area of banks retrieved from database
+*
+      CALL MZLINK(IDIV,'/USRLNK/',LADDR,LADDR,LADDR)
+*
+*     Unit for database access
+*
+      LUNCD  = 1
+*
+*     Unit for database update (via journal files)
+*
+      LUNFZ  = 2
+*
+*     Unit for RZKAL file
+*
+      LUNRZ  = 3
+*
+*     Open CPLEAR calibration database (RZKAL.DATA)
+*
+      LRECL  = 0
+      CALL RZOPEN(LUNRZ,'RZKAL','rzkal.data',' ',LRECL,IRC)
+      CALL RZFILE(LUNRZ,'RZKAL',' ')
+*
+*     Find the database file and construct the top directory name
+*
+      CALL CDPREF(10,'CD',CHTOP,CHFILE,IRC)
+*
+*     Open the database file
+*
+      LRECL  = 0
+      CALL CDOPEN(LUNCD,LUNFZ,CHTOP,CHFILE,LRECL,IDIV,' ',IRC)
+*
+*     Loop over directories in RZKAL.DATA
+*
+      CALL RZSCAN('//RZKAL',CPKALC)
+*
+*     Terminate
+*
+      CALL CDEND(' ','A',IRC)
+      CALL RZCLOS(' ','A')
+
+      END
+CDECK  ID>, CPKALC.
+      SUBROUTINE CPKALC(CHDIR)
+      CHARACTER*(*) CHDIR
+      PARAMETER    (NKEYS=2)
+      PARAMETER    (MAXOBJ=1000)
+      CHARACTER*8   CHTAG(NKEYS)
+      CHARACTER*2   CHFOR
+      CHARACTER*255 CHPATH,CHSAVE
+      DATA          NENTRY/0/
+      SAVE          NENTRY
+
+      IF(NENTRY.EQ.0) THEN
+         NENTRY = 1
+         RETURN
+      ENDIF
+*
+*     Must save directory in local variable: calls to RZ
+*     overwrite it!
+*
+      LDIR   = LENOCC(CHDIR)
+      CHSAVE = CHDIR(1:LDIR)
+*
+*     Make directories in HEPDB database
+*
+      DELTA = 0.0
+      IPREC = 0
+      CHFOR = 'HH'
+      CHTAG(1) = 'DETECTOR'
+      CHTAG(2) = 'POINTER '
+*
+*     Construct directory name for HEPDB file
+*
+      LSLASH   = INDEXB(CHSAVE(1:LDIR),'/') + 1
+      IF(INDEX(CHSAVE(1:LDIR),'MONTE').EQ.0) THEN
+         CHPATH   = '//CDCD/CALIBRATION/'//CHSAVE(LSLASH:LDIR)
+         LPATH    = LDIR - LSLASH + 20
+      ELSE
+         CHPATH   = '//CDCD/'//CHSAVE(LSLASH:LDIR)
+         LPATH    = LDIR - LSLASH + 8
+      ENDIF
+      CALL CDMDIR(CHPATH(1:LPATH),NKEYS,CHFOR,CHTAG,MAXOBJ,
+     +            IPREC,DELTA,'CP',IRC)
+
+   99 CONTINUE
+
+      CALL RZCDIR(CHSAVE(1:LDIR),' ')
+
+      END
+\end{XMPt}
+
+The data is then entered using a program that is very similar to the above.
+
+\begin{XMPt}{Entering the data into the {\tt HEPDB} database}
+CDECK  ID>, KALCONV.
+      PROGRAM KALCONV
+*
+*     Program to convert CPLEAR calibration database
+*     to HEPDB format
+*
+*     RZKAL keys: VAL_STAR (I)
+*                 VAL_STOP (I)
+*                 DETECTOR (H)
+*                 BANK ID  (H)
+*     insertion time = RZ date/time
+*
+*     HEPDB keys: NPAIR    = 1
+*                 VAL_STAR = KEYS(11) (I)
+*                 VAL_STOP = KEYS(12) (I)
+*                 NUSER    = 2
+*                 DETECTOR = KEYS(13) (H)
+*                 BANK ID  = LEYS(14) (H)
+*     insertion time = KEYS(IDHINS)
+*
+*     Output pathnames:
+*
+*     //CDCD/CALIBRATION/DC_ST
+*     //CDCD/CALIBRATION/DC_LT
+*     //CDCD/CALIBRATION/DC_MT
+*
+*     //CDCD/CALIBRATION/PC_ST
+*     //CDCD/CALIBRATION/PC_LT
+*     //CDCD/CALIBRATION/PC_MT
+*
+*     //CDCD/CALIBRATION/PID_ST
+*     //CDCD/CALIBRATION/PID_LT
+*     //CDCD/CALIBRATION/PID_MT
+*
+*     //CDCD/CALIBRATION/ST_MT
+*
+*     //CDCD/CALIBRATION/CALO_LT
+*
+      PARAMETER    (NWPAW=100000)
+      COMMON/PAWC/ PAW(NWPAW)
+      COMMON/USRLNK/IDIV,LADDR
+      CHARACTER*4  CHTOP
+      CHARACTER*80 CHFILE
+      EXTERNAL     CPKALC
+*
+*     Initialise Zebra, HBOOK and HEPDB
+*
+      CALL CDPAW(NWPAW,NHBOOK,IDIV,'USR-DIV',5000,50000,'ZPHU',IRC)
+*
+*     Link area of banks retrieved from database
+*
+      CALL MZLINK(IDIV,'/USRLNK/',LADDR,LADDR,LADDR)
+*
+*     Unit for database access
+*
+      LUNCD  = 1
+*
+*     Unit for database update (via journal files)
+*
+      LUNFZ  = 2
+*
+*     Unit for RZKAL file
+*
+      LUNRZ  = 3
+*
+*     Open CPLEAR calibration database (RZKAL.DATA)
+*
+      LRECL  = 0
+      CALL RZOPEN(LUNRZ,'RZKAL','rzkal.data',' ',LRECL,IRC)
+      CALL RZFILE(LUNRZ,'RZKAL',' ')
+*
+*     Find the database file and construct the top directory name
+*
+      CALL CDPREF(10,'CD',CHTOP,CHFILE,IRC)
+*
+*     Open the database file
+*
+      LRECL  = 0
+      CALL CDOPEN(LUNCD,LUNFZ,CHTOP,CHFILE,LRECL,IDIV,' ',IRC)
+*
+*     Loop over directories in RZKAL.DATA
+*
+      CALL RZSCAN('//RZKAL',CPKALC)
+*
+*     Terminate
+*
+      CALL CDEND(' ','A',IRC)
+      CALL RZCLOS(' ','A')
+
+      END
+CDECK  ID>, CPKALC.
+      SUBROUTINE CPKALC(CHDIR)
+      CHARACTER*(*) CHDIR
+      COMMON/USRLNK/IDIV,LADDR
+      PARAMETER    (NKEYS=2)
+      PARAMETER    (MAXOBJ=1000)
+      DIMENSION     KEYS(13)
+      DIMENSION     KEYZ(4)
+      CHARACTER*8   CHTAG(NKEYS)
+      CHARACTER*2   CHFOR
+      CHARACTER*255 CHPATH,CHSAVE
+      PARAMETER      (IQDROP=25, IQMARK=26, IQCRIT=27, IQSYSX=28)
+      COMMON /QUEST/ IQUEST(100)
+      COMMON /ZVFAUT/IQVID(2),IQVSTA,IQVLOG,IQVTHR(2),IQVREM(2,6)
+      COMMON /ZEBQ/  IQFENC(4), LQ(100)
+                              DIMENSION    IQ(92),        Q(92)
+                              EQUIVALENCE (IQ(1),LQ(9)), (Q(1),IQ(1))
+      COMMON /MZCA/  NQSTOR,NQOFFT(16),NQOFFS(16),NQALLO(16), NQIAM
+     +,              LQATAB,LQASTO,LQBTIS, LQWKTB,NQWKTB,LQWKFZ
+     +,              MQKEYS(3),NQINIT,NQTSYS,NQM99,NQPERM,NQFATA,NQCASE
+     +,              NQTRAC,MQTRAC(48)
+                                       EQUIVALENCE (KQSP,NQOFFS(1))
+      COMMON /MZCB/  JQSTOR,KQT,KQS,  JQDIVI,JQDIVR
+     +,              JQKIND,JQMODE,JQDIVN,JQSHAR,JQSHR1,JQSHR2,NQRESV
+     +,              LQSTOR,NQFEND,NQSTRU,NQREF,NQLINK,NQMINR,LQ2END
+     +,              JQDVLL,JQDVSY,NQLOGL,NQSNAM(6)
+                                       DIMENSION    IQCUR(16)
+                                       EQUIVALENCE (IQCUR(1),LQSTOR)
+      COMMON /MZCC/  LQPSTO,NQPFEN,NQPSTR,NQPREF,NQPLK,NQPMIN,LQP2E
+     +,              JQPDVL,JQPDVS,NQPLOG,NQPNAM(6)
+     +,              LQSYSS(10), LQSYSR(10), IQTDUM(22)
+     +,              LQSTA(21), LQEND(20), NQDMAX(20),IQMODE(20)
+     +,              IQKIND(20),IQRCU(20), IQRTO(20), IQRNO(20)
+     +,              NQDINI(20),NQDWIP(20),NQDGAU(20),NQDGAF(20)
+     +,              NQDPSH(20),NQDRED(20),NQDSIZ(20)
+     +,              IQDN1(20), IQDN2(20),      KQFT, LQFSTA(21)
+                                       DIMENSION    IQTABV(16)
+                                       EQUIVALENCE (IQTABV(1),LQPSTO)
+C
+      COMMON /RZCL/  LTOP,LRZ0,LCDIR,LRIN,LROUT,LFREE,LUSED,LPURG
+     +,              LTEMP,LCORD,LFROM
+                   EQUIVALENCE (LQRS,LQSYSS(7))
+C
+      PARAMETER (KUP=5,KPW1=7,KNCH=9,KDATEC=10,KDATEM=11,KQUOTA=12,
+     +           KRUSED=13,KWUSED=14,KMEGA=15,KIRIN=17,KIROUT=18,
+     +           KRLOUT=19,KIP1=20,KNFREE=22,KNSD=23,KLD=24,KLB=25,
+     +           KLS=26,KLK=27,KLF=28,KLC=29,KLE=30,KNKEYS=31,
+     +           KNWKEY=32,KKDES=33,KNSIZE=253,KEX=6,KNMAX=100)
+C
+      DATA          NENTRY/0/
+      SAVE          NENTRY
+
+      IF(NENTRY.EQ.0) THEN
+         NENTRY = 1
+         RETURN
+      ENDIF
+*
+*     Must save directory in local variable: calls to RZ
+*     overwrite it!
+*
+      LDIR   = LENOCC(CHDIR)
+      CHSAVE = CHDIR(1:LDIR)
+*
+*     Retrieve the keys in this directory
+*
+      IF(LQRS.EQ.0)  GOTO 99
+      IF(LCDIR.EQ.0) GOTO 99
+      LS = IQ(KQSP+LCDIR+KLS)
+      LK = IQ(KQSP+LCDIR+KLK)
+      NK = IQ(KQSP+LCDIR+KNKEYS)
+      NWK= IQ(KQSP+LCDIR+KNWKEY)
+      DO 10 I=1,NK
+
+         K=LK+(NWK+1)*(I-1)
+         DO 20 J=1,NWK
+            IKDES=(J-1)/10
+            IKBIT1=3*J-30*IKDES-2
+            IF(JBYT(IQ(KQSP+LCDIR+KKDES+IKDES),IKBIT1,3).LT.3)THEN
+               KEYZ(J)=IQ(KQSP+LCDIR+K+J)
+            ELSE
+               CALL ZITOH(IQ(KQSP+LCDIR+K+J),KEYZ(J),1)
+            ENDIF
+   20    CONTINUE
+
+         CALL VZERO(KEYS,10)
+         CALL UCOPY(KEYZ(1),KEYS(11),4)
+*
+*     Retrieve the highest cycle of this object
+*     (will need modification if all cycles are to be converted)
+*
+         ICYCLE = 9999
+         JBIAS = 2
+         CALL RZIN(IDIV,LADDR,JBIAS,KEYZ,ICYCLE,' ')
+         IF(IQUEST(1).NE.0) THEN
+            PRINT *,'CPKALC. error ',IQUEST(1),' from RZIN for ',KEYZ
+            GOTO 10
+         ENDIF
+*
+*     Date/time of insertion
+*
+         CALL RZDATE(IQUEST(14),IDATE,ITIME,1)
+         CALL CDPKTM(IDATE,ITIME,IPACK,IRC)
+         KEYS(4) = IPACK
+*
+*     Store objects in HEPDB with appropriate keys
+*     Option H: honour insertion time in KEYS(IDHINS)
+*
+         CALL CDSTOR(CHPATH(1:LPATH),LADDR,LKYBK,IDIV,KEYS,'H',IRC)
+*
+*     Reset directory
+*
+         CALL RZCDIR(CHSAVE(1:LDIR),' ')
+*
+*     Drop this bank
+*
+         CALL MZDROP(IDIV,LADDR,' ')
+         LADDR = 0
+
+   10 CONTINUE
+
+   99 CONTINUE
+*
+*     Send updates to server one directory at a time
+*
+      CALL CDSTSV(' ',0,IRC)
+      CALL RZCDIR(CHSAVE(1:LDIR),' ')
+
+      END
+\end{XMPt}
+
+\Filename{H2hdbappen-Creation-of-the-CHORUS-database}
+\section{Creation of the {\tt CHORUS} database}
+
+The programs in this section were all written by
+{\tt J. Brunner/CHORUS}.
+
+The following program shows the creation of the directory
+structure and aliases for the {\tt CHORUS} geometry database.
+
+Once the directories have been created by the server,
+the program can be rerun to enter the aliases.
+
+\begin{XMPt}{Creating the directories and aliases for {\tt CHORUS}}
+      PROGRAM MKDIRHDB
+C     ----------------
+C     CREATES THE DIRECTORY STRUCTURE
+C     FOR THE GEOMETRY DATABASE OF CHORUS
+C
+      PARAMETER (NPAW=100000,NHBOOK=0,NDX=43)
+      COMMON /PAWC/ PAW(NPAW)
+      CHARACTER*4 CHTOP
+      CHARACTER*80 CHFILE
+      CHARACTER*80 DNAME
+      CHARACTER*40 DITAG(NDX)
+      CHARACTER*4  ALIAS(NDX)
+      DATA ALIAS /'3021','3022','3023','3024','3061','3062','3063',
+     +'3041','3042','3043','3044','3051','3052','3053','3054',
+     +'3011','3012','3015','3016','3017','3014','3018',
+     +'3031','3032','3033','3034','3091',
+     +'3071','3072','3073','3074','3075','3076','3077','3078',
+     +'3081','3082','3083','3084','3085','3086','3087','3088'/
+      DATA DITAG /'TUBES/X-COORD',
+     +            'TUBES/V-COORD',
+     +            'TUBES/V-OFFSET',
+     +            'TUBES/ORIENTATION',
+     +            'TUBES/ANALOG-V-COORD',
+     +            'TUBES/ANALOG-V-OFFSET',
+     +            'TUBES/MAGNET',
+     +            'BREMS/X-COORD',
+     +            'BREMS/V-COORD',
+     +            'BREMS/V-OFFSET',
+     +            'BREMS/ORIENTATION',
+     +            'DRIFT/X-COORD',
+     +            'DRIFT/V-COORD',
+     +            'DRIFT/V-OFFSET',
+     +            'DRIFT/ORIENTATION',
+     +            'CALOR/X-COORD',
+     +            'CALOR/V-COORD',
+     +            'CALOR/ELM-V-OFFSET',
+     +            'CALOR/HA1-V-OFFSET',
+     +            'CALOR/HA2-V-OFFSET',
+     +            'CALOR/ORIENTATION',
+     +            'CALOR/MASK',
+     +            'FIBER/X-COORD',
+     +            'FIBER/V-COORD',
+     +            'FIBER/V-OFFSET',
+     +            'FIBER/ORIENTATION',
+     +            'DIAMO/X-COORD',
+     +            'TRIGG/X-COORD-PLAN',
+     +            'TRIGG/Y-COORD-PLAN',
+     +            'TRIGG/Z-COORD-PLAN',
+     +            'TRIGG/X-WIDTH-PLAN',
+     +            'TRIGG/Y-WIDTH-PLAN',
+     +            'TRIGG/Z-WIDTH-PLAN',
+     +            'TRIGG/Z-ANGLE-PLAN',
+     +            'TRIGG/POINTER-TO-BAR',
+     +            'TRIGG/X-COORD-BAR',
+     +            'TRIGG/Y-COORD-BAR',
+     +            'TRIGG/Z-COORD-BAR',
+     +            'TRIGG/X-WIDTH-BAR',
+     +            'TRIGG/Y-WIDTH-BAR',
+     +            'TRIGG/Z-WIDTH-BAR',
+     +            'TRIGG/Z-ANGLE-BAR',
+     +            'TRIGG/POINTER-TO-PLAN'/
+C
+C---      INITIALISATION
+C
+      CALL CDPAW(NPAW,NHBOOK,IDIV,'USR-DIV',5000,50000,'ZPHU',IRC)
+      PRINT '('' IRC FROM CDPAW '',I5)',IRC
+      LUNCD=1
+      LUNFZ=2
+      CALL CDPREF(10,'CH',CHTOP,CHFILE,IRC)
+      PRINT '('' IRC FROM CDPREF '',I5)',IRC
+      LRECL = 0
+      CALL CDOPEN(LUNCD,LUNFZ,CHTOP,CHFILE,LRECL,IDIV,' ',IRC)
+      PRINT '('' IRC FROM CDOPEN '',I5)',IRC
+C
+C--- CREATE DIRECTORIES
+C
+      IPREC = -8
+      MAX   = 100
+      DELTA = 0.0
+      NKEYS = 0
+      DO IDX=1,NDX
+      DNAME = '//CDCH/GEOMETRY/'//DITAG(IDX)
+*
+*     First run with the following call to CDMDIR
+*
+      CALL CDMDIR(DNAME,NKEYS,' ',' ',MAX,IPREC,DELTA,' ',IRC)
+      PRINT '('' IRC FROM CDMDIR '',I5)',IRC
+*
+*     Then rerun with the following call uncommented and
+*     the previous call to CDMDIR commented out
+*
+*     CALL CDALIA(DNAME,ALIAS(IDX),'P',IRC)
+*     PRINT '('' IRC FROM CDALIA '',I5)',IRC
+      END DO
+C
+C--- TERMINATION
+C
+      CALL CDEND(' ','A',IRC)
+      END
+\end{XMPt}
+
+The following program shows an example of how the directories
+created by the previous program can be populated with vectors.
+
+{\tt HEPDB} always stores objects as Zebra banks and so the
+first operation is to convert the vectors into banks using
+the routine \Rind{CDVECT}. The banks can then be stored
+using \Rind{CDSTOR}.
+
+\begin{XMPt}{Storing vectors in a {\tt HEPDB} database}
+      PROGRAM FILLHDB
+C     ----------------
+C     FILLS THE DIRECTORY STRUCTURE
+C     FOR THE GEOMETRY DATABASE OF CHORUS
+C
+      DIMENSION KEYDBS(100)
+      PARAMETER (NPAW=400000,NHBOOK=0,NDX=42)
+      COMMON /PAWC/ PAW(NPAW)
+      CHARACTER*4 CHTOP
+      CHARACTER*80 CHFILE
+      CHARACTER*80 DNAME
+      CHARACTER*40 DITAG(NDX)
+      CHARACTER*4  ALIAS(NDX)
+      DIMENSION IPO(1300)
+      DATA (IPO(L),L=1,90)/
+     + 13633, 13634, 13635, 13636, 13637, 13638, 13639, 13640,     0,
+     +     0, 13641, 13642, 13643, 13644, 13645, 13646, 13647, 13648,
+     + 13649, 13650, 13651, 13652, 13653, 13654, 13655, 13656, 13657,
+     + 13658, 13659, 13660, 13661, 13662, 13663, 13664, 13665, 13666,
+     + 13667, 13668,     0,     0, 13377, 13378, 13379, 13380, 13381,
+     + 13382, 13383, 13384,     0,     0, 13385, 13386, 13387, 13388,
+     + 13389, 13390, 13391, 13392, 13393, 13394, 13395, 13396, 13397,
+     + 13398, 13399, 13400, 13401, 13402, 13403, 13404, 13405, 13406,
+     + 13407, 13408, 13409, 13410, 13411, 13412,     0,     0, 13121,
+     + 13122, 13123, 13124, 13125, 13126, 13127, 13128,     0,     0/
+      data (ipo(L),L=91,180)/
+     + 13129, 13130, 13131, 13132, 13133, 13134, 13135, 13136, 13137,
+     + 13138, 13139, 13140, 13141, 13142, 13143, 13144, 13145, 13146,
+     + 13147, 13148, 13149, 13150, 13151, 13152, 13153, 13154, 13155,
+     + 13156,     0,     0, 12865, 12866, 12867, 12868, 12869, 12870,
+     + 12871, 12872,     0,     0, 12873, 12874, 12875, 12876, 12877,
+     + 12878, 12879, 12880, 12881, 12882, 12883, 12884, 12885, 12886,
+     + 12887, 12888, 12889, 12890, 12891, 12892, 12893, 12894, 12895,
+     + 12896, 12897, 12898, 12899, 12900,     0,     0, 12609, 12610,
+     + 12611, 12612, 12613, 12614, 12615, 12616,     0,     0, 12617,
+     + 12618, 12619, 12620, 12621, 12622, 12623, 12624, 12625, 12626/
+      data (IPO(L),L=181,270)/
+     + 12627, 12628, 12629, 12630, 12631, 12632, 12633, 12634, 12635,
+     + 12636, 12637, 12638, 12639, 12640, 12641, 12642, 12643, 12644,
+     +     0,     0, 13697, 13698, 13699, 13700, 13701, 13702, 13703,
+     + 13704,     0,     0, 13705, 13706, 13707, 13708, 13709, 13710,
+     + 13711, 13712, 13713, 13714, 13715, 13716, 13717, 13718, 13719,
+     + 13720, 13721, 13722, 13723, 13724, 13725, 13726, 13727, 13728,
+     + 13729, 13730, 13731, 13732,     0,     0, 13441, 13442, 13443,
+     + 13444, 13445, 13446, 13447, 13448,     0,     0, 13449, 13450,
+     + 13451, 13452, 13453, 13454, 13455, 13456, 13457, 13458, 13459,
+     + 13460, 13461, 13462, 13463, 13464, 13465, 13466, 13467, 13468/
+      data (IPO(L),L=271,360)/
+     + 13469, 13470, 13471, 13472, 13473, 13474, 13475, 13476,     0,
+     +     0, 13185, 13186, 13187, 13188, 13189, 13190, 13191, 13192,
+     +     0,     0, 13193, 13194, 13195, 13196, 13197, 13198, 13199,
+     + 13200, 13201, 13202, 13203, 13204, 13205, 13206, 13207, 13208,
+     + 13209, 13210, 13211, 13212, 13213, 13214, 13215, 13216, 13217,
+     + 13218, 13219, 13220,     0,     0, 12929, 12930, 12931, 12932,
+     + 12933, 12934, 12935, 12936,     0,     0, 12937, 12938, 12939,
+     + 12940, 12941, 12942, 12943, 12944, 12945, 12946, 12947, 12948,
+     + 12949, 12950, 12951, 12952, 12953, 12954, 12955, 12956, 12957,
+     + 12958, 12959, 12960, 12961, 12962, 12963, 12964,     0,     0/
+      data (IPO(L),L=361,450)/
+     + 12673, 12674, 12675, 12676, 12677, 12678, 12679, 12680,     0,
+     +     0, 12681, 12682, 12683, 12684, 12685, 12686, 12687, 12688,
+     + 12689, 12690, 12691, 12692, 12693, 12694, 12695, 12696, 12697,
+     + 12698, 12699, 12700, 12701, 12702, 12703, 12704, 12705, 12706,
+     + 12707, 12708,     0,     0,  9537,  9538,  9539,  9540,  9541,
+     +  9542,  9543,  9544,  9545,  9546,  9547,  9548,  9549,  9550,
+     +  9551,  9552,  9553,  9554,  9555,  9556,  9557,  9558,  9559,
+     +  9560,  9561,  9562,  9563,  9564,  9565,  9566,  9567,  9568,
+     +  9569,  9570,  9571,  9572,  9573,  9574,  9575,  9576,  9281,
+     +  9282,  9283,  9284,  9285,  9286,  9287,  9288,  9289,  9290/
+      data (IPO(L),L=451,540)/
+     +  9291,  9292,  9293,  9294,  9295,  9296,  9297,  9298,  9299,
+     +  9300,  9301,  9302,  9303,  9304,  9305,  9306,  9307,  9308,
+     +  9309,  9310,  9311,  9312,  9313,  9314,  9315,  9316,  9317,
+     +  9318,  9319,  9320,  9025,  9026,  9027,  9028,  9029,  9030,
+     +  9031,  9032,  9033,  9034,  9035,  9036,  9037,  9038,  9039,
+     +  9040,  9041,  9042,  9043,  9044,  9045,  9046,  9047,  9048,
+     +  9049,  9050,  9051,  9052,  9053,  9054,  9055,  9056,  9057,
+     +  9058,  9059,  9060,  9061,  9062,  9063,  9064,  8769,  8770,
+     +  8771,  8772,  8773,  8774,  8775,  8776,  8777,  8778,  8779,
+     +  8780,  8781,  8782,  8783,  8784,  8785,  8786,  8787,  8788/
+      data (IPO(L),L=541,630)/
+     +  8789,  8790,  8791,  8792,  8793,  8794,  8795,  8796,  8797,
+     +  8798,  8799,  8800,  8801,  8802,  8803,  8804,  8805,  8806,
+     +  8807,  8808,  8513,  8514,  8515,  8516,  8517,  8518,  8519,
+     +  8520,  8521,  8522,  8523,  8524,  8525,  8526,  8527,  8528,
+     +  8529,  8530,  8531,  8532,  8533,  8534,  8535,  8536,  8537,
+     +  8538,  8539,  8540,  8541,  8542,  8543,  8544,  8545,  8546,
+     +  8547,  8548,  8549,  8550,  8551,  8552,  9601,  9602,  9603,
+     +  9604,  9605,  9606,  9607,  9608,  9609,  9610,  9611,  9612,
+     +  9613,  9614,  9615,  9616,  9617,  9618,  9619,  9620,  9621,
+     +  9622,  9623,  9624,  9625,  9626,  9627,  9628,  9629,  9630/
+      data (IPO(L),L=631,720)/
+     +  9631,  9632,  9633,  9634,  9635,  9636,  9637,  9638,  9639,
+     +  9640,  9345,  9346,  9347,  9348,  9349,  9350,  9351,  9352,
+     +  9353,  9354,  9355,  9356,  9357,  9358,  9359,  9360,  9361,
+     +  9362,  9363,  9364,  9365,  9366,  9367,  9368,  9369,  9370,
+     +  9371,  9372,  9373,  9374,  9375,  9376,  9377,  9378,  9379,
+     +  9380,  9381,  9382,  9383,  9384,  9089,  9090,  9091,  9092,
+     +  9093,  9094,  9095,  9096,  9097,  9098,  9099,  9100,  9101,
+     +  9102,  9103,  9104,  9105,  9106,  9107,  9108,  9109,  9110,
+     +  9111,  9112,  9113,  9114,  9115,  9116,  9117,  9118,  9119,
+     +  9120,  9121,  9122,  9123,  9124,  9125,  9126,  9127,  9128/
+      data (IPO(L),L=721,810)/
+     +  8833,  8834,  8835,  8836,  8837,  8838,  8839,  8840,  8841,
+     +  8842,  8843,  8844,  8845,  8846,  8847,  8848,  8849,  8850,
+     +  8851,  8852,  8853,  8854,  8855,  8856,  8857,  8858,  8859,
+     +  8860,  8861,  8862,  8863,  8864,  8865,  8866,  8867,  8868,
+     +  8869,  8870,  8871,  8872,  8577,  8578,  8579,  8580,  8581,
+     +  8582,  8583,  8584,  8585,  8586,  8587,  8588,  8589,  8590,
+     +  8591,  8592,  8593,  8594,  8595,  8596,  8597,  8598,  8599,
+     +  8600,  8601,  8602,  8603,  8604,  8605,  8606,  8607,  8608,
+     +  8609,  8610,  8611,  8612,  8613,  8614,  8615,  8616,  5186,
+     +  5187,  5188,  5189,  5190,  5191,  5192,  5193,  5194,  5195/
+      data (IPO(L),L=811,900)/
+     +  5196,  5197,  5198,  5199,  5200,  5201,  5202,  5203,  5204,
+     +  5205,  5206,  5207,  5208,  5209,  5210,  5211,  5212,  5213,
+     +  5214,  5215,  5216,  5217,  5218,  5219,  5220,  5221,  5222,
+     +  5223,  5224,  5225,  5226,  5227,  5228,  5229,  5230,  5231,
+     +  5232,  5233,  5234,  5235,  5236,  5237,  5238,  5239,  5240,
+     +  5241,  5242,  5243,  5244,  5245,  4930,  4931,  4932,  4933,
+     +  4934,  4935,  4936,  4937,  4938,  4939,  4940,  4941,  4942,
+     +  4943,  4944,  4945,  4946,  4947,  4948,  4949,  4950,  4951,
+     +  4952,  4953,  4954,  4955,  4956,  4957,  4958,  4959,  4960,
+     +  4961,  4962,  4963,  4964,  4965,  4966,  4967,  4968,  4969/
+      data (IPO(L),L=901,990)/
+     +  4970,  4971,  4972,  4973,  4974,  4975,  4976,  4977,  4978,
+     +  4979,  4980,  4981,  4982,  4983,  4984,  4985,  4986,  4987,
+     +  4988,  4989,  4674,  4675,  4676,  4677,  4678,  4679,  4680,
+     +  4681,  4682,  4683,  4684,  4685,  4686,  4687,  4688,  4689,
+     +  4690,  4691,  4692,  4693,  4694,  4695,  4696,  4697,  4698,
+     +  4699,  4700,  4701,  4702,  4703,  4704,  4705,  4706,  4707,
+     +  4708,  4709,  4710,  4711,  4712,  4713,  4714,  4715,  4716,
+     +  4717,  4718,  4719,  4720,  4721,  4722,  4723,  4724,  4725,
+     +  4726,  4727,  4728,  4729,  4730,  4731,  4732,  4733,  4418,
+     +  4419,  4420,  4421,  4422,  4423,  4424,  4425,  4426,  4427/
+      data (IPO(L),L=991,1080)/
+     +  4468,  4469,  4470,  4471,  4472,  4473,  4474,  4475,  4476,
+     +  4477,  5250,  5251,  5252,  5253,  5254,  5255,  5256,  5257,
+     +  5258,  5259,  5260,  5261,  5262,  5263,  5264,  5265,  5266,
+     +  5267,  5268,  5269,  5270,  5271,  5272,  5273,  5274,  5275,
+     +  5276,  5277,  5278,  5279,  5280,  5281,  5282,  5283,  5284,
+     +  5285,  5286,  5287,  5288,  5289,  5290,  5291,  5292,  5293,
+     +  5294,  5295,  5296,  5297,  5298,  5299,  5300,  5301,  5302,
+     +  5303,  5304,  5305,  5306,  5307,  5308,  5309,  4994,  4995,
+     +  4996,  4997,  4998,  4999,  5000,  5001,  5002,  5003,  5004,
+     +  5005,  5006,  5007,  5008,  5009,  5010,  5011,  5012,  5013/
+      data (IPO(L),L=1081,1170)/
+     +  5014,  5015,  5016,  5017,  5018,  5019,  5020,  5021,  5022,
+     +  5023,  5024,  5025,  5026,  5027,  5028,  5029,  5030,  5031,
+     +  5032,  5033,  5034,  5035,  5036,  5037,  5038,  5039,  5040,
+     +  5041,  5042,  5043,  5044,  5045,  5046,  5047,  5048,  5049,
+     +  5050,  5051,  5052,  5053,  4738,  4739,  4740,  4741,  4742,
+     +  4743,  4744,  4745,  4746,  4747,  4748,  4749,  4750,  4751,
+     +  4752,  4753,  4754,  4755,  4756,  4757,  4758,  4759,  4760,
+     +  4761,  4762,  4763,  4764,  4765,  4766,  4767,  4768,  4769,
+     +  4770,  4771,  4772,  4773,  4774,  4775,  4776,  4777,  4778,
+     +  4779,  4780,  4781,  4782,  4783,  4784,  4785,  4786,  4787/
+      data (IPO(L),L=1171,1260)/
+     +  4788,  4789,  4790,  4791,  4792,  4793,  4794,  4795,  4796,
+     +  4797,  4482,  4483,  4484,  4485,  4486,  4487,  4488,  4489,
+     +  4490,  4491,  4532,  4533,  4534,  4535,  4536,  4537,  4538,
+     +  4539,  4540,  4541,  4428,  4429,  4430,  4431,  4432,  4433,
+     +  4434,  4435,  4436,  4437,  4438,  4439,  4440,  4441,  4442,
+     +  4443,  4444,  4445,  4446,  4447,  4448,  4449,  4450,  4451,
+     +  4452,  4453,  4454,  4455,  4456,  4457,  4458,  4459,  4460,
+     +  4461,  4462,  4463,  4464,  4465,  4466,  4467,  4492,  4493,
+     +  4494,  4495,  4496,  4497,  4498,  4499,  4500,  4501,  4502,
+     +  4503,  4504,  4505,  4506,  4507,  4508,  4509,  4510,  4511/
+      data (IPO(L),L=1261,1300)/
+     +  4512,  4513,  4514,  4515,  4516,  4517,  4518,  4519,  4520,
+     +  4521,  4522,  4523,  4524,  4525,  4526,  4527,  4528,  4529,
+     +  4530,  4531,  4417,  4673,  4929,  5185,  4478,  4737,  4990,
+     +  5249,     0,     0,  4481,  4734,  4993,  5246,  4542,  4798,
+     +  5054,  5310,     0,     0/
+      DATA ALIAS /'3021','3022','3023','3024','3061','3062',
+     +'3041','3042','3043','3044','3051','3052','3053','3054',
+     +'3011','3012','3015','3016','3017','3014','3018',
+     +'3031','3032','3033','3034','3091',
+     +'3071','3072','3073','3074','3075','3076','3077','3078',
+     +'3081','3082','3083','3084','3085','3086','3087','3088'/
+      DATA DITAG /'TUBES/X-COORD',
+     +            'TUBES/V-COORD',
+     +            'TUBES/V-OFFSET',
+     +            'TUBES/ORIENTATION',
+     +            'TUBES/ANALOG-V-COORD',
+     +            'TUBES/ANALOG-V-OFFSET',
+     +            'BREMS/X-COORD',
+     +            'BREMS/V-COORD',
+     +            'BREMS/V-OFFSET',
+     +            'BREMS/ORIENTATION',
+     +            'DRIFT/X-COORD',
+     +            'DRIFT/V-COORD',
+     +            'DRIFT/V-OFFSET',
+     +            'DRIFT/ORIENTATION',
+     +            'CALOR/X-COORD',
+     +            'CALOR/V-COORD',
+     +            'CALOR/ELM-V-OFFSET',
+     +            'CALOR/HA1-V-OFFSET',
+     +            'CALOR/HA2-V-OFFSET',
+     +            'CALOR/ORIENTATION',
+     +            'CALOR/MASK',
+     +            'FIBER/X-COORD',
+     +            'FIBER/V-COORD',
+     +            'FIBER/V-OFFSET',
+     +            'FIBER/ORIENTATION',
+     +            'DIAMO/X-COORD',
+     +            'TRIGG/X-COORD-PLAN',
+     +            'TRIGG/Y-COORD-PLAN',
+     +            'TRIGG/Z-COORD-PLAN',
+     +            'TRIGG/X-WIDTH-PLAN',
+     +            'TRIGG/Y-WIDTH-PLAN',
+     +            'TRIGG/Z-WIDTH-PLAN',
+     +            'TRIGG/Z-ANGLE-PLAN',
+     +            'TRIGG/POINTER-TO-BAR',
+     +            'TRIGG/X-COORD-BAR',
+     +            'TRIGG/Y-COORD-BAR',
+     +            'TRIGG/Z-COORD-BAR',
+     +            'TRIGG/X-WIDTH-BAR',
+     +            'TRIGG/Y-WIDTH-BAR',
+     +            'TRIGG/Z-WIDTH-BAR',
+     +            'TRIGG/Z-ANGLE-BAR',
+     +            'TRIGG/POINTER-TO-PLAN'/
+C
+C---      INITIALISATION
+C
+      CALL CDPAW(NPAW,NHBOOK,IDIV,'USR-DIV',5000,50000,'ZPHU',IRC)
+      PRINT '('' IRC FROM CDPAW '',I5)',IRC
+      LUNCD=1
+      LUNFZ=2
+      CALL CDPREF(10,'CH',CHTOP,CHFILE,IRC)
+      PRINT '('' IRC FROM CDPREF '',I5)',IRC
+      LRECL = 0
+      CALL CDOPEN(LUNCD,LUNFZ,CHTOP,CHFILE,LRECL,IDIV,' ',IRC)
+      PRINT '('' IRC FROM CDOPEN '',I5)',IRC
+C
+C---  STORE VECTORS
+C
+      DO IDX=1,NDX
+          DNAME = '//CDCH/GEOMETRY/'//DITAG(IDX)
+          NDAT = 1300
+          CALL CDVECT(' ',IPO,NDAT,JADDR,'PI',IRC)
+          PRINT '('' IRC FROM CDVECT '',I5)',IRC
+          KEYDBS(11) = 1
+          KEYDBS(12) = 999999
+          IDIV = 0
+          CALL CDSTOR(DNAME(1:26),JADDR,LDUMI,IDIV,KEYDBS,' ',IRC)
+          PRINT '('' IRC FROM CDSTOR '',I5)',IRC
+      END DO
+C
+C--- TERMINATION
+C
+      CALL CDEND(' ','A',IRC)
+      END
+\end{XMPt}
+
+The following example shows how objects may be copied from
+one database to another. The directory structures in the two
+databases is different in this case.
+
+\begin{XMPt}{Copying objects from one database to another}
+      PROGRAM COPYHDB
+C     ----------------
+C     FILLS THE DIRECTORY STRUCTURE
+C     FOR THE GEOMETRY DATABASE OF CHORUS
+C
+      DIMENSION KEYDBS(100),KEY(5),JP(5)
+      DATA KEY /3023,3062,3043,3053,3071/
+      DATA JP  /   3,   6,  10,  14,   7/
+      PARAMETER (NWPAW=400000,NHBOOK=0,NDX=43)
+      COMMON/PAWC/NWP,IXPAWC,IHDIV,IXHIGZ,IXKU,FENC(5),LMAIN,HCV(NWPAW)
+      DIMENSION IQ(2),Q(2),LQ(8000)
+      EQUIVALENCE (LQ(1),LMAIN),(IQ(1),LQ(9)),(Q(1),IQ(1))
+      CHARACTER*7 CHPAT1
+      DATA CHPAT1 /'//CDC2/'/
+      CHARACTER*4 CHTOP
+      CHARACTER*80 CHFILE,CHPATH
+      CHARACTER*80 DNAME
+      CHARACTER*40 DITAG(NDX)
+      CHARACTER*4  ALIAS(NDX)
+      DATA ALIAS /'3021','3022','3023','3024','3061','3062','3063',
+     +'3041','3042','3043','3044','3051','3052','3053','3054',
+     +'3011','3012','3015','3016','3017','3014','3018',
+     +'3031','3032','3033','3034','3091',
+     +'3071','3072','3073','3074','3075','3076','3077','3078',
+     +'3081','3082','3083','3084','3085','3086','3087','3088'/
+      DATA DITAG /'TUBES/X-COORD',
+     +            'TUBES/V-COORD',
+     +            'TUBES/V-OFFSET',
+     +            'TUBES/ORIENTATION',
+     +            'TUBES/ANALOG-V-COORD',
+     +            'TUBES/ANALOG-V-OFFSET',
+     +            'TUBES/MAGNET',
+     +            'BREMS/X-COORD',
+     +            'BREMS/V-COORD',
+     +            'BREMS/V-OFFSET',
+     +            'BREMS/ORIENTATION',
+     +            'DRIFT/X-COORD',
+     +            'DRIFT/V-COORD',
+     +            'DRIFT/V-OFFSET',
+     +            'DRIFT/ORIENTATION',
+     +            'CALOR/X-COORD',
+     +            'CALOR/V-COORD',
+     +            'CALOR/ELM-V-OFFSET',
+     +            'CALOR/HA1-V-OFFSET',
+     +            'CALOR/HA2-V-OFFSET',
+     +            'CALOR/ORIENTATION',
+     +            'CALOR/MASK',
+     +            'FIBER/X-COORD',
+     +            'FIBER/V-COORD',
+     +            'FIBER/V-OFFSET',
+     +            'FIBER/ORIENTATION',
+     +            'DIAMO/X-COORD',
+     +            'TRIGG/X-COORD-PLAN',
+     +            'TRIGG/Y-COORD-PLAN',
+     +            'TRIGG/Z-COORD-PLAN',
+     +            'TRIGG/X-WIDTH-PLAN',
+     +            'TRIGG/Y-WIDTH-PLAN',
+     +            'TRIGG/Z-WIDTH-PLAN',
+     +            'TRIGG/Z-ANGLE-PLAN',
+     +            'TRIGG/POINTER-TO-BAR',
+     +            'TRIGG/X-COORD-BAR',
+     +            'TRIGG/Y-COORD-BAR',
+     +            'TRIGG/Z-COORD-BAR',
+     +            'TRIGG/X-WIDTH-BAR',
+     +            'TRIGG/Y-WIDTH-BAR',
+     +            'TRIGG/Z-WIDTH-BAR',
+     +            'TRIGG/Z-ANGLE-BAR',
+     +            'TRIGG/POINTER-TO-PLAN'/
+C
+C---      INITIALISATION, OPEN 2 DATABASE FILES
+C
+      CALL CDPAW(NWPAW,NHBOOK,IDIV,'USR-DIV',5000,50000,'ZPHU',IRC)
+      PRINT '('' IRC FROM CDPAW '',I5)',IRC
+      LUNCD=1
+      LUNFZ=2
+      CALL CDPREF(10,'CH',CHTOP,CHFILE,IRC)
+      PRINT '('' IRC FROM CDPREF1 '',I5)',IRC
+      LRECL = 0
+      CALL CDOPEN(LUNCD,LUNFZ,CHTOP,CHFILE,LRECL,IDIV,' ',IRC)
+      PRINT '('' IRC FROM CDOPEN1 '',I5)',IRC
+*
+      LUNCD=3
+      LUNFZ=4
+      CALL CDPREF(10,'C2',CHTOP,CHFILE,IRC)
+      PRINT '('' IRC FROM CDPREF2 '',I5)',IRC
+      LRECL = 0
+      CALL CDOPEN(LUNCD,LUNFZ,CHTOP,CHFILE,LRECL,IDIV,' ',IRC)
+      PRINT '('' IRC FROM CDOPEN2 '',I5)',IRC
+C
+C---  COPY OBJECTS
+C
+C     DO IDX=1,NDX
+      DO J=1,5
+          WRITE(CHPATH,'(A7,I4)') CHPAT1,KEY(J)
+          DNAME = '//CDCH/GEOMETRY/'//DITAG(JP(J))
+          NRUN = 1
+          CALL CDUSE(CHPATH,JKEY,NRUN,'N',IRC)
+          JADDR = LQ(JKEY-1)
+          PRINT '(A30)',CHPATH
+          PRINT '(I8)',JADDR
+          PRINT '('' IRC FROM CDUSE '',I5)',IRC
+          KEYDBS(11) = 1
+          KEYDBS(12) = 999999
+          CALL CDSTOR(DNAME,JADDR,LDUMI,IDIV,KEYDBS,' ',IRC)
+          PRINT '('' IRC FROM CDSTOR '',I5)',IRC
+      END DO
+C
+C--- TERMINATION
+C
+      CALL CDEND(' ','A',IRC)
+      END
+\end{XMPt}
+
+\Filename{H1hdbappen-HEPDB-compression-algorithms}
+\chapter{HEPDB compression algorithms}
+
+Three methods of packing are used by the HEPDB when storing data.
+These are the {\bf differences} method,
+the {\bf delta} method, and the {\bf packing} method.
+
+\Filename{H2hdbappen-The-delta-packing-method}
+\section{The delta packing method}
+
+In the delta packing method, the user has to supply a
+floating point variable (delta). All numbers below this (in absolute
+value) are treated as zero and ignored.
+The output bank has 3 extra words.
+
+\begin{OL}
+\item The number of data words in the original bank
+\item delta
+\item the number of words stored after the zero-suppression.
+\end{OL}
+
+\Filename{H2hdbappen-The-packing-method}
+\section{The packing method}
+
+In the packing method, all numbers are first converted
+to integers by multiplying the original number with \Lit{10**IPREC},
+a user specified quantity.
+They are then truncated at the decimal point.
+The minimum offset to make all numbers positive is then found and added
+to each value.
+The optimum packing factor is then determined.
+This
+factor is chosen so that the minimum number of words are used after packing.
+The data is then packed, except for those words which cannot be stored
+with the chosen packing factor, which are stored in 32 bit words.
+Here again 3 extra words are used to keep useful information, as follows:
+
+\begin{OL}
+\item The number of data words \Lit{*10**4 + original data type*1000 + (IPREC+100)}
+  The data type is indicated as follows:
+  \begin{DLtt}{1}
+    \item[2]Integer
+    \item[3]Floating point
+  \end{DLtt}
+\item The offset to make all the numbers positive
+\item A packed word with bits \\
+  \Lit{1-26} = number of words stored as 32-bit words,\\
+  bits \Lit{27-31} = number of bits used in packing,\\
+  bit \Lit{32} set to distinguish from the other methods.
+\end{OL}
+
+\Filename{H2hdbappen-The-differences-method}
+\section{The differences method}
+
+In addition to the above two methods, one can also store
+the difference of the current object from a master.
+A comparison is made with the five nearest
+neighbours which are not themselves updates. The differences are then made
+against that neighbour for which the minimum number of words are required.
+The user may select that the user keys must also match during the search
+for nearest neighbours.
+
+\Filename{H1hdbappen-Extraction-and-Merging-of-database-records}
+\chapter{Extraction and Merging of database records}
+
+\Filename{H2hdbappen-Copying-database-records-from-one-to-another-database}
+\section{Copying database records from one to another database}
+
+There will probably be a need to extract only a subset of the contents
+of a database to form a smaller private database. For maintaining the
+main database, the manager will have to be able to merge new or updated
+records from privately created database files into the main database,
+and there will also be the need to create `snapshot' records of the
+status of the current valid records in the database.
+Routine \Rind{HDBEXTR} serves these purposes.
+
+\Rind{HDBEXTR} extracts records from the subdirectory (or subdirectories)
+specified by the path \Rarg{PATHI} , and also (if \Rarg{PATHI} only leads to a
+directory, not a subdirectory) the \Lit{NSDIR}-element \Lit{CHARACTER} vector
+\Rarg{CHDIR}, which contains the subdirectory names (optionally, records
+from all subdirectories are extracted). The extracted records are
+valid for the period of validity specified in the integer vector
+\Rarg{KEYS}. If the \Ropt{W} option is not requested and there is more than
+one valid current record, appropriate for the given type, in the range
+then a series of summary records (each of which compresses the
+information from the chain of records which apply to a part of
+the period of validity) is created. The extracted record is written into
+the corresponding subdirectory in the file with top-directory name
+\Rarg{PATHO}.
+There is also additional information written which is needed for
+book-keeping when databases are merged
+(see also option \Ropt{E} in \Rind{HDBSTOR} and \Rind{HDBSTOM}).
+If the user only wants a copy of the database records he can
+choose option \Ropt{M}, which suppresses the storing of merge informations.
+By default a brief summary of all extracted records is printed, unless
+option \Ropt{N} is specified. If the user wishes to write the
+extracted records also on an FZ file he should specify the option \Ropt{X},
+but note that the appropriated FZ calls should have previously been
+issued before calling \Rind{HDBEXTR}.
+
+\Shubr{HDBEXTR}{(PATHI,PATHO,KEYS,CHSDIR,NSECD,CHOPT,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[PATHI]Full pathname of directory to be extracted.
+\item[PATHO]Name of top directory of the output database.
+  This database should not yet contain any of the
+  subdirectories that are to be copied from the main database, unless
+option \Ropt{O} is requested.
+\item[ISEL]Vector specifying the required validity range.
+\item[CHDIR]Character array of subdirectories to be extracted
+\item[NSDIR]Number elements in array \Rarg{CHDIR}
+\item[CHOPT]Character variable containing a string of single letter options
+  \begin{DLtt}{123}
+    \item[' ']directory specified by \Rarg{PATHI} will be extracted
+    \item['A']All subdirectories of the specified path will be extracted
+    \item['C']extract only records with key status bit copy set
+    \item['I']extend the validity range beyond one experiment number
+    \item['M']no merge information will be stored
+    \item['N']no summary will be printed
+    \item['S']a selected subset of subdetector subdirectories
+    (specified in \Rarg{CHDIR}) will be extracted
+    \item['O']subdetector-subdirectories in \Rarg{PATHO} may exist
+    \item['W']the whole number of stored records are
+      copied to the auxiliary database. However
+      the key word containing the pointer to the
+      logging will be changed. The input values of \Lit{ISEL} are ignored.
+    \item['X']write extracted records also to an FZ file,
+      where the FZ logical unit number is given by
+      the logical unit number for \Lit{PATHO+10}
+  \end{DLtt}
+\index{return code!{\tt IRC}}
+\item[IRC]Return status
+  \begin{DLtt}{1}
+    \item[0]Normal completion
+  \end{DLtt}
+\end{DLtt}
+
+\Filename{H2hdbappen-Merging-databases-or-database-records}
+\section{Merging databases or database records}
+
+The problem of merging records into the main database in a
+coherent manner is not a trivial one. In particular, care
+must be taken that conflicting updates are not entered into
+the main database. The routine \Rind{HDBMERG} described below
+performs checks to ensure that at record to be merged into
+the database does not conflict with any updates already
+in the database that have been made since information
+upon which the new record is based was extracted from the
+main database.
+\par
+Routine \Rind{HDBMERG} will merge a database or records from a database with a
+pre-existing `target' database. Depending on the options selected,
+all subdetector subdirectories or only a selected few may have their
+records merged. The subdetector-subdirectories to be merged are either
+specified by a full pathname in \Lit{CHAUX}, or else a path to the
+relevant subdetector-directory in \Lit{CHAUX} and a list of the selected
+subdetector-subdirectory names in the \Lit{NSDIR} elements of the \Lit{CHARACTER}
+vector \Rarg{CHSDIR}. The ``target'' database is
+identified by the top-directory name given in \Lit{CHTMAI} .
+
+The database which contains the records to be merged can be created
+with the \Rind{HDBEXTR} routine or with the routine \Rind{HDBNEW}. If the
+database has been created with the \Rind{HDBEXTR} routine only the records which
+have been stored in this database after calling \Rind{HDBEXTR} will be merged
+in. In the other case all records will be merged in. If the option \Ropt{X}
+is specified the merged records are also written to an FZ file, but note
+that the appropriated FZ calls should have previously been issued before
+calling \Rind{HDBMERG}.
+By default a brief summary of all merged records is printed. This
+can be suppressed with option \Ropt{N}. For expert use only there is the
+facility to change the range of applicability of the records on merging
+(option \Ropt{R}).
+
+\Shubr{HDBMERG}{(PATHI,PATHO,KEYS,CHSDIR,NSECD,CHOPT,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[PATHI]Full pathname of directory to be MERGacted.
+\item[PATHO]Name of top directory of the output database.
+  This database should not yet contain any of the
+  subdirectories that are to be copied from the main database, unless
+  option \Ropt{O} is requested.
+\item[KEYS]Vector specifying the required validity range.
+\item[CHDIR]Character array of subdirectories to be MERGacted
+\item[NSDIR]Number elements in array \Rarg{CHDIR}
+\item[CHOPT]Character variable containing a string of single letter options
+  \begin{DLtt}{123}
+    \item[' ']directory specified by \Rarg{PATHI} will be MERGacted
+    \item['A']All subdirectories of the specified path will be
+      MERGacted
+    \item['C']MERGact only records with key status bit copy set
+    \item['I']extend the validity range beyond one experiment number
+    \item['M']no merge information will be stored
+    \item['N']no summary will be printed
+    \item['S']a selected subset of subdetector subdirectories
+    (specified in \Rarg{CHSDIR}) will be MERGacted
+    \item['O']subdetector-subdirectories in \Rarg{PATHO} may exist
+    \item['R']the new period of validity given by the
+      integer vector \Rarg{KEYS} is used. This
+      may only be used for database records created by
+      the \Rind{HDBEXTR} routine and with option \Ropt{W} not requested.
+    \item[X]write extracted records also to an FZ file,
+      where the FZ logical unit number is given by
+      the logical unit number for \Lit{PATHO+10}.
+  \end{DLtt}
+\index{return code!{\tt IRC}}
+\item[IRC]Return status
+  \begin{DLtt}{12}
+    \item[0]Normal completion
+  \end{DLtt}
+\end{DLtt}
+
+\Filename{H2hdbappen-Transferring-datastructures-to-and-from-FZ-files}
+\section{Transferring datastructures to and from FZ files}
+
+RZ are not in themselves transportable between computers, unless
+they are written in exchange format (which is the default for
+HEPDB RZ files).
+They may also be translated into FZ file format for
+transportation. This process is possible for a whole database, a
+directory sub-tree or a single database record. It is possible
+to store the validity information in the record headers or in
+a special start-of-run record.
+
+The records are written to an FZ file using the routine \Rind{HDBTOFZ}, and
+may be read back into a database using the routine \Rind{HDBFRFZ}. It is
+also possible to store the contents of some other FZ file in a
+specified subdirectory using the routine \Rind{HDBFRFZ}. The routine
+\Rind{HDBFZM} can only used for FZ files which have been produced by the
+routines \Rind{HDBEXTR} or \Rind{HDBMERG} with the option \Ropt{X} requested,
+because of the special FZ file organisation.
+
+\Filename{H2hdbappen-Converting-database-records-into-an-FZ-file}
+\section{Converting database records into an FZ file}
+
+\Shubr{HDBTOFZ}{(PATH,LUN,ISEL,CHOPT,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[PATH]Pathname of the directory from where the data are
+  to be retrieved.
+\item[LUN]Logical unit number for the FZ file.
+\item[CHOPT]Character variable containing a string of single character options
+  \begin{DLtt}{1234}
+    \item[' ']Write retrieved record to a FZ file.
+    \item['C']Write pathname into header vector (not valid for
+      \Ropt{R} option).
+    \item['P']Write period of validity and \Lit{NSTYPE} in header vector.
+    \item['R']Write start-of-run record.
+    \item['RP']Write start-of-run record with header containing
+      the period of validity.
+    \item['W']Writes the directory and all subdirectories to
+      a FZ file (using \Rind{RZTOFZ}). Other options are ignored.
+  \end{DLtt}
+\index{return code!{\tt IRC}}
+\item[IRC]Return status
+  \begin{DLtt}{1}
+    \item[0]Normal completion
+  \end{DLtt}
+\end{DLtt}
+
+Information from a HEPDB database may be copied to a ZEBRA FZ sequential
+file using the routine \Rind{HDBTOFZ}. This routine can output a single
+datastructure, the contents of a subdirectory or directory tree with optional
+selection on perid of validity.
+The required \Rind{OPEN} and \Rind{FZFILE} statements must have
+previously been issued for the FZ file before calling this routine
+(see, for example, \Lit{PROGRAM HDBTOFZ} in the HEPDB PAM file).
+
+
+\newpage
+\Filename{H2hdbappen-Reading-database-records-from-FZ-files}
+\section{Reading database records from FZ files}
+
+\Shubr{HDBFRFZ}{(PATH,LUN,NSKIP,KEYS,CHOPT,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[PATH]Pathname of the directory into which the records are
+  to be copied.
+\item[LUN]Logical unit number for the FZ file.
+\item[NSKIP]Skip \Rarg{NSKIP} records before reading.
+  If option \Ropt{R} is chosen the
+  start-of-run record is not included in \Rarg{NSKIP}.
+\item[KEYS]Vector of \Rarg{KEYS} containing the period of validity.
+\item[CHOPT]Character variable containing a string of single character options
+  \begin{DLtt}{1234}
+    \item[' ']No start-of-run record and take period
+      of validity from input. Store as base record.
+    \item['A']Create the directory specified by \Rarg{PATH} before
+      reading the FZ file (cannot create a new file
+      if a whole database is to be loaded).
+    \item['B']Store as base record.
+    \item['C']Header contains the pathname, i.e. first header
+      contains length of the pathname (max. 40 words)
+      and the following words contain the pathname.
+      However, the pathname cannot be written into the start-of-run header.
+    \item['H']Take period of validity from the first 6 words of each header.
+      If option \Ropt{P} is chosen take
+      sub-run type from the seventh word of the header.
+    \item['I']extend the validity range beyond one experiment number
+    \item['P']Store as partial record.
+    \item['R']FZ file begins with start-of-run record.
+    \item['RH']As option \Ropt{R} and take period of validity from
+      start-of-run header as is described for option \Ropt{H}.
+    \item['T']Take time stamp from input \Rarg{KEYS} vector
+    \item['W']The whole directory is loaded via call to \Rind{RZFRFZ}.
+  \end{DLtt}
+\index{return code!{\tt IRC}}
+\item[IRC]Return status
+  \begin{DLtt}{12}
+    \item[0]Normal completion
+  \end{DLtt}
+\end{DLtt}
+
+An FZ file created using the routine \Rind{HDBTOFZ} or the routines
+\Rind{HDBMERG} or \Rind{HDBEXTR} with the {\tt X} option may
+be read using the routine \Rind{HDBFRRZ}.
+In the special case that the FZ file contains the contents of a complete database,
+using the option \Ropt{W} in \Rind{HDBTOFZ}, a new database file should be
+created using the routine \Rind{HDBNEW} before calling this routine.
+In all other cases, the data is entered into the subdirectory specified
+by the path \Rarg{PATH}, or else the subdirectory tree stored is added
+at the level specified by the path \Rarg{PATH}.
+This routine may also be used to process FZ files that are not written
+by one of the HEPDB routines. For example, an FZ file containing a single
+datastructure may be read in and entered into the database in the directory
+specified by the variable \Rarg{PATH}
+with the period of validity as specified by \Lit{ISEL}.
+
+Clearly, if the FZ file contains a database or directory tree, the
+validity of the recovered records is the same as those originally
+stored. However, when the FZ file contains a single record extracted
+from a database previously, or a completely new ZEBRA structure, then
+the validity may be specified. If the validity has been stored with the
+record, then this may be retrieved and applied. If the record contains
+a start-of-run record, the option \Ropt{R} must be used.
+
+\newpage
+\Filename{H2hdbappen-Merging-FZ-files-written-by-HDBEXTR-or-HDBMERG}
+\section{Merging FZ files written by \protect\Rind{HDBEXTR} or \protect\Rind{HDBMERG}}
+
+FZ files written by \Rind{HDBEXTR} or \Rind{HDBMERG} with the
+option \Ropt{X} may be processed with the routine \Rind{HDBFZM}.
+This routine decodes this FZ file structure and merges the
+corresponding information into the database. The user must issue
+the appropriate \Rind{OPEN} statement and call to the routine \Rind{FZFILE}
+before calling \Rind{HDBFZM}.
+
+\Shubr{HDBFZM}{(PATH,LUN,CHOPT,IRC*)}
+
+\begin{DLtt}{1234567}
+\item[PATH]Top directory name of the database into which the records
+  are to be copied.
+\item[LUN]Logical unit number for the FZ file.
+\item[CHOPT]Character variable containing a string of single character options
+  \begin{DLtt}{123}
+    \item[' ']Copy records, skip directories which are not
+      present, and print a summary.
+    \item['A']Add directories which are not present.
+    \item['N']No summary will be printed.
+  \end{DLtt}
+\item[IRC]Integer return code
+\index{return code!{\tt IRC}}
+  \begin{DLtt}{1}
+    \item[0]Normal completion
+  \end{DLtt}
+\end{DLtt}
+
+\Filename{H1hdbappen-Updating-HEPDB-databases}
+\chapter{Updating HEPDB databases}
+
+Several methods exist for updating HEPDB databases. Normally,
+updates are not applied directly to the database itself but
+queued to a dedicated server. The client-server communication
+also has several variants but the most important is when the
+communication is via files.
+Only this method will be described here as it is the only one
+enabled in the standard CERNLIB distribution of the package.
+
+When a user accesses a HEPDB database a journal file is opened
+in which database modifications are written. This journal file
+is created in the user's directory and is in Zebra FZ alpha exchange
+format. This file is then moved to a queue directory upon request,
+when the user starts to modify a different
+database or when the database is closed. The queue directory is
+defined by a configuration file which is described in detail below.
+
+The journal file name contains information on which database
+the modifications are for and the user and node name from which
+the update originated.
+
+The above scheme works well in both localised and distributed
+environments and is designed with file systems such as NFS and
+DFS in mind. In the case of nodes which do not offer network
+file systems, journal files are transferred using the
+CERN Program Library package CSPACK~\cite{bib-CSPACK}.
+
+\chapter{Access control}
+
+By default, all users may access any database in read mode.
+Updates are also possible, but are not performed directly,
+but placed in a queue where they will be handled by a server.
+
+One may use standard file permissions to control read and write
+access to a database (using write access to the queue directory
+in case of updates.) Alternatively, the {\bf :read} and {\bf :write}
+tags, described on page \pageref{sect-NAMES}, may be used.
+
+\Filename{H1hdbappen-Creating-a-new-database}
+\chapter{Creating a new database}
+
+The following example shows how to create a new database file.
+
+\begin{XMPt}{Creating a new database file}
+      PROGRAM CDEXA1
+*     ==============
+*
+*     Create a new, empty database
+*
+      PARAMETER   (NWPAW=100000)
+      COMMON/PAWC/PAW(NWPAW)
+*
+*     Initialise Zebra, HBOOK and HEPDB
+*
+      CALL CDPAW(NWPAW,NHBOOK,IDIV,'USR-DIV',5000,50000,'ZPHU',IRC)
+*
+*     Unit for database access
+*
+      LUNCD  = 1
+*
+*     Database parameters
+*
+      NPAIR  = 1
+      NREC   = 20000
+      NTOP   = 1
+*
+*     Accept default record length (1024 words)
+*
+      LRECL  = 0
+      CALL CDNEW(LUNCD,'HEPDB','HEPDB.DBS',IDIV,NPAIR,NREC,NTOP,
+     +           LRECL,' ',IRC)
+*
+*     Set the log level
+*
+      CALL CDLOGL(' ',3,'A',IRC)
+*
+*     Terminate
+*
+      CALL CDEND(' ','A',IRC)
+
+      END
+\end{XMPt}
+
+The same result can be achieved by running the {\tt CDMAKE} program, e.g.
+using the following script.
+
+\begin{XMPt}{Script to run CDMAKE program}
+#
+# Make a new database
+#
+# export CDFILE='name of the database file'
+  export CDFILE='test.dbs'
+
+# export CDPAIR='number of validity range pairs'
+  export CDPAIR=1
+
+# export CDPRE='number of records to be preformatted'
+  export CDPRE=100
+
+# export CDTOP='numeric ID for database'
+  export CDTOP=1
+
+# export CDQUO='number of records for database quota'
+  export CDQUO=65000
+
+# export CDRECL='record length of database file (words)'
+  export CDRECL=1024
+
+#
+# now run the job
+#
+
+  /cern/pro/bin/cdmake
+\end{XMPt}
+\Filename{H1hdbappen-Managing-the-database-servers}
+\chapter{Managing the database servers}
+
+\label{sect-NAMES}
+\index{names file}
+\index{HEPDB NAMES}
+
+Once the database file has been created, the server must be configured
+for this file. This is done using a \Lit{NAMES} file, as follows.
+
+\begin{XMPt}{Names file entries for a database file (hepdb.names)}
+
+:nick.config
+            :list.ge au
+            :log./hepdb/cplear/logs
+            :queue./hepdb/cplear/queue
+            :todo./hepdb/cplear/todo
+            :save./hepdb/cplear/save
+            :bad./hepdb/cplear/bad
+            :loglevel.3
+            :wakeup.60
+            :servers.cernvm vxcpon hepdb
+
+:nick.ge
+            :file./hepdb/cplear/database/geo.dbs
+            :servers.vxcpon hepdb cernvm
+            :desc.Geometry database for the CPLEAR experiment
+
+:nick.au
+            :file./hepdb/cplear/database/aux.dbs
+            :servers.vxcpon cernvm
+            :desc.Auxiliary database for the CPLEAR experiment
+            :read.*
+            :write.phr cpb
+
+:nick.hepdb
+            :userid.cdcplear
+            :node.hepdb
+            :localq./hepdb/l3/todo
+
+:nick.vxcpon
+            :userid.cdcplear
+            :node.vxcpon
+            :queue.disk$db:[cdcplear.todo]
+            :protocol.tcpip
+            :localq./hepdb/cplear/tovxcpon
+
+:nick.cernvm
+            :userid.cdcplear
+            :node.cernvm
+            :queue./hepdb/cplear/tocernvm
+            :protocol.tcpip
+            :localq./hepdb/cplear/tocernvm
+
+\end{XMPt}
+
+The various tags in the preceding names file have the following meanings.
+\begin{DLtt}{1234567890}
+\item[CONFIG]Configuration details for the server, as follows.
+\begin{DLtt}{1234567890}
+\item[LIST]A list of two character database prefixes
+\item[LOG]The directory where the server logs are written
+\item[QUEUE]The directory where new updates are placed by HEPDB clients
+\item[TODO]The directory scanned by the HEPDB servers for updates to
+process. In the case of {\tt MASTER} servers, the {\tt todo}
+and {\tt queue} directories are the same. In the case of {\tt SLAVE}
+servers, these queues are different.
+\item[BAD]The directory where the server places {\tt bad} updates.
+Bad updates are files for which the corresponding database cannot be
+found, or updates which cannot be successfully processed by the
+database server.
+\item[SAVE]The directory where the server saves updates after processing
+\item[LOGL]The log level for the server
+\item[WAKEUP]The wakeup interval in seconds for the server
+\item[SERVERS]This is the {\it or} of the list of servers for the
+individual databases. The database servers are responsible for
+moving updates to the local queues for the remote servers. A separate
+process, CDMOVE, is responsible for moving the processes between different
+systems.
+\end{DLtt}
+\item[prefix]The two character database prefix, e.g. {\Lit aa}.
+\begin{DLtt}{1234567890}
+\item[FILE]The full name of the database file. For VM/CMS systems,
+the syntax is {\tt <user.address>filename.filetype}
+\item[DESC]A comment string identifying the database and/or its purpose
+\item[SERVERS]The list of remote servers for this database. Each node
+in this list {\bf must} also be in the list for the :nick.config entry.
+\item[READ]A list of users who may read the database. An asterisk
+grants read access to all users. If this tag is not present,
+read access control is not performed.
+\item[WRITE]A list of users who may update the database.
+Users with write access automatically gain read access.
+If this tag is not present, write access control is not performed.
+\end{DLtt}
+\item[server]The nickname of the servers, e.g. {\Lit aa1}.
+\begin{DLtt}{1234567890}
+\item[USERID]Userid under which the server runs on the remote node
+\item[NODE]Node on which the server runs
+\item[QUEUE]Input queue on the remote node
+\item[PROTOCOL]Method by which updates are transmitted
+\item[LOCALQ]The local directory where updates are written pending
+transmission to the remote node. This may, in fact, be the same
+as \Lit{QUEUE}, e.g. when the directory is accessible via NFS
+or AFS.
+\index{NFS}\index{AFS}%
+\end{DLtt}
+\end{DLtt}
+
+\Filename{H2hdbappen-Master-and-slave-database-servers}
+\section{Master and slave database servers}
+
+Objects entered into a {\tt HEPDB} database are assigned a unique
+key within the directory into which they are inserted (the key serial number)
+and are stamped with the insertion date and time. It is important
+that these values are the same in all copies of the database. This is
+achieved by assigning these values centrally. The node on which the
+so-called {\tt master} server runs may be different for each experiment
+but will typically be at the laboratory where the experiment is being
+conducted. At CERN, a dedicated system has been set up to host the
+master database servers. This is node {\tt hepdb}.
+
+Master and slave servers operate identically. The only difference
+lies in the names file  (hepdb.names) that drives them. Updates are always queued
+by the {\tt HEPDB} client software into the directory pointed to
+by the {\tt :queue} tag in the names file, as described above.
+The servers scan the directory pointed to by the {\tt :todo} tag
+for outstanding updates. In the case of the master server, the
+{\tt :queue} and {\tt :todo} directories are the same. In all other
+cases it is a separate process that performs the automatic distribution
+of updates between servers. In the case of distributed file systems
+such as {\tt afs}, this operation is trivial. In other cases
+{\tt TCP/IP, Bitnet, DECnet} or other transport mechanism is used.
+
+The updates are stamped with the user and node name of origin. This
+allows the servers to avoid forwarding updates back to their node
+of origin.
+
+\Filename{H1hdbappen-Managing-HEPDB-servers-at-CERN}
+\chapter{Managing HEPDB servers at CERN}
+\label{CERN-servers}
+
+The following sections describe the setup of HEPDB at CERN.
+In general, the descriptions are also valid for other sites.
+
+\Filename{H2hdbappen-Creating-a-new-server-on-CERNVM}
+\section{Creating a new server on CERNVM}
+
+On CERNVM a dedicated account is used per experiment.
+Thus for {\tt CPLEAR} we have the account {\tt CDCPLEAR},
+for {\tt CHORUS} we have {\tt CDCHORUS}. These accounts
+are created using the standard {\tt USERREG} procedure.
+Each account has 3 mini-disks plus a link to the {\tt 191}
+disk of the {\tt HEPDB} machine. The latter is used to
+store the various EXECs that are required for the servers,
+to avoid cluttering up the {\tt CERNLIB} disks.
+
+The various disks are used as follows:
+\begin{DLtt}{1234}
+\item[191]Disk for the database files and log files
+\item[192]Link to {\tt HEPDB 191}
+\item[193]Disk for journal files
+\item[194]Disk for {\tt bad} files, i.e. those that
+cannot be successfully processed.
+\end{DLtt}
+
+In addition there is a special server named {\tt CDHEPDB}.
+This is used to exchange journal files between node {\tt hepdb}
+and {\tt CERNVM}. It is also used as a gateway to remote {\tt Bitnet}
+sites. Thus, in the case of {\tt CPLEAR}, updates from the
+{\tt VM/CMS} systems in Lyon, Saclay and Rutherford are first
+sent via {\tt CDHEPDB} to the master server on node {\tt hepdb}.
+Once a unique key serial number and the insertion date and time
+has been allocated, the new journal files are then resent
+to the slave servers on those nodes and CERNVM.
+
+The database servers are autologged by the machine {\tt FATONE},
+which also controls the {\tt FATMEN} servers.
+
+\Filename{h2hdbappen-Update-flow-between-CERNVM-and-HEPDB}
+\section{Transfer of updates between CERNVM and HEPDB}
+
+Updates are transferred between CERNVM and HEPDB by a dedicated service
+machine running under the account CDHEPDB. This machine keeps
+a TCP/IP connection open between the two nodes. Upon startup, it builds
+a list of HEPDB servers on the HEPDB node and transfers any pending
+updates. These updates are then sent to the appropriate server on
+CERNVM, or to a distribution list. The following example shows 
+NAMES file (hepdb.names) entry that will cause 
+updates to be distributed to multiple VM/CMS systems.
+
+\begin{XMPt}{Sending updates to multiple VM/CMS systems}
+ 
+:nick.CDCPLEAR
+               :list.cdcplear at frcpn11 cdcplear at cernvm
+ 
+\end{XMPt}
+
+When an update is received by this service machine, it is immediately
+transferred to HEPDB and a scan for updates pending for CERNVM made.
+
+\begin{XMPt}{Code for CDHEPDB service machine}
+      PROGRAM CDHEPDB
+*CMZ :          21/02/91  16.24.17  by  Jamie Shiers
+*-- Author :    Jamie Shiers   21/02/91
+*     Program to move updates between CERNVM and HEPDB
+*
+*     Stolen from FATMEN.
+*
+      PARAMETER     (NDIR=100)
+      CHARACTER*255 CHDIRS(NDIR)
+      PARAMETER     (NMAX=500)
+      CHARACTER*64  FILES(NMAX)
+      CHARACTER*8   HEPUSR,HEPNOD,REMUSR,REMNOD,REMDBS
+      CHARACTER*64  REMOTE,TARGET
+      CHARACTER*12  CHTIME
+      CHARACTER*8   CHUSER,CHPASS
+      CHARACTER*8   CHNODE,CHTYPE,CHSYS,CHRAND
+      CHARACTER*6   CHENT
+      CHARACTER*80  CHMAIL,LINE,CHDIR
+      CHARACTER*38  VALID
+      CHARACTER*255 ERRMSG
+      CHARACTER*2   CDPREF
+      CHARACTER*255 CDFILE
+      COMMON/PAWC/PAW(50000)
+      PARAMETER     (IPRINT=6)
+      PARAMETER     (IDEBUG=0)
+      PARAMETER     (LUNI=1)
+      PARAMETER     (LUNO=2)
++CDE,QUEST.
++CDE,SLATE.
+      DATA          NENTRY/0/
+      DATA          VALID/'ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890._'/
+*
+*     Initialise ZEBRA
+*
+      CALL HLIMIT(50000)
+*
+*     Initialise XZ
+*
+      CALL XZINIT(IPRINT,IDEBUG,LUNI,LUNO)
+*
+      CALL CDHOST(CHNODE,IRC)
+      LNODE = LENOCC(CHNODE)
+*
+*     Open connection to HEPDB...
+*
++SELF,IF=TCPSOCK.
+      IDUMMY = CINIT(IDUMMY)
++SELF,IF=-TCPSOCK.
+      CALL VMREXX('F','USER',CHUSER,IC)
+      CALL VMREXX('F','PWD' ,CHPASS,IC)
+      CALL CUTOL(CHUSER)
+      CALL CUTOL(CHPASS)
+      CALL VMSTAK(CHPASS,'L',IC)
+      CALL VMSTAK(CHUSER,'L',IC)
++SELF.
+ 
+      CALL CZOPEN('zserv','HEPDB',IRC)
+*
+*     First entry: look on hepdb before sleeping
+*
+      NDIRS = 0
+      GOTO 20
+ 
+   10 CALL VMCMS('EXEC HDBSERV',IRC)
+      IF(IRC.EQ.99) GOTO 20
+      IF(IRC.NE.0) THEN
+         PRINT *,'CDHEPDB. error ',IRC,' from HDBSERV. Stopping...'
+         GOTO 90
+      ENDIF
+ 
+      NENTRY = NENTRY + 1
+*
+*     Get the user and node name for this file...
+*
+      CALL VMCMS('GLOBALV SELECT *EXEC STACK HDBADDR',IC)
+      CALL VMRTRM(LINE,IEND)
+      ISTART = ICFNBL(LINE,1,IEND)
+      CALL CDWORD(HEPUSR,0,' ',LINE(ISTART:IEND),IC)
+      LHEP   = LENOCC(HEPUSR)
+      CALL CDWORD(HEPNOD,1,' ',LINE(ISTART:IEND),IC)
+      LNOD   = LENOCC(HEPNOD)
+*
+*     Get file name (for database prefix and name of remote server)
+*
+      CALL VMCMS('GLOBALV SELECT *EXEC STACK CDFILE',IC)
+      CALL VMRTRM(CDFILE,LFILE)
+      CDPREF = CDFILE(1:2)
+      LBLANK = INDEX(CDFILE(1:LFILE),' ')
+      JBLANK = INDEXB(CDFILE(1:LFILE),' ')
+      REMDBS = CDFILE(LBLANK+1:JBLANK-1)
+      LDBS   = JBLANK - LBLANK - 1
+ 
+      IF(IDEBUG.GE.1)
+     +PRINT *,'CDHEPDB. Update received for ',REMDBS(1:LDBS),' prefix ',
+     +         CDPREF
+*
+*     Number of pending files
+*
+      CALL VMCMS('GLOBALV SELECT *EXEC STACK HDBFILES',IC)
+      CALL VMRTRM(LINE,IEND)
+      NFILES = ICDECI(LINE,1,IEND)
+ 
+      CALL DATIME(ID,IT)
+      WRITE(CHTIME,'(I6.6,I4.4,I2.2)') ID,IT,IS(6)
+      WRITE(CHENT ,'(I6.6)') NENTRY
+      CALL CDRAND(CHRAND,IRC)
+*
+*    Now put this file...
+*    This assumes the HEPDB naming convention: /hepdb/cdgroup,
+*                                          e.g. /hepdb/cdchorus
+      CHDIR  = '/hepdb/'//REMDBS(1:LDBS)//
+     +         '/todo'
+      LDIR   = LENOCC(CHDIR)
+*
+      REMOTE = ' '
+      REMOTE = 'zz'//CHTIME//CHRAND//CHENT
+     +         //'.'//HEPUSR(1:LHEP)//'_'//HEPNOD(1:LNOD)
+      LREM   = LENOCC(REMOTE)
+      TARGET = REMOTE(1:LREM)
+*
+*     Change remote directory
+*
+      CALL CUTOL(CHDIR(1:LDIR))
+      IF(IDEBUG.GE.1) PRINT *,'CDHEPDB. Changing remote directory to ',
+     +   CHDIR(1:LDIR)
+      CALL XZCD(CHDIR(1:LDIR),IRC)
+ 
+      IF(IDEBUG.GE.1) PRINT *,'CDHEPDB. Sending file as ',
+     +   REMOTE(1:LREM)
+      CALL XZPUTA(CDFILE(1:LFILE),REMOTE(1:LREM),' ',IC)
+      IF(IC.NE.0) THEN
+         WRITE(ERRMSG,9001) IC,HEPUSR,HEPNOD
+ 9001    FORMAT(' CDHEPDB. error ',I6,' sending update from ',
+     +            A,' at ',A,' to HEPDB')
+         LMSG = LENOCC(ERRMSG)
+         GOTO 100
+      ENDIF
+*
+*     Rename the remote update file
+*
+      LSTA = INDEXB(TARGET(1:LREM),'/') + 1
+      TARGET(LSTA:LSTA+1) = CDPREF
+      IF(IDEBUG.GE.1) PRINT *,'CDHEPDB. Renaming file to ',
+     +   TARGET(1:LREM)
+      CALL XZMV(REMOTE(1:LREM),TARGET(1:LREM),' ',IRC)
+*
+*     Delete this update...
+*
+      CALL VMCMS('ERASE '//CDFILE(1:LFILE),IC)
+*
+*     Try to clear out RDR
+*
+      IF(NFILES.GT.10) GOTO 10
+*
+*     Are there any files for us to get?
+*
+   20 CONTINUE
+*
+*     Get list of remote directories
+*
+      JCONT  = 0
+      IF(NDIRS.EQ.0) THEN
+         IF(IDEBUG.GE.1) PRINT *, 'HEPDB. Retrieving list of remote '
+     +   //'directories...'
+         CALL XZLS('/hepdb/cd*/tovm',CHDIRS,NDIR,NDIRS,JCONT,'D',IC)
+         NDIRS = MIN(NDIR,NDIRS)
+         IF(JCONT.NE.0) THEN
+            IC = 0
+            PRINT *,'CDHEPDB. too many directories - excess names ',
+     +      'will be flushed'
+*
+   30       CONTINUE
+            CALL CZGETA(CHMAIL,ISTAT)
+            LCH = LENOCC(CHMAIL)
+            IF(CHMAIL(1:1).EQ.'0') THEN
+*
+*        Nop
+*
+            ELSEIF(CHMAIL(1:1).EQ.'1') THEN
+            ELSEIF(CHMAIL(1:1).EQ.'2') THEN
+               GOTO 30
+            ELSEIF(CHMAIL(1:1).EQ.'3') THEN
+               IQUEST(1) = 1
+               IRC = 1
+            ELSEIF(CHMAIL(1:1).EQ.'E') THEN
+               IQUEST(1) = -1
+               IRC = -1
+            ELSEIF(CHMAIL(1:1).EQ.'V') THEN
+               GOTO 30
+            ELSE
+               IQUEST(1) = 1
+               IRC = 1
+            ENDIF
+*
+         ENDIF
+      ENDIF
+ 
+      IF(NDIRS.EQ.1.AND.INDEX(CHDIRS(1),'not found').NE.0) THEN
+         ERRMSG = 'CDHEPDB. there are no remote directories!'
+         LMSG   = LENOCC(ERRMSG)
+         GOTO 100
+      ENDIF
+ 
+      DO 80 J=1,NDIRS
+ 
+         LDIR = LENOCC(CHDIRS(J))
+         IF(LDIR.EQ.0) GOTO 80
+         CALL CLTOU(CHDIRS(J)(1:LDIR))
+*
+*     Get the name of the server for whom these updates are intended...
+*
+         JSTART = INDEX(CHDIRS(J)(1:LDIR),'/CD')
+         IF(JSTART.EQ.0) THEN
+            IF(IDEBUG.GE.-3)
+     +      PRINT *,'CDHEPDB. unrecognised directory - skipped ',
+     +      '(',CHDIRS(J)(1:LDIR),')'
+            GOTO 80
+         ELSE
+            JSTART = JSTART + 1
+         ENDIF
+ 
+         JEND = INDEX(CHDIRS(J)(JSTART:LDIR),'/')
+ 
+         IF(JEND.EQ.0) THEN
+            PRINT *,'CDHEPDB. unrecognised file name - skipped ',
+     +      '(',CHDIRS(J)(1:LDIR),')'
+            GOTO 80
+         ENDIF
+ 
+         REMUSR = CHDIRS(J)(JSTART:JSTART+JEND-2)
+         LREM = LENOCC(REMUSR)
+ 
+         IF(LREM.EQ.0) THEN
+            IF(IDEBUG.GE.-3)
+     +      PRINT *,'CDHEPDB. unrecognised file name - skipped ',
+     +      '(',CHDIRS(J)(1:LDIR),')'
+            GOTO 80
+         ENDIF
+ 
+         IF(IDEBUG.GE.1)
+     +   PRINT *,'CDHEPDB. processing updates for ',REMUSR(1:LREM)
+         CALL XZCD(CHDIRS(J)(1:LDIR),IRC)
+         IF(IRC.NE.0) THEN
+            IF(IDEBUG.GE.-3)
+     +      PRINT *,'CDHEPDB. cannot set directory to ',
+     +         CHDIRS(J)(1:LDIR)
+            GOTO 80
+         ENDIF
+ 
+         ICONT  = 0
+         NFILES = 0
+         IF(IDEBUG.GE.1) PRINT *, 'HEPDB. Retrieving list '
+     +   //'of remote files in ', CHDIRS(J)(1:LDIR)
+         CALL XZLS(' ',FILES,NMAX,NFILES,ICONT,' ',IC)
+         NFILES = MIN(NFILES,NMAX)
+         IF(IDEBUG.GE.2)
+     +   PRINT *,'CDHEPDB. ',NFILES,' files found in ',CHDIRS(J)(1:LDIR)
+         IF(ICONT.NE.0) THEN
+            IC = 0
+            IF(IDEBUG.GE.0)
+     +      PRINT *,'CDHEPDB. too many files - excess names will be '
+     +      //'flushed'
+*
+   40       CONTINUE
+            CALL CZGETA(CHMAIL,ISTAT)
+            LCH = LENOCC(CHMAIL)
+            IF(CHMAIL(1:1).EQ.'0') THEN
+*
+*        Nop
+*
+            ELSEIF(CHMAIL(1:1).EQ.'1') THEN
+            ELSEIF(CHMAIL(1:1).EQ.'2') THEN
+               GOTO 40
+            ELSEIF(CHMAIL(1:1).EQ.'3') THEN
+               IQUEST(1) = 1
+               IRC = 1
+            ELSEIF(CHMAIL(1:1).EQ.'E') THEN
+               IQUEST(1) = -1
+               IRC = -1
+            ELSEIF(CHMAIL(1:1).EQ.'V') THEN
+               GOTO 40
+            ELSE
+               IQUEST(1) = 1
+               IRC = 1
+            ENDIF
+*
+         ENDIF
+ 
+ 
+         DO 70 I=1,NFILES
+            LF = LENOCC(FILES(I))
+            IF(LF.EQ.0) GOTO 70
+            CALL CLTOU(FILES(I))
+*
+*     Fix for the case when there are no files...
+*
+            IF(NFILES.EQ.1) THEN
+ 
+               IF(INDEX(FILES(I)(1:LF),'DOES NOT EXIST').NE.0.OR.
+     +         INDEX(FILES (I)(1:LF),'NOT FOUND').NE.0) GOTO 10
+ 
+               IF(INDEX(FILES(I)(1:LF),'ARG LIST TOO LONG').NE.0) THEN
+                  IF(IDEBUG.GE.-3) THEN
+                     PRINT *,'CDHEPDB. Stopping due to the following '
+     +               //'error...'
+                     PRINT *,FILES(I)(1:LF)
+                     PRINT *,'(Intervention required on HEPDB)'
+                  ENDIF
+                  CALL VMCMS('EXEC TELL JAMIE '//FILES(I)(1:LF),IC)
+                  CALL VMCMS('EXEC TELL JAMIE Logging off...',IC)
+                  CALL VMCMS('EXEC TELL FATONE Logging off due to'//
+     +            FILES(I)(1:LF),IC)
+                  CALL VMSTAK('LOGOFF','L',IC)
+                  STOP
+               ENDIF
+ 
+            ENDIF
+*
+*     Check that file name is valid
+*
+            DO 50 L=1,LF
+               IF(INDEX(VALID,FILES(I)(L:L)).EQ.0) THEN
+                  IF(IDEBUG.GE.-3) THEN
+                     PRINT *,'CDHEPDB. invalid character ',
+     +                  FILES(I)(L:L),
+     +                  ' at ',L,' in ',FILES(I)(1:LF)
+                     PRINT *,'CDHEPDB. skipping update...'
+                  ENDIF
+                  GOTO 70
+               ENDIF
+   50       CONTINUE
+ 
+            IF(INDEX(FILES(I)(1:LF),CHNODE(1:LNODE)).NE.0) THEN
+               IF(IDEBUG.GE.1)
+     +         PRINT *,'CDHEPDB. skipping update for ',CHNODE(1:LNODE),
+     +         '(',FILES(I)(1:LF),')'
+               GOTO 70
+            ENDIF
+            LSLASH = INDEXB(FILES(I)(1:LF),'/')
+            IF(FILES(I)(LSLASH+1:LSLASH+2).EQ.'ZZ') THEN
+               IF(IDEBUG.GE.1)
+     +         PRINT *,'CDHEPDB. active file - skipped ', '(',FILES(I)
+     +         (1:LF),')'
+               GOTO 70
+            ENDIF
+ 
+            IF(IDEBUG.GE.2)
+     +      PRINT *,'CDHEPDB. update found for ',REMUSR(1:LREM), '(',
+     +      FILES(I)(1:LF),')'
+ 
+            IF(IDEBUG.GE.1) PRINT *,'CDHEPDB. retrieving update ',
+     +      FILES(I)(1:LF)
+ 
+            CDPREF = FILES(I)(1:LF)
+            CALL CDRAND(CHRAND,IRC)
+            CDFILE = CDPREF // CHRAND(3:) // '.HEPDB.B'
+            LFILE  = 16
+ 
+            CALL XZGETA(CDFILE(1:LFILE),FILES(I)(1:LF),'S',IC)
+            IF(IC.NE.0) THEN
+               WRITE(ERRMSG,9002) IC,REMUSR(1:LREM)
+ 9002    FORMAT(' CDHEPDB. error ',I6,' retrieving update for ',A)
+               LMSG = LENOCC(ERRMSG)
+               GOTO 100
+            ENDIF
+*
+*      Protection against zero length files
+*
+            IF(IQUEST(11).EQ.0) GOTO 60
+ 
+            LDOT = INDEX(CDFILE(1:LFILE),'.')
+            CDFILE(LDOT:LDOT) = ' '
+            LDOT = INDEX(CDFILE(1:LFILE),'.')
+            CDFILE(LDOT:LDOT) = ' '
+ 
+            CALL VMCMS('EXEC SENDFILE '//CDFILE(1:LFILE)//' TO '
+     +                 //REMUSR(1:LREM),IC)
+            IF(IC.NE.0) THEN
+               WRITE(ERRMSG,9003) IC,REMUSR(1:LREM)
+ 9003    FORMAT(' CDHEPDB. error ',I6,' sending update to ',A)
+               LMSG = LENOCC(ERRMSG)
+               GOTO 100
+            ENDIF
+*
+*     Now delete local file
+*
+            CALL VMCMS('ERASE '//CDFILE(1:LFILE),IC)
+*
+*     and the remote one
+*
+   60       continue
+            CALL XZRM(FILES(I)(1:LF),IC)
+            IF(IC.NE.0) THEN
+               WRITE(ERRMSG,9004) IC,FILES(I)(1:LF)
+ 9004    FORMAT(' CDHEPDB. error ',I6,' deleting file ',A)
+               LMSG = LENOCC(ERRMSG)
+               GOTO 100
+            ENDIF
+ 
+   70    CONTINUE
+ 
+   80 CONTINUE
+*
+*     Wait for some action...
+*
+      GOTO 10
+ 
+   90 CALL CZCLOS(ISTAT)
+      STOP
+  100 CONTINUE
+*
+*     Error exit
+*
+      IF(IDEBUG.GE.-3) PRINT *,ERRMSG(1:LMSG)
+      CALL VMCMS('EXEC TELL JAMIE '//ERRMSG(1:LMSG),IC)
+      CALL VMCMS('EXEC TELL JAMIE Logging off...',IC)
+      CALL VMCMS('EXEC TELL FATONE Logging off due to'//ERRMSG(1:LMSG),
+     +           IC)
+      CALL VMSTAK('LOGOFF','L',IC)
+      GOTO 90
+      END
+\end{XMPt}
+
+\Filename{h2hdbappen-Update-flow-between-HEPDB-and-other-nodes}
+\section{Transfer of updates between HEPDB and other nodes}
+
+\label{sect-CDMOVE}
+\index{CDMOVE}
+\index{Update distribution}
+Updates are transferred between HEPDB and non-VM nodes using
+a generalisation of the above procedure, known as {\bf CDMOVE}. 
+Rather than maintain
+a permanent network connection with each of the remote nodes,
+the method is as follows:
+
+\begin{itemize}
+\item
+Upon startup, the program obtains a list of experiments
+for which updates are to be processed. This list is defined by
+the environmental variable {\bf CDGROUPS}.
+
+\begin{XMPt}{Defining a list of groups}
+CDGROUPS="CDCHORUS,CDCPLEAR,CDNOMAD,CDCMS,CDNA48";export CDGROUPS
+\end{XMPt}
+
+\item
+Each group is then processed in turn. The directory containing
+the NAMES file (hepdb.names) for a given group is obtained from the environmental
+variable {\bf CDgroup}, e.g. {\bf CDCPLEAR}.
+
+\item
+The list of remote nodes is identified by the {\bf :servers} tag of
+the {\bf :nick.config} entry. Thus, for CPLEAR, the list of remote
+nodes is vxcrna uxcp05 axcp01 (see below).
+{\bf N.B. Each database may have a different list of remote
+servers. The :servers tags on the individual database entries
+are processed by CDSERV, not CDMOVE. CDMOVE only looks at
+the :servers tag on the :nick.config entry.}
+
+\item
+The remote nodes are processed for each database. Any files
+in the local queue for the remote node will be sent.
+The local queue is defined by the tag {\bf :localq}.
+If this queue is missing, the directory tonode, e.g.
+tovxcrna, is used.
+
+\item
+The updates are transferred to the directory 
+defined by the {\bf :queue} tag. If this tag is
+missing, the subdirectory {\bf TODO} is used.
+
+\item
+One may define a different list of remote nodes for each
+database. However, this is the concern of {\bf CDSERV},
+the database server, and not {\bf CDMOVE}. {\bf CDSERV}
+makes a copy of all update files in a local queue directory
+for each remote server defined by the {\bf :servers} tag
+for the current database. {\bf CDMOVE} looks at all
+of the local queues - the database to which an update
+file corresponds is determined by the two character
+prefix of the update file.
+
+\item
+If the tag {\bf :receive.yes} is specified, any pending updates
+will be retrieved from the remote system.
+
+\item
+If the tag {\bf :poll.yes} is specified, the remote node
+will be contacted and any pending updates
+will be retrieved from the remote system, regardless of
+whether there are any updates pending for the remote node
+in question.
+
+\item
+A connection is only made to a remote system if there are updates
+pending for that system. This makes sense in an environment where
+database updates are typically produced centrally.
+
+\item
+The files are received from the directory identified by the
+{\bf :remoteq} tag. If this tag is not specified, the
+subdirectory {\bf queue} is used.
+
+\item
+In all cases, the updates are received into the {\bf todo}
+subdirectory of the local server. It is assumed
+that {\bf CDMOVE} will be run on the same machine
+as the master server.
+
+\end{itemize}
+
+\begin{XMPt}{Example script to run CDMOVE}
+
+#!/bin/ksh
+#
+# Define the list of groups for whom updates are to be processed
+#
+export CDGROUPS="CDCPLEAR,CDCHORUS"
+#
+# For each group, define the pathname where the hepdb.names file resides
+#
+export CDCPLEAR=/hepdb/cdcplear
+export CDCHORUS=/hepdb/cdchorus
+#
+# Now start the server
+#
+/cern/pro/bin/cdmove
+
+\end{XMPt}
+
+\begin{XMPt}{NAMES file for CDCPLEAR (hepdb.names) }
+
+:nick.config
+   :list.au ge ca aa
+   :log./hepdb/cdcplear/log
+   :queue./hepdb/cdcplear/todo
+   :todo./hepdb/cdcplear/todo
+   :save./hepdb/cdcplear/save
+   :bad./hepdb/cdcplear/bad
+   :loglevel.3
+   :wakeup.60
+   :servers.vxcrna uxcp05 axcp01
+
+:nick.au
+   :file./hepdb/cdcplear/aux.dbs
+   :desc.auxil database
+   :servers.cernvm vxcrna uxcp05
+
+:nick.ca
+   :file./hepdb/cdcplear/cal.dbs
+   :desc.calibration database
+   :servers.cernvm vxcrna uxcp05
+
+:nick.ge
+   :file./hepdb/cdcplear/geo.dbs
+   :desc.geometry database
+   :servers.cernvm vxcrna uxcp05
+
+:nick.aa
+   :file./hepdb/cdcplear/aa.dbs
+   :desc.test database
+   :servers.cernvm
+
+:nick.cernvm
+   :userid.cdcplear
+   :node.cernvm
+   :localq./hepdb/cdcplear/tovm
+
+:nick.vxcrna
+   :userid.cdcplear
+   :node.axcrnb
+   :localq./hepdb/cdcplear/tovxcrna
+   :queue.disk$mf:[cdcplear.todo]
+
+:nick.uxcp05
+   :userid.cdcplear
+   :node.uxcp05
+   :localq./hepdb/cdcplear/touxcp05
+   :queue.disk$mf:[cdcplear.todo]
+   :poll.yes
+
+:nick.axcp01
+   :userid.cdcplear
+   :node.axcp01
+   :localq./hepdb/cdcplear/toaxcp01
+   :queue./hepdb/cdcplear/todo
+\end{XMPt}
+
+\begin{XMPt}{NAMES file for CDCHORUS (hepdb.names) }
+
+:nick.config
+   :list.c2 ch
+   :log./hepdb/cdchorus/log
+   :queue./hepdb/cdchorus/todo
+   :todo./hepdb/cdchorus/todo
+   :save./hepdb/cdchorus/save
+   :bad./hepdb/cdchorus/bad
+   :loglevel.3
+   :wakeup.60
+   :servers.vxcrna xantia
+
+:nick.c2
+   :file./hepdb/cdchorus/charm2.dbs
+   :desc.Charm2 database converted to HEPDB format
+   :servers.cernvm vxcrna xantia
+
+:nick.ch
+   :file./hepdb/cdchorus/chorus.dbs
+   :desc.CHORUS (geometry) database
+   :servers.cernvm vxcrna xantia
+
+:nick.cernvm
+   :userid.cdhepdb
+   :node.cernvm
+   :localq./hepdb/cdchorus/tovm
+
+:nick.vxcrna
+   :userid.cdhepdb
+   :node.vxcrna
+   :localq./hepdb/cdchorus/tovxcrna
+
+:nick.xantia
+   :userid.cdhepdb
+   :node.xantia.caspur.it
+   :localq./hepdb/cdchorus/toxantia
+   :receive:yes
+   :queue./cern/hepdb/cdchorus/todo
+\end{XMPt}
+
+The actual file transfer is performed by \CSPACK{}~\cite{bib-CSPACK}
+routines. Thus, the remote node must be set up correctly, i.e.
+{\bf ZSERV} must be installed. The user name and password for
+the remote connection are defined in the {\bf .netrc} file
+(or ftplogin. for VMS systems) 
+in the home directory of the account under which the
+{\bf CDMOVE} job is run.
+
+\section{Example of configuration on two VAX systems}
+
+Let us take the example of two VAX systems: {\bf VXLNFB}
+and {\bf AXPALS}. In this example, the {\it master} server
+will run on the node {\bf VXLNFB}. To achieve this, we
+must configue the file {\bf hepdb.names} so that the
+{\bf :queue} and {\bf :todo} tags point to the same directory,
+as shown below.
+
+\begin{XMPt}{Example names file for master server}
+
+:nick.config
+:list.ct rt gt
+:log.DISK\$MF:[KLOEDB.LOG]
+:queue.DISK\$MF:[KLOEDB.TODO]
+:todo.DISK\$MF:[KLOEDB.TODO]
+:save.DISK\$MF:[KLOEDB.SAVE]
+:bad.DISK\$MF:[KLOEDB.BAD]
+:loglevel.3
+:wakeup.60
+:servers.axpals
+
+:nick.ct
+:file.DISK\$MF:[KLOEDB.DATABASE]CALRT.DBS
+:desc.Calibration Database for Test Beam 1994
+:servers.axpals
+
+:nick.rt
+:file.DISK\$MF:[KLOEDB.DATABASE]RUNRT.DBS
+:desc.RUN CONDITION Database for Test Beam 1994
+:servers.axpals
+
+:nick.gt
+:file.DISK\$MF:[KLOEDB.DATABASE]GEORT.DBS
+:desc.Geometry Database for Test Beam 1994
+:servers.axpals
+
+:nick.axpals
+:userid.kloedb
+:node.axpals
+:poll.yes
+
+\end{XMPt}
+
+The names file for the slave server is similar, as shown below.
+
+\begin{XMPt}{Example names file for slave server}
+
+:nick.config
+:list.ct rt gt
+:log.DISK\$MF:[KLOEDB.LOG]
+:queue.DISK\$MF:[KLOEDB.TOVXLNFB]
+:todo.DISK\$MF:[KLOEDB.TODO]
+:save.DISK\$MF:[KLOEDB.SAVE]
+:bad.DISK\$MF:[KLOEDB.BAD]
+:loglevel.3
+:wakeup.60
+:servers.
+
+:nick.ct
+:file.DISK\$MF:[KLOEDB.DATABASE]CALRT.DBS
+:desc.Calibration Database for Test Beam 1994
+:servers.vxlnfb
+
+:nick.rt
+:file.DISK\$MF:[KLOEDB.DATABASE]RUNRT.DBS
+:desc.RUN CONDITION Database for Test Beam 1994
+:servers.vxlnfb
+
+:nick.gt
+:file.DISK\$MF:[KLOEDB.DATABASE]GEORT.DBS
+:desc.Geometry Database for Test Beam 1994
+:servers.vxlnfb
+
+\end{XMPt}
+
+In the above examples, it is assumed that {\bf CDMOVE} will run on the 
+same node as the {\it master} server, e.g. {\bf VXLNFB}.
+
+\subsection{Making an update on a node with a {\bf MASTER} server}
+\begin{itemize}
+\item
+If an update is made on the node where the master server is running,
+it is written into the directory {\bf DISK\$MF:[KLOEDB.TODO]}. 
+\item
+The master server will process this update and make a copy in the directory
+{\bf DISK\$MF:[KLOEDB.TOAXPALS]}. 
+\item
+A seperate process, {\bf CDMOVE} takes the files in 
+{\bf DISK\$MF:[KLOEDB.TOAXPALS]}, connects to the node {\bf AXPALS}
+and transfers the files to the directory
+{\bf DISK\$MF:[KLOEDB.TODO]}. 
+\item
+It will then be processed by the
+{\bf CDSERV} process on this node and the local copy of the 
+database updated.
+\end{itemize}
+
+\subsection{Making an update on a node with a {\bf SLAVE} server}
+\begin{itemize}
+\item
+If an update is made on the node where the slave server is running,
+it will be written into the directory {\bf DISK\$MF:[KLOEDB.TOVXLNFB]}.
+\item
+The {\bf CDMOVE} process running on VXLNFB will connect at
+periodic intervals and transfer any pending files,
+as we have specified the tag {\bf :poll.yes}, the {\bf CDMOVE}
+Alternatively, one may specify
+{\bf :receive.yes}, in which case updates will only be transferred
+from {\bf AXPALS} if the {\bf CDMOVE} server has made a connection
+to transfer updates from {\bf VXLNFB} to {\bf AXPALS}. If neither
+tag is specified, updates will never be transferred from {\bf AXPALS}
+to {\bf VXLNFB}.
+\end{itemize}
+
+\subsection{Running {\bf CDMOVE} on the slave node}
+
+Normally, one would run the {\bf CDMOVE} process on the same
+node as the master server. As stated above, this requires
+that {\bf ZSERV} has been correctly configured on all slave
+nodes.
+
+\index{ZSERV}
+\index{UCX}
+
+If this is not possible for some reason, e.g. if UCX is running
+on the slave node, then {\bf CDMOVE} can be run on the slave
+node. This, in turn, requires that {\bf ZSERV} is correctly
+configured on the master node.
+
+In this case the names file on the slave node must be modified
+as shown below.
+The changes are indented for clarity, although this is purely
+cosmetic.
+
+\begin{XMPt}{Example names file for slave server with changes for CDMOVE}
+
+:nick.config
+:list.ct rt gt
+:log.DISK\$MF:[KLOEDB.LOG]
+:queue.DISK\$MF:[KLOEDB.TOVXLNFB]
+:todo.DISK\$MF:[KLOEDB.TODO]
+:save.DISK\$MF:[KLOEDB.SAVE]
+:bad.DISK\$MF:[KLOEDB.BAD]
+:loglevel.3
+:wakeup.60
+   :servers.VXLNFB
+
+:nick.ct
+:file.DISK\$MF:[KLOEDB.DATABASE]CALRT.DBS
+:desc.Calibration Database for Test Beam 1994
+:servers.vxlnfb
+
+:nick.rt
+:file.DISK\$MF:[KLOEDB.DATABASE]RUNRT.DBS
+:desc.RUN CONDITION Database for Test Beam 1994
+:servers.vxlnfb
+
+:nick.gt
+:file.DISK\$MF:[KLOEDB.DATABASE]GEORT.DBS
+:desc.Geometry Database for Test Beam 1994
+:servers.vxlnfb
+
+   :nick.VXLNFB
+   :userid.kloedb
+   :node.VXLNFB
+   :poll.yes
+
+\end{XMPt}
+
+
+\Filename{H2hdbappen-Creating-a-new-server-on-VXCRNA}
+\section{Creating a new server on VXCRNA}
+
+Although it is possible to access remote database files
+from {\tt VAX/VMS} systems using {\tt NFS}, there
+are cases, such as on an online {\tt VAXcluster}, when
+it is desirable to have a database server on the
+{\tt VAX} itself.
+
+As above, an account is first created using {\tt USERREG}.
+This account is then configured using the following command
+file, included in the standard distribution:
+
+\begin{XMPt}{CDNEW.COM}
+$!DECK ID>, CDNEW.COM
+$ !
+$ ! Setup the directory and file structure for a new
+$ ! server
+$ !
+$   procedure = f$parse(f$environment("PROCEDURE"),,,"NAME")
+$   say       = "write sys$output"
+$   if p1 .eqs. ""
+$      then
+$         write sys$output "''procedure': usage ''procedure' group"
+$         exit
+$   endif
+$ !
+$ ! Does the directory already exist?
+$ !
+$   home = f$search("DISK$MF:[000000]''p1'.dir")
+$   if home .eqs. ""
+$      then
+$         say "''procedure': home directory for ''p1' does not exist."
+$         say "''procedure': please create an account using USERREG"
+$         exit
+$   endif
+$ !
+$ ! Create subdirectories
+$ !
+$   create/directory DISK$MF:['p1'.BAD]
+$   create/directory DISK$MF:['p1'.LOG]
+$   create/directory DISK$MF:['p1'.QUEUE]
+$   set file/protection=w:rwe DISK$MF:['p1']QUEUE.DIR
+$   create/directory DISK$MF:['p1'.TODO]
+$   create/directory DISK$MF:['p1'.SAVE]
+$   directory DISK$MF:['p1'] /security
+$ !
+$ ! Create names file
+$ !
+$   open/write out DISK$MF:['p1']HEPDB.NAMES
+$   write out ":nick.config"
+$   write out ":list.aa"
+$   write out ":bad.DISK$MF:[''p1'.BAD]"
+$   write out ":log.DISK$MF:[''p1'.LOG]"
+$   write out ":queue.DISK$MF:[''p1'.QUEUE]"
+$   write out ":todo.DISK$MF:[''p1'.TODO]"
+$   write out ":save.DISK$MF:[''p1'.SAVE]"
+$   write out ":wakeup.120"
+$   write out ":loglevel.3"
+$   close out
+$   type DISK$MF:['p1']HEPDB.NAMES
+\end{XMPt}
+
+Should the disk in question have disk quotas enabled,
+one should ensure that the {\tt queue} directory is
+owned by an identifier and has an ACL as in the following
+example:
+
+\begin{XMPt}{Queue directory on VAX/VMS systems}
+(IDENTIFIER=CDCHORUS,ACCESS=READ+WRITE+EXECUTE+DELETE+CONTROL)
+(IDENTIFIER=ID$_CHORUS,ACCESS=READ+WRITE+EXECUTE)
+(IDENTIFIER=ID$_CHORUS,OPTIONS=DEFAULT,ACCESS=READ+WRITE+EXECUTE+DELETE+CONTROL)
+(IDENTIFIER=CDF_EXPERIMENT,OPTIONS=DEFAULT,ACCESS=READ+WRITE+EXECUTE)
+\end{XMPt}
+
+The identifier must be granted to all users who should be permitted
+to update the database with the {\tt RESOURCE} attribute.
+
+As for {\tt CERNVM}, an extra account exists which is used to
+exchange updates between {\tt VXCRNA} and {\tt hepdb}.
+
+The files created on {\tt hepdb} must have the correct ownership
+(in this case UID 102 and GID 3) which must be mapped to the UIC
+under which the command file is executed on the VAX.
+
+This is performed as follows:
+
+\begin{XMPt}{Mapping a Unix UID/GID pair to a VMS username}
+$ !    MULTINET CONFIGURE /NFS
+$ !    NFS-CONFIG>add cdhepdb 102 3
+$ !    NFS-CONFIG>ctrl-z
+\end{XMPt}
+
+This is done using the following command file:
+\begin{XMPt}{Moving updates between VXCRNA and hepdb}
+$!DECK ID>, CDSEND.COM
+$ !
+$ ! Command file to move updates between 'slave' and 'master'
+$ !
+$ ! Invoked by CDSERV.COM from the account CDHEPDB on VXCRNA
+$ !
+$ ! Assumes correct UID & GID mapping for directories on 'master'
+$ !    MULTINET CONFIGURE /NFS
+$ !    NFS-CONFIG>add cdhepdb 102 3
+$ !    NFS-CONFIG>ctrl-z
+$ !
+$ set noon
+$ !
+$ ! List of servers
+$ !
+$   cdservers = "CDCPLEAR,CDCHORUS,CDNOMAD"
+$ !
+$ ! Master & slave definitions
+$ !
+$   slave     = "VXCRNA"
+$   master    = "HEPDB"
+$ !
+$ main_loop:
+$   nserver   = 0
+$ !
+$ ! Loop over all servers
+$ !
+$ loop_servers:
+$   server    = f$element(nserver,",",cdservers)
+$   nserver   = nserver + 1
+$   if server .eqs. "," then goto sleep
+$ !
+$ ! Look for files waiting to be sent to 'master'
+$ !
+$ to_hepdb:
+$    journal_file = f$search("DISK$MF:[''server'.TO''master']*.*")
+$ !
+$    if journal_file .eqs. "" then goto from_hepdb
+$ !
+$ ! Skip 'active' files
+$ !
+$    if f$extract(0,2,journal_file) .eqs. "ZZ" then goto to_hepdb
+$ !
+$ ! Build remote file name
+$ !
+$   istart = f$locate("]",journal_file) + 1
+$   remote_file = "''master':[''server'.TODO]ZZ" + -
+       f$extract(istart+2,f$length(journal_file),journal_file)
+$ !
+$ ! Copy the file over
+$ !
+$   copy 'journal_file' 'remote_file' /log /noconfirm
+$ !
+$ ! Rename remote file and delete local file if it was ok
+$ !
+$   if $severity .eq. 1
+$      then
+$         remote_update = "''master':[''server'.TODO]" + -
+             f$extract(istart,f$length(journal_file),journal_file)
+$         rename 'remote_file' 'remote_update' /nolog /noconfirm
+$         if $severity .eq. 1 then delete /nolog /noconfirm 'journal_file'
+$   endif
+$ !
+$   goto to_hepdb
+$ !
+$ ! Look for files to be pulled over from 'master'
+$ !
+$ from_hepdb:
+$    journal_file = f$search("HEPDB:[''server'.TO''slave']*.*")
+$ !
+$    if journal_file .eqs. "" then goto loop_servers
+$ !
+$ ! Skip 'active' files
+$ !
+$    if f$extract(0,2,journal_file) .eqs. "ZZ" then goto from_hepdb
+$ !
+$ ! Build local file name
+$ !
+$   istart = f$locate("]",journal_file) + 1
+$   local_file = "DISK$MF:[''server'.TODO]ZZ" + -
+       f$extract(istart+2,f$length(journal_file),journal_file)
+$ !
+$ ! Copy the file over
+$ !
+$   copy 'journal_file' 'local_file' /log /noconfirm
+$ !
+$ ! Rename local file and delete remote file if it was ok
+$ !
+$   if $severity .eq. 1
+$      then
+$         local_update = "DISK$MF:[''server'.TODO]" + -
+             f$extract(istart,f$length(journal_file),journal_file)
+$         rename 'local_file' 'local_update' /log /noconfirm
+$         if $severity .eq. 1 then delete /log /noconfirm 'journal_file'
+$   endif
+$ !
+$   goto from_hepdb
+$ !
+$ sleep:
+$   wait 00:30:00
+$   goto main_loop
+\end{XMPt}
+
+The servers are controlled by the following job, which runs in the
+{\tt SYS\$FATMEN} queue:
+
+\begin{XMPt}{Command file to control HEPDB servers}
+$!DECK ID>, CDMAST.COM
+$SET NOON
+$ !
+$ !   Master HEPDB command file
+$ !
+$     save_mess = f$environment("MESSAGE")
+$     set message/nofacility/noseverity/noid/notext
+$     write sys$output "CDMAST starting at ''f$time()'"
+$ !
+$ !   define list of servers
+$ !
+$     servers  = "CDHEPDB,CDCHORUS,CDCPLEAR" ! Separate by commas
+$     wakeup :== 00:30:00                    ! Every 30 minutes
+$ !
+$ !   define symbols - this is VXCRNA specific
+$ !
+$     n = 0
+$ loop:
+$     server    = f$element(n,",",servers)
+$     if server .eqs. "," then goto again
+$     'server' == "DISK$MF:[''server']"
+$     n         = n + 1
+$     goto loop
+$ again:
+$ !
+$ !   Run the command files that expect a complete list as argument
+$ !
+$     write sys$output ">>> CDPURGE..."
+$     @CERN_ROOT:[EXE]CDPURGE 'servers'  ! Purge old journal files
+$ !
+$     write sys$output ">>> CDCHECK..."
+$     @CERN_ROOT:[EXE]CDCHECK 'servers'  ! Check that servers are started
+$ !
+$     write sys$output ">>> Time is ''f$time()'. Waiting ''wakeup'..."
+$     wait 'wakeup'
+$     write sys$output ">>> Wakeup at ''f$time()'."
+$     goto again
+$     set message 'save_mess'
+$     exit
+\end{XMPt}
+
+The job {\tt CDPURGE} purges old journal and log files and is as
+follows:
+
+\begin{XMPt}{Job to purge old journal and log files}
+$!DECK ID>, CDPURGE.COM
+$SET NOON
+$ !
+$ ! Purge journalled HEPDB updates that are over a day old
+$ !
+$ if p1 .eqs. "" then exit
+$ hepdb =  p1
+$ count  = 0
+$ save_mess = f$environment("MESSAGE")
+$ set message/nofacility/noseverity/noid/notext
+$loop:
+$ server = f$element(count,",",hepdb)
+$ if server .eqs. "," then goto end
+$ count  = count + 1
+$ write sys$output "Processing ''server'..."
+$ ON WARNING THEN GOTO UNDEFINED
+$ cddir = &server
+$ purge 'cddir' ! Purge old log files
+$ cdfil = f$extract(0,f$length(cddir)-1,cddir) + ".SAVE]*.*;*"
+$ ON WARNING THEN CONTINUE
+$ delete/before=-0-23:59 'cdfil'
+$ goto loop
+$ undefined:
+$ write sys$output "Warning: symbol ''server' is not defined"
+$ goto loop
+$ end:
+$ set message 'save_mess'
+$ exit
+\end{XMPt}
+
+The job to check and restart the servers is as follows:
+\begin{XMPt}{CDCHECK command file}
+$!DECK ID>, CDCHECK.COM
+$SET NOON
+$ !
+$ ! Check that HEPDB servers are started
+$ !
+$ if p1 .eqs. "" then exit
+$ servers = p1
+$ count   = 0
+$ save_mess = f$environment("MESSAGE")
+$ set message/nofacility/noseverity/noid/notext
+$ !
+$ ! Check that the queue is started
+$ !
+$ if f$getqui("DISPLAY_QUEUE","QUEUE_STOPPED","SYS$FATMEN") .eqs. "FALSE" then -
+     start/queue sys$fatmen
+$loop:
+$ server = f$element(count,",",servers)
+$ if server .eqs. "," then goto end
+$ count  = count + 1
+$ write sys$output "Processing ''server'..."
+$ show user/nooutput 'server'
+$ if $severity .ne. 1
+$    then
+$ !
+$ !  Check that server has not been stopped
+$ !
+$    ON WARNING THEN GOTO UNDEFINED
+$    cddir = &server
+$    ON WARNING THEN CONTINUE
+$    cddir = f$extract(0,f$length(cddir)-1,cddir) + ".TODO]SIGNAL.STOP"
+$    if f$search(cddir) .nes. ""
+$       then write sys$output "Signal.Stop file found - will not restart"
+$       goto loop
+$    endif
+$    write sys$output "Restarting server ..."
+$    cdserv = &server + "CDSERV.COM"
+$    submit/queue=sys$fatmen/user='server' /id 'cdserv'
+$    endif
+$ goto loop
+$ undefined:$ write sys$output "Warning: symbol ''server' is not defined"
+$ goto loop
+$ end:
+$ exit
+\end{XMPt}
+
+\Filename{H2hdbappen-Accessing-remote-database-files-over-NFS}
+\section{Accessing remote database files over NFS}
+\index{NFS}
+One may avoid running a local database server on a given node
+by accessing the database files over the network. This is the
+recommended procedure for Unix systems at CERN.
+To enable this, one should first mount the {\tt /hepdb} file
+system as shown below.
+
+\begin{XMPt}{Mounting the /hepdb file system on a machine running Unix}
+
+mount hepdb:/hepdb /hepdb
+
+\end{XMPt}
+
+\index{CORE}
+\index{SHIFT}
+\index{CSF}
+
+Should your experiment require access to {\bf HEPDB} from one of 
+the CORE/SHIFT/CSF systems, please contact your CORE representative
+and ask them to perform the above action on the nodes in question.
+
+On a VAX/VMS system that has the NFS client software installed,
+as is the case on VXCERN, the following commands are issued
+at system startup time.
+
+\begin{XMPt}{Mounting the /hepdb file system on a machine running VMS}
+
+$ !
+$ ! Mount the file system if not already done
+$ !
+$ if f$trnlm("HEPDB").eqs."" then NFSMOUNT/soft HEPDB::"/hepdb" HEPDB
+
+\end{XMPt}
+
+The HEPDB software automatically uses C I/O to access remote database files
+on VMS systems. This is because VAX Fortran does not recognise the file
+structure of the remote Unix database file but is in any case completely
+transparent to the user.
+
+It is currently recommended that the update directory reside on the local
+VMS system. This is because Multinet NFS requires that VMS UICs are
+mapped to Unix UID and GID pairs on the remote node, even if the remote
+directory is {\tt world} writable (or writable by {\tt others} in Unix
+parlence). On VXCERN only a single UIC is mapped to a valid UID/GID pair
+on node hepdb. A job runs under this UIC to move the update files between
+the local and remote file systems.
+
+\Filename{H2hdbappen-VMS-systems-running-UCX}
+\section{VMS systems running UCX}
+
+{\bf N.B. The use of UCX is not recommended. The following section
+remains for historical reasons only.}
+
+At the time of writing, DEC's UCX product still does not provide
+an NFS client. In this case one can mount a VMS directory on
+node {\tt hepdb}. This is done today for {\tt CPLEAR}.
+
+As is the case for Multinet NFS, one must map a Unix UID/GID pair
+to a VMS username. In addition, a {\tt binding} must be made been
+a VMS directory and a Unix style file name.
+
+This can be done as follows:
+
+\begin{XMPt}{Binding a VMS directory to a Unix name}
+
+$ UCX
+UCX> BIND UXCP05$DKA300: /vxcplear
+UCX> show bind
+
+Logical filesystem                      Pathname
+
+UXCP05$DKA300:                          /vxcplear
+UCX>
+
+\end{XMPt}
+
+\begin{XMPt}{Mapping a UID/GID pair to a VMS username}
+
+$ UCX
+UCX> ADD PROXY CDCPLEAR /UID=102 /GID=1 /HOST=hepdb.cern.ch
+
+\end{XMPt}
+
+Note that UCX treats hostnames as case sensitive.
+
+Finally, one must start the UCX NFS server. This involves
+\begin{itemize}
+\item
+Modifying (correcting) the UCX startup command file
+{\tt SYS\$MANAGER:UCX\$NFS\_STARTUP.COM)}
+\item
+Invoking the command file at system startup.
+\end{itemize}
+
+\begin{XMPt}{Modifying the UCX NFS startup command file}
+$ ! ...
+$ !
+$ ! Set the following UID and GIDs
+$ !
+$ DEFINE/SYSTEM/EXE/NOLOG UCX$NFS00000000_GID 1
+$ DEFINE/SYSTEM/EXE/NOLOG UCX$NFS00000000_UID 0
+$ !
+$ ! ...
+$ !
+$ ! Comment out the following line
+$ ! RUN SYS\$SYSTEM:UCX\$SERVER\_NFS.EXE
+$ !
+$ ! The following section contains NFS process quota that is required by
+$ ! manual startup.  Please uncomment the following lines and comment out
+$ ! the "RUN" command above, if you choose to manually start NFS.
+$ !
+$ RUN SYS\$SYSTEM:UCX\$SERVER\_NFS.EXE/DETACH -
+        /OUTPUT=NLA0: -
+        /ERROR='P1' -
+        /AST\_LIMIT=512 -
+        /BUFFER\_LIMIT=200000 -
+        /EXTENT=20000 -
+        /FILE\_LIMIT=1024 -
+        /IO\_BUFFERED=400 -
+        /IO\_DIRECT=200 -
+        /QUEUE\_LIMIT=64 -
+        /ENQUEUE\_LIMIT=3000 -
+        /MAXIMUM\_WORKING\_SET=20000 -
+        /PAGE\_FILE=20000 -
+        /PRIORITY=8 -
+        /PRIVILEGES=(BYPASS,SYSPRV) -
+        /UIC=[1,4] -
+        /NORESOURCE
+$ !
+$EXIT:
+$ EXIT
+\end{XMPt}
+
+The file system is now ready for mounting on {\tt hepdb}.
+
+\begin{XMPt}{Extract from /etc/filesystems for /vxcplear}
+/vxcplear:
+        dev             = /vxcplear/cdcplear
+        vfs             = nfs
+        nodename        = uxcp05
+        mount           = true
+        options         = bg,hard,intr
+\end{XMPt}
+
+\Filename{H2hdbappen-Setting-up-a-new-server-on-hepdb}
+\section{Setting up a new server on {\tt hepdb}}
+
+The {\tt hepdb} system is a dedicated IBM RS6000 that only runs
+{\tt HEPDB} servers and associated jobs. The database files
+are maintained in the {\tt /hepdb} file system. This is nfs exported
+and should be mounted on other Unix systems, such as {\tt CSF},
+as follows:
+
+\begin{XMPt}{Mounting the /hepdb file system}
+
+mount hepdb:/hepdb /hepdb
+
+\end{XMPt}
+
+Before creating a new server, the account must be registered for
+service {\bf AFS} using {\bf USERREG}. The account should be
+the letters {\bf cd} followed by the name of the experiment,
+e.g. {\bf cdatlas, cdnomad, cdna49}.
+
+Once the account has been centrally registered for {\bf AFS}, one should
+create an account on the {\bf HEPDB} machine, using the UID and GID
+allocated by {\bf USERREG} and visible through {\bf XWHO}.
+
+Finally, the following script is run to create the appropriate directories
+and dummy configuration files.
+
+New servers can be setup using the following script, which creates
+the necessary directory structure and configuration files.
+
+\begin{XMPt}{Creating the files and directories for a new server}
+#
+# Setup the directory and file structure for a new
+# server
+#
+iam=`whoami`
+#
+# Are we root?
+#
+if [ "$iam" != "root" ]
+then
+   echo $0: This script must be run from root
+   exit
+fi
+#
+# Did we get any arguments?
+#
+if [ $# != 1 ]
+then
+   echo $0: usage $0 group
+   exit
+fi
+#
+# Does this directory exist?
+#
+if [ -d /hepdb/$1 ]
+then
+   echo $0: Directory /hepdb/$1 already exists
+   exit
+fi
+#
+# No, so make it
+#
+mkdir /hepdb/$1
+#
+# and the subdirectories...
+#
+mkdir /hepdb/$1/bad
+mkdir /hepdb/$1/log
+mkdir /hepdb/$1/queue
+chmod o+w /hepdb/$1/queue
+mkdir /hepdb/$1/todo
+mkdir /hepdb/$1/save
+ls -F /hepdb/$1
+#
+# now create the names file
+#
+echo :nick.config > /hepdb/$1/hepdb.names
+echo :list.aa     >> /hepdb/$1/hepdb.names
+echo :log./hepdb/$1/log >> /hepdb/$1/hepdb.names
+echo :queue./hepdb/$1/queue >> /hepdb/$1/hepdb.names
+echo :todo./hepdb/$1/todo >> /hepdb/$1/hepdb.names
+echo :save./hepdb/$1/save >> /hepdb/$1/hepdb.names
+echo :bad./hepdb/$1/bad >> /hepdb/$1/hepdb.names
+echo :loglevel.3 >> /hepdb/$1/hepdb.names
+echo :wakeup.60 >> /hepdb/$1/hepdb.names
+echo :nick.aa >> /hepdb/$1/hepdb.names
+echo :file./hepdb/$1/aa.dbs >> /hepdb/$1/hepdb.names
+echo :desc.Description of the database >> /hepdb/$1/hepdb.names
+echo :servers. >> /hepdb/$1/hepdb.names
+cat /hepdb/$1/hepdb.names
+#
+# Link the server script
+#
+ln -s /cern/new/bin/cdserv.sh /hepdb/$1/cdserv
+#
+# and the server module
+#
+ln -s /cern/new/bin/cdserv /hepdb/$1/cdsrv
+\end{XMPt}
+
+The servers are started at boot time by adding the
+file /etc/inittab as follows:
+
+\begin{XMPt}{Extract from /etc/inittab}
+rcnfs:2:wait:/etc/rc.nfs > /dev/console 2>&1 # Start NFS Daemons
+hepdb:2:wait:/etc/rc.hepdb > /dev/console 2>&1 # Start HEPDB
+cons:0123456789:respawn:/etc/getty /dev/console
+\end{XMPt}
+
+This invokes the following script:
+
+\begin{XMPt}{rc.hepdb}
+#!/bin/sh
+#
+#               Start HEPDB servers
+#
+#
+if [ -x /cern/pro/bin/cdstart ]
+then
+        echo Start HEPDB servers ...
+        su - hepdb /cern/pro/bin/cdstart 2>&1
+fi
+\end{XMPt}
+
+One may execute {\tt cdstart} at any time, as it will only
+restart servers that are not already running.
+
+\begin{XMPt}{cdstart script}
+#!/bin/ksh
+start=" "
+stop=" "
+run=" "
+nolog=" "
+noscr=" "
+b="."
+#
+#   Ensure that variables are defined...
+#
+
+for i in /hepdb/cd*
+   do
+
+echo
+typeset -u cdgrp
+cdpath=$i
+cdgrp=`basename $i`
+echo Setting $cdgrp to $cdpath ...
+eval $cdgrp=$cdpath;export $cdgrp
+#
+# and start the servers
+#
+if [ -x ${i}/cdserv ]
+   then
+#
+# does a log file exist?
+#
+   if [ -f /hepdb/${cdgrp}.log ]
+      then
+      echo '>>> log file exists - looking for existing process'
+      log=${log}${b}${cdgrp}
+      pid=`cat /hepdb/${cdgrp}.log | awk '{printf "%s\\n",$13}'`
+      if (test $pid)
+         then
+         echo Looking for server process for $cdgrp
+         if(ps -ae  | grep -s $pid )
+            then
+            echo CDSRV running PID = $pid
+            run=${run}${b}${cdgrp}
+            else
+            echo No existing server found for $cdgrp - starting server
+            if [ -f ${i}/todo/signal.stop ]
+               then echo but signal.stop file found!
+               else echo Starting server for $cdgrp
+               nohup ${i}/cdserv ${cdgrp} > $i/cdserv.log &
+               start=${start}${b}${cdgrp}
+            fi
+         fi
+
+         else
+         echo No existing server found for $cdgrp - starting server
+         if [ -f ${i}/todo/signal.stop ]
+            then echo but signal.stop file found!
+            stop=${stop}${b}${cdgrp}
+            else echo Starting server for $cdgrp
+            nohup ${i}/cdserv ${cdgrp} > $i/cdserv.log &
+            start=${start}${b}${cdgrp}
+         fi
+      fi
+      else
+      echo No server log found in $i
+      if [ -f ${i}/todo/signal.stop ]
+         then echo but signal.stop file found!
+         stop=${stop}${b}${cdgrp}
+         else echo Starting server for $cdgrp
+         nohup ${i}/cdserv ${cdgrp} > $i/cdserv.log &
+         start=${start}${b}${cdgrp}
+      fi
+   fi
+   else
+   echo No cdserv script found in $i - cannot start server
+   scr=${scr}${b}${cdgrp}
+fi
+
+done
+
+echo
+echo Log files found for $log | tr '.' ' '
+echo Started servers for $start | tr '.' ' '
+echo Servers already running for $run | tr '.' ' '
+echo Servers stopped $stop | tr '.' ' '
+echo No scripts found for $scr | tr '.' ' '
+\end{XMPt}
+
+The servers can be checked by running the following script:
+
+\begin{XMPt}{Looking for running servers}
+echo 'HEPDB server                                        Elapsed     CPU time   %CPU'
+echo '==============================================================================='
+ps -aef -F "args,etime,time,pcpu" | grep "/cdsrv" | sort +2 -r
+\end{XMPt}
+
+\begin{XMPt}{Output from the above script}
+HEPDB server                                        Elapsed     CPU time   %CPU
+===============================================================================
+/hepdb/cdnomad/cdsrv                              7-02:19:29    00:04:44   0.0
+/hepdb/cdchorus/cdsrv                             7-02:19:29    00:04:43   0.0
+/hepdb/cdcplear/cdsrv                             7-02:19:29    00:04:41   0.0
+\end{XMPt}
+
+\Filename{H1hdbappen-Examples-of-of-the-flow-of-journal-files}
+\chapter{Examples of of the flow of journal files}
+
+\Filename{H2hdbappen-Updating-a-database-on-node-hepdb}
+\section{Updating a database residing on node {\tt hepdb} from a Unix system at CERN}
+
+In this simple example, the journal file is written directly to the directory
+pointed to by the {\tt :queue} tag in the {\tt hepdb.names} file. As the
+server is the database master, the {\tt :queue} and {\tt :todo} tags point to
+the same directory. Whilst the journal file is being written, the reserved prefix
+{\tt zz} is used. As soon as it is complete, the file is renamed to have the
+correct database prefix so that the server, which can of course handle several
+databases for the same experiment, can identify which database file is to be updated.
+
+After the update has been processed, the master server sends the new journal file
+to all slave servers.
+
+\Filename{H2hdbappen-Updating-a-database-residing-on-node-hepdb-from-CERNVM}
+\section{Updating a database residing on node {\tt hepdb} from CERNVM}
+
+In this case the update is first sent to the service machine {\tt CDHEPDB}.
+This machine receives the file and transfers it to the {\tt todo} directory
+of the appropriate server on {\tt hepdb}. Once the update has been processed,
+the new journal file will be written to a {\tt tovm} directory and transferred
+back. This file will then be sent to the local slave server on CERNVM and
+any remote servers on Bitnet nodes.
+
+\Filename{H2hdbappen-Updating-a-database-on-node-hepdb-from-VMS}
+\section{Updating a database residing on node {\tt hepdb} from a VMS system at CERN}
+
+This is similar to the above, except that the journal file is written to a special
+{\tt tohepdb} directory on the local VMS system. A batch job periodically scans
+this directory and copies any files found over NFS to {\tt hepdb}. Once again,
+once the update has been processed the new journal file is copied back and placed
+in the {\tt todo} directory of the local VMS slave server.
+
+\Filename{H2hdbappen-Updating-a-database-residing-on-hepdb-from-remote-VM-system}
+\section{Updating a database residing on node {\tt hepdb} from a remote VM system}
+
+This is the same as for the CERNVM case, except that the names file on the remote
+system points to {\tt CDHEPDB at CERNVM}, rather than simply {\tt CDHEPDB}.
+
+\chapter{Hardware configuration of node HEPDB}
+
+The central HEPDB server at CERN is an RS6000 model 320.
+
+It has an internal disk, used only for the system, and
+two external disks, used for the /hepdb and /backdb filesystems.
+
+\begin{XMPt}{HEPDB disk configuration}
+
+name   status    location    description
+
+hdisk0 Available 00-01-00-00 320 MB SCSI Disk Drive
+hdisk1 Available 00-01-00-30 Other SCSI Disk Drive
+hdisk2 Available 00-01-00-40 Other SCSI Disk Drive
+
+\end{XMPt}
+\Filename{H1hdbappen-Return-codes}
+\chapter{Return codes}
+\begin{XMP}
+ +-----+------------------------------------------------+--------------+
+ |Error|             Meaning                            | Routine Name |
+ |Code |                                                |              |
+ +-----+------------------------------------------------+--------------+
+ |  -1 |Invalid top directory name                      |   CDINIT     |
+ |  -2 |The file is already open with correct LUNRZ and |   CDINIT     |
+ |     |TOPNM                                           |              |
+ |  -3 |The file is already open with wrong LUNRZ or    |   CDINIT     |
+ |     |TOPNM                                           |              |
+ |  -5 |Invalid process name in Online context          |   CDINIT     |
+ |  -6 |Error in IC_BOOK for booking the CACHE          |   CDINIT     |
+ |  -7 |Error in CC_SETUP for reserving the CLUSCOM     |   CDINIT     |
+ |  -8 |Error in opening journal file in server mode    |   CDFOPN     |
+ |  -9 |Unable to open FZ communication channel         |   CDINIT     |
+ | -10 |Host unable to open RZ file                     |   CDINIT     |
+ +-----+------------------------------------------------+--------------+
+ |   1 |Illegal character option                        |CDUSEDB/CDUSEM|
+ |   2 |Illegal path name                               |CDGETDB/CDUSE/|
+ |     |                                                |CDUSEM        |
+ |   3 |Data base structure in memory clobbered         |CDUSE/CDUSEDB/|
+ |     |                                                |CDUSEM        |
+ |   4 |Illegal key option                              |CDUSE/CDUSEDB/|
+ |     |                                                |CDUSEM        |
+ |   5 |Error in CDCHLD in P3 communication             |   CDUSP3     |
+ +-----+------------------------------------------------+--------------+
+ |  12 |Illegal pathname                                |   CDNODE     |
+ |  13 |Not enough structural link to support a new Node|   CDNODE     |
+ |  15 |Cannot define IO descriptor for Key bank        |   CDNODE     |
+ +-----+------------------------------------------------+--------------+
+ |  21 |Too many keys with option M                     |   CDKMUL     |
+ |  22 |Illegal key option                              |   CDKMUL     |
+ |  24 |No Key bank created satisfying key options for  |   CDBKKS     |
+ |     |option S                                        |              |
+ |  25 |Illegal Path Name                               |   CDBKKS     |
+ +-----+------------------------------------------------+--------------+
+ |  31 |Illegal path name or path name in node bank     |CDCHCK/CDKXIN/|
+ |     |is wrong                                        |CDPRIN        |
+ |  32 |No keys/data in this directory                  |CDCHCK/CDGETDB|
+ |     |                                                |CDPRIN        |
+ |  33 |No valid data for the given range of insertion  |   CDKXIN     |
+ |     |time or for the given set of keys and program   |              |
+ |     |version number                                  |              |
+ |  34 |RZIN fails to read the data                     |   CDRZIN     |
+ |  35 |Wrong reference to data objects in update mode  |   CDKXIN     |
+ |  36 |Data bank address zero on return from CDKXIN    |   CDCHCK     |
+ |  37 |Insufficient space in USER store array          |   CDCHCK     |
+ |  38 |Read error in getting the RZ date and time      |   CDPRDT     |
+ |  39 |Illegal data type in the key descriptor         |   CDPRKY     |
+ +-----+------------------------------------------------+--------------+
+ |  43 |Too many key elements                           |   CDMDIR     |
+ |  44 |Cannot find the top directory name              |   CDMDIR     |
+ |     |(wrong initialization)                          |              |
+ |  45 |Illegal Path name                               |   CDMDIR     |
+ |  47 |The Directory already exists                    |   CDMKDI     |
+ |  48 |Error in directory search sequence              |   CDMKDI     |
+ |  49 |FZOUT fails to write on the sequential file     |   CDSDIR     |
+ +-----+------------------------------------------------+--------------+
+ |  51 |Illegal character option                        |   CDFRDB     |
+ |  52 |No access to the Key banks                      |   CDFRDB     |
+ |  54 |Pathname not matched to that found in bank NODB |   CDFRDB     |
+ |  57 |Illegal pathname                                |   CDFRDB     |
+ |  58 |Database structure in memory clobbered          |   CDFRDB     |
+ |  59 |Some of the expected key banks not found        |   CDFRDB     |
+ +-----+------------------------------------------------+--------------+
+ |  61 |Too many keys                                   |CDENTB/CDREPL |
+ |  62 |Illegal character option                        |CDREPL/CDSTOM |
+ |  63 |Data base structure in memory clobbered         |CDREPL/CDSTOR |
+ |  64 |Error in MZCOPY while copying Data bank         |CDREPL/CDSTOR |
+ |  65 |Illegal number of data objects                  |   CDSTOM     |
+ |  66 |Illegal logical unit number                     |CDATOI/CDRHLP |
+ |  67 |File too long; no space in buffer               |   CDATOI     |
+ |  68 |Input directory is partitioned                  |   CDPART     |
+ |  69 |Input directory is not partitioned              |   CDPURP     |
+ |  70 |Error in deleting a partition through RZDELT    |   CDPURP     |
+ +-----+------------------------------------------------+--------------+
+ |  71 |Illegal path name                               |CDDONT/CDENFZ/
+ |     |                                                |CDENTB/CDFZUP/|
+ |     |                                                |CDKOUT/CDPART/|
+ |     |                                                |CDPURP/CDRTFZ |
+ |  72 |Read error on the FZ file (journal file)        |CDENFZ/CDFZUP |
+ |  73 |RZOUT fails to write on disk                    |CDDONT/CDENFZ/|
+ |     |                                                |CDENTB/CDKOUT/|
+ |     |                                                |CDPART/CDPURP |
+ |  74 |Error in RZRENK in updating key values for      |CDENFZ/CDENTB/|
+ |     |partitioned data set                            |CDKOUT/CDPART/|
+ |     |                                                |CDPURP        |
+ |  76 |Cannot form the IO descriptor for the FZ header |CDDONT/CDENTB/|
+ |     |                                                |CDFZUP/CDFZWR/|
+ |     |                                                |CDKOUT/CDPART |
+ |  77 |FZOUT fails to write on the sequential journal  |CDDONT/CDENFZ/|
+ |     |file                                            |CDENTB/CDFZWR/|
+ |     |                                                |CDKOUT/CDPART/|
+ |     |                                                |CDPURP        |
+ |  78 |Illegal number of keys on data base/journal file|CDFZUP/CDKOUT |
+ |  79 |Top directory name illegal in the FZ file       |   CDFZUP     |
+ +-----+------------------------------------------------+--------------+
+ |  81 |Precision is not correctly given                |   CDUCMP     |
+ |  82 |Illegal Data Type                               |   CDUCMZ     |
+ |  83 |Data update but uncompreseed                    |   CDUNCP     |
+ |  84 |The update structure has different number of    |   CDUNCP     |
+ |     |data words                                      |              |
+ |  85 |No data in the structure                        |   CDUNCP     |
+ |  86 |The update structure has different data type    |   CDUNCP     |
+ +-----+------------------------------------------------+--------------+
+ |  91 |Illegal Character Option                        |   CDOPTS     |
+ |  92 |Nonstandard IO descriptor                       |   CDFRUS     |
+ |  93 |Illegal time                                    |CDPKTM/CDUPTM |
+ |  94 |Nonmatching NPAR's in different UPCD banks      |   CDVALID    |
+ |  95 |Description not found in the dictionary         |   CDLDIC     |
+ |  96 |RZCDIR fails to set to the current directory    |   CDLDUP     |
+ |  97 |No matching UPCD bank found                     |CDLDUP/CDVALID|
+ |  98 |Invalid path name in Node bank                  |   CDSTAT     |
+ |  99 |No space in memory for creating the bank        |CDBANK/CDRZIN |
+ +-----+------------------------------------------------+--------------+
+ | 111 |Illegal path name                               |CDPURG/CDPURK |
+ | 112 |No key or data for the path name                |CDPURG/CDPURK |
+ | 113 |Illegal character option                        |   CDPURK     |
+ | 114 |Valid data object(s) in the Node/Key structure  |   CDPURK     |
+ | 115 |Cannot form the IO descriptor for the FZ header |   CDSPUR     |
+ | 116 |FZOUT fails to write on the sequential file     |   CDSPUR     |
+ +-----+------------------------------------------------+--------------+
+ | 131 |Illegal pathname (in key bank for CDLAST)       |CDLAST/CDLKEY/|
+ |     |                                                |CDLMOD        |
+ | 132 |Illegal number of keys in the directory         |CDLAST/CDLKEY |
+ |     |                                                |CDLMOD        |
+ | 135 |Illgeal Top directory name                      |CDFZOP/CDILDU |
+ | 136 |Illegal logical unit number                     |CDILDF/CDILDU/|
+ |     |                                                |CDJOUR        |
+ +-----+------------------------------------------------+--------------+
+ | 140 |Illegal top directory name                      |   CDUDIC     |
+ | 141 |Error in creating the DICTIONARY/HELP directory |   CDUDIC     |
+ | 142 |Error in RZ in writing the dictionary object    |CDCDIC/CDUDIC |
+ | 143 |Error in RZ in purging the dictionary directory |CDCDIC/CDUDIC |
+ | 144 |Dictionary directory cannot be loaded           |   CDCDIC     |
+ | 145 |Pathname already exists in the dictionary       |   CDCDIC     |
+ | 146 |Illegal path name                               |CDDINF/CDEALI |
+ |     |                                                |CDEHLP/CDENAM/|
+ |     |                                                |CDGNAM/CDRHLP/|
+ |     |                                                |CDRNAM        |
+ | 147 |Dictionary directory not found in memory        |CDEALI/CDGNAM/|
+ |     |                                                |CDRNAM        |
+ | 148 |FZOUT fails to write on the sequential file     |CDEALI/CDSNAM |
+ | 149 |Error in RZ for writing to the R.A. file        |CDEALI/CDSNAM |
+ | 150 |Illegal number of data words                    |   CDENAM     |
+ | 151 |No description of data elements for the given   |CDGNAM/CDRNAM |
+ |     |path name exists in the data base               |              |
+ | 152 |Illegal flag (IFLAG)                            |   CDSNAM     |
+ | 153 |FZIN error for reading the data structure       |   CDSNAM     |
+ | 154 |Illegal alias name for a directory              |   CDRALI     |
+ | 155 |No HELP directory inside the data base          |   CDRHLP     |
+ | 156 |No help information for this path stored yet    |   CDRHLP     |
+ +-----+------------------------------------------------+--------------+
+ | 171 |Illegal Path name                               |   CDDDIR     |
+ | 172 |Cannot find the top directory for the path name |   CDDDIR     |
+ | 173 |Error in RZ for reading the dictionary object   |   CDDDIR     |
+ | 174 |Error in FZOUT for saving the journal file      |   CDDDIR     |
+ | 175 |Error in RZ in writing the dictionary object    |   CDDDIR     |
+ | 176 |Error in RZ in purging the dictionary directory |   CDDDIR     |
+ | 177 |Error in RZ in deleting the tree                |   CDDDIR     |
+ | 178 |Error in RZ in deleting Name/Help information   |   CDDDIR     |
+ +-----+------------------------------------------------+--------------+
+ | 191 |Illegal path name                               |   CDRENK     |
+ | 192 |Specified key elements do not match with any of |   CDRENK     |
+ |     |the existing set of keys                        |              |
+ | 194 |Cannot form the IO descriptor for the FZ header |   CDRENK     |
+ | 195 |FZOUT fails to write on the sequential journal  |   CDRENK     |
+ |     |file                                            |              |
+ | 196 |Error in RZRENK in updating key values          |   CDRENK     |
+ |     |partitioned data set                            |              |
+ +-----+------------------------------------------------+--------------+
+ | 211 |Illegal number of paths                         |   CDKEEP     |
+ | 212 |Illegal path name                               |CDFPAT/CDKEEP |
+ | 213 |Conflicting top directory names                 |   CDKEEP     |
+ +-----+------------------------------------------------+--------------+
+ | 221 |Error in CC_WRITELOCK for locking CLUSCOM (VAX);|   CDWLOK     |
+ | 222 |Error in CC_RELEASE for releasing CLUSCOM (VAX) |   CDCWSV     |
+ | 223 |Error in IC_SIGNAL for signalling the VAX Server|   CDCWSV     |
+ | 225 |Error in sending spool file to the server (IBM  |   CDSTSV     |
+ |     |or APOLLO)                                      |              |
+ +-----+------------------------------------------------+--------------+
+\end{XMP}
+
+\Filename{H1hdbappen-Format-for-FZ-output}
+\chapter{Format for FZ output}
+
+HEPDB can create a journal file and can also update a data base from
+the corresponding journal file. The journal file format is defined as an
+FZ record consisting of a header and the data part. The format is
+general enough and can also be used for the communication betwen the
+server and a process which wants to update the data base.
+
+The data part of the FZ record is relevant only for data to be
+entered. It is exactly the same data structure as input to \Lit{DBENTR}. For
+efficiency reason, HEPDB for its own journal file stores the data
+structure as input to the \Rind{RZOUT} call. This difference can be easily
+recognised from the value of \Lit{KEY(1)}, which is zero for outside source
+and nonzero for HEPDB's own journal file.
+
+The header part has very similar structure for the eight actions
+foreseen so far, e.g., entering data, creating new directories, deleting
+data objects, deleting a directory tree, renaming the keys, entering
+names of data elements or help information for a directory, entering
+alias name to a directory, deleting a few partitions in a partitioned
+directory. However, they differ in details and the eight different types
+of FZ headers are listed below.
+\begin{XMP}
+
+   Header for entering data :
+
+ +----------+----------+------+----------------------------------------+
+ |Word Count| Mnemonic | Type |         Content                        |
+ +----------+----------+------+----------------------------------------+
+ |        1 |   IACT   |   I  | Action code (=1)                       |
+ |        2 |  NWKEY   |   I  | Number of key elements                 |
+ |        3 |  NWDOP   |   I  | Number of words used to store CHOPT    |
+ |        4 |   NDOP   |   I  | Number of words used to to store the   |
+ |          |          |      | path name                              |
+ |        5 |  IPREC   |   I  | Precision chosen for packing           |
+ |          |          |      | (see DBENTR)                           |
+ |        6 |  KEY(1)  |   I  | Key element 1                          |
+ |       .. |   ...    |  ..  |   ........                             |
+ |  NWKEY+5 |KEY(NWKEY)|  ..  | Key element NWKEY                      |
+ |  NWKEY+6 |  CHOPT   |   H  | Character option                       |
+ |       .. |     ..   |   H  |                                        |
+ |  NWKEY+6 |  PATHN   |   H  | Path name                              |
+ |   +NWDOP |          |      |                                        |
+ |       .. |     ..   |   H  |                                        |
+ +----------+----------+------+----------------------------------------+
+
+   Header for creating directories :
+
+ +----------+----------+------+----------------------------------------+
+ |Word Count| Mnemonic | Type |         Content                        |
+ +----------+----------+------+----------------------------------------+
+ |        1 |   IACT   |   I  | Action code (=2)                       |
+ |        2 |  NWKEY   |   I  | Number of key elements                 |
+ |        3 |  NWDOP   |   I  | Number of words used to store CHOPT    |
+ |        4 |   NDOP   |   I  | Number of words used to to store the   |
+ |          |          |      | path name                              |
+ |        5 |   MXKP   |   I  | Maximum number of objects inside one   |
+ |          |          |      | partition (see DBMDIP)                 |
+ |        6 |  INSTM   |   I  | Insertion time packed up to minutes    |
+ |          |          |      | (see DBPKTM)                           |
+ |        7 |  NRECD   |   I  | Unused at this moment                  |
+ |        8 |  CHOPT   |   H  | Character option (e.g., 'P' for a      |
+ |       .. |   ...    |  ..  | partitioned directory)                 |
+ |   NDOP+8 |  CHFOR   |   H  | Description of key element type. This  |
+ |       .. |     ..   |  ..  | information is stored in NCFO = (NWKEY |
+ |       .. |     ..   |  ..  | +3)/4 words                            |
+ |   NDOP+8 |  CHTAG   |   H  | Tags for each key element. This info.  |
+ |    +NCFO |     ..   |  ..  | is stored in NTAG = 2*NWKEY words.     |
+ |NDOP+NCFO |  PATHN   |   H  | Path name                              |
+ |  +NTAG+8 |          |      |                                        |
+ |       .. |     ..   |   H  |                                        |
+ +----------+----------+------+----------------------------------------+
+
+   Header for deleting objects :
+
+ +----------+----------+------+----------------------------------------+
+ |Word Count| Mnemonic | Type |         Content                        |
+ +----------+----------+------+----------------------------------------+
+ |        1 |   IACT   |   I  | Action code (=3)                       |
+ |        2 |  NWKEY   |   I  | Number of key elements                 |
+ |        3 |  NWDOP   |   I  | Number of words used to store CHOPT    |
+ |        4 |   NDOP   |   I  | Number of words used to to store the   |
+ |          |          |      | path name                              |
+ |        5 |  NPARS   |   I  | Number of pairs of validity range (set |
+ |          |          |      | for CDPURK) or -1 for CDPURG           |
+ |        6 |  INSTM   |   I  | Deletion time packed up to minutes     |
+ |          |          |      | (see DBPKTM)                           |
+ |        7 |  ISEL(1) |   I  | The objects to be selected using the   |
+ |       .. |    ...   |      | validity criteria in CDPURK            |
+ |  NPARS+6 |  ISEL(n) |   I  |                                        |
+ |  NPARS+7 |  KEY(1)  |   I  | Key element 1 for CDURK                |
+ |          |   ...    |  ..  |      .........                         |
+ |    NENDK |  KEY(n)  |  ..  | Key element NWKEY for CDPURK           |
+ |        7 |  KYDAT   |   I  | To be used for CDPURG                  |
+ |        8 |  KYTIM   |   I  | To be used for CDPURG                  |
+ |       .. |   ...    |  ..  |                                        |
+ |    NENDK |          |      | NWKEYth word following KYDAT for CDPURG|
+ |  NENDK+1 |  CHOPT   |   H  | Character option                       |
+ |       .. |   ...    |  ..  |                                        |
+ |  NENDK+1 |  PATHN   |   H  | Path name                              |
+ |   +NWDOP |          |      |                                        |
+ |       .. |     ..   |   H  |                                        |
+ +----------+----------+------+----------------------------------------+
+
+   Header for deleting directories :
+
+ +----------+----------+------+----------------------------------------+
+ |Word Count| Mnemonic | Type |         Content                        |
+ +----------+----------+------+----------------------------------------+
+ |        1 |   IACT   |   I  | Action code (=4)                       |
+ |        2 |    ---   |   I  | Unused (set to 0)                      |
+ |        3 |  NWDOP   |   I  | Number of words used to store CHOPT    |
+ |        4 |   NDOP   |   I  | Number of words used to to store the   |
+ |          |          |      | path name                              |
+ |        5 |    ---   |   I  | Unused (set to 0)                      |
+ |        6 |  INSTM   |   I  | Deletion time packed up to minutes     |
+ |          |          |      | (see DBPKTM)                           |
+ |        7 |  CHOPT   |   H  | Character option                       |
+ |  NWDOP+7 |  PATHN   |   H  | Path name                              |
+ |       .. |     ..   |   H  |                                        |
+ +----------+----------+------+----------------------------------------+
+
+   Header for renaming keys :
+
+ +----------+----------+------+----------------------------------------+
+ |Word Count| Mnemonic | Type |         Content                        |
+ +----------+----------+------+----------------------------------------+
+ |        1 |   IACT   |   I  | Action code (=5)                       |
+ |        2 |  NWKEY   |   I  | Number of key elements                 |
+ |        3 |  NWDOP   |   I  | Number of words for CHOPT (= 0)        |
+ |        4 |   NDOP   |   I  | Number of words used to to store the   |
+ |          |          |      | path name                              |
+ |        5 |  Unused  |   I  | Set to zero                            |
+ |        6 |  KYO(1)  |   I  | Old key element 1                      |
+ |       .. |   ...    |  ..  |   ........                             |
+ |  NWKEY+5 |KYO(NWKEY)|  ..  | Old key element NWKEY                  |
+ |  NWKEY+6 |  KYN(1)  |   I  | New key element 1                      |
+ |       .. |     ..   |  ..  |   ........                             |
+ |2*NWKEY+5 |KYO(NWKEY)|  ..  | New key element NWKEY                  |
+ |2*NWKEY+6 |  PATHN   |   H  | Path name                              |
+ |       .. |     ..   |   H  |                                        |
+ +----------+----------+------+----------------------------------------+
+
+   Header for entering/deleting names or help information :
+
+ +----------+----------+------+----------------------------------------+
+ |Word Count| Mnemonic | Type |         Content                        |
+ +----------+----------+------+----------------------------------------+
+ |        1 |   IACT   |   I  | Action code (=6)                       |
+ |        2 |  NWKEY   |   I  | Number of key elements                 |
+ |        3 |  NWDOP   |   I  | Number of words used to store CHOPT    |
+ |        4 |   NDOP   |   I  | Number of words used to to store the   |
+ |          |          |      | path name (DICTIONARY or HELP)         |
+ |        5 |  IFLAG   |   I  | Flag (1 for help information; 2 for    |
+ |          |          |      | names of the data elements)            |
+ |        6 |  KEY(1)  |   I  | Key element 1 ( = Identifier of path)  |
+ |       .. |   ...    |  ..  |   ........                             |
+ |  NWKEY+5 |KEY(NWKEY)|  ..  | Key element NWKEY                      |
+ |  NWKEY+6 |  CHOPT   |   H  | Character option                       |
+ |       .. |   ...    |  ..  |   ........                             |
+ |   NWKEY+ |          |      |                                        |
+ |  NWDOP+6 |  PATHN   |   H  | Path name (DICTIONARY or HELP)         |
+ |       .. |     ..   |   H  |                                        |
+ +----------+----------+------+----------------------------------------+
+
+   Header for entering the alias name :
+
+ +----------+----------+------+----------------------------------------+
+ |Word Count| Mnemonic | Type |         Content                        |
+ +----------+----------+------+----------------------------------------+
+ |        1 |   IACT   |   I  | Action code (=7)                       |
+ |        2 |    ---   |   I  | Unused (set to 0)                      |
+ |        3 |  NWDOP   |   I  | Number of words used to store CHOPT(=0)|
+ |        4 |   NDOP   |   I  | Number of words used to to store the   |
+ |          |          |      | path name of the dictitionary          |
+ |        5 |  IFLAG   |   I  | Flag (0 means temporary; 1 permanent)  |
+ |        6 |   NWDP   |   I  | Number of words used to store the      |
+ |          |          |      | path name                              |
+ |        7 |  PATHD   |   H  | Path name of the dictionary            |
+ |       .. |     ..   |   H  |                                        |
+ |   NDOP+7 |  ALIAS   |   H  | Alias name                             |
+ |       .. |     ..   |   H  |                                        |
+ |   NDOP+9 |  PATHN   |   H  | Path name of the directory             |
+ |       .. |     ..   |   H  |                                        |
+ +----------+----------+------+----------------------------------------+
+
+   Header for deleting a few partitions in a partitioned directory :
+
+ +----------+----------+------+----------------------------------------+
+ |Word Count| Mnemonic | Type |         Content                        |
+ +----------+----------+------+----------------------------------------+
+ |        1 |   IACT   |   I  | Action code (=8)                       |
+ |        2 |    ---   |   I  | Unused (set to 0)                      |
+ |        3 |  NWDOP   |   I  | Number of words used to store CHOPT    |
+ |        4 |   NDOP   |   I  | Number of words used to to store the   |
+ |          |          |      | path name                              |
+ |        5 |  INSTM   |   I  | Deletion time packed up to minutes     |
+ |          |          |      | (see CDPKTM)                           |
+ |        6 |  NKEEP   |   I  | Number of partitions to be kept        |
+ |        7 |  CHOPT   |   H  | Character option                       |
+ |  NWDOP+7 |  PATHN   |   H  | Path name of the directory             |
+ |       .. |     ..   |   H  |                                        |
+ +----------+----------+------+----------------------------------------+
+
+\end{XMP}
+
+The bank structure created in memory by HEPDB is show below.
+\begin{verbatim}
+
+            (3)   +-------\
+        +---------|  FZDB  >   List of directories to be updated
+        |         +-------/
+        |
+  +--------\      +--------\
+  |  UPDB   >-----|  UPDB   >  Support for all top directories opened
+  +--------/      +--------/
+    |   |
+    |   |   (2)   +--------\
+    |   +---------|  DICT   >  Dictionary information
+    |             +--------/
+    |
+    |       (1)   +--------\
+    +-------------|  NODB   >  Node bank for the top directory
+                  +--------/
+                   |..|..||
+                      |
+                      |
+                  +--------\
+                  |  NODB   >
+                  +--------/
+                   |....|||
+                        |      Node bank of subdirectory for which data
+                  +--------\   +--------\   +--------\   is retrieved
+                  |  NODB   >--|  KYDB   >--|  KYDB   >
+                  +--------/   +--------/   +--------/   Key banks
+                                   | (1)        | (1)
+                               +--------+   +--------+
+                               |  DATA  |   |  DATA  |
+                               +--------+   +--------+
+
+
+\end{verbatim}
+
+\begin{XMPt}{Bank description}
+========================================================================
+|Bank:  UPDB                                            Top level bank |
+|NL_/NS_ =  2/2                                          IO_ = '8I -H' |
+|NW_     =  12                                                         |
++----------------------------------------------------------------------+
+|LINKS:                                                                |
+|link   type   bank                                        offset      |
+|----   ----   ----                                        ------      |
+| -3     Ref   FZDB                                        KLFZDB ( 3) |
+| -2     Str   DICT                                        KLDICT ( 2) |
+| -1     Str   NODB                                                    |
+|  0     nxt   UPDB of the next data base file                         |
++----------------------------------------------------------------------+
+|DATA WORDS:                                                           |
+|word  type  contents                                      offset      |
+|----  ----  --------                                      ------      |
+|   1    I   Logical unit number of RZ file                MUPLUN ( 1) |
+|   2    I   Flag if database to be updated (0 if not)     MUPFLG ( 2) |
+|   3    I   Logical unit number of standard journal file  MUPJFL ( 3) |
+|   4    I   Logical unit number of special backup file    MUPBAK ( 4) |
+|   5    I   Identifier of the top directrory              MUPDIC ( 5) |
+|   6    I   Number of characters in the top directory     MUPNCH ( 6) |
+|            name                                                      |
+|   7    I   Shared/server flag (IOPS*10 + IOPP)           MUPSRV ( 7) |
+|            (IOPS = 1 if S option in DBINIT;                          |
+|             IOPP = 1 if P option in DBINIT)                          |
+|   8    I   Maximum insertion time for subsequent         MUPKY7 ( 8) |
+|            object retrieval                                          |
+|9-12    H   Name of the top directory                     MUPNAM ( 9) |
++----------------------------------------------------------------------+
+
+
+========================================================================
+|Bank:  DICT                                           Dictionary bank |
+|NL_/NS_ =  0/0                                     IO_ = '1I /3I 22H' |
+|NW_     =  1 + 25*n                                                   |
++----------------------------------------------------------------------+
+|DATA WORDS:                                                           |
+|word  type  contents                                      offset      |
+|----  ----  --------                                      ------      |
+|   1    I   Number of nodes in the dictionary             MDCNTM ( 1) |
+|      For each node (Node number n)                                   |
+|IOFF+      (= (n-1)*NWITDB + 1)  (NWITDB = 25)                        |
+|   1    I   Unique identifier of the node                 MDCITM ( 1) |
+|   2    I   Number of characters for describing the path  MDCNCH ( 2) |
+|            to the node                                               |
+|   3    I   Last update to the node (not avaialable yet)  MDCLUP ( 3) |
+| 4-5    H   Alias name                                    MDCALI ( 4) |
+|6-25    H   Name of the path to the node (excluding the   MDCNAM ( 6) |
+|            top directory part)                                       |
++----------------------------------------------------------------------+
+
+
+========================================================================
+|Bank:  NODB                                                 Node bank |
+|NL_/NS_ =  NS_/(number of down nodes)               IO_ = '4I 16B -H' |
+|NW_     =  20 + words needed for path name                            |
++----------------------------------------------------------------------+
+|LINKS:                                                                |
+|link   type   bank                                        offset      |
+|----   ----   ----                                        ------      |
+| -n     Str   NODB (next level node)                                  |
+|  0     nxt   KYDB of the first key bank to the node      KLDYDB ( 0) |
++----------------------------------------------------------------------+
+|DATA WORDS:                                                           |
+|word  type  contents                                      offset      |
+|----  ----  --------                                      ------      |
+|   1    I   Number of key elements for this node          MNDNWK ( 1) |
+|   2    I   Total number of data words in the Key bank    MNDNWD ( 2) |
+|   3    I   Number of characters describing the path to   MNDNCH ( 3) |
+|            the node                                                  |
+|   4    I   Unique identifier of this node                MNDDIC ( 4) |
+|5-20    B   IO descriptor of the Key bank                 MNDIOF ( 5) |
+|21-..   H   Name of the path to the node                  MNDNAM (21) |
++----------------------------------------------------------------------+
+
+
+========================================================================
+|Bank:  KYDB                                                  Key bank |
+|NL_/NS_ =  3/1                                          IO_ = Dynamic |
+|NW_     =  NWKEY + NWFXM(=6)                                          |
++----------------------------------------------------------------------+
+|LINKS:                                                                |
+|link   type   bank                                        offset      |
+|----   ----   ----                                        ------      |
+| -2     Ref   UPDB (Top level bank)                       KLUPDB ( 3) |
+| -2     Ref   NODB (parent node bank)                     KLNODB ( 2) |
+| -1     Str   Data bank                                   KLDADB ( 1) |
+|  0     nxt   KYDB of the next key bank                               |
++----------------------------------------------------------------------+
+|DATA WORDS:                                                           |
+|word  type  contents                                      offset      |
+|----  ----  --------                                      ------      |
+|   1    I   Serial number of the object                               |
+|   2    I   Refernce to the master object (for update)                |
+|   3    I   Start validity time (upto seconds)                        |
+|   4    I   End   validity time (upto seconds)                        |
+|   5    I   Source identifier                                         |
+|   6    I   Flag for storing the object (internal to HEPDB)           |
+|             Bit JRZUDB (=1) : Full RZ option                         |
+|                 JIGNDB (=2) : Ignore the object                      |
+|                 JPRTDB (=3) : Directory is partitioned               |
+|                 JASFDB (=4) : Specially encoded ASCII                |
+|   7    I   Insertion time (upto minutes)                             |
+|8-NWKEY     User keys                                                 |
+|NWKEY+1 I   Logical end validity time (upto seconds)                  |
+|NWKYDB+                                                               |
+|  -4    I   Number of physical reads to disk for this key MKYRID (-4) |
+|  -3    I   Number of calls to DBUSE in the same event    MKYCEV (-3) |
+|  -2    I   Number of calls to DBUSE in the entire run    MKYCRU (-2) |
+|  -1    I   Precision used for storing the object         MKYPRE (-1) |
+|   0    I   Free flag (set by DBFREE call)                MKYFRI ( 0) |
++----------------------------------------------------------------------+
+
+
+========================================================================
+|Bank:  FZDB                         List of directories to be updated |
+|NL_/NS_ =  0/0                                             IO_ = '-H' |
+|NW_     =  4 + 20*n                                                   |
++----------------------------------------------------------------------+
+|LINKS:                                                                |
+|link   type   bank                                        offset      |
+|----   ----   ----                                        ------      |
+|  0     nxt   FZDB of the next data base file                         |
++----------------------------------------------------------------------+
+|DATA WORDS:                                                           |
+|word  type  contents                                      offset      |
+|----  ----  --------                                      ------      |
+| 1-4    H   Top directory name                            MFZTOP ( 1) |
+|      For each directory (number n)                                   |
+|IOFF+      (= (n-1)*(MXLWDB+1) + MFZDIR)  (MXLWDB = 20; MFZDIR = 5)   |
+|  1     I   Number of characters in the path                          |
+|2-21    H   Complete pathname of the directory or the root            |
++----------------------------------------------------------------------+
+\end{XMPt}

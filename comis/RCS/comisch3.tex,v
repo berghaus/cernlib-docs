@@ -1,0 +1,421 @@
+head	1.2;
+access;
+symbols;
+locks; strict;
+
+
+1.2
+date	98.08.19.14.16.24;	author goossens;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	94.01.17.12.31.05;	author goossens;	state Exp;
+branches;
+next	;
+
+
+desc
+@Initial installment
+@
+
+
+1.2
+log
+@Version put on WWWASD/cernlib/comis
+@
+text
+@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%   COMIS - Reference Manual -- LaTeX Source                      %
+%                                                                 %
+%   Chapter 3                                                     %
+%                                                                 %
+%   Files referenced: none                                        %
+%                                                                 %
+%   Editor: Michel Goossens / CN-AS                               %
+%   Last Mod.: 17 Jan 1993  12:25  mg                             %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\Filename{H1comiscalling-sequences}
+\chapter{Calling sequences}
+ 
+This chapter describes the \COMIS{} interface with a user
+and his application program.
+
+\Filename{H2comisinitialization}
+\section{Initialization}
+ 
+The first action to perform is to initialize
+the \COMIS{} system variables by calling:
+
+\Shubr{CSINIT}{(NWORDS)}
+
+where the input parameter \Lit{NWORDS} is the size of the system common block
+\begin{alltt} 
+ COMMON /COMIS/CS(NWORDS)
+\end{alltt} 
+By default \Lit{NWORDS=2000}, which is usually sufficient.
+
+\Filename{H2comis-entry-to-comis}
+\section{Entry to \protect\COMIS{}}
+ 
+The three routines described in this section can be used for this purpose:
+
+\Shubr{CSPAUS}{(ENTRY\_PROMPT)}
+ 
+where \Lit{ENTRY_PROMPT} is a character string. In this case
+\COMIS{} types the \Lit{ENTRY_PROMPT} and the dialogue is started.
+
+\Shubr{CSTEXT}{(ENTRY\_PROMPT,TEXT)}
+ 
+where input parameters \Lit{ENTRY_PROMPT} and \Lit{TEXT} are
+characters strings. 
+In this case
+\COMIS{} interprets the string ``\Lit{TEXT}'', 
+types \Lit{ENTRY_PROMPT} and starts the dialogue.
+
+\Shubr{CSEXEC}{(TEXT,IERR*)}
+ 
+where input parameter \Lit{TEXT} is a character string. In this case
+\COMIS{} interprets the given string ``\Lit{TEXT}'' only and control is returned
+to the calling routine. 
+The output parameter \Lit{IERR} is zero when no errors 
+are encountered, non-zero otherwise.
+ 
+During the dialogue session \COMIS{} gives the standard prompt ``\Lit{CS>}''
+and the user can:
+\begin{UL}
+\item enter the system directives( see Chapter~\ref{sec:system-directives});
+\item enter the function or the subroutine definition;
+\item enter the \COMIS{} main program.
+\end{UL}
+ 
+All system directives are executed immediately and
+the prompt ``\Lit{CS>}'' is displayed again.
+ 
+If the FUNCTION or the SUBROUTINE statement is entered, \COMIS{} changes
+his prompt to ``\Lit{FSD>}'' until the END statement completes the routine
+definition. An intermediate code is stored in the internal buffer
+and \COMIS{} gives the prompt ``\Lit{CS>}''.
+ 
+During the main program definition \COMIS{} uses the prompt ``\Lit{MND>}''.
+The \COMIS{} linker is invoked automatically if the compilation
+was error-free. The linker tries to resolve references in the
+order: \COMIS{} routines; user's routines.
+After this stage the main program executes
+and \COMIS{} types the entry prompt
+and gives the standard prompt ``\Lit{CS>}''.
+ 
+A \COMIS{} built-in editor (see Chapter~\ref{sec:comiseditor}) is automatically
+invoked when a syntax
+error is detected. The command ``\Cind{E}'' of the editor causes
+the recompilation of the text edited and then the dialogue
+is continued. The command ``\Cind{Q}'' of the editor causes the current
+routine definition to be skipped and \COMIS{} gives the prompt ``\Lit{CS>}''.
+ 
+The exit from the \COMIS{} dialogue session is performed
+by the \Cind{RETURN} statement
+in the main program or by an ``empty'' (\Cind{END} or \Lit{#} )
+main program definition.
+For exiting from any \COMIS{} routine to an application program
+the \Cind{QUIT} statement can be used.
+
+\Filename{H2comis-calling-user-routines}
+\section{Calling the user routines}
+\label{sec:callinguserroutines}
+ 
+In order to invoke the routines compiled by the user \COMIS{}
+has to know the address of the called routine. 
+The location of the routine can be passed
+to the \COMIS{} interpreter through a call to subroutine \Rind{CSEXT}:
+
+\Shubr{CSEXT}{('name1.type,...,nameN.type\num',name1,...,nameN)}
+
+where \Lit{name1,...,nameN} should be declared as
+EXTERNAL in the Fortran program.
+Possible values for the \Rarg{.type} specifier are:
+
+\begin{DLtt}{1}
+\item[D] for a double precision function;
+\item[I] for an integer function;
+\item[L] for a logical function;
+\item[R] for a real function;
+\item[S] for a subroutine;
+\item[X] for a complex function.
+\end{DLtt}
+
+If the type specifier is omitted, then 
+type subroutine (\Lit{'.S'}) is assumed.
+
+Data transmission between Fortran and \COMIS{} routines
+is done in the usual way using routine parameters and
+through COMMON blocks. 
+To handle COMMON blocks
+the interpreter  has to know the address of the first element
+of each such block.
+This is specified by using subroutine \Rind{CSCOM} as follows:
+
+\Shubr{CSCOM}{('name1,...,nameN\num',FE1,...,FEN)}
+
+\Lit{FE1,...,FEN} are the first elements of the COMMON blocks with
+names \Lit{name1,...,nameN}.
+The name \Lit{\$BLANK} should be used for the blank COMMON.
+\index{COMMON}\index{COMMON!blank}
+
+The addresses of COMMON blocks which contain character data should be 
+specified with a call to routine \Rdef{CSCOMC}, whose
+calling sequence is similar to \Rind{CSCOM}.
+
+\Filename{H2comiscalling-comis-from-user-program}
+\section{Calling \COMIS{} routines from a user program}
+ 
+The user can call a \COMIS{} routine from a Fortran77 program
+using the routine's name or address. The second call is faster, but it
+requires the preliminary calculation of the address by
+
+\begin{alltt}
+    JADP=CSADDR('NAME')
+\end{alltt}
+ 
+\subsection*{Arithmetic parameters}
+
+This section describes routines and functions which can be used
+for calling \COMIS{} subroutines and functions which have only 
+arithmetic parameters.
+
+\newpage %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsubsection*{Calling a \COMIS{} subroutine}
+\index{subroutine}
+
+\Shubrii{CSCALL}{('NAME',NPAR,P1,P2,...)}{CSJCAL}{(JADP,NPAR,P1,P2,...)}
+
+where
+\begin{DLtt}{1234567}
+\item[NAME] is the name of the called \COMIS{} routine;
+\item[JADP] is the address of the called \COMIS{} routine;
+\item[NPAR] is the number of arguments;
+\item[P1,P2,...] are the routine's actual arguments.
+\end{DLtt}
+ 
+\subsection*{Using integer \COMIS{} functions}
+\index{function!integer}
+
+\Sfuncii{CSICAL}{I = CSICAL('NAME',NPAR,P1,P2,...)}%
+        {CSIJCL}{I = CSIJCL(JADP,NPAR,P1,P2,...)}
+
+\subsection*{Using real \COMIS{} functions}
+\index{function!real}
+ 
+\Sfuncii{CSRCAL}{R = CSRCAL('NAME',NPAR,P1,P2,...)}%
+        {CSRJCL}{R = CSRJCL(JADP,NPAR,P1,P2,...)}
+
+To speed up execution three special functions are available
+for the case of routines with one, two and three arguments:
+
+\begin{alltt}
+    R = \Rdef{CSR1FN}(JADP,P1)
+    R = \Rdef{CSR2FN}(JADP,P1,P2)
+    R = \Rdef{CSR3FN}(JADP,P1,P2,P3)
+\end{alltt}
+
+\subsection*{Using double precision \COMIS{} functions}
+\index{function!double precision}
+ 
+\Sfuncii{CSDCAL}{D = CSDCAL('NAME',NPAR,P1,P2,...)}%
+        {CSDJCL}{D = CSDJCL(JADP,NPAR,P1,P2,...)}
+
+\subsection*{Using complex \COMIS{} functions}
+\index{function!complex}
+ 
+\Sfuncii{CSCCAL}{Cx = CSCCAL('NAME',NPAR,P1,P2,...)}%
+        {CSCJCL}{Cx = CSCJCL(JADP,NPAR,P1,P2,...)}
+
+\subsection*{General parameters}
+
+This section describes routines and functions which can be used
+for calling \COMIS{} subroutines and functions which can have
+any type of parameters.
+
+\subsubsection*{Calling a \COMIS{} subroutine}
+\index{subroutine}
+ 
+\Shubrii{CSSUBR}{(STR,P1,P2,...)}{CSJSUB}{(JADP,STR1,P1,P2,...)}
+ 
+where \Lit{STR} and \Lit{STR1} are character strings which specifies
+the name of called \COMIS{} routines and the type of each
+parameters in argument list.
+
+\newpage %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection*{Using integer \COMIS{} functions}
+\index{function!integer}
+ 
+\Sfuncii{CSIFUN}{I = CSIFUN(STR,P1,P2,...)}%
+        {CSIJFN}{I = CSIJFN(J,STR1,P1,P2,...)}
+
+\subsection*{Using real \COMIS{} functions}
+\index{function!real}
+ 
+\Sfuncii{CSRFUN}{R = CSRFUN(STR,P1,P2,...)}%
+        {CSRJFN}{R = CSRJFN(J,STR1,P1,P2,...)}
+
+\subsection*{Using double precision \COMIS{} functions}
+\index{function!double precision} 
+\Sfuncii{CSDFUN}{D = CSDFUN(STR,P1,P2,...)}%
+        {CSDJFN}{D = CSDJFN(J,STR1,P1,P2,...)}
+
+\subsection*{Using complex \COMIS{} functions}
+\index{function!complex}
+
+\Sfuncii{CSCFUN}{Cx = CSCFUN(STR,P1,P2,...)}%
+        {CSCJFN}{Cx = CSCJFN(J,STR1,P1,P2,...)}
+ 
+The parameters \Lit{STR} and \Lit{STR1} 
+in these routines have the forms
+
+\begin{DLtt}{1234}
+\item[STR]   \Lit{name} (parameter type description)
+\item[STR1]  (parameter type description)
+\end{DLtt}
+ 
+where ``\Lit{name}'' is the name of the \COMIS{} routine 
+which is called;
+``\Lit{(parameters types description)}'' specifies the type of each
+parameter in the argument list.
+ 
+\Examples
+\begin{alltt}
+ STR = 'NAME(I,R,D,C,E,*12)'
+
+ where  I  stands for INTEGER or LOGICAL
+        R         for REAL
+        D         for DOUBLE PRECISION
+        C         for COMPLEX
+        E         for EXTERNAL
+        *12       for CHARACTER *n
+\end{alltt}
+ 
+If a double precision \COMIS{} function is declared with:
+\begin{alltt}
+      FUNCTION CSDPF(R,D,C,I)
+      DOUBLE CSDPF,D
+      REAL R  INTEGER I
+      CHARACTER *(*)C
+      .....
+      END
+\end{alltt}
+then the call from the user's routine may look like:
+\begin{alltt}
+      CHARACTER *12 TEXT
+      DOUBLE PRECISION D,DP,CSDFUN
+      .....
+      D = \Rind{CSDFUN}('CSDPF(R,D,*12,I)', R, DP,TEXT,10)
+\end{alltt}
+
+\newpage %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\Filename{H2comisXYZ-expressions}
+\section{XYZ-expressions}
+ 
+\COMIS{} supports a special class of XYZ-expressions. The XYZ-expression
+uses only the variable names X and/or Y and/or Z, e.g.
+
+\begin{alltt}
+      X+Y+Z  or X**2+Z**2  or SIN(Y)**2+COS(Y)**2
+\end{alltt}
+ 
+An XYZ-expression can be translated by
+
+\Shubr{CSEXPR}{(XYZexpr,JADDR)}
+
+where \Lit{XYZexpr} is an argument of type character, whose contents is an XYZ-expression,
+\Lit{JADDR} is the address of an XYZ-expression stored in the  \COMIS{} internal buffer.
+ 
+The XYZ-expression can be evaluated by
+
+\begin{alltt}
+      VAL = \Rind{CSRJCL}(JADDR,NPAR,ARG1,ARG2,ARG3)
+\end{alltt}
+
+using the standard way to call a \COMIS{} real function.
+ 
+If X is omitted in the XYZ-expression then \Lit{ARG1} must be a dummy argument,
+if Y is omitted then \Lit{ARG2} must be a dummy argument, e.g.
+
+\begin{alltt}
+  \textrm{XYZ-expression}        \textrm{can be evaluated by}
+
+  SIN(Y)/Y              V = \Rind{CSRJCL}(JADDR,2,dummy,Y)
+  X+Z                   V = \Rind{CSRJCL}(JADDR,3,X,dummy,Z)
+  Z**2                  V = \Rind{CSRJCL}(JADDR,3,dummy,dummy,Z)
+  X**2                  V = \Rind{CSRJCL}(JADDR,1,X)
+\end{alltt}
+
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d28 1
+a28 1
+\begin{XMP} 
+d30 1
+a30 1
+\end{XMP} 
+d136 1
+a136 1
+The name \Lit{$BLANK} should be used for the blank COMMON.
+d150 1
+a150 1
+\begin{XMP}
+d152 1
+a152 1
+\end{XMP}
+d190 1
+a190 1
+\begin{XMP}
+d194 1
+a194 1
+\end{XMP}
+d262 1
+a262 1
+\begin{XMP}
+d271 1
+a271 1
+\end{XMP}
+d274 1
+a274 1
+\begin{XMP}
+d281 1
+a281 1
+\end{XMP}
+d283 1
+a283 1
+\begin{XMP}
+d288 1
+a288 1
+\end{XMP}
+d298 1
+a298 1
+\begin{XMP}
+d300 1
+a300 1
+\end{XMP}
+d311 1
+a311 1
+\begin{XMP}
+d313 1
+a313 1
+\end{XMP}
+d320 1
+a320 1
+\begin{XMP}
+d327 1
+a327 1
+\end{XMP}
+@

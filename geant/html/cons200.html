@@ -1,0 +1,259 @@
+<PRE>
+
+
+
+
+<H2>Geant  3.16  Routine  CONS200</H2>
+
+
+<PRE>
+
+
+Origin:  R.Brun                                          Submitted:  01.06.83
+Revision:  F.Carminati,  M.Maire   Revised:  08.12.93
+Documentation:
+
+
+</PRE>  <HR>  <H2>Tracking  medium  parameters</H2>
+
+
+<PRE>
+
+
+</PRE>
+
+
+<H2>*</H2>
+
+
+<PRE>
+
+
+Description  of  the  routines
+
+
+
+       CALL  GSTMED                         (ITMED,NATMED,NMAT,ISVOL,IFIELD,FIELDM,TMAXFD,STEMAX,
+                                            DEEMAX,EPSIL,STMIN,UBUF,NWBUF)
+
+
+
+This  routine  associates  a  set  of  tracking
+parameters  to  a  material,  defining  a  so-called
+tracking  medium.  Every  GEANT  volume  must  be
+associated  to  an  existing  tracking  medium.  The
+routine  stores  the  parameters  of  the  tracking
+medium  ITMED  in  the  data  structure  JTMED.
+
+
+ITMED                     (INTEGER)  tracking  medium  number;
+NATMED                    (CHARACTER*20)  tracking  medium  name;
+NMAT                      (INTEGER)  material  number  corresponding
+                          to  ITMED;
+ISVOL                     (INTEGER)  sensitivity  flag  (see  later):
+
+                          < =   0       not  a  sensitive  volume;
+                          >0            sensitive  volume;
+
+IFIELD                    (INTEGER)  magnetic  field  flag:
+
+                          =0            no  magnetic  field;
+                          =1            strongly  inhomogeneous  magnetic
+                                        field  (returned  by  the  user
+                                        function  GUFLD):  tracking
+                                        performed  with  the  Runge-Kutta
+                                        method  by  the  routine  GRKUTA;
+                          =2            inhomogeneous  magnetic  field
+                                        (returned  by  the  user  function
+                                        GUFLD),  tracking  along  a  helix
+                                        performed  by  the  routine  GHELIX;
+                          =3            uniform  magnetic  field  along  the  z
+                                        axis  of  strength  FIELDM,  tracking
+                                        performed  along  a  helix  by  the
+                                        routine  GHELX3;
+
+
+
+FIELDM                    (REAL)  maximum  field  value  (in
+                          Kilogauss);
+TMAXFD                    (REAL)  maximum  angular  deviation  due  to
+                          the  magnetic  field  permitted  in  one  step
+                          (in  degrees);
+STEMAX                    (REAL)  maximum  step  permitted  (cm);
+DEEMAX                    (REAL)  maximum  fractional  energy  loss
+                          in  one  step  (0<  DEEMAX  < =   1);
+EPSIL                     (REAL)  boundary  crossing  precision
+                          (cm);
+STMIN                     (REAL)  minimum  value  for  the  maximum
+                          step  imposed  by  energy  loss,  multiple
+                          scattering,  Cerenkov  or  magnetic  field
+                          effects  (cm);
+UBUF                      (REAL)  array  of  NWBUF  additional  user
+                          parameters;
+NWBUF                     (INTEGER)  number  of  additional  user
+                          parameters.
+
+
+Note:  the  tracking  medium  number  can  in  principle
+be  any  positive  integer  from  1  to  65,535.  However
+this  number  is  used  directly  by  GEANT  as  the
+number  of  the  pointer  to  the  data  structure  where
+the  information  is  stored.  When  a  pointer  is
+defined,  all  pointers  from  1  to  the  one  allocated
+are  created,  if  not  already  existing.  Every  time
+data  structures  are  moved  in  memory,  all  the
+links  are  potentially  scanned  for  update.  This
+can  be  time  consuming  and  it  can  seriously  affect
+performances.  So  a  continuous  range  of  numbers
+should  be  used  for  tracking  media.
+
+
+
+       CALL  GFTMED                         (ITMED,NATMED*,NMAT*,ISVOL*,IFIELD*,FIELDM*,TMAXFD*,
+                                            STEMAX*,DEEMAX*,EPSIL*,STMIN*,UBUF*,NWBUF*)
+
+
+
+Extracts  the  parameters  of  the  tracking  medium
+ITMED  from  the  data  structure  JTMED.
+
+
+
+       CALL  GPTMED                         (ITMED)
+
+
+
+Prints  the  tracking  medium  parameters  for  the
+given  medium.
+
+
+ITMED            (INTEGER)  tracking  medium  to  be  printed,
+                 all  tracking  media  if  ITMED=0.
+
+
+</PRE>
+
+
+<H2>*</H2>
+
+
+
+<PRE>
+
+
+Automatic  calculation  of  the  tracking  parameters
+
+
+The  results  of  the  simulation  depend  critically
+on  the  choice  of  the  tracking  medium  parameters.
+To  make  of  GEANT  a  reliable  and  consistent
+predictive  tool,  the  calculation  of  these
+parameters  has  been  automated.  In  a  normal  GEANT
+run,  the  variable  IGAUTO  in  common  /GCTRAK/  is
+set  to  1.  In  this  case  the  following  parameters
+are  calculated  by  the  program:
+
+
+
+                                           o
+                                       20                                   if  TMAXFD  < =   0  or  TMAXFD  >20
+TMAXFD                  =         -                                                                                                *
+ *                    .
+
+                                       input  value                         if  0<  TMAXFD  < =   20
+
+
+
+                                                      10
+STEMAX                  =                BIG     (= 10      )
+
+
+
+                                       0. 25                                                       if  ISVOL  = 0  and  X   < =    *
+ *2cm,  where  X     is@
+                                                                                                                         0         *
+ *              0
+DEEMAX                  =         -                                                                of  the  material               *
+ *                     @
+                                                        p  ======
+
+                                       0. 25- ((0. 2)/ (   X     ))                                otherwise
+                                                            0
+
+
+
+                                               p  ======
+
+                                       ((2R)/ (   X     ))                      if  ISVOL  = 0
+
+   STMIN                =         -            p  =0====                                                            .
+
+                                       ((5R)/ (   X     ))                      if  ISVOL  6= 0
+                                                   0
+
+
+
+where  R  is  the  range  in  cm  of  an  electron  of  energy
+CUTELE+200keV.
+
+
+If  the  IGAUTO  variable  is  set  to  0  via  the  AUTO
+data  record,  then  value  given  by  the  user  for  the
+above  parameters  is  accepted  as  the  true
+parameter  value  if  >0,  while  automatic
+calculation  still  takes  place  in  case  the  input
+value  is  negative.
+
+
+Users  are  strongly  recommended  to  begin  their
+simulation  with  the  parameters  as  calculated  by
+GEANT.  Users  who  want  to  modify  any  of  the  above
+parameters  must  be  sure  they  understand  their
+function  in  the  program  and  the  implications  of  a
+change.
+
+
+
+The  EPSIL  parameter  represents  the  absolute
+precision  with  which  the  tracking  is  performed.
+It  has  a  double  meaning.  When  tracking  in
+magnetic  field,  EPSIL  is  the  minimum  distance  for
+which  boundaries  are  checked.  A  particle  nearer
+than  EPSIL  to  the  boundary  is  considered  as
+exiting  the  current  volume.  If  the  end  point  of
+the  step  of  a  particle  in  magnetic  field  is
+distant  less  than  EPSIL  along  each  axis  from  what
+would  be  the  end  point  in  absence  of  magnetic
+field,  then  no  boundary  checking  is  performed.
+
+
+In  all  cases,  when  a  particle  is  going  to  reach
+the  boundary  of  the  current  volume  with  the
+current  step,  the  step  length  is  increased  by  a
+quantity  (PREC,  common  /GCTMED/)  which  is  set  to
+the  minimum  between  0. 1 x EPSIL           and  10  micron  at
+the  beginning  of  the  tracking.  This  quantity  is
+recalculated  at  every  step  according  to  the
+formula:
+
+
+PREC        = max     [min      (((EPSIL         )/ (10)), 10mu    ), max     [_x_, _y_, _z_, S)xepsilon             ]
+                                                                                                                            (1)
+Where  x, y, z  are  the  current  coordinates  of  the
+particle,  S  is  the  length  of  the  track,  and
+epsilon               is  the  assumed  machine  precision.  epsilon
+(called  EPSMAC  in  the  program)  is  initially  set
+
+      -6                                      -11
+to  10        for  32  bits  machines  and  10           for  64  bits
+machines.  During  the  tracking,  every  fifth  time
+that  a  particle  tries  unsuccessfully  to  exit  from
+the  same  volume,  the  machine  precision  is
+multiplied  by  the  number  of  trials.  This  accounts
+for  additional  losses  of  precision  due  to
+transformation  of  coordinates  and  region  of  the
+floating  point  range  where  the  real  machine
+precision  is  different  from  the  above  (this
+happens  in  particular  on  IBM  mainframes  with  370
+floating  point  number  representation).
+</PRE>

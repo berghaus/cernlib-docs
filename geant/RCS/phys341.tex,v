@@ -1,0 +1,324 @@
+head     1.1;
+access   ;
+symbols  ;
+locks    goossens:1.1; strict;
+comment  @@;
+
+
+1.1
+date     94.04.25.09.23.47;  author goossens;  state Exp;
+branches ;
+next     ;
+
+
+desc
+@Initial Entry
+@
+
+
+
+1.1
+log
+@Initial revision
+@
+text
+@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%  GEANT manual in LaTeX form                                     %
+%                                                                 %
+%  Version 1.00                                                   %
+%  Last Mod.  8 June 1993  1300   MG                              %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\Origin{G.N. Patrick, L.Urb\'{a}n}
+\Version{Geant 3.16}\Routid{PHYS341}
+\Submitted {26.10.84}  \Revised{16.12.93}
+\Makehead{Simulation of discrete bremsstrahlung by electrons}
+
+\section{Subroutines}
+
+\Shubr{GBREME}{}
+
+\Rind{GBREME} generates a bremsstrahlung photon from an electron 
+as a discrete process. The photon energy is sampled from 
+a parameterisation of the 
+bremsstrahlung cross-section of Seltzer and Berger
+\cite{bib-SEL1} for electron energies below $10$ GeV, and from 
+the screened Bethe-Heitler cross-section 
+above $10$ GeV.
+Midgal corrections are applied in both cases. 
+The angular distribution of the photon is calculated by the
+function \Rind{GBTETH}.
+ 
+\begin{tabular}{ll}
+Input :  & via common block \FCind{/GCTRAK/} \\
+Output:  & via common block \FCind{/GCKING/}.
+\end{tabular}
+ 
+\Rind{GBREME} is called from the tracking
+routine \Rind{GTELEC} when
+the parent electron reaches a radiation point during tracking.
+ 
+\Sfunc{GBTETH}{THETA = GBTETH(ENER,PARTM,EFRAC)}
+
+\begin{DLtt}{MMMMMMMM}
+\item[THETA] ({\tt REAL}) angle of the radiated photon or $e^{\pm}$
+pair;
+\item[ENER] ({\tt REAL}) energy of the particle;
+\item[PARTM] ({\tt REAL}) mass of the particle;
+\item[EFRAC] ({\tt REAL}) ratio between the energy of the photon and the
+energy of the particle.
+\end{DLtt}
+\Rind{GBTETH} calculates the angular distribution of the $e^+ e^-$-pair
+in photon pair production and of the emitted photon in 
+$\mu$ and $e^{\pm}$ bremsstrahlung.
+\Rind{GBTETH} is called by \Rind{GBREME}.
+
+\section {Method}
+
+The photon energy is sampled according to the Seltzer and Berger
+bremsstrahlung spectrum~\cite{bib-SEL1}. Seltzer and Berger have calculated the
+spectra for materials with atomic numbers Z = 6,13,29,47,74,92
+in the electron (kinetic) energy range  1 keV - 10 GeV. Their tabulated
+results have been used as input in a parametrising-fitting procedure.
+The functional form of the parameterisation for the quantity:
+
+\[
+S(x) = C k \frac{d \sigma}{d k}
+\]
+ 
+can be written as
+\begin{equation}
+\label{eq:phys341-1}
+S(x) = \left \{
+\begin{array}{L@@{\hspace{1cm}}L}
+(1-a_{h} \epsilon )F_{1}(\delta) + b_{h} \epsilon^{2} F_{2} (\delta)
+& T \geq 1 MeV \\
+1 + a_{l} x + b_{l} x^{2} & T < 1 MeV
+\end{array} \right .
+\end{equation}
+where:
+\[
+\begin{array}{L@@{}cL@@{\hspace{2cm}}LcL}
+C & & \mbox{normalisation constant} & 
+k & & \mbox{photon energy} \\ [1mm]
+T, E & & \mbox{kinetic and total energy of the primary electron} & 
+x & = & \frac{k}{T} \\ [2mm]
+\epsilon & = & \frac{k}{E} = x \frac{T}{E} 
+\end{array}
+\]
+
+The $F_{i}(\delta)$ screening functions depend on the screening variable:
+\[
+\begin{array}{LcLL}
+\delta & = & \frac{136 m_{e}}{Z^{1/3} E} \frac{\epsilon}{1-\epsilon} \\
+F_{1}(\delta) & = & F_{0} (42.392 - 7.796 \delta +1.961 \delta^{2} - F)
+& \delta \leq 1 \\
+F_{2}(\delta) & = & F_{0} (41.734 - 6.484 \delta +1.250 \delta^{2} - F) 
+& \delta \leq 1 \\
+F_{1}(\delta) & = & F_{2}(\delta) =
+F_{0} (42.24 - 8.368 \ln(\delta + 0.952) -F) & \delta > 1 \\
+F_{0} & = & \frac{1}{42.392-F} \\
+F & = & 4 \ln Z - 0.55 (\ln Z)^{2}
+\end{array}
+\]
+ 
+$a_{h,l}$ and $b_{h,l}$ are parameters to be fitted.
+ 
+The `high energy' (T $>$  1 MeV) formula comes from the
+Coulomb-corrected, sceened Bethe-Heitler formula (see e.g. 
+\cite{bib-WILL,bib-BUTC,bib-EGS3}). However, there are two things in eq. 
+(\ref{eq:phys341-1}) which make a difference:
+ 
+\begin{enumerate}
+\item $a_{h}, b_{h}$ depend on T and on the atomic number Z ( in the case
+of the Bethe-Heitler spectrum $a_{h} = 1$, $b_{h} =0.75$);
+\item the function $F$ is not the same than that in the Bethe-Heitler
+cross-section, this function gives a better behaviour in the
+high frequency limit, i.e. when $k \rightarrow T$  ($x \rightarrow 1$).
+\end{enumerate}
+ 
+The T and Z dependence of the parameters are described by the equations:
+ 
+\begin{eqnarray*}
+a_{h} & = & 1 + \frac{a_{h1}}{u}+\frac{a_{h2}}{u^{2}}+\frac{a_{h3}}{u^{3}} \\
+b_{h} & = & 0.75+\frac{b_{h1}}{u}+\frac{b_{h2}}{u^{2}}+\frac{b_{h3}}{u^{3}} \\
+a_{l} & = & a_{l0} + a_{l1} u + a_{l2} u^{2} \\
+b_{l} & = & b_{l0} + b_{l1} u + b_{l2} u^{2} \\
+\mbox{with} \\
+u & = & \ln \left ( \frac{T}{m_{e}} \right )
+\end{eqnarray*}
+ 
+the $a_{hi}, b_{hi}, a_{li}, b_{li}$ parameters are polynomials of second order
+in the variable:
+
+\[
+v = [Z (Z+1)]^{1/3}
+\]
+ 
+It can be seen relatively easily that for the limiting case $T \rightarrow
+\infty$, $a_{h} \rightarrow 1, b_{h} \rightarrow 0.75$,
+so eq. (\ref{eq:phys341-1}) gives the Bethe-Heitler cross section.
+ 
+There are altogether 36 linear parameter in the formulae , their
+values are given in \Rind{GBREME}. The parameterisation reproduces
+the Seltzer-Berger tables within a few \% (2-3 \% on average,
+the maximum error being less than 10-12 \%), the tables, on the other hand,
+agree well with the experimental data and theoretical (low- and high-energy)
+results (less than 10 \% below 50 MeV, less than 5 \% above 50 MeV).
+ 
+Apart from the normalisation the cross section differential in photon
+energy can be written as:
+\[
+\frac{d \sigma}{d k} = \frac{1}{\ln \frac{1}{x_{c}}} \frac{1}{x}
+g(x) = \frac{1}{\ln \frac{1}{x_{c}}} \frac{1}{x} \frac{S(x)}{S_{max}}
+\]
+ 
+where $x_{c} = k_{c}/T$, $k_{c}$ is the photon cut-off energy below
+which the bremsstrahlung is treated as a continuous energy loss
+(this cut is {\tt BCUTE} in the program). Using this decomposition of
+the cross section and two random numbers $r_{1}$, $r_{2}$ uniformly
+distributed in $]0,1[$, the sampling of $x$ is done as follows:
+\begin{enumerate}
+\item sample $x$ from
+\[
+\frac{1}{\ln \frac{1}{x_{c}}} \frac{1}{x} \mbox{\hspace{1cm}setting\hspace{1cm}}
+x = e^{r_{1} \ln x_{c}}
+\]
+ 
+\item calculate the rejection function $g(x)$ and:
+\begin{itemize}
+\item if $r_{2} > g(x)$ reject $x$ and go back to 1;
+\item if $r_{2} \leq g(x)$ accept $x$.
+\end{itemize}
+\end{enumerate}
+ 
+To apply the Migdal correction \cite{bib-MIGD} all it has to be done is to
+multiply the rejection function by the Migdal correction
+factor:
+ 
+\[
+C_M (\epsilon)  =\frac{1 + C_0 / \epsilon_c^2}
+               {1 + C_0 / \epsilon^2} 
+\]
+ where
+\[
+C_0 =\frac{nr_0 \lambdar^2 }{\pi}, \hspace{1cm} \epsilon_c = \frac{k_{c}}{E}
+\]
+\begin{DLtt}{MM}
+\item[$n$]           electron density in the medium
+\item[$r_0$]         classical electron radius
+\item[$\lambdar$]    reduced Compton wavelength of the electron.
+\end{DLtt}
+This correction decreases the cross-section for low photon energy.
+ 
+After the successful sampling of $\epsilon$, \Rind{GBREME} generates the
+polar angles of the radiated photon with respect to the parent
+electron's momentum. It is difficult to find in the literature
+simple formulas for this angle. For example the double differential
+cross section reported by Tsai~\cite{bib-TSAI,bib-TSAI-err} is the 
+following:
+\begin{eqnarray*}
+\frac{d \sigma}{dkd \Omega} 
+& = & \frac{2 \alpha^{2}e^{2}}{\pi k m^{4}}
+  \left\{ \left[ \frac{2\epsilon-2}{(1+u^2)^2}+
+\frac{12u^2(1-\epsilon)}{(1+u^2)^4}\right]
+      Z(Z+1)  \right. \\
+&   & \mbox{} + \left. \left[ \frac{2-2\epsilon-\epsilon^{2}}{(1+u^2)^2}- 
+      \frac{4u^2(1-\epsilon)}{(1+u^2)^4}
+      \right]
+      \left[ X-2Z^{2}f_{c}((\alpha Z)^{2})\right]
+      \right\} \\
+u & = & \frac{E \theta}{m} \\
+X & = & \int_{t_{min}}^{m^{2}(1+u^{2})^{2}}
+{\left [ G_{Z}^{el}(t) + G_{Z}^{in}(t) \right ] \frac{t-t_{min}}
+{t^{2}} dt} \\
+G_{Z}^{el, in}(t) & & \mbox{atomic form factors} \\
+t_{min} & = & \left [ \frac{k m^{2} (1+u^{2})}{2 E (E-k)} \right ] ^{2}
+ = \left [ \frac{\epsilon m^{2} (1+u^{2})}{2 E (1-\epsilon)} \right ] ^{2}
+\end{eqnarray*}
+
+This distribution is complicated to sample, and it is anyway only an
+approximation to within few percent, if nothing else, due to
+the presence of the atomic form-factors. 
+The angular dependence is contained in the
+variable $u = E \theta m^{-1}$. For a given value
+of $u$ the dependence of the shape of the function on $Z$, $E$,
+$\epsilon = k/E$ is very weak.
+Thus, the distribution can be approximated by a function
+\begin{equation}
+f(u) = C \left( u e^{-au} + d u e^{-3au} \right)
+\end{equation}
+where
+\[
+C = \frac{9a^{2}}{9 + d} \hspace{1cm} a = 0.625 \hspace{1cm} 
+d = 0.13 \: \left ( 0.8+\frac{1.3}{Z} \right ) \left (100+\frac{1}{E} \right )
+(1+\epsilon)
+\]
+where $E$ is in GeV. While this approximation is good at high energies,
+it becomes less accurate around few MeV. However in that region the
+ionisation losses dominate over the radiative losses.
+
+The sampling of the function $f(u)$ can be done in the following way
+($r_{i},\: i=1,2,3$ are uniformly distributed random numbers 
+in [0,1]):
+\begin{enumerate}
+\item Choose between $u e^{-au}$ and $d u e^{-3au}$:
+\[
+b = \left \{ \begin{array}{Ll}
+a & \mbox{if\hspace{0.5cm}}r_{1} < 9/(9+d) \\
+3a & \mbox{if\hspace{0.5cm}}r_{1} \geq 9/(9+d) 
+\end{array} \right .
+\]
+\item Sample $u e^{-bu}$:
+\[
+u=-\frac{\log ( r_{2} r_{3}) }{b}
+\]
+\item check that:
+\[
+u \leq u_{max} = \frac{E \pi}{m}
+\]
+otherwise go back to 1.
+\end{enumerate}
+
+The probability of failing in the last test is reported in 
+table~\ref{tb:phys341-1}.
+
+\begin{table}
+\begin{centering}
+\begin{tabular}{|l|l|}
+\multicolumn{2}{c}{$\displaystyle
+P = \int^{\infty}_{u_{max}}{f(u) \: du} \hfill $} \\ [0.5cm]
+\hline
+E (MeV) & P(\%) \\ \hline
+0.511 & 3.4 \\
+0.6 &  2.2 \\
+0.8 & 1.2 \\
+1.0 & 0.7 \\
+2.0 & $<$ 0.1 \\ \hline
+\end{tabular}
+\caption{Angular sampling efficiency}
+\label{tb:phys341-1}
+\end{centering}
+\end{table}
+
+The function $f(u)$ can be used also to describe
+the angular distribution of the photon in $\mu$ bremsstrahlung and to
+describe the angular distribution in photon pair production.
+
+The azimuthal angle, $\Phi$, is generated isotropically.
+This information is used to calculate the momentum vector of the radiated
+photon, to transform it to the {\tt GEANT} coordinate system and 
+to store the result into common block \FCind{/GCKING/}. Also, the momentum of the parent electron 
+is updated.
+
+\subsection{Restrictions}
+
+\begin{enumerate}
+\item
+Target materials composed of compounds or mixtures are treated identically
+to elements using the effective atomic number $Z$ calculated in
+\Rind{GSMIXT}
+(this is not correct when computing the mean free path!).
+\end{enumerate}
+@

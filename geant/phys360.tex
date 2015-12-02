@@ -1,0 +1,158 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%  GEANT manual in LaTeX form                                     %
+%                                                                 %
+%  Michel Goossens (for translation into LaTeX)                   %
+%  Version 1.00                                                   %
+%  Last Mod. Jan 24 1991  1300   MG + IB                          %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\Origin{I.Gavrilenko}
+\Documentation{K.Lassila-Perini, I.Gavrilenko}
+\Submitted{17.11.93} \Revised{16.12.93}
+\Version{Geant 3.16}\Routid{PHYS360}
+\Makehead{Synchrotron radiation}
+\section{Subroutines}
+
+\Shubr{GSYNC}{}
+\Rind{GSYNC} is called for electron and positrons
+when the flag {\tt ISYNC} is set $>$ 0. It 
+computes the magnetic field and calls
+\Rind{GSYNGE} for the generation of the synchrotron radiation
+photons. It reads them in the {\tt GEANT} stack.
+\Rind{GSYNC} is called from \Rind{GTELEC}.
+
+\Shubr{GSYNGE}{(GAMMA,AMASS,FLDT,STEP,NTR,ETR,STR)}
+\Rind{GSYNGE} generates the synchrotron radiation 
+for an e$^-$ or e$^+$ with the Lorentz factor {\tt GAMMA}
+in the magnetic field {\tt FLDT} and when the step
+length is {\tt STEP}. The number of the secondary
+photons is {\tt NTR}, their energy is in the array {\tt ETR} and
+their position along the step is in {\tt STR}.
+\Rind{GSYNGE} is called by \Rind{GSYNC}.
+
+
+\section{Method}
+A charged particle in a magnetic field emits radiation.
+The number of photons emitted in a second is
+\begin{equation}
+\frac{d^2 \! N}{d\varepsilon \, dt} = \frac{15 \sqrt{3}}{8} \frac{P}{\varepsilon_c}
+\end{equation}
+
+where $\varepsilon_c$ is the critical photon energy
+(the median of the energy spectrum) and $P$ the
+total radiated power:
+
+\begin{eqnarray}
+\varepsilon_c & = & \frac{3}{2} \hbar c \frac{\gamma^3}{\rho} \\
+P             & = & \frac{2}{3} \frac{ e^2 c}{\rho^2}\beta^4 \gamma^4
+\end{eqnarray}
+$\gamma$ is the e$^-$/e$^+$ Lorentz factor $E_{tot}/m_e$ and
+$\beta = 1 - 1/\gamma^2$. $\rho$ is the
+curvature caused by the magnetic field.
+For more detailed derivation of these equations,
+see \cite{bib-MAIE}.
+The velocity of the particle being $\beta c$, the number of
+photons per meter is
+\begin{eqnarray}
+\frac{d^2 \! N}{d\varepsilon \, dx}  & = & 
+         \frac{d^2 \! N}{d\varepsilon \, dt} \, \frac{1}{\beta c} \nonumber \\
+  & = & \frac{5 \sqrt{3}}{6} \frac{e^2}{\hbar c} 
+        \beta^3 \gamma \frac{1}{\rho} \nonumber \\
+  & = & \frac{5}{2 \sqrt{3}} \, \alpha \, \frac{\gamma}{\rho} 
+        \; \approx  \; 0.01053 \, \frac{\gamma}{\rho}
+\end{eqnarray}
+The fine structure constant $\alpha = e^2/(\hbar c)$ and it is
+assumed that $\beta^3 \approx 1$.
+
+The curvature in a magnetic field $B$ which has a component
+$B_{\perp}$ transversal to the particle velocity can
+be computed \cite{bib-PDGB}
+\begin{equation}
+\rho = \frac{p} {0.3 B_{\perp}}
+\end{equation} 
+where $p$ is the momentum of the particle in GeV. $B$ is in tesla
+and $\rho$ is in meters.
+
+Knowing the step length, the energy of the electron
+and the curvature of the particle track in the magnetic field,
+the number of photons in a step $\delta x$ can be sampled from
+a Poissonian distribution around the mean value
+\begin{equation}
+\overline{n_{\delta x}} = 0.01053 \, \frac{\gamma}{\rho} \delta x
+\end{equation}
+
+Now, the energies of $n_{\delta x}$ photons have to be determined.
+The energy distribution in a step follows the distribution  \cite{bib-MAIE}
+\begin{equation}
+f(\varepsilon) \, = \, \frac{dN}{d\varepsilon} \, \propto \, 
+        \int_{\varepsilon / \varepsilon_c}^{\infty} K_{5/3}(x) \, dx
+\end{equation}
+The energy can be sampled from this by inverse transform method:
+\begin{eqnarray}
+N \, & = & \, F(\varepsilon) = \, \int f(\varepsilon) \, d\varepsilon \\
+\varepsilon \, & = & \, F^{-1}(N)
+\end{eqnarray}
+The double integral is not analytically solved, and the sampling
+is done from tabulated values of numerically computes $F(\varepsilon)$. 
+
+
+Two methods have been implemented. If the flag {\tt ISYNC}
+is set to 1, the photons are emitted at the end of the step along the current
+direction. If {\tt ISYNC} is set to 3, the photons are
+emitted randomly along the tangent the real trajectory of the particle.
+In the case when {\tt ISYNC = 3}, the magnetic field tracking routines are 
+called for each photon, and therefore this option is
+considrably slower than {\tt ISYNC = 1}.
+
+\begin{figure}
+\begin{picture}(300,100)(-60,0)
+
+\put(40,80){{\tt ISYNC = 1}}
+\put(0,0){\line(2,1){80}}
+\put(80,40){\vector(1,0){20}}
+\multiput(80,40)(16,0){4}{\vector(1,0){12}}
+\put(45,15){{\tt STEP}}
+\put(40,5){Current step}
+\put(85,57){{\tt VECT}}
+\put(85,47){New direction of e}
+\put(90,25){Photons}
+
+\put(240,80){{\tt ISYNC = 3}}
+\put(200,0){\line(2,1){80}}
+\put(280,40){\vector(1,0){20}}
+\put(205,5){\circle*{.25}}
+\put(210,9){\circle*{.25}}
+\put(215,13){\circle*{.25}}
+\put(220,16){\circle*{.25}}
+\put(225,19){\circle*{.25}}
+\put(230,22){\circle*{.25}}
+\put(235,25){\circle*{.25}}
+\put(240,27){\circle*{.25}}
+\put(245,29){\circle*{.25}}
+\put(250,31.5){\circle*{.25}}
+\put(255,33.5){\circle*{.25}}
+\put(260,35.){\circle*{.25}}
+\put(265,36.5){\circle*{.25}}
+\put(270,38){\circle*{.25}}
+\put(275,39){\circle*{.25}}
+
+\put(202,4){\vector(1,1){12}}
+\put(218,16){\vector(4,3){12}}
+\put(242,29){\vector(2,1){12}}
+\put(263,37){\vector(3,1){12}}
+\put(245,15){{\tt STEP}}
+\put(240,5){Current step}
+\put(285,57){{\tt VECT}}
+\put(285,47){New direction of e}
+\put(190,30){Photons}
+\end{picture}
+\caption{The point where the synchrotron radiation photon
+         is generated. The figure on the left describes
+         the situation when {\tt ISYNC = 1}, and the one
+         on the right when {\tt ISYNC = 3}. The little
+         arrows are the photons and {\tt STEP} is the
+         step taken by the e$^-$ or e$^+$. {\tt VECT}
+         is the new direction computed in {\tt GTELEC}
+         before entering in {\tt GSYNC}.}
+\end{figure}

@@ -1,0 +1,550 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%   EPIO User Guide -- LaTeX Source                               %
+%                                                                 %
+%   Chapter 5                                                     %
+%                                                                 %
+%   The following external EPS files are referenced:              %
+%                                                                 %
+%   Editor: Michel Goossens / CN-AS                               %
+%   Last Mod.: 25 Nov 1993 23:45 mg                               %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ 
+\Filename{H1EPIO-technical-details}
+\chapter{Technical details}
+\label{sec:H1TechnicalDetails}
+
+\Filename{H2EPIO-technical-details-status-words}
+\section{Status words}
+\index{status word}
+
+One set of status words per unit will be kept in a common block (which
+should reside in the root for overlayed programs). The status words
+contain all information the routines have to know in order to operate.
+The shorthand notations 'physical header' and 'record header' refer
+to the physical and logical headers respectively of the EP format
+description.
+ 
+Words marked '*' can be defined and changed by the user through calls
+to special routines (the user should not write into the status
+word area directly).
+
+r, w, and r/w under 'use' means reading or writing only, or both.
+
+\begin{longtable}{@{}rllp{.84\linewidth}@{}}
+\caption{Overview of the status words}\label{tab:statuswords}         \\
+1 & * & r/w & Physical block length in 16-bit words.
+              Used for writing; should always be a multiple of the 
+              ``magic'' 180.
+              For the UNIX and ``standard Fortran'' versions it is
+              the actual block length.                                \\
+  &   &     & For reading, it is the upper limit
+              of the EPIO buffer \Lit{IBUF}.                          \\
+  &   &     & The user has to provide sufficient space in \Lit{IBUF}. \\
+  &   &     & Example: for a buffer length of 1800 16-bit words,
+              \Lit{IBUF(480)} is needed on a 60-bit machine.          \\
+  &   &     &  Default=1800                                           \\
+2 & * &  r  & Maximum logical record length (in machine words).       \\
+  &   &     & Default=999999                                          \\
+3 & * & r/w & Reading : as read from physical header word 11          \\
+  &   &     & Writing : Logical record word length (16 or 32-bits); 
+              a word of this length will be called a ``unit'' 
+              in the following.                                       \\
+  &   &     & Default=16                                              \\
+4 & * & r/w & P.h. word 5 (run number), read or written               \\
+  &   &     & Default=10101                                           \\
+5 & * & w   & If $\geq0$, logical record type identifier 
+              (will be used as record header word 2).                 \\
+  &   &     & If $\leq0$, for user purposes.                          \\
+  &   &     & Default=0                                               \\
+6 & * & w   & If $\geq0$, logical record count will be placed 
+              in record header word 4                                 \\
+  &   &     & If $<0$, record header word 4 will not be set 
+              (i.e. for user purposes).                               \\
+  &   &     & Default=0                                               \\
+7 & * & r/w & Reading : as read from physical header word 2, 
+              or 0 if no physical header                              \\
+  &   &     & Writing : Actual physical header length. 
+              Is automatically set at call to \Rind{EPADDH}.          \\
+  &   &     & Default=12 (see control word 6), 24 for 32 bit p.h.     \\
+8 & * & w   & Output padding flag, values \Lit{i+j}                   \\
+  &   &     & \Lit{i=0} : span logical records over blocks            \\ 
+  &   &     & \Lit{i=10}: do not span logical records                 \\
+  &   &     & Remark: headers will never be spanned on writing        \\
+  &   &     & \Lit{j=1} : pad physical block with zeros to full length
+              (i.e. write fixed length blocks)                        \\
+  &   &     & \Lit{j=2} : pad up to next magic multiple 
+              (see control word 5)                                    \\
+  &   &     & \Lit{j=3} : do not pad at all                           \\
+  &   &     & Default=1                                               \\
+9 & * & r/w & Physical header word 6 (physical record type)           \\
+  &   &     & Default=0 (16 bit p.h.), 1 for 32 bit p.h.              \\
+10&   & r/w & Logical unit number                                     \\ 
+11&   & r/w & Number of blocks read or written                        \\
+12&   & r/w & Number of records read or written                       \\ 
+13&   & r/w & Number of read or write parities                        \\
+14&   & r/w & Actual occupation of I/O buffer (16-bit words)          \\
+15&   & r/w & Displacement to start of first logical record 
+              (physical header)                                       \\
+16&   & r/w & Status indicator: 0 at start, 1 writing, 2 reading.     \\
+17&   & r   & Flag for old (=1) or new (=0) EP format. Recognized
+              when reading.                                           \\
+18&   & r   & Number of headerless blocks still following (from
+              physical header word 9)                                 \\
+19&   & r   & Normally 0, 1 if last read access resulted in E.O.F.    \\
+20&   & r   & Actual number of units read, including header, in
+              current logical record (logical record header word 1)   \\
+21&   & r   & Logical record header length (logical record header word 3)\\
+22&   & r   & Position indicator - Internal in \Rind{EPREAD}          \\
+  &   &     & \Lit{=0} : pointer at start of logical record (header)  \\
+  &   &     & \Lit{=1} : pointer at start of logical record (data)    \\
+  &   &     & \Lit{=2} : pointer at end of physical header            \\
+23&   & r   & Internal pointer \Lit{IP1} in \Rind{EPREAD}             \\
+24&   & r/w & Internal unit name UNIVAC and Apollo only               \\
+25& * & r/w & VAX: Channel address (magnetic tape)                    \\
+  &   &     & UNIVAC: -1 if tape, otherwise sector address            \\
+  &   &     & IBM: if 0 (default) \Lit{ULP} option, 
+              else \Lit{NULP} (see \Rind{IOPACK})                     \\
+  &   &     & \Lit{NULP} allows concatenation of files, 
+              \Lit{ULP} does not                                      \\
+  &   &     & Apollo: must be set before first read \Lit{Stream _$ID} \\
+  &   &     & UNIX C I/O: stream address (not user settable!)         \\
+26& * & r   & Maximum logical record header length, for calls
+              to \Rind{EPREAD} with \Lit{MODE=20} (default 999999)    \\
+27& * & r   & User wants automatic byte-swapping if 1 (default) 
+              or suppression of it (=0).                              \\
+  &   &     & User forces new format if 2                             \\
+28&   & r   & Internal usage                                          \\
+29& * & r/w & Select physical header record format                    \\
+  &   &     & writing: 16 bit headers = 0 (default) or
+              32 bit headers = 1                                      \\
+  &   &     & reading: as deduced from header words 7 and 8           \\
+30& * & w   & Vax tape append option,                                 \\
+  &   &     & = 0 (default) new tape file,= 1 append.                 \\
+31&   & r   & =Pointer to logical reader header, for random access    \\
+32&   & r   & =Internal usage                                         \\
+33& * & r/w & Select type of I/O in the UNIX version;
+              see section \ref{sec:usageunix} ``Usage on UNIX''.      \\
+\end{longtable}
+
+The status words are kept in a common block
+
+\begin{XMP}
+      COMMON/EPCOMM/NMUNIT,NWUNIT,NCONT,ISTART,LASTUT,LREF,LIST($dim)
+\end{XMP}
+
+with
+\begin{DLtt}{123456}
+\item[NMUNIT] max. no. of units supported simultaneously, reading plus writing
+              (default = 10).
+\item[NWUNIT] number of status words per unit according to list above
+              (default = 32).
+\item[NCONT]  number of overall control words for package 
+              according to list below (default = 8).
+\item[ISTART] internal reference flag
+\item[LASTUT] internal reference flag
+\item[LREF]   internal reference flag
+\item[LIST]   status word list, with \Lit{$dim = NCONT+NWUNIT*NMUNIT}, 
+              this allows the support of more units than the default 10 
+              (see below) default value of \Lit{$dim = 350}.
+\end{DLtt}
+ 
+\subsection*{Important note}
+ 
+These defaults may change in a later version of the package. Users who
+want to use or modify these values (e.g.: to support more than 10
+simultaneous units) are urged to check the current values by printing
+the start of above COMMON block after a call to \Rind{EPINIT}.
+
+\Filename{H2EPIO-technical-details-control-words}
+\section{Control words}
+\index{control word}
+
+These control words are kept in the first 8 locations of the
+array \Lit{LIST} in common block \Lit{/EPCOMM/}.
+
+\begin{DLtt}{1}
+\item[1] no. of units actually in use
+\item[2] max. no. of error print messages (default=100)
+\item[3] actual number of error print messages
+\item[4] no. bits/machine word
+\item[5] no. of 16-bit words / recommended unit (default=180)
+\item[6] standard physical header length (default=12) in words (16 or 32 bit)
+\item[7] number of unit control words accessible to user mods
+\item[8] logical print output unit
+\end{DLtt}
+
+\newpage
+
+\Filename{H2EPIO-technical-details-remark-logical-record-headers}
+\section{Important remark on logical record headers}
+\label{sec:remarkslogicalrecords}
+\index{logical record}\index{record!logical}
+
+The logical record header consists of 3 words minimum, but the
+standard form has four words, being:
+
+\begin{enumerate}
+\item the logical record length
+\item the logical record type identifier
+\item the logical record header length
+\item the logical record sequence number.
+\end{enumerate}
+ 
+Of these, words 1 and 3 will always be  provided by the output
+routines when writing (basic protection).
+ 
+Words 2 and 4 of the logical record will always be assigned the values
+described above when the user writes via calls to \Rind{EPOUTS}.
+ 
+For use with \Rind{EPOUTL}, two status words, number 5 and 6, are used to
+assign values in the following way:
+
+\begin{quote}
+let the status words be \Lit{S5}, \Lit{S6}, \Lit{S12}
+and the header words be \Lit{H2}, \Lit{H4},
+\end{quote}
+
+then
+
+\begin{DLtt}{12345678}
+\item[if S5 $\geq0$] \Lit{H2} is set to \Lit{S5} by \Rind{EPOUTL}
+\item[if S5 $< 0$]   \Lit{H2} is not set by \Rind{EPOUTL},
+                     i.e. the user should have set it before
+                     calling \Rind{EPOUTL}.
+\item[if S6 $\geq0$] \Lit{H4} is set to \Lit{S12} (!) by \Rind{EPOUTL}
+\item[if S6 $< 0$]   \Lit{H4} is not set by \Rind{EPOUTL},
+                     i.e. the user should have set it before
+                     calling \Rind{EPOUTL}.
+\end{DLtt}
+
+\Filename{H2EPIO-technical-details-remark-padding}
+\section{Remark on padding}
+\index{padding}
+
+Full padding, partial padding, and no padding have certain
+consequences on the different computers, and should therefore be
+considered beforehand.
+\begin{enumerate}
+\item Full padding: all blocks on the output file have the same (user
+      specified) length, which should be a multiple of 180 16-bit words.
+      This mode will probably work on any computer for
+      reading and writing.
+\item Partial padding: ensures the blocks to have an integer length when
+      counted in machine words (no trailing bits, or incomplete words on
+      reading, no extra-bits when writing). This should normally work
+      except on computers which can only read and write fixed length blocks.
+\item No padding: since in the current package, full machine words are
+      written on all computers, this may lead to problems when reading, on
+      another machine but normally only if the physical or logical lengths
+      are not known. For example, due to extra padding during the transfer,
+      records of unknown length may not be processed correctly
+      when received through a network.
+\end{enumerate}
+
+\newpage
+\Filename{H2EPIO-technical-details-error-list}
+\section{List of errors}
+\index{error codes}
+
+Table~\ref{tab:errorcodes} explains the meaning of the integer \Lit{IERR} 
+returned as the last parameter of most EPIO subroutine calls,
+zero meaning no error.
+For each error two types of routines are quoted: those called by the user,
+and in which the error condition was detected, and those in which the
+error occurred.
+ 
+Control is always returned to the user, but some of the errors
+(marked by * in first column) are so serious that it becomes meaningless
+to continue reading or writing on the unit concerned,
+at least after a limited number of them.
+
+\newcommand{\RA}{\Rightarrow} 
+\begin{longtable}{@{}lllp{.6\linewidth}@{}}
+\caption{Overview of the error codes}\label{tab:errorcodes}            \\
+\textbf{Error}  & \textbf{Routine} & \textbf{User} & \textbf{Meaning}  \\
+                &                  & \textbf{routine} &                \\\hline
+\endhead
+1   &\Rind{EPBLIN}&\Rind{EPREAD}&End of file on reading or open 
+                                 failure on IBM                        \\
+    &\Rind{EPBOUT}&\Rind{EPOUTL}&reading or writing                    \\
+    &             &\Rind{EPOUTS}&                                      \\
+2   &\Rind{EPBLIN}&\Rind{EPREAD}&r/w parity, or I/O error (IBM)        \\
+    &\Rind{EPBOUT}&\Rind{EPOUTL}&                                      \\
+    &             &\Rind{EPOUTS}&                                      \\
+    &             &\Rind{EPRWND}&                                      \\
+3   &\Rind{EPBLIN}&\Rind{EPREAD}& end of information on reading, or in
+                                  some cases after an open error on IBM\\
+4*  &\Rind{EPBLIN}&\Rind{EPREAD}& physical record length $\leq0$       \\
+5*  &\Rind{EPBLIN}&\Rind{EPREAD}& physical record length of record just
+                                  read \Lit{>} actual length of block 
+                                  read or user buffer too small        \\
+6   &see $\RA$    &\Rind{EPREAD}& user record chopped (\Lit{IREC} too 
+                                  small, status word 2) the actual 
+                                  length (including header) can be 
+                                  retrieved from status word 20 
+                                  using \Rind{EPGETW}                  \\
+7*  &see $\RA$    &\Rind{EPREAD}& physical header error; could be a 
+                                  record in the old format             \\
+8   &see $\RA$    &\Rind{EPOUTS}& invalid mode specified in call       \\
+    &             &\Rind{EPOUTL}&                                      \\
+    &             &\Rind{EPREAD}&                                      \\
+9   &see $\RA$    &\Rind{EPREAD}& call to \Rind{EPREAD} with mode 11, 
+                                  12, or 13, without prior call with 
+                                  \Lit{MODE=20}                        \\
+    &             &             & You can also get this error reading 
+                                  OLD format, with \Lit{MODE=20}
+                                  followed by 11, 12 or 13             \\
+10  &\Rind{EPBLIN}&\Rind{EPREAD}&end-of-run (logical record length = 0)\\
+11* &\Rind{EPBOUT}&\Rind{EPOUTS}&unit not declared on JCL card,        \\
+    &             &\Rind{EPOUTL}&or wrong \Lit{BLKSIZE} (only IBM)     \\
+    &\Rind{EPBLIN}&\Rind{EPREAD}&                                      \\
+12  &\Rind{EPBOUT}&\Rind{EPOUTS}&end of volume, or unrecovered write   \\
+    &             &\Rind{EPOUTL}&parity (only IBM~\cite{bib-IOPACK})   \\
+    &             &\Rind{EPCLOS}&                                      \\
+    &             &\Rind{EPRWND}&                                      \\
+13  &\Rind{EPUNIT}&\Rind{EPOUTS}&maximum number of units reached       \\
+    &             &\Rind{EPOUTL}&                                      \\
+    &             &\Rind{EPRWND}&                                      \\
+    &             &\Rind{EPADDH}&                                      \\
+    &             &\Rind{EPSETW}&                                      \\
+    &             &\Rind{EPSETA}&                                      \\
+    &             &\Rind{EPREAD}&                                      \\
+    &             &\Rind{EPGETA}&                                      \\
+    &             &\Rind{EPGETW}&                                      \\
+14  &see $\RA$    &\Rind{EPDROP}& unit does not exist                  \\
+    &             &\Rind{EPADDH}&                                      \\
+    &             &\Rind{EPEND} &                                      \\
+15  &see $\RA$    &\Rind{EPOUTS}& logical record header (or complete 
+                                  record)                              \\
+    &             &\Rind{EPOUTL}& too long to fit in physical block    \\
+16  &see $\RA$    &\Rind{EPGETW}& status word address out of range     \\
+    &             &\Rind{EPGETA}&                                      \\
+    &             &\Rind{EPSETW}&                                      \\
+    &             &\Rind{EPSETA}&                                      \\
+17  &see $\RA$    &\Rind{EPADDH}& user switches from reading to writing\\
+    &             &\Rind{EPREAD}& or vice versa, without rewinding unit\\
+    &             &\Rind{EPOUTL}&                                      \\
+    &             &\Rind{EPOUTS}&                                      \\
+18  &see $\RA$    &\Rind{EPREAD}& displacement to start of logical 
+                                  record inconsistent with current 
+                                  logical record length, not tested 
+                                  by \Rind{EPFRD}                      \\
+19  &\Rind{EPOUTL}&\Rind{EPOUTL}& number of words to write $< 0$       \\
+    &             &\Rind{EPOUTS}&                                      \\
+20  &\Rind{EPOUTL}&\Rind{EPOUTL}& Negative record length or negative or\\
+    &             &\Rind{EPOUTS}& zero header length in user call      \\
+21  &\Rind{EPREAD}&\Rind{EPREAD}& Old format and \Lit{MODE\(\neq\)2}   \\
+22  &\Rind{EPBLIN}&\Rind{EPREAD}& Wrong 32 bit physical header read    \\
+23  &\Rind{EPREAD}&\Rind{EPREAD}& Logical record unit neither 16 nor 
+                                  32 bit (status word 3).              \\
+24  &\Rind{EPOUTL}&\Rind{EPOUTL}&Logical record or header length       \\
+    &             &\Rind{EPOUTS}& \Lit{>} 65536 for 16 bit headers     \\
+25  &\Rind{EPBLIN}&\Rind{EPREAD}&Error from \Rind{cfseek} reading
+                                 in random access mode                 \\
+\end{longtable}
+
+\newpage
+
+\Filename{H2EPIO-technical-details-format-description}
+\section{Format Description}
+\label{sec:EPIOformat}
+\index{tape format}
+
+\subsection{Tapes}
+\index{logical record}\index{record!logical}
+ 
+Logical records may be of fixed or variable length.
+A logical record may be entirely contained in one physical record
+or may overflow into one or more physical records.  Normally an
+event or trigger corresponds to one logical record but it may equally
+well consist of a sequence of related logical records.
+ 
+Physical records may be of fixed or variable length.
+ 
+A fixed record length is recommended (for ease of reading using standard
+system and particularly FORTRAN, input routines). A fixed record length
+is particularly important if the record has no header specifying the
+length.
+ 
+A record length which is a multiple of 360 bytes is recommended
+(corresponding to an integral number of 16, 18, 24, 32, 36, 48, 60, 64-bits).
+ 
+The following table indicates the increase in tape utilisation with record
+length up to the maximum of 32K bytes for IBM 370~\cite{bib-WYLBUR}.
+\begin{table}[h]
+\centering
+\begin{tabular}{clllll}
+\textbf{Usage(\%)}            &
+67   & 80     & 88     & 90     & 94      \\
+\textbf{Record length (bytes)}&
+3600 & 3600*2 & 3600*4 & 3600*5 & 3600*8  \\
+\end{tabular}
+\caption{Tape usage at 6250 bpi}
+\label{tab:tapeusage}
+\end{table}
+ 
+\subsection{Files}
+ 
+It is recommended that logical records relating to the same
+experimental conditions or 'run' are grouped in one file.
+ 
+For unlabelled tapes the end-of-file (and
+end-of-run) is indicated by one EOF mark.
+ 
+For labelled tapes the end-of-file (and end-of-run) is indicated by
+an EOF mark and the associated EOF records~\cite{bib-LABTAP}.
+ 
+End-of-data on the tape (and end-of-file) is indicated by two
+consecutive EOF marks. It is NOT recommended that files (runs) span
+from one tape to another.
+ 
+\textsc{End-of-tape}. It is NOT recommended to write past the EOT reflective
+marker, therefore, on detection of the EOT marker, the software should
+backspace over a sufficient number of data records to allow the
+required end-of-run and EOF records to be written.
+ 
+\textsc{Record formats}.  Logical records and physical records, (i.e. physical
+tape blocks) normally consist of a number of header words, followed by
+data. In some cases the number of header words in a physical record
+may be 0.
+ 
+\textsc{Word lengths}.  All lengths in the physical header are expressed in words
+where a word is defined as a 16-bit unsigned integer.
+The logical record wordlength is defined in the physical record header.
+ 
+\begin{DLtt}{12345}
+\item[byte 0] is defined as the highest order 8-bits of the word,
+\item[byte 1] is defined as the next highest order 8-bits, etc.
+\item[byte 0] is written to tape before byte 1.
+\end{DLtt}
+
+\clearpage
+\subsection*{Logical Record Format}
+\index{logical record format}\index{record format!logical}
+ 
+A logical record normally has a minimum of three header words followed
+by data. The logical record wordlength is defined in the physical record
+header. Logical record headers with 32 bit words should have their 16
+bit components in ``IBM'' order.
+
+\begin{longtable}{@{}>{\tt}lp{.86\linewidth}@{}}
+\caption{Logical Record Format}\label{tab:logicalrecordformat}       \\
+\multicolumn{1}{c}{\textbf{Word}} &
+\multicolumn{1}{c}{\textbf{Definition}}                              \\
+\multicolumn{2}{c}{\textbf{Header}}                                  \\
+ 1  & The logical record length (\Lit{LRL}), which  should 
+      always correspond to the actual number of words in the 
+      logical record, except in the following special cases:
+      \begin{DLtt}{1234567890}
+        \item[LRL=1] The total length of the logical record 
+                     is unknown at the time of writing 
+                     (the logical record header to tape).
+        \item[LRL=0] End-of-data in this run.
+        \item[LRL=\(2^{16}-1\)] End-of-data in this physical record
+                      (16-bit word all-bits set).
+      \end{DLtt}
+      Note that even when the logical record wordlength 
+      is 16-bits the 16-bits following the last word of the 
+      current logical record will,when set, be an unambiguous 
+      indication of the end-of-data in the physical record.          \\
+ 2  & Logical Record Type Identifier     
+      It is mandatory,except in the above mentioned special cases 
+      (but may simply be set to zero). No attempt is made to 
+      standardise on record types as they are rather application 
+      dependent.                                                     \\
+ 3  & Logical Record Header Length (\Lit{LHL}), whose  
+      definition is strongly recommended.
+      The offline package writes this word and uses it when unpacking.\\
+ 4  & Logical record sequence number.
+      Its use is recommended. (It has been found useful online but 
+      is not required by the offline unpack routines.)                \\
+... &                                                                \\
+\multicolumn{2}{c}{\textbf{Data}}                                    \\
+LHL+1 & First Data Word                                              \\
+... &                                                                \\
+LRL & Last Data Word                                                 \\
+\end{longtable}
+
+ 
+\subsection*{Physical Record Format}
+\index{physical record format}\index{record format!physical}
+ 
+Each physical record normally has a variable length physical record
+header, followed by data. However, certain records, following a record
+with a suitable header may have no header.
+The word length may be 16 or 32 bits but in both cases the values of
+lengths and pointers are in units of 16 bits.
+ 
+The physical header identifier fields (7 and 8) are used by
+the off-line package to identify the header word length, to help in
+error detection and recovery, and to decide if byte swapping is
+required. For the 32 bit
+header words, the least significant 16 bits are in the leftmost 16 bits
+of the word, i.e. "IBM format". The off-line package achieves this by
+calling \Rind{CTOIBM} before the header is output.
+ 
+\newpage
+
+\begin{longtable}{@{}>{\tt}lp{.86\linewidth}@{}}
+\caption{Physical Record Format}\label{tab:physicalrecordformat}\\
+\multicolumn{2}{c}{\textbf{Header}}                            \\
+\multicolumn{1}{c}{\textbf{Word}} &
+\multicolumn{1}{c}{\textbf{Definition}}                        \\
+ 1 & Physical Record Length        (\Lit{PRL})                 \\
+ 2 & Physical Record Header Length (\Lit{PHL>SHL}) (see below) \\
+ 3 & Physical Record Number (\Lit{NR})                         \\
+   & This number identifies each record on tape.
+     Each physical record counts in the numbering even if 
+     there is no physical record header.
+     \Lit{NR} is modulo 65536 ($2^{16}$) for 16 bit headers.   \\
+ 4 & Displacement (\Lit{NS} from first header word to first 
+     word of first logical record in present physical record
+     (or to end-of-data indicator if no logical record starts 
+     in current physical record).                              \\
+   & \Lit{LS=PHL}   if logical record starts 
+     immediately after header                                  \\
+   & \Lit{LS=0\ \ } if ALL data in this record belong to 
+     current logical record                                    \\
+ 5 & Run Number or other Run Identifier. 
+     They can be selected by Run number or other Run identifier.\\
+ 6 & Physical Record Type. 
+     It is application dependent and is foreseen to readily
+     select data from different sources which may be 
+     interleaved on tape.                                      \\   
+ 7 & Physical Header Identifier Fields 1 =29954 (16 bit),
+     522144444 (32 bit)                                        \\
+ 8 & Physical Header Identifier Fields 2 =31280 (16 bit),
+     522144444 (32 bit)                                        \\
+   & These Header Identifier fields are present to identify
+     extensions to the 'EP' format~\cite{bib-MAG} and to 
+     recognise the physical header during error recovery.      \\
+ 9 & Number of Physical Records following this one, with
+     0 length headers. 0 if next record has a header.
+     Physical records without headers are \textbf{not} 
+     recommended, mainly to help error recovery.               \\
+10 & Tape Format Version Number = 8012                         \\
+11 & Logical Record word length (in-bits, 16 or 32)
+     This is the word length (of header and data words) for all
+     logic records which start in this physical record. 
+     Initially the unpack
+     routines will be written to handle 16 or 32-bit words.    \\
+12 & Length of Standard Physical Record Header 
+     (\Lit{SHL=12} for 16 bit or \Lit{24} for 32 bit)
+     This length (\Lit{SHL}) is to be used as a displacement to 
+     access the user header words (independently of any
+     future addition to the standard header).                  \\
+\multicolumn{2}{c}{\textbf{Data}}                              \\
+SHL+1 & Start of User Header Words                             \\
+...   &                                                        \\
+PHL+1 & Start of data from previous logical record (if any)    \\
+...   &                                                        \\
+LS+1  & First word of first logical record in this physical 
+        record (if any)                                        \\
+...   &                                                        \\
+...   & Logical record(s) data                                 \\
+...   &                                                        \\
+PRL   & Last word in physical record                           \\
+\end{longtable}
+

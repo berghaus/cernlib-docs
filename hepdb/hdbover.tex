@@ -1,0 +1,572 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%   HEBDB    - Reference Manual -- LaTeX Source                   %
+%                                                                 %
+%   Overview                                                      %
+%                                                                 %
+%   Original: Jamie Shiers (from DBL3, OPCAL doc)                 %
+%                                                                 %
+%   Last Mod.: 02 Sep  1991 10:50 mg                              %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\Filename{H1hdbover-Overview}
+\chapter{Overview}
+
+High Energy Physics experiments require the use of powerful
+data base systems in which to store information such
+as detector geometry and calibration constants.
+The data stored usually consist of a part which is largely
+time independent, for instance the parameters which describe the
+experimental setup, and of another part whose contents may vary with
+time, with different frequencies, and have therefore to be recorded
+repeatedly, with proper time or other validity ranges.
+
+The latter may represent quite a large amount of data. As an example,
+for a LEP Detector, one has to store between tens and hundreds of megabytes
+of data per year of operation.
+
+At program execution time, fast access to the data base contents is
+essential, and an efficient system which limits the rate of transactions
+between the directly addressable storage medium, where the data base
+resides, and the computer memory available to the user, has to be
+implemented.
+
+In a multi-user, multi-computer environment, keeping up to date a
+centralized data base and optimizing the data flow is not a trivial
+matter. This can only be achieved through dedicated 'service' machines
+under control of a data base 'server'.
+
+Last, but not least, the system has to be robust and safe, and
+equipped with facilities which minimize the inconveniences of a
+possible program crash or of a computer hang-up.
+
+The package HEPDB, described in this manual, is an attempt to
+solve the above requirements. It has greatly benefitted from
+similar packages developed by other experiments at CERN and elsewhere,
+notably the DBL3 and OPCAL packages,
+written by the L3 and OPAL collaborations respectively.
+The DBL3 package is described in~\cite{bib-DBL3}.
+
+HEPDB is based on the ZEBRA system~\cite{bib-ZEBRA} and relies heavily on
+the Random Access I/O package RZ~\cite{bib-ZEBRARZ}, and also
+MZ (memory management) \cite{bib-ZEBRAMZ},
+DZ~(debug and dump)~\cite{bib-ZEBRADZ} and
+FZ~(sequential I/O)~\cite{bib-ZEBRAFZ} packages.
+
+The choice of the ZEBRA RZ package as a subsystem on which
+to build HEPDB was natural, as it is used by other widely used
+programs such as GEANT \cite{bib-GEANT}, HBOOK \cite{bib-HBOOK},
+PAW \cite{bib-PAW} and FATMEN \cite{bib-FATMEN}.
+The ZEBRA package provides all of basic features required for the HEPDB
+system, including interchange mechanism (which in fact uses
+ZEBRA FZ sequential exchange mode files).
+\Filename{H1hdbover-HEPDB-concepts-and-basic-functionality}
+\chapter{HEPDB concepts and basic functionality}
+
+Built upon RZ, the HEPDB package provides facilities and utilities
+which are sufficiently general as to be of use to all High Energy
+Physics experiments.
+It increases the functionality of RZ in a number of areas, such
+as  data compression, for more
+economical storage on the random access devices and via
+partitioned directories, which helps optimize performance.
+
+\Filename{H2hdbover-Overview-of-the-Zebra-RZ-package}
+\section{Overview of the Zebra RZ package}
+
+The ZEBRA RZ \cite{bib-ZEBRARZ} package uses random access files,
+which can reside on direct access devices or in memory.
+RZ files are organised in a hierarchical manner, much like
+the Unix file system. Thus, data is accessed or stored using a Unix-like
+{\bf pathname}, plus one or more identifiers known as {\bf keys}.
+
+The ZEBRA RZ package was designed for use in High Energy Physics experiments,
+and thus is well suited to applications such as HEPDB.
+
+In HEPDB, data is stored in one or more ZEBRA RZ files.
+Typically, one might use separate subdirectories for the different
+detector components. Again, for any given subdetector, separate
+subdirectories could be used for the various types of information
+that are to be stored for that component. Thus, one might have
+subdirectories such as {\tt TEMPERATURE}, {\tt GAS}, {\tt ALIGN}
+and so on. For efficiency reasons, it is also recommended to
+store information with widely differing update frequencies
+in different directories. Thus, one might have a subdirectory
+per subdetector for constant or pseudo-constant information,
+such as the number of wires
+in a cell, and other directories, as shown above, for
+information which varies more rapidly, such as gas pressures.
+
+\Filename{H2hdbover-Data-base-representation-in-memory}
+\section{Data base representation in memory}
+
+The HEPDB package uses a Zebra dynamic store (which is
+in fact a Fortran labelled common block).
+This can be any of the stores used by the application program. HEPDB
+operates inside two divisions in that store: a HEPDB system division, of
+no concern for the user, and the division where, at user's request, the
+data objects are dumped from the random access medium and kept in memory
+as long as required by the user.
+
+In the latter division, data objects from a given data base file are
+stored as Zebra banks, or Zebra data structures, within a main data
+structure which reproduces, partially and only for the directories in
+use, the Node/Key structure of the data base files. As many main
+structures can be simultaneously handled in memory as there are data
+base files declared by the user; however, they are expected to all share
+the same division. The skeleton of NODE and KEY banks grows up,
+following the successive user requests, and stays permanently available
+in memory. The data banks, appended to the corresponding KEY
+banks, can be either refreshed when the time dependence of their
+contents requires it, or dropped when they are no longer needed by the
+user. They can also be marked as temporarily unwanted, so that the
+system can drop them in case of shortage of memory, at the cost of
+reaccessing them from the random access device if and when required
+again.
+
+\Filename{H2hdbover-HEPDB-keys}
+\section{HEPDB keys}
+
+In order to minimize the disk-memory transfers and to permit a tight
+control of the whole system, a few general standard keys have been
+defined. The HEPDB package assumes that all key vectors consist of at
+least 10 keys. These keys are defined as shown in table
+\ref{table-keys}.
+
+\begin{table}[t]
+\begin{center}
+\begin{tabular}{|l|l|l|}
+\hline
+\multicolumn{3}{|c|}{\bf System keys}\\
+\hline
+Key number & Meaning & Parameter \\
+\hline
+1 & serial number & \Lit{IDHKSN}  \\
+\hline
+2 & pointer       & \Lit{IDHPTR}  \\
+\hline
+3 & flags         & \Lit{IDHFLG}  \\
+\hline
+4 & insertion time & \Lit{IDHINS} \\
+\hline
+5 & {\it reserved} & \\
+\hline
+\multicolumn{3}{|c|}{\bf Special User keys}\\
+\hline
+6 & unique source identifier& \Lit{IDHUSI} \\
+\hline
+7 & software reference number& \Lit{IDHSRN} \\
+\hline
+8 & {\it reserved}  & \\
+\hline
+9 & {\it reserved}  & \\
+\hline
+10 & {\it reserved} & \\
+\hline
+\multicolumn{3}{|c|}{\bf Validity range pairs (Repeated \Lit{NPAIR} times)}\\
+\hline
+11 & start range 1 & \\
+\hline
+12 & end range 1   & \\
+\hline
+\multicolumn{3}{|c|}{Normal user keys (up to RZ limit of 100)}\\
+\hline
+\Lit{11+NPAIR*2} & first normal user key& \\
+\hline
+\Lit{12+NPAIR*2} & second normal user key& \\
+\hline
+\end{tabular}
+\end{center}
+\caption{HEPDB keys}
+\label{table-keys}
+\end{table}
+
+The system keys should not be touched by the user or application program.
+The normal user keys may contain any information.
+
+After the standard keys come a number of key pairs. The number of pairs
+is a database constant. For example, the L3 collaboration uses only
+one key pair, the start and end times for which a database object is
+valid. The OPAL collaboration uses 3 key pairs - the start and end
+experiment, run and event number for which a database object is valid.
+
+Additional keys, the so-called user keys, can be declared by the user
+(within the overall RZ \cite{bib-ZEBRARZ} limit of 100 keys).
+Their role will become more
+transparent when reviewing the functionality of the storage and
+retrieval of data objects, described below.
+
+\Filename{H2hdbover-Data-compression}
+\section{Data compression}
+
+In order to minimise the usage of disk storage, data objects may be packed.
+Several packing mechanisms are provided - one that is particularly useful
+is bit packing. In this case, and provided that all elements of a data
+object must be of the same type (integer or real), HEPDB
+searches for the optimum bit-length that permits the majority of the data
+elements to be packed. The remaining elements are stored using two words
+each. Another
+packing algorithm, activated at user's request, stores only the data
+elements whose absolute values are greater than a predefined number.
+Packing and unpacking are automatic and not seen by the user, who always
+deals with unpacked data in memory. Furthermore, the user is in any case
+given the possibility to inhibit the packing.
+
+In order to store data as compactly as possible,
+one may also store only the differences from another object
+in the same directory.  Like packing,
+the storing of difference records is completely automatic and transparent
+to the user.
+
+Further information on packing and the storing of difference records
+is given in the Appendix.
+
+\Filename{H2hdbover-Real-time-optimization}
+\section{Real time optimization}
+
+The RZ package is not optimized for handling directories with large numbers of
+data objects; the memory resident part of the data describing the keys
+becomes very large and storage and retrieval become more expensive, both
+in CPU time and real time, when the number of data objects exceeds a few
+thousands. The concept of partitioned directory has been introduced to
+attenuate these effects. Subdirectories are automatically created when
+needed, with keys which permit to keep track of their contents and to
+quickly access the right partition. Partitioning is invisible to the
+user, who just has to give its characteristics when creating the
+directory. Subsequent storage and retrieval of data objects in a
+partitioned directory follow the same rules as for a normal directory,
+as far as the calling sequences of the user interface subroutines are
+concerned. It should be noted however that direct calls to RZ routines
+for handling such directories would be extremely hazardous and should
+be avoided.
+
+To further optimize real time usage in storing data, HEPDB also
+provides a facility to store several objects, belonging to the same
+directory, in one pass. In real time, the gain is about proportional to
+the number of objects one stores at once.
+
+\Filename{H2hdbover-Dictionary}
+\section{Dictionary}
+\index{dictionary}
+
+The HEPDB package supports a dictionary in a special directory called
+DICTIONARY. In the dictionary the user can enter, for any of the
+directories, simple aliases for the pathnames as well as mnemonic names
+for the data object elements (both limited to 8 characters). The
+DICTIONARY directory, which does not make use of the standard HEPDB keys,
+is automatically generated, at the top level, when the data base is
+created. To start with, it has only one data object, with key 1 set to
+\Lit{-1}. The data object contains the number of directories in the data base,
+followed by 25 words for each directory, 3 integers and 22 hollerith.
+The integers contain the unique numeric identifier assigned to the
+directory, the number of characters in the pathname and the date of the
+last modification. The 2 first hollerith are reserved to store an alias
+name for the pathname (up to 8 characters) and the rest to store the
+pathname itself (top directory name excluded).
+
+\Filename{H2hdbover-Aliases}
+\section{Aliases}
+\index{aliases}
+\label{HDB-ALIAS}
+
+Aliases are names of up to 8 characters for standard {\tt HEPDB}
+directories. They provide a convenient way of accessing frequently
+accessed directories or directories with long names.
+Aliases may be manipulated by the \Rind{CDALIA} routine or the
+\Rind{ALIAS} command.
+
+\Filename{H2hdbover-Mnemonic-names}
+\section{Mnemonic names}
+\index{mnemonics}
+\label{HDB-MNEMONIC}
+
+Mnemonic names are character names of up to 8 characters for the
+various elements of the Zebra banks stored in {\tt HEPDB}.
+
+\Filename{H2hdbover-ASCII-data-objects-and-HELP-directory}
+\section{ASCII data objects and HELP directory}
+\index{ascii files}
+\index{help files}
+
+ASCII files, with up to 80 characters per record, may be stored in the database.
+An example of the use of such a facility is for
+Production Control, when the logs of individual production jobs
+are stored in the database.
+Another example is related to the storage of help information in a special HELP
+directory generated at the top level when a data base file is created.
+HELP directories do not make use of the standard keys. One key is used
+to specify the node to which the help information is relevant.
+
+\Filename{H2hdbover-Journaling}
+\section{Journaling}
+\index{journaling}
+\index{dictionary}
+
+For restoring the integrity of a data base after a crash, as well as
+for establishing communication with other servers, a journaling
+facility has been implemented. This facility is used exclusively
+by the database servers. It consists of recording on an FZ
+sequential file all kinds of updates which affect the data base, namely
+the addition or deletion of directory trees, the addition or deletion of
+data objects, the alteration of key values, the deletion of some
+partitions in a partitioned directory, the definition of aliases and
+mnemonics in the \Lit{DICTIONARY} directory or the insertion of items in the
+\Lit{HELP} directory. The information is recorded in different types of FZ
+records, consisting of at least an FZ header, with or without a data
+part, depending on the kind of action, recorded as first word in the FZ
+header. In case of several data base files, each corresponding top
+directory is associated with an RZ file number. The same FZ file can
+however serve several top directories, if the user has decided so. It is
+possible to update a database on a selective number of directories from
+a journal file.
+
+Two journal files are supported - a 'standard' journal file, which
+is used to communicate updates to other servers, and a 'special
+backup' file, which is retained locally. In either case, the journal
+files are handled automatically by the servers and are no concern
+of general users.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\Filename{H1hdbover-Using-the-HEPDB-Fortran-interface}
+\chapter{Using the HEPDB Fortran interface}
+
+In most of the HEPDB calling sequences, various character options can
+be preset by the user and transmitted as a character string, the
+argument \Rarg{CHOPT}.
+These will be referred to as ``options'' in the following paragraphs.
+\index{option}
+
+\Filename{H2hdbover-Initialisation}
+\section{Initialisation}
+
+The user must initialise the ZEBRA memory management
+\index{ZEBRA}%
+system before calling any of the HEPDB routines. This may
+either be done explicitly, e.g. via a call to \Rind{MZEBRA}, or
+implicitly, e.g. via a call to \Rind{HLIMIT}.
+Alternatively, the routine \Rind{CDSTART} may be used.
+
+Then, for each data base file, a call to
+\Rind{CDOPEN} initializes the HEPDB/RZ control for the corresponding file. When
+using several data base files, the user should be careful always to give
+the complete pathnames for all subsequent references to the directories.
+
+For an optimum usage of the RZ system, the user is advised to have a
+reasonably large allocation for the system division.
+This is performed automatically if the option \Ropt{E} is specified when calling
+\Rind{CDOPEN}.
+
+A unique numeric identifier is associated to every given top directory
+(every file). The HEPDB package defines by default an identifier
+increasing monotonically as the user makes the successive calls to
+\Rind{CDOPEN}. The choice of the identifier can however be imposed by the user,
+by presetting \Lit{IQUEST(1)}, a Zebra short term communication variable, to
+\index{quest@{\tt QUEST}!{\tt IQUEST}}\index{iquest@{\tt IQUEST}}%
+the desired value, before calling \Rind{CDOPEN}. The numeric identifier
+assigned to each directory packed with that of the top directory, is
+stored in the corresponding \Lit{NODE} bank. This permits to record in a
+simple way which data objects have been used in a given program
+execution.
+
+The \Lit{DICTIONARY} directory, initially generated under control of \Rind{CDNEW},
+is dumped into memory at every call to \Rind{CDOPEN}. It can be expanded at
+user's request to store mnemonics (up to 8 characters) for the elements
+of the data objects. These are mainly used in HEPDB interactive
+applications. For each directory, the mnemonics are stored in a data
+object of the \Lit{DICTIONARY} directory, with key 1 set equal to the numeric
+identifier of the corresponding directory. The routine which can be
+used for entering or retrieving the information is \Rind{CDNAME}.
+The aliases, in the \Lit{DICTIONARY} directory, can be
+stored and retrieved through the routine \Rind{CDALIA}.
+
+The HELP directory, also generated automatically under control of
+\Rind{CDNEW}, at the time of creating the data base, is initially empty. The
+user should enter the help information as an ASCII file through the
+routine \Rind{CDHELP}. The content of the file is encoded as a computer
+independent single data object with the key 1 set equal to the numeric
+identifier of the relevant directory. The help information can be
+subsequently retrieved, decoded and displayed, also through the routine
+\Rind{CDHELP}.
+
+\Filename{H2hdbover-Creation-of-standard-directories}
+\section{Creation of standard directories}
+
+Before storing any data, the user has to create a directory with all
+specifications of the key vector. The routine \Rind{CDMDIR} permits the creation of
+HEPDB standard directories, with any number of additional user keys. The
+option 'P' (partitioned) can be used to create a partitioned directory.
+The dictionary directory is automatically updated upon creation of a new
+directory. In case the directories at the intermediate nodes do not
+exist, \Rind{CDMDIR} will create them automatically with 9 integer keys.
+Even if a directory is created as a non-partitioned directory it may
+be converted at any time using the routine \Rind{CDPART}.
+\Filename{H2hdbover-Storage-of-data}
+\section{Storage of data}
+The user can store data from memory to disk with the
+routine \Rind{CDSTOR} , the data in memory being simple Zebra banks
+or Zebra data structures.
+The pathname of the directory as well as the key
+vector have to be supplied when storing the data (the system keys 1-5
+do not however need to be filled in). In order to retain complete
+flexibility, the directory structure must already have been created
+before an object is stored.
+
+The contents of an ASCII file can converted into a packed, machine independant
+format and stored in a ZEBRA bank suitable for storing in the data base
+through the routine \Rind{CDTEXT}. This bank can then be stored in the
+database using \Rind{CDSTOR} as above.
+
+\Filename{H2hdbover-Retrieval-of-data}
+\section{Retrieval of data}
+
+The user can retrieve Zebra data structures from any directory on a
+disk file into memory through the routine \Rind{CDUSE}. The data objects are
+selected according to the given directory pathname and to the contents
+of the key vector. Selection is made on the pairs of validity ranges and
+on the specific user keys selected, if any.
+If not yet done, the routine creates
+in memory a tree structure of NODE banks, according to the pathname
+elements. At the lowest node, \Rind{CDUSE} inserts the information relevant to
+the keys in KEY banks (one or several, created as a linear chain at the
+next-of-same-type link of the corresponding NODE banks) and the
+information relevant to the data itself, in DATA banks supported by the
+first link of the corresponding KEY banks. As a general rule, when \Rind{CDUSE}
+finds that more than one data object satisfy the validity criteria, the
+default action is to return the most recently inserted object
+that matches the selection criteria. Special actions can
+however be taken, by using the mask {\tt IMASK} to select on values of
+system or standard user keys, such as the {\tt source identifier} or
+{\tt insertion time}, or indeed any of the normal user keys.
+If any element {\it n} of the vector {\tt IMASK} is set, then only objects
+with this key element equal to the corresponding element of the input
+key vector will be selected. In the special case of the key pairs,
+setting this element will select only objects with start validity
+less than, or end validity greater than, the corresponding value specified
+in the input selection vector {\tt ISEL}.
+This permits selection of all objects valid before or after
+a given run, event or time, depending on the key pair definitions.
+
+Independently, the user can set a global selection on insertion time,
+through the routine
+\Rind{CDBE4}, for instance to ignore modifications to the data base past a
+certain date and be able to reproduce the conditions of a previous
+program execution.
+
+In some special cases, one may wish to retrieve all valid objects that
+satisfy the specified selection criteria, and not just the most recently inserted one.
+In this case, or if one wishes to
+make multiple selections in a single call,
+the routine \Rind{CDUSEM} should be used.
+
+With the option 'K' (key), \Rind{CDUSE} also permits retrieval of the keys
+only, without loading the data objects.
+
+In case \Rind{CDUSE} finds that the required data objects already exist in
+memory, it does not bother to transfer them again from disk.
+
+For an optimum use of the memory, and in order to minimize the disk
+accesses, the user should call the routine \Rind{CDFREE}, in conjunction with
+\Rind{CDUSE}. \Rind{CDFREE} sets a flag in the specified KEY bank to signal that the
+corresponding data object is no longer needed, until a subsequent call
+to \Rind{CDUSE} requires it again. The data object bank is not dropped
+immediately, but only if and when any other call to \Rind{CDUSE} need more
+space than currently available in memory. If the 'frozen' data object
+has not been dropped when it is required again, the flag is cleared and
+no further disk transfer will take place.
+
+To read data objects where ASCII information has been encoded, the
+user can call \Rind{CDTEXT}, similar to \Rind{CDUSE}, except that the logical unit
+number of the file reserved to write the ASCII information has to be
+passed as an argument.
+
+Simple Fortran vectors may be stored and retrieved using the
+routine \Rind{CDVECT}.
+
+\Filename{H2hdbover-Error-handling}
+\section{Error handling}
+
+\index{return code!{\tt IRC}}
+All HEPDB routines have an integer return code {\tt IRC} as last
+argument. If, on return, this contains the value zero then
+the routine was successful. A non-zero return code indicates
+an error. The error codes may be translated to a meaningful
+error message using the routine \Rind{CDERR}.
+An explicit message is printed out when the debug log level has been
+set to 1 or a higher value, through a call to \Rind{CDLOGL} (the debug level
+is set by default to 0 in \Rind{CDOPEN}).
+
+Some routines return additional status information in the
+Zebra common block \Lit{/QUEST/IQUEST(100)}.
+However, the user is not required
+to test on the values of the \Lit{IQUEST} vector on return.
+\index{quest@{\tt QUEST}!{\tt IQUEST}}\index{iquest@{\tt IQUEST}}%
+
+\Filename{H2hdbover-Termination}
+\section{Termination}
+
+The user should always close the data base files at the end of the
+job, through a call to \Rind{CDEND}. This routine closes all the RZ files
+opened during the session, or just a single file, depending on the
+options specified.
+The user should not make reference to any HEPDB routines
+(other than \Rind{CDOPEN} !) after the call to \Rind{CDEND}.
+
+\Filename{H2hdbover-Other-HEPDB-facilities}
+\section{Other HEPDB facilities}
+
+In this section a few other user callable subroutines of general
+interest are mentioned, as well as some additional facilities which
+extend the functionality of the HEPDB package and make it more user
+friendly.
+
+\subsection{Print and trace-back}
+
+The user can print the contents of a directory with the routine
+\Rind{CDLDIR}, only the keys with the option 'K' (keys), or both the data and
+the keys with the option 'D' (data).
+
+The user can print the summary of data base usage through the routine
+\Rind{CDSTAT}. The summary consists of the numbers of calls to \Rind{CDUSE} and actual
+disk accesses, for each set of user key values.
+
+Information on the data objects used in a given program execution can
+be obtained through the routine \Rind{CDRINFO}.
+
+\subsection{Time related routines}
+
+Two sets of routines are available to pack/unpack the date and time
+to/from one single word - the routines \Rind{CDPKTM} and \Rind{CDUPTM}
+for times accurate to one minute and
+\Rind{CDPKTS} and \Rind{CDUPTS} when one second accuracy is required.
+
+The maximum of the start validity and the minimum of the end validity
+of all data base objects used in a given program execution can be
+obtained through the routine \Rind{CDVALID}.
+
+The insertion time of the last inserted object in a given directory
+can be enquired through the routine \Rind{CDLKEY}, and the time when a
+directory has been last modified, through the routine \Rind{CDLMOD}.
+
+\subsection{Purging operations}
+
+With the automatic updating mode, deleting data objects from a given
+directory is rather critical, because of the possibility of deleting a
+master object and leaving alive its updated version(s). Therefore, any
+direct call to RZ deletion routines should be avoided. The operation can
+be taken care of by the routines \Rind{CDPURK} and \Rind{CDPURG}. The latter provides
+a wide range of actions through a number of character options, while
+\Rind{CDPURK} can be used to purge data objects with selection on user keys
+like \Rind{CDUSE}.
+
+The user can delete a complete tree of directory starting from a given
+node, using the routine \Rind{CDDELT}. In the situation where a normal
+directory has been 'a posteriori' partitioned, through the use of
+\Rind{CDPART}, the user should call \Rind{CDDELT} to delete the original directory.
+
+With the routine \Rind{CDPURGP}, it is possible to delete all but the last few
+partitions, as specified by the user, from a partitioned directory.
+
+The user can delete all but a few directory trees from the data base
+using the routine \Rind{CDKEEP}.

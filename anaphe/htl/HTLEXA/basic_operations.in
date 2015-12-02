@@ -1,0 +1,90 @@
+<![CDATA[/* basic_operations.cpp */
+/******************************************************************************
+Demonstrate:
+. how to create, fill and print a basic Histo1D
+. how to create/clone a new histo out of an existing one.
+  (constructor and cloning techniques demonstrated)
+. how to perform basic operations.
+******************************************************************************/
+#include <iostream.h>
+#include <iomanip.h> 		// Formatting output string.
+#include "HTL/PHistograms.h" // Persistent histograms.
+class Histo_App : public HepDbApplication
+{
+public:
+  Histo_App( const char *a_db_name = 0 )
+  { db_name_ = ( a_db_name == 0 ) ? "Default_DB" : a_db_name; }
+  // If no database name is provided then the default one is 
+  // "Default_DB".
+public:
+  void run();
+  void init()
+  {
+    Init();
+    startUpdate();
+    db_ = db(db_name_);
+  }
+private:
+  ooHandle(ooDBObj) db_; // Handle on the database.
+  const char *db_name_; // Name of the database.
+};
+// Implementation:
+//
+void Histo_App::run()
+{
+  const Size bin_count = 20;
+  const double x_min = 0.0;
+  const double x_max = 20.0;
+  // Create a histo 1D using Gravity_Bin and Even_Partition:
+  // (The type of the points is double.)
+  //
+  HepRef(PHisto1D) histo1 = new (db_) PHisto1D( "Histo1: parabolic function", bin_count, x_min, x_max );
+  // Let's fill the histo with 50000 points:
+  //
+  long i;
+  double x, w;
+  for( i=0; i<50000; i++ ) {
+    x = (i % 22) - 1;
+    w = (x-9.5)*(x-9.5)+3;
+    histo1->fill(x,w);
+  }
+  // Print:
+  //
+  HPrinter hp( cout );
+  cout << endl << endl; hp.print( *histo1 );
+  // Now create a clone of histo1 and print it out:
+  //
+  HepRef(PHisto1D) histo2 = histo1->clone();
+  // Change name.
+  histo2->set_name( "Histo2: a clone of Histo1" );
+  cout << endl << endl; hp.print( *histo2 );
+  // Add histo1 to histo2 and print the result:
+  //
+  histo2->add( *histo1 );
+  histo2->set_name( "Histo2 =  Histo2+Histo1 = 2*Histo1" );
+  cout << endl << endl; hp.print( *histo2 );
+  //
+  // It is also possible to clone and perform an operation on single
+  // statement:
+  // 	histo2 = histo1->clone()->add( histo1 );
+  //
+  // Now create a new histo out of histo2:
+  // ... (So simple, huh?)
+  //
+  HepRef(PHisto1D) histo3 = new(db_) PHisto1D( *histo2 );
+  // Sub histo1 to histo3 ==> histo3 should hold values of histo1
+  // Mul by -1.0 ==> histo3 should now hold the opposite of histo1
+  // And print the result:
+  //
+  histo3->sub( *histo1 );
+  histo3->mul( -1.0 );
+  histo3->set_name( "Histo3: -(Histo2 - Histo1) = -Histo1" );
+  cout << endl << endl; hp.print( *histo3 );
+}
+int main( int argc, char **argv )
+{
+  Histo_App app;
+  app.init();
+  app.run();
+  app.commit();
+}]]>

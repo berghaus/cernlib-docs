@@ -1,0 +1,151 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%  GEANT manual in LaTeX form                                     %
+%                                                                 %
+%  Version 1.00                                                   %
+%                                                                 %
+%  Last Mod. 12 June 1993 1700   MG                               %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\Origin{R.Brun}            
+\Revision{F.Carminati, M.Maire}
+\Version{Geant 3.16}           \Routid{CONS200}
+\Submitted{01.06.83}           \Revised{08.12.93}
+\Makehead{Tracking medium parameters}
+\section*{Description of the routines}
+\Shubr{GSTMED}{(ITMED,NATMED,NMAT,ISVOL,IFIELD,FIELDM,TMAXFD,STEMAX,
+                DEEMAX,EPSIL,STMIN,UBUF,NWBUF)}
+This routine associates a set of tracking parameters to a material, defining
+a so-called {\it tracking medium}. Every {\tt GEANT} volume must be 
+associated to an existing tracking medium. The routine
+stores the parameters of the tracking
+medium {\tt ITMED} in the data structure {\tt JTMED}.
+\begin{DLtt}{MMMMMMMM}
+\item[ITMED]      ({\tt INTEGER}) tracking medium number;
+\item[NATMED]     ({\tt CHARACTER*20}) tracking medium name;
+\item[NMAT]       ({\tt INTEGER}) material number corresponding to {\tt ITMED};
+\item[ISVOL]      ({\tt INTEGER}) {\it sensitivity} flag (see later):
+\begin{DLtt}{MMMM}
+\item[$\leq$0] not a sensitive volume;
+\item[$>$0] sensitive volume;
+\end{DLtt}
+\item[IFIELD]     ({\tt INTEGER}) magnetic field flag:
+\begin{DLtt}{MMMM}
+\item[=0]         no magnetic field;
+\item[=1]         strongly 
+inhomogeneous magnetic field (returned by the user function
+\Rind{GUFLD}): tracking performed with the Runge-Kutta method by the
+routine \Rind{GRKUTA};
+\item[=2]         inhomogeneous magnetic field (returned by the user function
+\Rind{GUFLD}), tracking along a helix performed by the routine \Rind{GHELIX};
+\item[=3]         uniform magnetic field along the {\tt z} axis of strength
+{\tt FIELDM}, tracking performed along a helix by the routine \Rind{GHELX3};
+\end{DLtt}
+\item[FIELDM]     ({\tt REAL}) maximum field value (in Kilogauss);
+\item[TMAXFD]     ({\tt REAL}) maximum angular deviation due to the magnetic
+field permitted in one step (in degrees);
+\item[STEMAX]     ({\tt REAL}) maximum step permitted (cm);
+\item[DEEMAX]     ({\tt REAL}) maximum fractional energy loss in one step ($0<$
+                  {\tt DEEMAX} $\leq 1$);
+\item[EPSIL]      ({\tt REAL}) boundary crossing precision (cm);
+\item[STMIN]      ({\tt REAL}) minimum value for the maximum step imposed by 
+energy loss, multiple scattering, \v{C}erenkov or magnetic field effects (cm);
+\item[UBUF]       ({\tt REAL}) array of {\tt NWBUF} additional user parameters;
+\item[NWBUF]      ({\tt INTEGER}) number of additional user parameters.
+\end{DLtt}
+ 
+{\bf Note:} the tracking medium number can in principle be any positive
+integer from 1 to 65,535. However this number is used directly by {\tt GEANT}
+as the number of the pointer to the data structure where the information
+is stored. When a pointer is defined,
+all pointers from 1 to the one allocated are created, if not already existing.
+Every time data structures are moved in memory, all the
+links are potentially scanned for update. This can be time consuming and
+it can seriously affect performances. So a continuous
+range of numbers should be used for tracking media.
+
+\Shubr{GFTMED}{(ITMED,NATMED*,NMAT*,ISVOL*,IFIELD*,FIELDM*,TMAXFD*,
+                STEMAX*,DEEMAX*,EPSIL*,STMIN*,UBUF*,NWBUF*)}
+ 
+Extracts the parameters of the tracking medium {\tt ITMED}
+from the data structure {\tt JTMED}.
+ 
+\Shubr{GPTMED}{(ITMED)}
+ 
+Prints the tracking medium parameters for the given medium.
+\begin{DLtt}{MMMMM}
+\item[ITMED]      ({\tt INTEGER}) tracking medium to be printed,
+all tracking media if {\tt ITMED}=0.
+\end{DLtt}
+
+\section*{Automatic calculation of the tracking parameters}
+
+The results of the simulation depend critically on the choice of the tracking
+medium parameters. To make of {\tt GEANT} a reliable and consistent predictive
+tool, the calculation of these parameters has been automated.
+In a normal GEANT run, the variable {\tt IGAUTO} in common
+\FCind{/GCTRAK/} is set to 1. In this case the following parameters 
+are calculated by the program:
+\begin{eqnarray*}
+\mbox{\tt TMAXFD} & = & \left\{
+\begin{array}{LL}
+20^{\circ} & \mbox{if {\tt TMAXFD} $\leq 0$ or {\tt TMAXFD} $ > 20$} \\
+\mbox{\it input value} & \mbox{if $0 <$ {\tt TMAXFD} $\leq 20$}
+\end{array} \right . \\
+\mbox{\tt STEMAX} & = & \phantom{\{} 
+\begin{array}{LL} \mbox{\tt BIG} (=10^{10}) \end{array} \\
+\mbox{\tt DEEMAX} & = & \left \{
+\begin{array}{LL}
+0.25 & \parbox[t]{10cm}{if {\tt ISVOL} $= 0$ and $X_{0} \leq 2cm$, 
+where $X_{0}$ is the radiation length of the material} \\
+0.25-\frac{0.2}{\sqrt{X_{0}}} & \mbox{otherwise}
+\end{array} \right . \\
+\mbox{\tt STMIN} & = & \left\{
+\begin{array}{LL}
+\frac{2 R}{\sqrt{X_{0}}} & \mbox{if {\tt ISVOL} $=0$} \\ [.2cm]
+\frac{5 R}{\sqrt{X_{0}}} & \mbox{if {\tt ISVOL} $\neq 0$}
+\end{array} \right . 
+\end{eqnarray*}
+
+where $R$ is the range in cm of an electron of energy {\tt CUTELE}+200keV.
+
+If the {\tt IGAUTO} variable is set to 0 via the {\tt AUTO} data record, 
+then value given by the user for the above parameters is accepted as the
+true parameter value if $>0$, while automatic calculation still takes place
+in case the input value is negative.
+
+Users are strongly recommended to begin their simulation with the parameters
+as calculated by {\tt GEANT}. Users who want to modify any of the above
+parameters must be sure they understand their function in the program and
+the implications of a change.
+
+The {\tt EPSIL} parameter represents the absolute precision with which the
+tracking is performed. It has a double meaning. When tracking in magnetic
+field, {\tt EPSIL} is the minimum distance for which boundaries are
+checked. A particle nearer than {\tt EPSIL} to the boundary is considered
+as exiting the current volume. If the end point of the step of a particle in
+magnetic field is distant less than {\tt EPSIL} along each axis 
+from what would be the end point in absence of magnetic field, then no boundary 
+checking is performed. 
+
+In all cases, when a particle is going to reach the
+boundary of the current volume with the current step, the step length is 
+increased by a quantity ({\tt PREC}, common \FCind{/GCTMED/}) which is set to the 
+minimum between $0.1 \times {\tt EPSIL}$
+and 10 micron at the beginning of the tracking. This quantity is recalculated
+at every step according to the formula:
+\begin{equation}
+\mbox{\tt PREC} 
+=\max \left [ \min \left(\frac{\mbox{\tt EPSIL}}{10}, 10 \mu \right ) ,
+\max \left [ | x |, | y |, | z |, S \right ) \times \epsilon \right ]
+\end{equation}
+Where $x, y, z$ are the current coordinates of the particle, $S$ is the length
+of the track, and $\epsilon$ is the assumed machine precision.
+$\epsilon$ (called {\tt EPSMAC} in the program) is initially set to
+$10^{-6}$ for 32 bits machines and $10^{-11}$ for 64 bits machines.
+During the tracking, every fifth time that a particle tries unsuccessfully
+to exit from the same volume, the machine precision is multiplied by the
+number of trials. This accounts for additional losses of precision due to
+transformation of coordinates and region of the floating point range where
+the real machine precision is different from the above (this happens 
+in particular on IBM mainframes with 370 floating point number representation).

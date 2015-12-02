@@ -1,0 +1,215 @@
+%!PS-Adobe-2.0 EPSF-2.0
+%%Title: divmenu.eps
+%%Creator: xpick Version 1.00  Rev: 22/03/93 - by Evgeni Chernyaev
+%%BoundingBox: 228 321 383 470
+%%EndComments
+%***********************************************************************
+%*                                                                     *
+%* Object: Image decoding PS-routine                                   *
+%* Author: Evgeni CHERNYAEV (chernaev@vxcern.cern.ch)                  *
+%*                                                                     *
+%* Function: Display a Lempel-Ziv Welch (LZW) encoded color image.     *
+%*           The image is displayed in color on viewers and printers   *
+%*           that support color Postscript, otherwise it is displayed  *
+%*           as grayscale.                                             *
+%*                                                                     *
+%***********************************************************************
+/CriticalSize 300000 def
+systemdict /colorimage known { /incr 3 def } { /incr 1 def } ifelse
+/Length 81 81 mul def
+/Table Length array def
+/Prefix Length array def
+/Length Length incr mul def
+/String Length string def
+%***********************************************************************
+/ReadCode                % Read next code from file                    *
+%***********************************************************************
+{
+  { currentfile read pop
+    dup dup 42 ge exch 123 lt and { exit } { pop } ifelse
+  } loop
+  42 sub 81 mul
+  currentfile read pop 42 sub add
+  /CurCode exch def
+} bind def
+%***********************************************************************
+/DecodeCodeA             % Decode CurCode (fast, but memory demanding) *
+%***********************************************************************
+{
+  ReadCode
+  CurCode Ncol eq {
+    ReadCode
+    /FreeCode Ncol 1 add def
+  }{
+    //Table FreeCode L incr add string
+    dup 0 Table OldCode get putinterval
+    dup L Table CurCode FreeCode lt { CurCode } { OldCode } ifelse get
+    0 incr getinterval putinterval put
+    /FreeCode FreeCode 1 add def
+  } ifelse
+  /OldCode CurCode def
+  Table CurCode get dup length /L exch def
+} bind def
+%***********************************************************************
+/DecodeCodeB         % Decode CurCode (not memory demanding, but slow) *
+%***********************************************************************
+{
+  /iout //Length //incr sub def
+  ReadCode
+  CurCode Ncol eq {
+    /FreeCode Ncol 1 add def
+    ReadCode
+    /OldCode CurCode def
+    /FinChar CurCode def
+    String iout Table CurCode get putinterval
+  }{
+    /InCode CurCode def
+    CurCode FreeCode eq {
+      /CurCode OldCode def
+      String iout Table FinChar get putinterval
+      /iout iout //incr sub def
+    } if
+    iout //incr neg 0 {
+      CurCode Ncol lt { exit } if
+      String exch Table CurCode get putinterval
+      /CurCode Prefix CurCode get def
+    } for
+    /iout exch def
+    /FinChar CurCode def
+    String iout Table FinChar get putinterval
+    Prefix FreeCode OldCode put
+    Table FreeCode Table FinChar get put
+    /FreeCode FreeCode 1 add def
+    /OldCode InCode def
+  } ifelse
+  String iout //Length iout sub getinterval
+}bind def
+%***********************************************************************
+/DisplayImage            % Display a LZW-encoded color image           *
+%***********************************************************************
+{
+  gsave
+  /buffer 72 string def
+  currentfile buffer readline pop
+  token { /degrees exch def pop } { } ifelse
+  degrees rotate
+  currentfile buffer readline pop
+  token { /x exch def } { } ifelse
+  token { /y exch def pop } { } ifelse
+  x y translate
+  currentfile buffer readline pop
+  token { /x exch def } { } ifelse
+  token { /y exch def pop } { } ifelse
+  x y scale
+  currentfile buffer readline pop
+  token { /columns exch def } { } ifelse
+  token { /rows exch def pop } { } ifelse
+  currentfile buffer readline pop
+  token { /Ncol exch def pop } { } ifelse
+  systemdict /colorimage known {
+    0 1 Ncol 1 sub {
+      Table exch
+      currentfile 3 string readhexstring pop put
+    } for
+    columns rows mul CriticalSize lt {
+      columns rows 8
+      [ columns 0 0 rows neg 0 rows ]
+      { DecodeCodeA } false 3 colorimage
+    }{
+      columns rows 8
+      [ columns 0 0 rows neg 0 rows ]
+      { DecodeCodeB } false 3 colorimage
+    } ifelse
+  }{
+    /color 3 string def
+    0 1 Ncol 1 sub {
+      Table exch
+      1 string dup 0
+      currentfile color readhexstring pop pop
+      color 0 get 0.299 mul
+      color 1 get 0.587 mul add
+      color 2 get 0.114 mul add
+      cvi put put
+    } for
+    columns rows mul CriticalSize lt {
+      columns rows 8
+      [ columns 0 0 rows neg 0 rows ]
+      { DecodeCodeA } image
+    }{
+      columns rows 8
+      [ columns 0 0 rows neg 0 rows ]
+      { DecodeCodeB } image
+    } ifelse
+  } ifelse
+  grestore
+} bind def
+%***********************************************************************
+%*                          Image decoding                             *
+%***********************************************************************
+DisplayImage
+0.00
+228.50 321.50
+155.00 149.00
+155 149
+256
+000000 ffffff 00ffff 9f0028 870022 d18598 460012 ffffff 53559e 474887
+b0b1d3 28294c ffffff e1e3bc bfc1a0 f2f3e3 7e7f69 000000 f0b550 cc9a44
+f8dfb2 7f602a ffffff 645fa2 55518a b8b5d4 312e50 ffffff b53560 9a2d51
+dda2b6 57192e ffffff 7f7f9b 6c6c84 c5c5d2 3f3f4e ffffff 700070 5f005f
+ba85ba 320032 ffffff e1e3bc afafaf 7d7d7d 4b4b4b 969696 646464 c8c8c8
+e1e1e1 323232 ff00ff ffff00 ff0000 0000ff 00ff00 71725e 7f7f7f f9f9f9
+f3f3f3 ededed e7e7e7 dbdbdb d4d4d4 cecece c2c2c2 bcbcbc b6b6b6 b0b0b0
+aaaaaa a4a4a4 9e9e9e 989898 929292 8c8c8c 868686 808080 797979 737373
+6d6d6d 676767 616161 5b5b5b 555555 4f4f4f 494949 434343 3d3d3d 373737
+313131 2b2b2b 242424 1e1e1e 181818 121212 0c0c0c 060606 0000cc 0013cc
+0027cc 003acc 004ecc 0061cc 0075cc 0088cc 009bcc 00afcc 00c2cc 00ccc2
+00ccaf 00cc9b 00cc88 00cc75 00cc61 00cc4e 00cc3a 00cc27 00cc13 00cc00
+13cc00 27cc00 3acc00 4ecc00 61cc00 75cc00 88cc00 9bcc00 afcc00 c2cc00
+ccc200 ccaf00 cc9b00 cc8800 cc7500 cc6100 cc4e00 cc3a00 cc2700 cc1300
+d9dcc7 f0af3a bc2458 7875b8 00004d 6666ff 9999ff 666666 698b22 cd950c
+cd1076 4f94cd 008b8b 008b00 ff4500 007f00 007f7f 007ffe 00fe00 00fe7f
+00fefe 7f0000 7f007f 7f00fe 7f7f00 7f7ffe 7ffe00 7ffe7f 7ffefe fe0000
+fe007f fe00fe fe7f00 fe7f7f fe7ffe fefe00 fefe7f f7deb1 072f64 7f602a
+802f64 efb450 3f3f00 3f3f3f 3f3f7f 3f3fbe 3f3ffe 3f7f00 3f7f3f 3f7f7f
+3f7fbe 3f7ffe 3fbe00 3fbe3f 3fbe7f 3fbebe 3fbefe 3ffe00 3ffe3f 3ffe7f
+3ffebe 3ffefe 7f0000 7f003f 7f007f 7f00be 7f00fe 7f3f00 7f3f3f 7f3f7f
+7f3fbe 7f3ffe 7f7f00 7f7f3f 7f7fbe 7f7ffe 7fbe00 7fbe3f 7fbe7f 7fbebe
+7fbefe 7ffe00 7ffe3f 7ffe7f 7ffebe 7ffefe be0000 be003f be007f be00be
+be00fe be3f00 be3f3f be3f7f be3fbe be3ffe be7f00 be7f3f be7f7f be7fbe
+be7ffe bebe00 bebe3f bebe7f bebebe bebefe befe00 befe3f befe7f befebe
+befefe fe0000 fe003f fe007f fe00be fe00fe
+-7*>-8-9-:-;-<-=->-?-@-A-B-C-D-E-F-G-H-I-J-K-L-M-N-?*?-8*<-S-T-U-V-W-X-Y
+-Z-[-\-]-^-_-`-a-`*?-Q*>-b-g-h-i-j-k-l-\-d-R-m-q-r-s-t-i-o-f-\****-]-z.+
+.*-u-[.,.0-z..*<.3.4./-V.6-T-w-S.6.1.8.8.>.7.-.=.*.1.?-W.:.B.E.B.,.>.E-S
+.<.P.5.C.@-s.G.U-Z.X.T.S.I...N._.4.?.[.[*<.R.\.\.:.T.`.O-T.O.j.L.F.r.b.p
+.9.a.k.a.l.d.w-X/*.].c.`.h.1.g.e.h/1.t.n.G/8/:.i/0.3.=-Y/4//.P/4/5.^/C/+
+/E.N.v.;-e/;/B/:.7.H.u/O/0/6.H/K/5/R.F.S/O/@.w/A/Q/W.H/3/H/Z/Z.^/7/\.r.]
+.k/^/./a.e/D/,/_/e/p-U/W/d/o/X/;/60+/-/</l/w/u0*0./]04/i0-/+.R.K.x05.m.j
+0;.J/>.X/W/80?.m/I/>0<07.x0J.q.c01.j.g.V0S0T.D.Y-l0R0U0Z0[0/-u0Y0\0`0a-r
+0_0b0e0f-a0d0g0j0k-W-w-d0o0p0q0r0s0t0u0v0w0x0y0z1*1+1,-e-O1/101112-F0i0l
+160j15171:0a191;1>0U1=1?1B.81A1C1F0c/M-^0D1G1L-]0R.u-`1K1M1B0Y1R.D1S1M1U
+.C/S0A1P1X1;1Z/s0E/?/E1_1T1I0+010P0K1f1?1a/F.v/H1m1n1h/\1j/j1v1s1`1u0@0>
+0I.L1z1>1E2023.f1u24270m26282;25-p0N2.2<1X222A2B2:2D232C2G1L2I2J1F2L2M1g
+2>2P202O2S2*2R2V1m221V/^2\-b2.2^1e1b171O0G-k2a-a2h271o2j.2-t2m2H26/*/f1]
+1w.q0L2@1k.s.y3*2@.o3-0B.s1@2r022/.50,00/G381x/z/Y.t._08/G/k0S2l0K0F3<0N
+/1.Z34/C2v0L3@0]2p-h3D1i2//`/N3+3J3G3N382`/i/U3Q-g3S3<3_07/q2\3V3M3=3G06
+0T2e0F3o3+3q3r3:2z.M083p2?2w0A3m2F-h3`3t2Y-[2U2c-g4.2V421q0W.2452P3n2f40
+1:474?0g4A4B0e4D4E1<4,4H2Q-x4K1Y4J4N2W4M4Q2N4P4T164G4-/]3Y-y491_0_4>2o4^
+4W.Q334/-m4;401o3A0E/k2y483*3z0;3H1\/=4i4+2X.p30/K/r3W3O0=3?3c314w.V0d4*
+/V3d/n3j/P3M1\5-5,2d4J583l2c4[5=1q5.3B53.@3S3l5?371e/b3^3e/t4g1833303d.M
+3g5Z3]4m0C3s2x5*4L-r5J4d-U4Y2b5f-k4Y1^5j-v2+3v5n4I2X5r0l5h5u1H5t5x4C4V6*
+0\5w6-5k6,60325z630`6/663a621Q.U5m4:3T434\1C4=/m2g4c2n4N3b6F-j5e2Z5W574l
+4z5\6E/h.z4r2f3.2t/<6G1D2:/J370B3T/T0W3h5O//505:.l5i4x4S350M2b5Q/N4\5E/[
+1i5F0,5N3C6^4[3\1[/p496e3[6p0=396k6z5z6c7,0*6T5D1l6q3;6i5I6\0^2F7-5_3s4s
+2^5\5]3y3N2,6V6M-c6;.W7B4d681W697V4:7T4T4=6>69-q7Y7_-^7a7b-n7R7e-s7d7h-Y
+7j7k29657n6]7p7q7C7s7t7i7g4m7z174o1S4`8,3i3`7P3i2E4y1r1p6@7W-u820[3b6w/l
+6R5X8//m6V6[0<8*8C4q0b4k7?7>6x/+7I860C36/r5B860Z8K6f7-5^3B83/X7F8?8O56.z
+8;1N4f3P7=8h8759580H748U5V858n8i1x3f1d1p8l/g8g8N5U7r6m3[3p8c3X2w1c3J0I7J
+3,3>8A915s9-1L8d9+8W7y0l9>75679A0f7^6F9C-b7]8B7w7Q7v9N-m7m9N9S7w9U7t9W7q
+9Y7n9[7k9]7h9S3F92.@9H6?2_3`8.8B2h2a8y-q534.9h8f1V9k6G9m4h7[599g6:8q487L
+6U8D3w95:17;3u926j/s3]4v8a3H7o6m6R7?6H6b/a1w8R4^788C8k8Z5*5Y8v5g7D998V6A
+5P:B8[9?:F8P/j5b:/71:M7p/U8]8j:R5<6=6\:V4c5M/t0D8,5L::366B008y7A:U5R5U:g
+398u:<4p8G:3:4.K7H6g3q94:18_:7:8;,3o:[/L9P9Q61;9;:5o;<;=:*4S5Z;@3R9F;D7f
+;?;G-_9_7e0n1-;O;P;Q;R;S;T0q*>;U;X;Y;Z;[;O
+showpage
+%%Trailer

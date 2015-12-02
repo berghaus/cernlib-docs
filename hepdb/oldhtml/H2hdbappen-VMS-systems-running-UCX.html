@@ -1,0 +1,103 @@
+<TITLE>HEPDB -- H2hdbappen-VMS-systems-running-UCX </TITLE>
+<P>
+<H2><A NAME=H2hdbappen-VMS-systems-running-UCX.html>VMS systems running UCX</A></H2>
+<P>
+At the time of writing, DEC's UCX product still does not provide an NFS
+client. In this case one can mount a VMS directory on node hepdb. This is
+done today for CPLEAR.
+<P>
+As is the case for Multinet NFS, one must map a Unix UID/GID pair to a VMS
+username. In addition, a binding must be made been a VMS directory and a
+Unix style file name.
+<P>
+This can be done as follows:
+<PRE>
+              <B>Binding a VMS directory to a Unix name</B>
+                                  </PRE>
+<P>
+<PRE>
+$ UCX
+UCX> BIND UXCP05$DKA300: /vxcplear
+UCX> show bind
+Logical filesystem                      Pathname
+UXCP05$DKA300:                          /vxcplear
+UCX>
+</PRE>
+<P>
+<PRE>
+             <B>Mapping a UID/GID pair to a VMS username</B>
+                                  </PRE>
+<P>
+<PRE>
+$ UCX
+UCX> ADD PROXY CDCPLEAR /UID=102 /GID=1 /HOST=hepdb.cern.ch
+</PRE>
+<P>
+Note that UCX treats hostnames as case sensitive.
+<P>
+Finally, one must start the UCX NFS server. This involves
+<P>
+<OL>
+<LI>Modifying (correcting) the UCX startup command file
+SYS$MANAGER:UCX$NFSSTARTUP.COM)
+<LI>Invoking the command file at system startup.
+</OL>
+<P>
+<PRE>
+            <B>Modifying the UCX NFS startup command file</B>
+                                  </PRE>
+<P>
+<PRE>
+$ ! ...
+$ !
+$ ! Set the following UID and GIDs
+$ !
+$ DEFINE/SYSTEM/EXE/NOLOG UCX$NFS00000000_GID 1
+$ DEFINE/SYSTEM/EXE/NOLOG UCX$NFS00000000_UID 0
+$ !
+$ ! ...
+$ !
+$ ! Comment out the following line
+$ ! RUN SYS$SYSTEM:UCX$SERVERNFS.EXE
+$ !
+$ ! The following section contains NFS process quota that is required by
+$ ! manual startup.  Please uncomment the following lines and comment out
+$ ! the "RUN" command above, if you choose to manually start NFS.
+$ !
+$ RUN SYS$SYSTEM:UCX$SERVERNFS.EXE/DETACH -
+        /OUTPUT=NLA0: -
+        /ERROR='P1' -
+        /ASTLIMIT=512 -
+        /BUFFERLIMIT=200000 -
+        /EXTENT=20000 -
+        /FILELIMIT=1024 -
+        /IOBUFFERED=400 -
+        /IODIRECT=200 -
+        /QUEUELIMIT=64 -
+        /ENQUEUELIMIT=3000 -
+        /MAXIMUMWORKING-SET=20000 -
+        /PAGEFILE=20000 -
+        /PRIORITY=8 -
+        /PRIVILEGES=(BYPASS,SYSPRV) -
+        /UIC=[1,4] -
+        /NORESOURCE
+$ !
+$EXIT:
+$ EXIT
+</PRE>
+<P>
+The file system is now ready for mounting on hepdb.
+<P>
+<PRE>
+            <B>Extract from /etc/filesystems for /vxcplear</B>
+                                  </PRE>
+<P>
+<PRE>
+/vxcplear:
+        dev             = /vxcplear/cdcplear
+        vfs             = nfs
+        nodename        = uxcp05
+        mount           = true
+        options         = bg,hard,intr
+</PRE>
+<P>

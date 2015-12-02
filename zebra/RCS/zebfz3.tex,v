@@ -1,0 +1,577 @@
+head	1.1;
+access;
+symbols;
+locks
+	goossens:1.1; strict;
+comment	@% @;
+
+
+1.1
+date	93.11.13.15.25.14;	author goossens;	state Exp;
+branches;
+next	;
+
+
+desc
+@initial entry
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@%  $Header: ch1.tex,v 1.11 93/08/02 21:16:12 goossens Exp $
+
+\Filename{H1-FZ-Usage-exchange-mode}
+\chapter{Usage of FZ files in exchange mode}
+\label{sec:H1FZ-exchange-mode}
+
+In the examples of this chapter the default record size
+for physical records is used, i.e. 900 words or 3600 bytes.
+To mark this, the second parameter to \Rind{FZFILE} is given explicitely
+as 900 (where zero would be enough).
+One will probably want to use a different value,
+especially for tape files,
+in which case one has to change 900 and 3600 to the appropriate values.
+
+The suggestions of this chapter are preliminary as it was not
+possible to test all the cases individually.
+People are kindly asked to mail their corrections for
+this chapter to \Lit{zoll@@cernapo.cern.ch}
+
+\Filename{H2-FZ-Exch-format-representation}
+\section{Exchange file format representation}
+
+A true exchange-mode file consists of a stream of fixed-length
+records without any system control-words;
+such a file can be shipped between machines using 'ftp'
+in binary mode.
+
+Unfortunately, the Fortran implementations of several UNIX
+machines cannot read or write such a file in sequential mode,
+for this mode they insist on having sytem control-words
+with every record.
+
+On these machines,
+such as Apollo, DECstation, HP Unix, Silicon Graphics, Sun,
+one should use the direct-access mode, or possibly the C-Library mode,
+selecting the \Ropt{D} or the \Ropt{L} option with \Rind{FZFILE}.
+
+There is another possibility:
+if on these machines one creates a Zebra file using sequential
+Fortran WRITE, one gets a file of fixed-length records,
+but with system control-words.
+Such a file one can re-read with sequential READ, of course,
+and one can ship it to another machine using the CERN utility \Rind{ZFTP},
+which can produce the target copy with or without system-control words.
+This is fine for sequential use of the file;
+the problem remains that one cannot then read the same file
+sometimes sequentially, sometimes with direct-access.
+
+The preferred solution for theses machines is to write and read it
+in direct-access mode for disk files,
+in C Library mode for tape files.
+
+And generally: use ZFTP rather than FTP, if you have it,
+to ship files around, particularly if the target machine is VAX.
+
+\Filename{H2-FZ-Tape-file-Fortran}
+\section{Tape file, Fortran}
+
+Tapes to be sent off-site should be \Lit{UNLABELLED},
+because labels create nothing but trouble to the receiver.
+
+Exchange-mode tape files cannot be handled with Fortran I/O
+on several UNIX machines.
+For these machines one has to use the \Ropt{L} mode,
+reading through the C Library interface, see the next paragraph.
+
+\subsubsection*{ALLIANT}
+
+Assuming that the name of the tape drive is \Lit{/dev/rxt00h}:
+
+Open the file and initialize FZ:
+
+\begin{verbatim}
+      OPEN (Lun, FILE='/dev/rxt00h', RECORDTYPE='FIXED'
+     +,          RECL=3600, BLOCKSIZE=3600, FORM='UNFORMATTED')
+
+      CALL FZFILE (Lun, 900, 'TX')     for input
+   or CALL FZFILE (Lun, 900, 'TXO')    for output
+\end{verbatim}
+
+\subsubsection{CONVEX}
+
+Assuming that the name of the tape drive is \Lit{/dev/mt12}:
+
+Open the file and initialize FZ:
+
+\begin{verbatim}
+      OPEN (Lun, FILE='/dev/mt12', RECORDTYPE='FIXED'
+     +,          RECL=3600, BLOCKSIZE=3600, FORM='UNFORMATTED')
+
+      CALL FZFILE (Lun, 900, 'TX')     for input
+   or CALL FZFILE (Lun, 900, 'TXO')    for output
+\end{verbatim}
+
+\subsubsection*{Apollo Aegis}
+
+One may stage a file to or from disk with:
+
+\begin{verbatim}
+ tape to disk:  RWMT -R -UNLAB -RAW -F 1 -RL 3600 -BL 3600 pathname
+
+ disk to tape:  RWMT -W -UNLAB -RAW -F 1 -RL 3600 -BL 3600 pathname
+\end{verbatim}
+
+If one has an on-line tape unit, one may connect the tape
+to a \Lit{pathname} with
+
+\begin{verbatim}
+ EDMTDESC pathname -C -S LAB NO RF F BL 3600 RL 3600 ASCNL NO
+\end{verbatim}
+
+\subsubsection*{IBM MVS, input}
+
+If the file is read with IOPACK on 'unit' 24:
+
+To inform the system of the intention to use a tape drive
+one should give right at the beginning of the JCL:
+
+\begin{verbatim}
+      /*UNIT   T6250=1       (or T1600)
+\end{verbatim}
+
+JCL for the file, if unlabelled:
+
+\begin{verbatim}
+      //G.IOFILE24 DD DSN=dsname,DISP=(SHR,KEEP),
+      //            DCB=(RECFM=U,BLKSIZE=3600),
+      //            UNIT=T6250,LABEL=(1,NL,,IN),VOL=SER=tapvsn
+\end{verbatim}
+
+Initialize FZ for this file:
+
+\begin{verbatim}
+      CALL FZFILE  (24, 900, 'TXY')
+\end{verbatim}
+
+\subsubsection*{IBM MVS, output}
+
+To deprotect the tape start the JCL with:
+
+\begin{verbatim}
+      /*UNIT   T6250=1       (or T1600)
+      //       EXEC  RING,TAPE=tapvsn
+\end{verbatim}
+
+JCL for the file, if unlabelled:
+
+\begin{verbatim}
+      //G.IOFILE24 DD DSN=dsname,DISP=(NEW,KEEP),
+      //            DCB=(RECFM=U,BLKSIZE=3600),
+      //            UNIT=T6250,LABEL=(1,NL,,OUT),VOL=SER=tapvsn
+\end{verbatim}
+
+Initialize FZ for this file:
+
+\begin{verbatim}
+      CALL FZFILE  (24, 900, 'TXYO')
+\end{verbatim}
+
+\subsubsection*{IBM VM/CMS}
+
+To inform the system of the intention to use a tape drive
+one should give right at the beginning of the JCL:
+
+\begin{verbatim}
+input:       SETUP    TAPE 181 tapevsn NL 6250 (END
+           or SETUP    TAPE 181 tapevsn NL 38K  (END
+
+output:      SETUP    TAPE 181 tapevsn NL 6250 RING (END
+           or SETUP    TAPE 181 tapevsn NL 38K  RING (END
+\end{verbatim}
+
+Fortran:  JCL for file 24, say, if unlabelled:
+
+\begin{verbatim}
+   FILEDEF  24 TAP1 NL 1 (RECFM U BLKSIZE  3600 PERM
+\end{verbatim}
+
+Initialize FZ for this file:
+
+\begin{verbatim}
+      CALL FZFILE  (24, 900, 'TXF')    for input
+  or  CALL FZFILE  (24, 900, 'TXFO')   for output
+\end{verbatim}
+
+\Rind{IOPACK}:  JCL for file 24, say, if unlabelled:
+
+\begin{verbatim}
+   FILEDEF  IOFILE24 TAP1 NL 1 (RECFM U BLKSIZE  3600 PERM
+\end{verbatim}
+
+Initialize FZ for this file:
+
+\begin{verbatim}
+      CALL FZFILE  (24, 900, 'TXY')    for input
+ or   CALL FZFILE  (24, 900, 'TXYO')   for output
+\end{verbatim}
+
+\subsubsection*{VAX VMS, input}
+
+Take out the write ring, mount the tape and give it a logical name with:
+
+\begin{verbatim}
+   normally:
+
+     $ ASSIGN MTA0: zname
+     $ ALLOC zname
+     $ MOUNT zname/FOREIGN/DENS=6250/BLOCKSIZE=3600/RECORDSIZE=3600
+
+   at CERN cluster VXCERN:
+
+     $ SETUP/BLOCK=3600/RECORD=3600/NOLABEL  tapid vid zname
+\end{verbatim}
+
+Open the file and initialize FZ:
+
+\begin{verbatim}
+      OPEN (Lun, FILE='zname', STATUS='OLD'
+     +,          FORM='UNFORMATTED', READONLY)
+
+      CALL FZFILE (Lun, 900, 'TX')
+\end{verbatim}
+
+The specifications  \Lit{RECORDTYPE='FIXED',RECL=900,BLOCKSIZE=3600}
+could be given,
+but they are not needed as they are taken from the MOUNT.
+(They must be specified on the MOUNT,
+or else the file will not be read correctly.)
+
+\subsubsection*{VAX VMS, output}
+
+Put a write ring; assign and mount as for input:
+
+\begin{verbatim}
+   normally:
+
+     $ ASSIGN MTA0: zname
+     $ ALLOC zname
+     $ MOUNT zname/FOREIGN/DENS=6250/BLOCK=3600/RECORD=3600
+
+   at CERN cluster VXCERN:
+
+     $ SETUP/WRITE/BLOCK=3600/RECORD=3600/NOLABEL  tapid vid zname
+\end{verbatim}
+
+Open the file and initialize FZ:
+
+\begin{verbatim}
+      OPEN (Lun, FILE='zname', STATUS='NEW', RECORDTYPE='FIXED'
+     +,          RECL=900, BLOCKSIZE=3600, FORM='UNFORMATTED')
+
+      CALL FZFILE (Lun, 900, 'TXO')
+\end{verbatim}
+
+\Filename{H2-FZ-Tape-file-CLibrary}
+\section{Tape file, C Library}
+
+This mode is available only on machines running under UNIX,
+and only on machines where the CF package of KERNLIB has
+been implemented.
+
+Assume that the name of the tape drive is \Lit{/dev/mt12}.
+
+\subsection*{Input}
+
+Open the file and initialize FZ:
+
+\begin{verbatim}
+      CALL CFOPEN (IQUEST(1), 1, 900, 'r ', 0, '/dev/mt12 ', ISTAT)
+      CALL FZFILE (Lun, 900, 'TL')
+\end{verbatim}
+
+\subsection*{Output}
+
+Open the file and initialize FZ:
+
+\begin{verbatim}
+      CALL CFOPEN (IQUEST(1), 1, 900, 'w ', 0, '/dev/mt12 ', ISTAT)
+      CALL FZFILE (Lun, 900, 'TLO')
+\end{verbatim}
+
+The record-length is given as the number of machine words per
+record, thus '900' is for 32-bit machines;
+on 64-bit machines this would be '450'.
+
+Note the passing of the file-pointer returned from \Rind{CFOPEN}
+to \Rind{FZFILE} via \Lit{IQUEST(1)}.
+
+If you are running ZEBRA version 3.66 with KERNLIB constructed
+from KERNFOR 4.26, note the following problem:
+
+The CF routines delivered with KERNFOR 4.26 do not work
+correctly for on-line tapes; they have been re-written
+and version KERNFOR 4.27 has been released.
+
+\Filename{H2-FZ-DF-Fortran-sequential}
+\section{Disk file, Fortran sequential}
+
+True exchange-mode disk files cannot be handled with
+sequential Fortran I/O on several Unix machines.
+For these machines one should use the D mode,
+for Fortran direct-access, see the next paragraph.
+
+\subsection*{ALLIANT}
+
+For input, open the file and initialize FZ:
+
+\begin{verbatim}
+      OPEN (Lun, FILE='zname', STATUS='OLD', FORM='UNFORMATTED'
+     +,          RECORDTYPE='FIXED', RECL=3600, BLOCKSIZE=3600)
+
+      CALL FZFILE (Lun, 900, 'X')
+\end{verbatim}
+
+For output, open the file and initialize FZ:
+
+\begin{verbatim}
+      OPEN (Lun, FILE='zname', STATUS='UNKNOWN', FORM='UNFORMATTED'
+     +,          RECORDTYPE='FIXED', RECL=3600, BLOCKSIZE=3600)
+
+      CALL FZFILE (Lun, 900, 'XO')
+\end{verbatim}
+
+\subsection*{CONVEX}
+
+For input, open the file and initialize FZ:
+
+\begin{verbatim}
+      OPEN (Lun, FILE='zname', STATUS='OLD', FORM='UNFORMATTED'
+     +,          READONLY
+     +,          RECORDTYPE='FIXED', RECL=3600, BLOCKSIZE=3600)
+
+      CALL FZFILE (Lun, 900, 'X')
+\end{verbatim}
+
+For output, open the file and initialize FZ:
+
+\begin{verbatim}
+      OPEN (Lun, FILE='zname', STATUS='UNKNOWN', FORM='UNFORMATTED'
+     +,          RECORDTYPE='FIXED', RECL=3600, BLOCKSIZE=3600)
+
+      CALL FZFILE (Lun, 900, 'XO')
+\end{verbatim}
+
+\subsection*{IBM MVS, input}
+
+If the file is handled with \Rind{IOPACK} on 'unit' 24:
+
+JCL for the file:
+
+\begin{verbatim}
+//G.IOFILE24 DD DISP=SHR,DSN=gg.uuu.name
+\end{verbatim}
+
+Initialize FZ for this file:
+
+\begin{verbatim}
+      CALL FZFILE  (24, 900, 'XY')
+\end{verbatim}
+
+\subsection*{IBM MVS, output}
+
+JCL for the file:
+
+\begin{verbatim}
+//G.IOFILE24 DD DSN=uu.ggg.name,DISP=(NEW,CATLG),
+//            DCB=(RECFM=U,BLKSIZE=3600),
+//            SPACE=(3600,800,RLSE),UNIT=SYSDA
+\end{verbatim}
+
+Initialize FZ for this file:
+
+\begin{verbatim}
+  CALL FZFILE  (24, 900, 'XYO')
+\end{verbatim}
+
+\subsection*{IBM VM/CMS}
+
+
+To handle with Fortran, JCL for the file:
+
+\begin{verbatim}
+      FI 24 DISK fname ftype fmode (RECFM U LRECL 3600 BLKSIZE 3600 PERM
+\end{verbatim}
+
+Initialize FZ for this file:
+
+\begin{verbatim}
+      CALL FZFILE  (24, 900, 'XF')     for input
+ or   CALL FZFILE  (24, 900, 'XFO')    for output
+\end{verbatim}
+
+
+To handle with \Rind{IOPACK}, JCL for the file:
+
+\begin{verbatim}
+   FILEDEF  IOFILE24 DISK fname ftype fmode (RECFM U BLKSIZE 3600 PERM
+\end{verbatim}
+
+Initialize FZ for this file:
+
+\begin{verbatim}
+      CALL FZFILE  (24, 900, 'XY')     for input
+ or   CALL FZFILE  (24, 900, 'XYO')    for output
+\end{verbatim}
+
+The file mode of a Zebra exchange file should be 1,
+thus one might give A1 for the 'fmode' parameter.
+
+\subsection*{VAX VMS, input}
+
+Open the file and initialize FZ:
+
+\begin{verbatim}
+      OPEN (Lun, FILE='zname', STATUS='OLD'
+     +,          FORM='UNFORMATTED', READONLY)
+
+      CALL FZFILE (Lun, 900, 'X')
+\end{verbatim}
+
+\subsection*{VAX VMS, output}
+
+Open the file and initialize FZ:
+
+\begin{verbatim}
+      OPEN (Lun, FILE='zname', STATUS='NEW', RECORDTYPE='FIXED'
+     +,          RECL=900, BLOCKSIZE=3600, FORM='UNFORMATTED')
+
+      CALL FZFILE (Lun, 900, 'XO')
+\end{verbatim}
+
+Such a file created on the VAX has these properties:
+
+\begin{verbatim}
+   VxCrnA$ DIR FZXVAX.DAT.* /FULL
+
+   Directory disk:[uuu]
+
+   FZXVAX.DAT;1                  File ID:  (19177,30,0)
+   Size:          240/240        Owner:    [L3_1,uuu]
+   Created:  31-MAY-1988 12:03   Revised:  31-MAY-1988 12:11 (2)
+   Expires:   <None specified>   Backup:    6-JUN-1988 07:18
+   File organization:  Sequential
+   File attributes:    Allocation: 240, Extend: 0, Global buffer count: 0
+                       No version limit
+ ! Record format:      Fixed length 3600 byte records
+ ! Record attributes:  None
+   Journaling enabled: None
+   File protection:    System:RWED, Owner:RWED, Group:RE, World:RE
+   Access Cntrl List:  None
+\end{verbatim}
+
+Note the parameters marked by '!' on the left margin.
+
+If a file acquired with FTP on a VAX does not have these properties,
+one could fix this with this little COM file:
+
+\begin{verbatim}
+      $ SET NOVERIFY     !  RESIZE.COM   900724 12.00
+      $ ON ERROR     THEN $ GOTO EXIT
+      $ ON CONTROL_Y THEN $ GOTO EXIT
+      $!
+      $!   COM-file to re-size FTP files
+      $!
+      $ IF (P1 .EQS. "") THEN
+      $   INQUIRE P1 "Enter UNIX file name"
+      $   INQUIRE P2 "Enter VMS  file name"
+      $   INQUIRE P3 "Give record size in bytes(<CR>=3600)"
+      $   IF (P3 .EQS. "") THEN P3 = 3600
+      $ OPEN/WRITE OUTP EXCHQZZZ.DAT
+      $ WRITE OUTP    "RECORD"
+      $ WRITE OUTP    "BLOCK_SPAN              yes"
+      $ WRITE OUTP    "CARRIAGE_CONTROL        none"
+      $ WRITE OUTP    "FORMAT                  fixed"
+      $ WRITE OUTP    "SIZE                    ''P3'"
+      $ CLOSE OUTP
+      $ EXCHANGE/NETWORK 'P1 'P2 -
+              /TRANSFERT=BLOCK -
+              /FDL=EXCHQZZZ.DAT
+      $EXIT:
+      $ DELETE/NOCONF/NOLOG EXCHQZZZ.DAT.*
+      $ EXIT
+\end{verbatim}
+
+\Filename{H2-FZ-DF-Fortran-d-a}
+\section{Disk file, Fortran direct-access}
+
+This mode works on all machines, except IBM VM.
+
+Note that one may create a true exchange-format file with
+sequential WRITE on some machine, and read it with
+direct-access on this or another machine.
+
+\subsection*{Input}
+
+Open the file and initialize FZ:
+
+\begin{verbatim}
+      OPEN (Lun, FILE='zname', STATUS='OLD', FORM='UNFORMATTED'
+     +,          ACCESS='DIRECT', RECL=3600)
+
+      CALL FZFILE (Lun, 900, 'D')
+\end{verbatim}
+
+Key-word \Lit{READONLY} should be given on CONVEX, VAX, DECstation.
+
+\subsection*{Output}
+
+Open the file and initialize FZ:
+
+\begin{verbatim}
+      OPEN (Lun, FILE='zname', STATUS='NEW', FORM='UNFORMATTED'
+     +,          ACCESS='DIRECT', RECL=3600)
+
+      CALL FZFILE (Lun, 900, 'DO')
+\end{verbatim}
+
+On most machines the record-length is given in bytes.
+
+On VAX and DECstation one must specify words: \Lit{RECL=900}
+
+\Filename{H2-FZ-Disk-file-CLibrary}
+\section{Disk file, C Library}
+
+This mode is available only on machines running under UNIX,
+and only on machines where the CF package of KERNLIB has
+been implemented.
+
+\subsection*{Input}
+
+Open the file and initialize FZ:
+
+\begin{verbatim}
+      CALL CFOPEN (IQUEST(1), 0, 900, 'r ', 0, 'zname ', ISTAT)
+      CALL FZFILE (Lun, 900, 'L')
+\end{verbatim}
+
+\subsection{Output}
+
+Open the file and initialize FZ:
+
+\begin{verbatim}
+      CALL CFOPEN (IQUEST(1), 0, 900, 'w ', 0, 'zname ', ISTAT)
+      CALL FZFILE (Lun, 900, 'LO')
+\end{verbatim}
+
+The record-length is given as the number of machine words per
+record, thus '900' is for 32-bit machines;
+on 64-bit machines this would be '450'.
+
+Note the passing of the file-pointer returned from \Rind{CFOPEN}
+to \Rind{FZFILE} via \Lit{IQUEST(1)}.
+@

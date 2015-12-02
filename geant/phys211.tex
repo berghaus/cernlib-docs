@@ -1,0 +1,310 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%  GEANT manual in LaTeX form                                     %
+%                                                                 %
+%  Michel Goossens (for translation into LaTeX)                   %
+%  Version 1.00                                                   %
+%  Last Mod. Jan 24 1991  1300   MG + IB                          %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\Origin{G.N.Patrick, L.Urb\'{a}n}
+\Submitted{12.12.84}\Revised{16.12.93}
+\Version{Geant 3.16}\Routid{PHYS211}
+\Makehead{Simulation of e-e+ pair production by photons}
+
+\section{Subroutines}
+\Shubr{GPAIRG}{}
+
+\Rind{GPAIRG} generates \Pem\Pep-pair production by photons.
+It uses a modified version
+of the random number techniques of Butcher and Messel \cite{bib-BUTC}
+to sample the secondary electron/positron energies from the Coulomb
+corrected Bethe-Heitler differential cross-section.
+For the angular distribution of the pair, it calls the function
+\Rind{GBTETH}.
+
+Input:    via COMMON \FCind{/GCTRAK/}
+
+Output:   via COMMON \FCind{/GCKING/}
+
+\Rind{GPAIRG} is called from \Rind{GTGAMA},
+when the photon reaches its pair production point.
+
+\Sfunc{GBTETH}{VALUE = GBTETH(ENER,PARTM,EFRAC)}
+\Rind{GBTETH} calculates the angular distribution of the \Pem\Pep-pair
+for pair production and of the photon for bremsstrahlung.
+In case of \Pem\Pep-pair production by photons, it gives the
+scaled angle for an electron (mass {\tt PARTM}) of energy {\tt ENER}
+which is {\tt EFRAC} times the initial energy of the photon.
+\Rind{GBTETH} is called by \Rind{GPAIRG}.
+
+\section{ Method}
+
+\subsection{MonteCarlo technique}
+We give a very short summary of the random number technique used here
+\latexhtml{\cite{bib-BUTC,bib-HAMM}}{\cite{bib-BUTC}, \cite{bib-HAMM}}.
+The method is a combination of the composition and
+rejection Monte Carlo methods. Suppose we wish to sample $x$ from
+the distribution $f(x)$ and the
+(normalised) probability density function can be written as
+\begin{equation}
+f(x)  = \sum_{i=1}^{n}\alpha _{i} f _{i} (x) g_{i} (x)
+\end{equation}
+
+where $f _i (x)$ are normalised density functions, $\alpha _i > 0 $ and
+$ 0 \leq g_i (x) \leq 1 $.
+
+According to this method, $x$ can sampled in the following way:
+\begin{enumerate}
+\item
+select a random integer $i$ such that $(1\leq i \leq n)$
+with probability proportional to $\alpha_i $
+\item
+select a value $x'$ from the distribution $f_i (x)$
+\item
+calculate $g_i (x')$ and accept $x = x'$ with probability
+$g_i (x')$;
+\item if $x'$ is rejected restart from step 1.
+\end{enumerate}
+It can be shown that this scheme is correct and the mean
+number of tries to accept a value is $ \sum_{i}\alpha_i $.
+
+In practice we have a good method of sampling from the distribution $f(x)$, if
+\begin{itemize}
+\item all the subdistributions $ f_i (x)$ can be sampled easily;
+\item the rejection functions $ g_i(x)$ can be evaluated easily/quickly;
+\item the mean number of tries is not too large.
+\end{itemize}
+Thus the different possible decompositions of the distribution
+$f(x)$ are not equivalent from the practical point of view (e.g. they
+can be very different in computational speed) and it can be very useful
+to optimise the decomposition.
+A remark of practical importance is that if our distribution is not
+normalised ($\int f(x)dx=C>0; C\approx 1$), the method can be used in the same
+manner, the only difference is that the mean number of tries in this
+case is given by  $\sum_ {i}\alpha_i/C$ .
+
+\subsection{Differential cross-section for pair production}
+The Bethe-Heitler differential cross-section with the Coulomb correction for
+a photon of energy $E$ to produce a \Pem\Pep-pair with one of the
+particles having
+energy  $ \epsilon E$  ($ \epsilon$ is the fraction of the
+photon energy carried by one particle of the pair)
+is given as in \cite{bib-EGS3}:
+\begin{equation}
+\frac{d\sigma (Z,E,\epsilon )}{d \epsilon} =
+     \frac{r_0^2\alpha Z [ Z +\xi (Z) ]}{E^2}
+     \left\{[\epsilon^ 2 + ( 1 -\epsilon ) ^ 2 ] [ \Phi _1 (\delta ) -
+     \frac{F (Z)}{2} ] +
+     \frac{2}{3}\epsilon (1-\epsilon ) [\Phi_2 (\delta ) - 
+     \frac{F (Z)}{2} ] \right\}
+\end{equation}
+where $\Phi_i(\delta)$ are the screening functions
+depending on the screening variable $\delta$\\
+\[ \begin{array}{LL}
+
+\delta  =  \frac { 136m}{ Z^{1/3}E}
+            \frac{ 1}{ \epsilon(1-\epsilon)}
+              &        m = \mbox{electron mass} \\
+& \\
+\hspace{-.2cm}
+\left.\begin{array}{L}
+\Phi_1(\delta)  =  20.867 - 3.242\delta +0.625\delta^2  \\
+\Phi_2(\delta)  =  20.209 - 1.930\delta - 0.086\delta^2  \\
+\end{array}        \right\} & \; \delta\leq 1 \\
+\Phi_1(\delta) = \Phi_2(\delta) =
+21.12 - 4.184 \ln(\delta+0.952)
+                    & \; \delta > 1  \\
+&\\
+F(Z)  = \left\{\begin{array}{L}
+        8/3 \ln Z          \\
+        8/3 \ln Z+8f_c(Z)  \\
+        \end{array}\right.
+&  \begin{array}{L}
+E<0.05 \; GeV      \\
+E\geq 0.05 \; GeV  \\
+\end{array}  \\
+\\
+\xi(Z)=\frac{\ln {(1440/Z^{2/3})}}{\ln
+{(183/Z^{1/3})}-f_c(Z)}  & \\
+\\
+f_c(Z)
+& \mbox{the Coulomb correction function}
+\end{array} \]
+
+\[ \begin{array}{LCL}
+f_c(Z) & = & a(1/(1+a)+0.20206-0.0369a+0.0083*a^2-0.002a^3)\\
+    a   & = & (\alpha*Z)^2                                     \\
+\alpha  & = & 1/137
+\end{array} \]
+
+The kinematical range for the variable $\epsilon$ is
+\begin{equation}
+\frac {m}{E} \leq \epsilon  \leq 1 - \frac{m}{E}
+\end{equation}
+The cross-section is symmetric with respect to
+the interchange of $\epsilon$ with
+$1-\epsilon $, so we can restrict $\epsilon $ to lie in the range
+ $\epsilon_0  = m/E\leq \epsilon \leq 1/2 $
+
+After some algebraic manipulations we can decompose the cross-section
+as (note: the normalisation is not important):
+\[ \begin{array}{LCLLCL}
+\frac{d\sigma}{d\epsilon} & = &
+\sum^{2}_{i=1}\alpha_i f_i (\epsilon) g_i (\epsilon) \\
+\end{array} \]
+
+where
+
+\[ \begin{array}{LCLLCL}
+\alpha_1 & = & \frac{(0.5 - \epsilon_0)^2}{3} F_{10} &
+\alpha_2 & = & \frac{1}{2}F_{20}    \\
+\\
+f_1 (\epsilon)& =&
+\frac{ 3}{ (0.5 - \epsilon_0)^3}(\epsilon-0.5)^2  &
+f_2 (\epsilon)& =& \frac{ 1}{ 0.5-\epsilon_0}    \\
+g_1 (\epsilon)&     =&  F_1 / F_{10}      &
+g_2 (\epsilon)&  = & F_2 / F_{20}        \\
+\end{array} \]
+
+and
+
+\[ \begin{array}{LCLLCL}
+F_1   &   = & F_1(\delta) = 3\Phi_1(\delta)-\Phi_2(\delta)-F(Z)       &
+F_{10}  & = & F_1(\delta_{min})                                          \\
+F_2  &  = & F_2(\delta) = \frac{3}{2}\Phi_1(\delta)+
+                        \frac{1}{2}\Phi_2(\delta)-F(Z)            &
+F_{20}  & = & F_2(\delta_{min})                                          \\
+\\
+\delta_{min} & = & 4\frac{ 136m}{ Z^{\frac{1}{3}}3E} & \\
+\end{array} \]
+
+$\delta_{min}$ is the minimal value of the
+screening variable $\delta$. It can be
+seen that the functions $f_i(\epsilon)$ are normalised and
+that the functions $ g_i(\epsilon)$ are ``valid" rejection functions.
+
+Therefore, if $r_i$ are uniformly distributed random numbers
+($0\leq r_i  \leq 1$), we can sample the
+$\epsilon $ ($x$ in the program) in the following way:
+\begin{enumerate}
+\item
+select $i$ to be 1 or 2 according to the following ratio:
+\[
+\mbox{\tt BPAR}  = \frac{ \alpha_1 }{\alpha_1 +\alpha_2}
+\]
+If $r_0 < \mbox{\tt BPAR}$ then $i=1$, otherwise if $r_0\geq \mbox{\tt BPAR}$ 
+$i=2$;
+\item
+sample $\epsilon$  from $f_1(\epsilon)$. This can be
+performed by the following expressions:
+
+\[
+\epsilon = \left\{
+\begin{array}{Ll}
+0.5 - (0.5 - \epsilon_0 ) {r_1}^\frac{1}{3} &
+\mbox{when $i=1$} \\
+\epsilon_0 + \left(\frac{1}{2} - \epsilon_0\right) r_1 &
+\mbox{when $i=2$}
+\end{array} \right.
+\]
+\item calculate the rejection function $g_i(\epsilon)$.
+If $r_2\leq g_{i}(\epsilon)$, accept $ \epsilon$, otherwise return
+to step 1.
+\end{enumerate}
+
+It should be mentioned that we need a step just after sampling $ \epsilon $
+in the step 2, because the cross-section formula becomes
+negative at large $ \delta$
+and this imposes an upper limit
+for $ \delta$;
+\[
+\delta_{max} = \exp \left[\frac{42.24-F(Z)}{8.368}\right] - 0.952
+\]
+
+If we get a $\delta$ value using the sampled $\epsilon$ such that
+$\delta > \delta_{max} $ , we
+have to start again from the step 1.
+After the successful sampling of $\epsilon $, \Rind{GPAIRG}
+generates the polar angles
+of the electron with respect to an axis defined along the direction
+of the parent photon.
+The electron and the positron are assumed to have
+a symmetric angular distribution.
+The energy-angle distribution is given by
+Tsai~\latexhtml{\cite{bib-TSAI,bib-TSAI-err}}%
+               {\cite{bib-TSAI}, \cite{bib-TSAI-err}}
+as following:
+\begin{eqnarray}
+\frac{d \sigma}{dpd \Omega}
+& = & \frac{2 \alpha^2e^2}{\pi k m^4}
+      \left\{ \left[ \frac{2x(1-x)}{(1+l)^2}-\frac{12lx(1-x)}{(1+l)^4}\right]
+      (Z^{2}+Z) \nonumber  \right. \\
+&   & \mbox{} + \left. \left[ \frac{2x^2-2x+1}{(1+l)^2} +
+      \frac{4lx(1-x)}{(1+l)^4}
+      \right]
+      \left[ X-2Z^{2}f((\alpha Z)^{2})\right]
+      \right\} \nonumber 
+\end{eqnarray}
+
+where $k$ is the photon energy, $p$ and $E$  are the momentum and
+the energy of the electron of the $e^+e^-$-pair,
+$x=E/k$  and $l = E^{2} \theta^{2}/m^{2}$. This distribution
+is quite complicated to sample and, furthermore, considered as
+function of the variable
+$u = E \theta/m$, it shows a very weak dependence on $Z$, $E$, $k$,
+$x = E/k$. Thus, the distribution can be approximated by a function
+\begin{equation}
+f(u) = C \left( u e^{-au} + d u e^{-3au} \right)
+\end{equation}
+where
+\begin{eqnarray*}
+C & = & \frac{9a^{2}}{9 + d} \\
+a & = & 0.625 \\
+d & = & 27.0 
+\end{eqnarray*}
+The sampling of the function $f(u)$ can be done in the following way
+($r_{i}$ are uniformly distributed random numbers
+in [0,1]):
+\begin{enumerate}
+\item choose between $u e^{-au}$ and $d u e^{-3au}$, with relative
+probability given by $9/(9+d)$ and $d/(9+d)$ respectively;
+if $r_{1} < 9/(9+d)$ then $b=a$, else $b=3a$;
+\item sample $u e^{-bu}$, $u=-(\ln r_{2} + \ln r_{3})/b$.
+\end{enumerate}
+
+The azimuthal angle, $\phi$, is generated isotropically.
+
+This information together with the momentum conservation is used to calculate
+the momentum vectors of both decay products and to transform
+them to the {\tt GEANT} coordinate system.
+The choice of which particle in the pair is the electron/positron is
+made randomly.
+
+\subsection{Restrictions}
+\begin{enumerate}
+\item
+Effects due to the breakdown of Born approximation at low energies
+are ignored (but the Coulomb correction is now included):
+\item
+as suggested by Ford and Nelson~\cite{bib-EGS4}, for very low energy 
+photons ($E\leq 2.1 MeV$) the electron energy is approximated by sampling 
+from a uniform distribution over the interval $ m\rightarrow 1/(2E)$.
+The reason for this suggestion is that the sampling method used in 
+EGS and in the earlier {\tt GEANT} versions becomes progressively more 
+inefficient as the pair threshold is approached. This is not true for 
+the sampling method outlined above (the efficiency of the method 
+practically does not depend on the photon energy), but we
+have chosen to keep this approximation;
+\item
+target materials composed of compounds or mixtures are treated identically
+to chemical elements (this is not the case when computing the mean free path!)
+using the effective atomic number computed in the routine \Rind{GSMIXT}. 
+It can be shown that the error of this type of treatment is small and can 
+be neglected;
+\item
+the differential cross-section implicitly accounts for pair production
+in both nuclear and atomic electron fields. However, triplet production
+is not generated, and the recoil momentum of the target nucleus/electron
+is assumed to be zero.
+\end{enumerate}

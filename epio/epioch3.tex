@@ -1,0 +1,502 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%   EPIO User Guide -- LaTeX Source                               %
+%                                                                 %
+%   Chapter 3                                                     %
+%                                                                 %
+%   The following external EPS files are referenced:              %
+%                                                                 %
+%   Editor: Michel Goossens / CN-AS                               %
+%   Last Mod.: 18 Nov 1993 22:55 mg                               %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ 
+ 
+\Filename{H1EPIO-User-routines}
+\chapter{User Routines}
+\label{sec:H1Userroutines}
+
+\Filename{H2EPIO-User-routines-initialisation}
+\section{Initialisation}
+ 
+\Shubr{EPINIT}{}
+ 
+Must be called once per job, in the  root. Pulls common block
+\Lit{/EPCOMM/} in and initializes the package.
+ 
+More than 10 units can be handled simultaneously as follows:
+ 
+\begin{enumerate}
+\item Load a common block \Lit{/EPCOMM/} that is big enough 
+      (see \Lit{$dim} as dimension of \Lit{LIST}, 
+       table~\ref{tab:statuswords})
+\item After the call to \Rind{EPINIT} set \Lit{NMUNIT} to the new maximum.
+\end{enumerate}
+ 
+\Filename{H2EPIO-User-routines-reading}
+\section{Reading}
+ 
+\Shubr{EPREAD}{(LUNIT,MODE,NW*,*IREC*,IBUF*,IERR*)}
+ 
+\begin{DLtt}{123456}
+\item[{\rm\bf Input parameters:}]
+\item[LUNIT] logical unit number
+\item[MODE] \Lit{=j,  j=1,2,3} : get next logical record data\\
+            \Lit{j=1} : data transferred in packed form\\
+            \Lit{j=2} : data unpacked as 16-bit bytes/word\\
+            \Lit{j=3} : data unpacked as 32-bit bytes/word\\
+            \Lit{\ =10+j, j=1,2,3} as above: get data of current logical record
+            (only possible after a previous call with \Lit{j=20}).\\
+            \Lit{\ =20} : get header of next logical record. The header will
+             always be unpacked in units (16 or 32-bit words).\\
+            \Lit{\ =30} : get next physical header.\\
+            The header will always be unpacked in units.
+\item[{\rm\bf Input/Output buffer:}]
+\item[IBUF] user provided unit buffer. Must not be touched by user.
+            Minimum size = (16*status word 1 - 1)/(bits/word) + 1
+\item[{\rm\bf Output parameters:}]
+\item[NW] no. of words transferred into \Lit{IREC}.\\
+          For \Lit{j=1} no. of units, for \Lit{j=2} or \Lit{j=3} 
+          no. of 16 or 32-bit words, i.e.,
+          number of machine words occupied in \Lit{IREC}
+\item[IREC] user provided area to store the header or data requested
+\item[IERR] error flag. See separate list.
+\end{DLtt}
+\subsection*{Remarks:}
+\begin{enumerate}
+\item For reading the old EP format status word 27 must be set to zero by a
+\begin{XMP}
+             CALL EPSETW(LUN,27,0,IERR)
+\end{XMP}
+and the previous call in the old ``\Lit{EVENT}'' package
+\begin{XMP}
+             CALL EVENT(IARRAY,ISTAT)
+\end{XMP}
+has to be replaced by a call to \Rind{EPREAD} with \Lit{j=2}. 
+In this case, as for \Lit{EVENT}, the complete record 
+(including the header) will be transferred. 
+Please note that the  data  now  start  in  \Lit{IREC(1)},
+instead of \Lit{IARRAY(2)} as before and the data are unpacked as 16-bit
+bytes/word only.
+ 
+Old format ``special records'' are not specifically decoded by
+\Rind{EPREAD} but return \Lit{IERR=7}. 
+The user is left to do the unpacking himself, e.g.:
+\begin{XMP}
+    CALL EPREAD(LUN,2,NW,irec,IBUF, ierr)
+    :
+    :
+    IF (IERR.NE.7) GO TO 10
+    NW=IWD16(IBUF,1)
+    CALL BLO16W(IBUF,1,IREC,1,NW)
+   10 CONTINUE
+\end{XMP}
+\item To read consecutive files of multifile tapes the user has only
+to make further calls to \Rind{EPREAD} after each end of file (signified by
+\Lit{IERR=1}). 
+In the case of labelled tapes the labels will be treated as
+data and \Rind{EPREAD} will return a length error on reading (\Lit{IERR=5}). 
+The user program should choose to continue reading in this case. 
+A combination of
+these techniques with \Lit{MODE=30} can provide the same facilities as
+\Rind{EVENTIN} in the old package. 
+To prevent tapes running off the end of reel
+users should stop reading at end of information (\Lit{IERR=3}), signified by 2
+consecutive EOF's, or by using the file or record count.
+\end{enumerate}
+
+\Shubr{EPFHDR}{(LUNIT,MLUSER,IHEAD*,*IBUF*,IERR*)}
+ 
+Fast logical record header reading routine.
+ 
+\begin{DLtt}{123456}
+\item[{\rm\bf Input parameters:}]
+\item[LUNIT] user unit number
+\item[MLUSER] no. of header words transferred to user
+\item[{\rm\bf Input/Output buffer:}]
+\item[IBUF] user buffer
+\item[{\rm\bf Output parameters:}]
+\item[IHEAD] \Lit{MLUSER} words of logical record header (regardless of actual
+             length or of status word 26)
+\item[IERR] error number
+\end{DLtt}
+
+\subsection*{Conditions for use:}
+\begin{enumerate}
+\item 16-bit units only (i.e. logical record header consists of 16-bit
+      words)
+\item No spanned headers
+\item Always \Lit{MLUSER} words transferred to user (word 3 is header length).
+      This may exceptionally lead to a program range error if the input
+      buffer \Lit{IBUF} coincides with the end of the user program.
+      Remedy: increase size of \Lit{IBUF} by 
+      \Lit{16*MLUSER/(no. of bits per word)}
+\item No headerless blocks
+\item No old EP format
+\item No unknown length records
+\end{enumerate}
+
+In addition, no checks performed whether input unit, or whether header
+cut.
+Conditions 2. to 6. are always fulfilled when writing with EPIO,
+condition 1. is default when writing with EPIO.
+
+Calls to this routine are entirely compatible with \Rind{EPREAD} calls.
+
+\Shubr{EPFRD}{(LUNIT,MODE,NW,IREC,IBUF,IERR)}
+
+Fast logical record data reading routine.
+ 
+\begin{DLtt}{123456}
+\item[{\rm\bf Input parameters:}]
+\item[UNIT] user unit number
+\item[MODE] one of 11, 12, 13 (see \Rind{EPREAD})
+\item[{\rm\bf /Input/Output buffer:}]
+\item[IBUF] user buffer
+\item[{\rm\bf Output parameters:}]
+\item[NW] no. of words in \Lit{IREC}
+\item[IREC] record transferred to user
+\item[IERR] error number
+\end{DLtt}
+
+\subsection*{Conditions for use:}
+
+\begin{enumerate}
+\item 16-bit units only (i.e. logical record header consists of 16-bit
+       words)
+\item no headerless blocks
+\item no old EP format
+\item no unknown length records
+\item modes 11, 12, 13 only (otherwise error 8)
+\end{enumerate}
+ 
+In addition, no checks performed whether input unit.
+Conditions 2. to 4. are always fulfilled when writing with EPIO,
+condition 1. is default when writing with EPIO.
+User data will be truncated at the value in status word 2,
+but no error will be signalled.
+ 
+The routine is poorly protected against bad user data on input,
+and may lead to program aborts in cases where \Rind{EPREAD} would recover.
+In particular \Rind{EPFRD} does not test for the condition which leads to
+\Lit{IERR=18} from \Rind{EPREAD}, and performs unpredictably in the case of this
+condition.
+ 
+Therefore, in case the user wants to be better protected (e.g.,
+after a fatal error in \Rind{EPFRD}), he should use \Rind{EPREAD}.
+
+Calls to this routine are entirely compatible with \Rind{EPREAD} calls.
+
+\Filename{H2EPIO-User-routines-writing}
+\section{Writing}
+
+\Shubr{EPOUTS}{(LUNIT,MODE,NW,IREC,*IBUF*,IERR*)}
+
+Writes one record with standard logical record header (4 words, see
+important remark on logical record headers in 
+section~\ref{sec:remarkslogicalrecords}.
+
+\begin{DLtt}{123456}
+\item[{\rm\bf Input parameters:}]
+\item[LUNIT] logical unit number
+\item[MODE] transfer more
+  \begin{DLtt}{1}
+    \item[1:] transfer data as they are (bit string)
+    \item[2:] pack data before writing, given as 16-bit right adjusted
+    \item[3:] pack data before writing, given as 32-bit right adjusted
+  \end{DLtt}
+\item[NW] no. of words to be written.\\
+    For \Lit{MODE=1} in units (as defined by physical header word 11),
+    for \Lit{MODE=2} or \Lit{=3} in 16 or 32-bit words respectively, i.e. the
+    number of machine words occupied
+\item[IREC] area containing the user data.
+\item[{\rm\bf Input/Output buffer:}]
+\item[IBUF] user provided unit buffer. Must not be touched by user.\\
+            Minimum size = \Lit{(16*status word 1 - 1)/(bits/word) + 1}
+\item[{\rm\bf Output parameters:}]
+\item[IERR] error flag. See separate list.
+\end{DLtt}
+
+\Shubr{EPOUTL}{(LUNIT,MODE,NH,IH,NW,IREC,*IBUF*,IERR*)}
+ 
+This routine writes a user specified logical record header in front
+of the data, instead of the header produced automatically from the
+status words. Words 1,3 (and possibly 2 and 4) will be set by the
+writing routine in any case (basic protection).
+ 
+The logical record data are given in the same call.
+
+\begin{DLtt}{123456}
+\item[{\rm\bf Input parameters:}]
+\item[LUNIT] logical unit number
+\item[MODE] transfer more
+  \begin{DLtt}{1}
+    \item[1:] transfer data as they are (bit string)
+    \item[2:] pack data before writing, given as 16-bit right adjusted
+    \item[3:] pack data before writing, given as 32-bit right adjusted
+  \end{DLtt}
+\item[NH] header length in words
+\item[IH] array containing header (in unpacked form)
+\item[NW] no. of words to be written.\\
+    For \Lit{MODE=1} in units (as defined by physical header word 11),
+    for \Lit{MODE=2} or \Lit{=3} in 16 or 32-bit words respectively, i.e. the
+    number of machine words occupied
+\item[IREC] area containing the user data.
+\item[{\rm\bf Input/Output buffer:}]
+\item[IBUF] user provided unit buffer. Must not be touched by user.\\
+            Minimum size = \Lit{(16*status word 1 - 1)/(bits/word) + 1}
+\item[{\rm\bf Output parameters:}]
+\item[IERR] error flag. See separate list.
+\end{DLtt}
+
+\Shubr{EPCLOS}{(LUNIT,*IBUF*,IERR*)}
+ 
+Routine to close output units (write existing physical
+buffer out - writing may continue afterwards). The physical block count
+will continue from its current value at re-opening.
+ 
+Closing an input unit has no effect.
+ 
+\fbox{\textbf{Mandatory at end of job for all output units (or \Rind{EPEND})}}
+
+\begin{DLtt}{123456}
+\item[{\rm\bf Input parameters:}]
+\item[LUNIT] logical unit number
+\item[{\rm\bf Input/Output buffer:}]
+\item[IBUF] user provided unit buffer. Must not be touched by user.\\
+\item[{\rm\bf Output parameters:}]
+\item[IERR] error flag. See separate list.
+\end{DLtt}
+
+\Filename{H2EPIO-User-routines-rewind}
+\section{Auxiliary Unit Operations---Rewind}
+
+\Shubr{EPRWND}{(LUNIT,*IBUF*,IERR*)}
+ 
+Rewinds to the start of the current file in use on this unit.
+ 
+Rewinding an output unit triggers writing the last buffer out and
+writes an end of file. After a rewind operation (and only in that case)
+the user may switch from reading to writing or vice versa.
+ 
+The physical header is reset to the standard header after a rewind.
+
+\begin{DLtt}{123456}
+\item[{\rm\bf Input parameters:}]
+\item[LUNIT] logical unit number
+\item[{\rm\bf Input/Output buffer:}]
+\item[IBUF] user provided unit buffer. Must not be touched by user.\\
+\item[{\rm\bf Output parameters:}]
+\item[IERR] error flag. See separate list.
+\end{DLtt}
+
+\subsection*{Note:}
+
+On the Apollo rewinding a magnetic tape file is done by
+explicitly closing the stream.
+
+\Filename{H2EPIO-User-routines-drop}
+\section{Drop}
+
+\Shubr{EPDROP}{(LUNIT,IERR*)}
+ 
+Drops an existing unit. User should call \Rind{EPCLOS} beforehand when writing.
+This concerns only this package, i.e. the space in common block
+\Lit{/EPCOMM/} becomes free for another unit. For the system, the unit
+still exists, and may therefore be ``opened'' again later.
+The physical block count will be reset at re-opening.
+
+\begin{DLtt}{123456}
+\item[{\rm\bf Input parameters:}]
+\item[LUNIT] logical unit number
+\item[{\rm\bf Output parameters:}]
+\item[IERR] error flag. See separate list.
+\end{DLtt}
+
+\Filename{H2EPIO-User-routines-writeEOF}
+\section{Write EOF mark}
+
+\Shubr{EPEND}{(LUNIT,*IBUF*,IERR*)}
+
+\fbox{\textbf{Mandatory at end of job for all output units (or \Rind{EPCLOS})}}
+ 
+Acts like \Rind{EPCLOS}, but in addition writes an end of file mark on
+\Lit{LUNIT} if output unit. On IBM and UNIVAC it must be called
+to properly terminate output units.
+ 
+Note that on IBM this has the same effect as \Rind{EPCLOS} - the filemark
+written is backspaced over so a new write to the same logical unit
+will not result in a new physical file but will merely continue the
+existing file. Users who really want to write a multi-file tape on
+IBM within the same job step must call \Rind{EPEND} and then 
+\Lit{IODD}~\cite{bib-IOPACK}.
+
+\begin{DLtt}{123456}
+\item[{\rm\bf Input parameters:}]
+\item[LUNIT] logical unit number
+\item[{\rm\bf Input/Output buffer:}]
+\item[IBUF] user provided unit buffer. Must not be touched by user.\\
+\item[{\rm\bf Output parameters:}]
+\item[IERR] error flag. See separate list.
+\end{DLtt}
+
+\Filename{H2EPIO-User-routines-reading}
+\section{Utility Routines}
+
+\Shubr{EPUREF}{(LUNIT)}
+ 
+Returns internal reference number for logical unit in \Lit{LREF} in the
+common block \Lit{/EPCOMM/}. 
+If \Lit{LUNIT} is invalid or there are no units
+open, then \Lit{LREF=0}.
+
+\begin{DLtt}{123456}
+\item[{\rm\bf Input parameters:}]
+\item[LUNIT] logical unit number
+\end{DLtt}
+
+\Shubr{EPDEFU}{(LUNIT,CHNAME,IERR*)}
+
+Allows to specify a file name other than the EPIO default name.
+
+\begin{DLtt}{123456}
+\item[{\rm\bf Input parameters:}]
+\item[LUNIT] logical unit number
+\item[CHNAME] Character variable, specifying the file name.
+\item[{\rm\bf Output parameters:}]
+\item[IERR] error flag. See separate list.
+\end{DLtt}
+ 
+\subsection{Get Status Words}
+\Shubr{EPGETW}{(LUNIT,NUMBER,IW*,IERR*)}
+
+\begin{DLtt}{123456}
+\item[{\rm\bf Input parameters:}]
+\item[LUNIT] logical unit number
+\item[NUMBER] Number of the desired status word.
+\item[{\rm\bf Output parameters:}]
+\item[IW] value of the status word.
+\item[IERR] error flag. See separate list.
+\end{DLtt}
+
+\Shubr{EPGETA}{(LUNIT,NW,IWS*,IERR*)}
+
+\begin{DLtt}{123456}
+\item[{\rm\bf Input parameters:}]
+\item[LUNIT] logical unit number
+\item[NW]    Number of desired status words (always start at word 1).
+\item[{\rm\bf Output parameters:}]
+\item[IWS] value of status words \Lit{1..NW}.
+\item[IERR] error flag. See separate list.
+\end{DLtt}
+
+\Shubr{EPGETC}{(NWCONT*,IWCONT*)}
+
+\begin{DLtt}{123456}
+\item[{\rm\bf Output parameters:}]
+\item[NWCONT] no. of overall control words (word 3 of common \Lit{/EPCOMM/}).
+\item[IWCONT] control words (words \Lit{1..NWCONT} 
+              of list of common \Lit{/EPCOMM/})
+\end{DLtt}
+
+\subsection{Set Status Words}
+ 
+These routines enable the user to change defaults kept in the  status
+words, such as the maximum length of the physical block he wants to
+read, the maximum length of the logical record, and so on.
+ 
+Normally, control words should be changed before any writing on  that
+unit takes place. Otherwise, it is strongly recommended to make a
+close call to the corresponding unit (\Rind{EPCLOS}) beforehand in order to
+avoid problems. The user should be fully aware of what he is doing,
+and foresee the possible effects of any change.
+ 
+For the use of \Rind{EPSETA}, and \Rind{EPSETC} 
+(setting more than one word), it is
+recommended to get hold of the existing status words by calls to
+\Rind{EPGETA} or \Rind{EPGETC}, modify where desired, and restore.
+
+\Shubr{EPSETW}{(LUNIT,NUMBER,IWORD,IERR*)}
+
+\begin{DLtt}{123456}
+\item[{\rm\bf Input parameters:}]
+\item[LUNIT] logical unit number
+\item[NUMBER] Number of the status word to change.
+\item[IWORD] new value of the status word.
+\item[{\rm\bf Output parameter:}]
+\item[IERR] error flag. See separate list.
+\end{DLtt}
+
+\Shubr{EPSETA}{(LUNIT,NW,IWORDS,IERR*)}
+
+\begin{DLtt}{123456}
+\item[{\rm\bf Input parameters:}]
+\item[LUNIT] logical unit number
+\item[NW] Number of status words to set (always start at word 1).
+\item[IWORDS] new value for the status words \Lit{1..NW}.
+\item[{\rm\bf Output parameter:}]
+\item[IERR] error flag. See separate list.
+\end{DLtt}
+
+\Shubr{EPSETC}{(NW,IW)}
+
+\begin{DLtt}{123456}
+\item[{\rm\bf Input parameters:}]
+\item[NW] no. of overall control words to set (from 1 up to \Lit{NCONT})
+\item[IW] new overall control words.
+\end{DLtt}
+
+\fbox{\textbf{Handle with care!}}
+
+\Shubr{EPADDH}{(LUNIT,NH,IH,*IBUF*,IERR*)}
+ 
+Adds a user portion to the standard physical header. The current block
+is written out beforehand if not empty.
+ 
+The physical header is reset to the standard header after a rewind.
+
+\begin{DLtt}{123456}
+\item[{\rm\bf Input parameters:}]
+\item[LUNIT] logical unit number
+\item[NH]  number of 16-bit words to add (0 resets the standard physical header).
+\item[IH]  user physical header words to add (16-bit, right adjusted, 0 filled)
+\item[{\rm\bf Input/Output buffer:}]
+      User provided unit buffer. Must not be touched by the user.
+\item[{\rm\bf Output parameter:}]
+\item[IERR] error flag. See separate list.
+\end{DLtt}
+
+\Shubr{EPUPDH}{(LUNIT,NH,IH,IBUF,IERR)}
+ 
+Updates the (optional) user portion of the physical block header.
+The necessary space for this optional portion must have been reserved
+by the user through a previous call to \Rind{EPADDH} (typically once at the
+start of the job). Whereas a call to \Rind{EPADDH} causes the existing (if
+any) block to be written out, \Rind{EPUPDH} does not have this effect.
+
+\begin{DLtt}{123456}
+\item[{\rm\bf Input parameters:}]
+\item[LUNIT] logical unit number
+\item[NH] no. of user words in header to be updated.
+          It is cut at the actual no. of extra user words available in the
+          physical block header.
+\item[IH] Array containing the new values.
+          Words \Lit{1..NH} of \Lit{IH} will replace the current words 
+          \Lit{1..NH} of the user portion in the header.
+\item[{\rm\bf Input/Output buffer:}]
+      User provided unit buffer. Must not be touched by the user.
+\item[{\rm\bf Output parameter:}]
+\item[IERR] error flag. See separate list.
+\end{DLtt}
+
+\subsection{Print Overall Status}
+
+\Shubr{EPSTAT}{}
+
+Prints the overall control words, and all unit status words in their
+
+actual state. Useful for debugging.
+
+\Shubr{EPIOT}{(LUN)}
+
+Print PAM title on \Lit{LUN}.

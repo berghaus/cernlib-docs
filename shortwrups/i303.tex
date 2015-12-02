@@ -1,0 +1,135 @@
+\Version {RDWORD}                    \Routid{I303}
+\Keywords{READ FORMAT FREE NUMBER}
+\Author{G. Kozlovsky}             \Library{KERNLIB}
+\Submitter{}                \Submitted{07.09.1986}
+\Language{Fortran}       %\Revised{}
+\Cernhead {Read a Format-Free Number}
+{\tt RDWORD} is a lexical analyser which reads numbers, alphabetic names
+and special characters from its internal buffer in format free form.
+The definitions of the three above mentioned lexical entities are as
+follows:
+\par
+A number has the form {\tt sd.dEsdx}.
+\begin{DLtt}{1234}
+\item[s:] {\tt '+'} or {\tt '-'} or null;
+\item[d:] Zero or more decimal digits;
+\item[.:] Decimal point or may be omitted;
+\item[E:] {\tt 'e'} or {\tt 'E'} or null;
+\item[x:] Terminating character which may be a blank, a letter,
+a special character, a second appearance of {\tt '.'} or {\tt 'E'},
+a {\tt '+'} or a {\tt '-'} followed by a digit.
+\end{DLtt}
+The sequence {\tt d.d} must contain at least one digit ({\tt 0.} or
+{\tt .0} are valid numbers, but not a decimal point alone).
+If {\tt E} is omitted, the following {\tt sd} must be omitted.
+If {\tt E} is  present, it must be followed by a {\tt d}
+containing at least one digit.
+\par
+An alphabetic name has the form {\tt ax} and an alphanumeric name the
+form {\tt ady}.
+\begin{DLtt}{1234}
+\item[a:] One or more alphabetic characters ({\tt a,...,z,A,...,Z});
+\item[d:] Zero or more decimal digits;
+\item[x:] Terminating character, which can be any non-alphabetic
+character;
+\item[y:] Terminating character, which can be any character except
+an alphabetic character or a decimal digit.
+\end{DLtt}
+A special character is any character except an alphabetic character,
+decimal digit or blank.
+\par
+Lexical entities may be separated by any number of blanks. The internal
+buffer has a length of 80 characters. A blank is added logically as an
+81st character.
+\Structure
+{\tt SUBROUTINE} subprograms\\
+User Entry Names:
+\Rdef{RDWORD}, \Rdef{RDLOAD}, \Rdef{RDSKIP}, \Rdef{RDENDB} \\
+Internal Entry Names:
+\begin{tabular}[t]{l*{7}{@{\hspace{4pt}}l}}
+{\tt RALPH},  & {\tt RDIGI},  & {\tt RDINT},  & {\tt RDMANT}, &
+{\tt RDNAME}, & {\tt RDNEXT}, & {\tt RDSKPB}, & {\tt RDUPCH}, \\
+{\tt RDUPST}
+\end{tabular} \\
+\Usage
+\begin{verbatim}
+    CALL RDLOAD(STRING)
+\end{verbatim}
+Puts {\tt STRING} (of type {\tt CHARACTER*(*)})
+into the internal buffer of {\tt RDWORD} and sets the
+internal pointer to the first position of the buffer. If {\tt STRING} is
+shorter than the buffer length the rest of the buffer is filled with
+blanks. If {\tt STRING} is longer than the buffer (80 characters), the
+remainder of it will be truncated.
+\newpage
+\begin{verbatim}
+    CALL RDWORD(INUM,FPNUM,NAME,KTYPE)
+\end{verbatim}
+Causes the next object (if any) to be read from the internal
+buffer starting from the current position of the internal pointer to
+the buffer while skipping leading blanks until the first non-blank
+character or the end of the buffer is encountered, and positions the
+internal pointer to the terminating character of the object.
+\par
+On exit, the arguments have the following values: \\
+{\bf When an integer or floating point number was read:}
+\begin{DLtt}{12345678}
+\item[INUM] ({\tt INTEGER}) The integer or the integer part of the
+floating point number read.
+\item[FPNUM] ({\tt REAL}) The number read.
+\item[NAME] ({\tt CHARACTER*(*)}) Filled with blanks.
+\item[KTYPE] ({\tt INTEGER}) Type of object read: \\
+$\mathtt{= 1:}$ Floating point number; \\
+$\mathtt{= 2:}$ Integer number.
+\end{DLtt}
+Reading and conversion by {\tt RDWORD} takes place from an internal
+file. {\tt I}-format is used to read integers and {\tt F}-format is used
+to read floating point numbers (this format can handle an exponent on
+input). Consequently, in the case of wrong input format, an error
+message may be issued by a Fortran system input routine.
+\par
+{\bf When a name or special character was read:}
+\begin{DLtt}{12345678}
+\item[INUM] ({\tt INTEGER}) Zero.
+\item[FPNUM] ({\tt REAL}) Zero.
+\item[NAME] ({\tt CHARACTER*(*)}) The name in UPPERCASE (for
+alphabetic) characters or the special character, left justified and
+filled with blanks.
+\item[KTYPE] ({\tt INTEGER}) Type of object read: \\
+$\mathtt{= \ 0:}$ Special character; \\
+$\mathtt{= -1:}$ Name.
+\end{DLtt}
+If the name read is longer than allowed by {\tt NAME}, it is truncated
+and an error message
+\begin{verbatim}
+    ERROR IN RDWORD: NAME READ IS TOO LONG. IT IS TRUNCATED TO: NTRUNC
+\end{verbatim}
+is printed. {\tt NTRUNC} stands for the truncated name.
+\par
+{\bf When an "end of buffer" is reached:}
+\begin{DLtt}{12345678}
+\item[INUM] ({\tt INTEGER}) Zero.
+\item[FPNUM] ({\tt REAL}) Zero.
+\item[NAME] ({\tt CHARACTER*(*)}) Filled with blanks.
+\item[KTYPE] ({\tt INTEGER}) $\mathtt{= -100}$.
+\end{DLtt}
+\begin{verbatim}
+    CALL RDSKIP
+\end{verbatim}
+Sets the internal pointer to 81 which means "end of buffer".
+\begin{verbatim}
+    CALL RDMODE(I)
+\end{verbatim}
+A call with $\mathtt{I=2}$ will force {\tt RDWORD} to read, as variables of
+type {\tt CHARACTER}, sets of alphanumeric characters starting with a
+letter, such as {\tt ALPHA99}.
+\par
+The default mode (purely alphabetic names that will be terminated by a
+digit will be restored by a call with $\mathtt{I=1}$. \\
+In any expression of type {\tt LOGICAL}
+\begin{verbatim}
+    RDENDB()
+\end{verbatim}
+has the value {\tt .TRUE.} if the end of the buffer was reached, and
+{\tt .FALSE.} otherwise. {\tt RDENDB} is of type {\tt LOGICAL}.
+\\ $\bullet$

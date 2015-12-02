@@ -1,0 +1,586 @@
+\Filename{H1-MZ-Internal-details}
+\chapter{Internal technical details for ZEBRA MZ}
+\label{sec:H1-MZ-Internal-technical-details}
+
+\Filename{H2-MZ-Master-Tables}
+\section{Master Tables}
+
+\subsection*{Master parameters of the process in \FCdef{/MZCA/}}
+
+\begin{verbatim}
+NQSTOR       number of the latest store initialized
+             (NQSTOR = 0, 1, ..., 15)    set to -1 by MZEBRA
+
+NQOFFT(J+1)  table off-set KQT for store J, J=0,1,...,NQSTOR
+
+NQOFFS(J+1)  store off-set KQS for store J,  = LQSTOR - LQASTO
+
+NQALLO(J+1)  allocation status of store J:
+               = 0:  normal, this store belongs to the running
+                      process for exclusive use
+                -1:  store disconnected
+                -2:  read-only store attached by MZATTM
+                -3:  store attached by MZATTM
+
+NQIAM        process identifier, currently zero and unused
+
+LQATAB       = LOCF(IQTABV(0))
+             absolute adress-1 of the store control table
+             for the primary store
+
+LQASTO       = LOCF(LQ(0))
+             absolute adress-1 of the general store base
+
+LQBTIS       = LQATAB - LQASTO
+             off-set for the primary table to the store base
+
+LQWKTB       adr of the Zebra working area IQWKTB rel. to /ZEBQ/,
+                    ie. LQ(LQWKTB) is word IQWKTB(1)
+NQWKTB       size of IQWKTB available to MQ, NORMALLY = 2560
+                    may be reduced temporarily by FQ
+NQWKTT       total size of IQWKTB, = 2560
+LQWKFZ       adr of the FZ work area in IQWKTB rel. to /ZEBQ/
+
+MQKEYS(3)    check on MZEBRA initialization already done
+NQINIT       initialization status
+
+NQTSYS       size of each system table
+             = LOCF(IQDN2(21)) - LOCF(IQTABV(1))
+
+NQM99        unused
+NQPERM       = zero: normal, error exit to ZFATAL
+                = 1: permit error return
+                     (used at the moment only in NZNEED for MZGAR1)
+
+NQFATA       number of words to be printed from IQUEST on fatal
+             error termination; zero during normal operation
+
+NQCASE       fatal error case; zero during normal operation
+
+NQTRAC       number of active trace words
+MQTRAC(44)   ZEBRA internal trace words
+\end{verbatim} 
+
+\subsection*{Current store / division: in \FCdef{/MZCB/}}
+
+When a particular store is selected by the user, and if it changes,
+these numbers are collected into here for easy access.
+Also, the parameters relevant for the division
+whose free reserve space has been calculated last,
+are kept in here.
+
+\begin{verbatim}
+JQSTOR       number of the current store
+KQT          table off-set for the current store
+KQS          store off-set for the current store
+
+JQDIVI       number of the current division
+
+JQDIVR       division whose free space has last been calculated
+JQKIND       = JBYT (IQKIND(JQDIVR),21,4)
+JQMODE       = JBIT (IQMODE(JQDIVR),1)
+JQDIVN       neighbour division of division JQDIVR at the moving end
+JQSHAR       = JQDIVN if the two divisions share the same reserve area
+             = zero otherwise
+JQSHR1       = forward division sharing the reserve area with JQDIVI
+JQSHR2       = reverse division sharing the reserve area with JQDIVI
+NQRESV       free space available to division JQDIVR
+
+IQCUR(1->12) this vector receives a copy of IQTABV(1->12),
+             see just below
+\end{verbatim} 
+
+\subsection*{\Lit{IQTABV}/\Lit{IQCUR}  vector}
+
+\begin{verbatim}
+     primary   current  store
+     IQTABV    IQCUR
+
+ (1) LQPSTO    LQSTOR    = LOCF(LQ(@0)),  absolute adr-1 of store
+ (2) NQPFEN    NQFEND    number of fence words preceding the store
+
+ (3) NQPSTR    NQSTRU    number of structural permanent links
+ (4) NQPREF    NQREF     number of permanent links
+ (5) NQPLK     NQLINK    number of permanent + working space links
+
+ (6) NQPMIN    NQMINR    minimum size of the reserve area
+ (7) LQP2E     LQ2END    minimum value of LQEND(2)
+
+ (8) JQPDVL    JQDVLL    last low division
+ (9) JQPDVS    JQDVSY    system division, also: first high division
+
+(10) NQPLOG    NQLOGL    log level for this store
+
+(11) NQPNAM(2) NQSNAM(2) printing name of the store
+
+(13) IQTABV(13)  lowest  possible origin-adr for the store
+(14) IQTABV(14)  highest possible origin-adr for the store
+(15) IQTABV(15)  initial allocation to last division created
+(16) IQTABV(16)  table-offset J of the table, if contained in store
+                 ie. LQ(@J+1) is the first word of the table, unless
+                 J = 0: the table is not contained in the store
+\end{verbatim} 
+
+\subsection*{Store control table}
+
+This table exists for each store in the 'system table'
+at the end of the space
+provided for the store by the user in the call to \Rind{MZSTOR},
+except for the primary store when it is held in \FCdef{/MZCC/}.
+
+For a particular store \Lit{JQSTOR}, acces to a particular number,
+say \Lit{IQTABV(J)}, is via
+\begin{verbatim}
+            KQT  = NQOFFT(JQSTOR+1)
+            IVAL = IQTABV(KQT+J)
+\end{verbatim} 
+ie. by off-setting to the store control table for the primary store.
+In the following we give simply the structure of this primary
+store control table; exactly the same structure is repeated in every
+store control table.
+
+\begin{verbatim}
+IQTABV(16)   store parameters, see the separate IQTABV vector
+             description on the previous page
+
+LQSYSS(  )   store system links, see the separate LQSYS vector
+LQSYSR(  )   descriptions on the next page
+
+LQSTA(21)    start adr of division J, J=1,2,...20
+             LQSTA(21) is end-of-store+1
+LQEND(20)    end+1 adr of division J
+NQDMAX(20)   maximum size of division J
+
+IQMODE(20)   mode of the division J
+                bit 1 = 0 / 1  division forward / reverse
+
+IQKIND(20)   kind of the division J
+             JBYT(IQKIND(J),21,4)= 1  user short-range division
+                                   2  user long-range division
+                                   4  package division
+                                   8  system division
+             JBIT(IQKIND,J) = 1, other bits 1 to 20 are zero
+
+IQRCU(20)    division bits: 'references to' are active, globals unfolded
+IQRTO(20)    division bits: 'references to' are active
+IQRNO(20)    division bits: 'references to' are permitted (mask)
+NQDINI(20)   initial size of division J
+NQDWIP(20)   number of times 'wipe' executed
+NQDGAU(20)   number of times user garbage collection
+NQDGAF(20)   number of times forced garbage collection for no space
+NQDPSH(20)   number of times 'push' executed with relocation pass
+NQDRED(20)   number of times 'reduced'
+NQDSIZ(20)   maximum size of the division seen
+IQDN1(20)    chars  1:4
+IQND2(20)           5:8 of the printing name of the division
+
+Primary store only:
+KQFT         such that LQFSTA(1) is LQSTA(KQFT+1)  (=342 at present)
+LQFSTA(21)   used in MZCOPY
+\end{verbatim} 
+
+\subsection*{\Lit{LQSYS} system link vectors: in \FCind{/MZCC/}}
+
+The vectors LQSYSS and LQSYSR are the system link areas
+attached to each store.
+Their words are reserved as follows:
+
+
+\subsection*{structural: \Lit{LQSYSS}}
+
+\begin{verbatim}
+   1       :  system bank holding the link area descriptions
+   2 LQMST :  working link for MQ
+   3 LQT   :  TZ package support link
+   4 LQFS  :  FZ package support link
+   5 LQFORM:  MZFORM format d/s support link
+   7 LQRS  :  RZ package support link
+  10 LQZEP :  ZEP support link
+\end{verbatim} 
+
+\subsection*{reference: \Lit{LQSYSR}}
+
+\begin{verbatim}
+   1 + 2 :  2 working links for MZ
+   4 LQFF:  FZ, last control-bank retrieved
+   5 LQFI:  FZ, control-bank for current input unit
+   6 LQFX:  FZ, control-bank for current output unit
+   7 LQRRF:  RZ package working link
+\end{verbatim} 
+
+\subsection*{Table of Link Areas}
+
+This table, one for each store,
+is held in a bank in the system division of the store;
+its address is  \Lit{L = LQSYSS(KQT+1)}.
+
+The table contains one entry of 5 words for each link area
+as follows:
+
+\begin{verbatim}
+   word 1:  LLA   for  LQ(@LLA)    being the first word,
+        2:  LLAE  for  LQ(@LLAE-1) being the  last word of the area
+
+        3:  bits 1-15:  number of structural links
+             bit  31      = 0  if permanent link area
+                          = 1  if temporary link area
+
+        4:  characters 1:4
+        5:             5:8  of the printing name of the area
+\end{verbatim} 
+
+The first entry of the table describes the permanent links
+plus the working space links of the store;
+this area may be of length zero.
+The second entry describes the system links contained in
+the store control table for this store.
+Further entries appear in the order in which they have been
+created by either \Rind{MZLINK} or \Rind{MZLINT}.
+
+The table as a whole in the bank at \Lit{L} is as follows:
+
+\begin{verbatim}
+         IQ(L+1)   NWU  active size of the table of n entries,
+                        NWU = 5*n + 1
+   entry 1
+             +2)   LLA = 1
+             +3)   LLE = 1 + NQLINK
+             +4)   number of permanent structural links
+             +5)   4HQWSP
+             +6)   blank
+   entry 2
+             +7)   LLA = LOCF(LQSYSS(KQT+1)) - LQSTOR
+             +8)   LLE = LLA + number of system links
+             +9)   number of structural system links
+            +10)   4HQLAS
+            +11)   4HYST
+   entry 3
+            +12)   LLA = LOCF(first word) - LQSTOR
+             ...   ...
+   entry i
+
+      IQ(L+5i-3)   LLA                    for entry i
+             ...   ...
+\end{verbatim} 
+
+\Filename{H2-MZ-relocation-tables}
+\section{Relocation Tables}
+
+\subsection*{Memory Occupation Table}
+
+The table has one entry of 8 words for each memory region
+taking part in global memory operations.
+Its bounds are given by \Lit{LQMTA} and \Lit{LQMTE}:
+
+\begin{verbatim}
+      LQMTA  start adr of the first entry
+      LQMTE  end+1 adr of the last  entry
+\end{verbatim} 
+
+A particular entry has this format:
+
+\begin{verbatim}
+   LQ(L+0)   division number
+             if zero: pseudo division
+
+   LQ(L+1)   activity flag:
+
+                -1  division is empty
+                 0  inactive
+                 1  relocation only
+                 2  active, eg. global shift, or MZPUSH, or MZREPL
+                 3  garbage collection
+                 4  wipe
+
+   LQ(L+2)   NWSH, global shift of this division by NWSH words
+
+               -ve  shift to low
+                 0  no shift
+               +ve  shift to high
+
+   LQ(L+3)   start adr of the first bank
+   LQ(L+4)   end+1 adr of the last  bank
+
+   LQ(L+5)   rel. adr of the first associated relocation entry
+             ie. LF = LQRTA + LQ(L+5), LQ(LF) is the first entry
+             in the link relocation table for this memory region
+
+   LQ(L+6)   rel. adr of the last+1 entry, (only if LQ(L+1)=3)
+             = -3 if division with garbage collection reset because
+                  of 'table full'
+
+   LQ(L+7)   NFREE, number of words collected or wiped
+\end{verbatim} 
+
+\subsection*{Link Relocation Table}
+
+This table contains the prescription of how any link is to be
+updated.
+
+The table covers the 'total relocation interval'
+\Lit{(LFIXLO,LFIXHI)},
+links pointing outside this interval are not changed.
+
+The area covered by the relocation interval is considered as a
+series of alternating 'live' and 'dead' regions,
+described by the link relocation table.
+One entry in this table specifies a particular live region
+\textbf{and}
+the dead region just behind it.
+Each region represents an integral number of live or dead banks,
+or alternatively a region of non-occupied store (reserve area).
+For the live region the table entry specifies the relocation
+constant, for the dead region it specifies whether a structural link
+pointing into this region should be bridged or not.
+
+The table is constructed in the largest gap of the ZEBRA stores,
+with the following structure:
+
+\begin{verbatim}
+  it starts at     LQ(LQTA-1)  holding LFIXLO
+  continues        LQ(LQTA)    first entry
+                   LQ(LQTA+4)  second entry
+           . . .
+                   LQ(LQTE-4)  last entry
+  and ends at      LQ(LQTE)    holding LFIXHI.
+
+\end{verbatim} 
+The format for entry i at  \Lit{L = LQTA + 4*(i-1)} is:
+
+\begin{verbatim}
+  LQ(L+0)    LAi:    start adr of the live area
+      +1)    LDi:    start adr of the adjacent dead area
+      +2)    NRELi:  relocation constant for the live area
+      +3)    IFLi:   bridging flag for the dead area
+                      zero: no, 1: yes, -1: link to remain unchanged
+\end{verbatim} 
+
+The store from \Lit{LQ(@LAi)} to \Lit{LQ(@LDi-1)} is occupied
+by live banks.
+The store from \Lit{LQ(@LDi)} to \Lit{LQ(@LAj)-1} with \Lit{j=i+1}
+is a dead region,
+containing dead banks to be bridged only if  \Lit{IFLi=1}.
+
+The store from \Lit{LQ(@LFIXLO)} to \Lit{LQ(@LA1)}
+is a non-bridging dead region.
+
+It is in the nature of this table that the link relocation table
+represents at the same time the detailed instructions for
+the memory move, if any.
+
+\subsection*{relocation parameters in \FCdef{/MZCT/}}
+
+The parameters in \FCind{/MZCT/} control the relocation process.
+
+\begin{verbatim}
+   IQFLIO      flag I/O, init to zero by MZTABM
+               flags special treatment for IO relocation
+               non-zero: relocation called from FZIN (also MZCOPY)
+               triggers actions in MZRELB:
+               1) links pointing outside <LQ(LQTA),LQ(LQTE> are
+                  simply reset to zero
+               2) do not go to ZFATAL for bank-chaining clobbered
+                  but return IQFLIO = -7 to signal bad input structure
+
+   IQGAP(5,4)  returns the parameters of the largest gaps found by MZFGAP
+               Entry 'J' in the table contains:
+                 IQGAP(1,J) = number of words available
+                 IQGAP(2,J) = abs. zebra adr of first word in the gap
+                 IQGAP(3,J) = division number
+                 IQGAP(4,J) = store number
+                 IQGAP(5,J)   user flag
+               Gaps J=1 and 2 are outside the moving region,
+                      3 and 4 could be inside the moving region
+
+   IQPART      partial garbage collection, init to zero by MZTABM
+               handle not enough space for the relocation tables
+               if = zero: no problem
+               set to =7  by MZTABH if not enough table space
+               set to =-7 by MZTABH if table moved into the forbidden gap
+               set to =1  by MZTABC if not enough space
+               set to =1  by MZTABR if not enough space
+
+   IQTBIT      status-bit for table building, init to IQDROP by MZTABM
+   IQTVAL      value of status-bit,           init to   zero by MZTABM
+               construct table for banks having IQTVAL in bit IQTBIT
+
+   IQTNMV      init to zero by MZTABM if JQSTMV < 0 on entry
+                set to zero by MZGAR1, MZDIV
+                set to   -7 by MZCOPY
+               used by MZTABH on first entry:
+               = 0: alright to move Mem.occ.table to forbidden gap
+                     return IQPART = 7 if no gap at all
+               < 0: alright to move Mem.occ.table to forbidden gap
+                     return IQPART = -7 if so done
+               > 0: Mem.occ.table may not go into a forbidden gap
+                     return IQPART = 7 if no allowed gap
+
+   JQGAPM      gap for Memory occupation table, init to zero by MZTABM
+               if non-zero: the Memory occupation table has been moved
+               to gap JQGAPM described by IQGAP(1/5,JQGAPM)
+
+   JQGAPR      gap for the Relocation table, init to zero by MZTABM
+               if non-zero: the Link Relocation table has been moved
+               to gap JQGAPR
+
+   JQSTMV      moving store, -1 if none, controlling MZFGAP
+   JQDVM1      first moving division
+   JQDVM2      last  moving division
+   NQDVMV      move divisions JQDVM1/2 by that many words, -ve: left
+               JQDVM1, JQDVM2, NQDVMV init to zero
+               by MZTABM if JQSTMV < 0 on entry
+
+      Original meaning of JQSTMV,JQDVM1,JQDVM2,NQDVMV (cf. MZTABS):
+      unless JQSTMV<0, the divisions JQDVM1 to JQDVM2 inclusive
+      of the store JQSTMV may have to be shifted by NQDVMV words,
+      to the left if -ve, to the right if +ve.
+      NQDVMV=0 means to the left by a yet unknown amount.
+      It follows that the gaps after divisions JDIV are not available
+      for the relocation table because they may be over-written
+      by the memory move, with:
+         NQDVMV  0, -ve:  JDIV = <JQDVM1-1,JQDVM2-1>
+                    +ve:  JDIV = <JQDVM1,  JQDVM2  >
+
+      MZFGAP is also used for I/O to find a gap where to put the
+      relocation table on input. In this case there is just one
+      gap unavailable, namely the one which will receive the data.
+      This is the gap before a reverse division (JQMODE=1) or after
+      a forward division (JQMODE=0). To block this gap one can give
+      JQDVM1=JQDVM2=JDIV and NQDVMV=1-2*JQMODE, setting JQSTMV also.
+
+   LQMTE       end+1 adr of the Memory occupation table,
+                     init to LQWKTB+NQWKTB-1 by MZTABM
+   LQMTA       start adr of the Memory occupation table,
+                     init to LQMTE-160 by MZTABM
+   LQMTB       curr. adr of the Memory occupation table,
+                     init to LQMTA by MZTABM
+
+   LQMTLU      adr in the Mem.occ.table of the last division used
+               init by MZTABM to point to division 20
+               reset by MZTABX
+
+   LQMTBR      init to zero by MZTABM
+               set by MZTABR to point to the current entry into
+               the Memory occupation table when it runs out of
+               table space.
+               The code handling this is a remenant from an
+               earlier approach to handle "table space full"
+               and has been left in MZTABR for safety.
+               In fact, now MZGAR1 recalls MZTABM after the first
+               partial garbage collection.
+               (The code handling LQ(LQMTB+6) = -3 is also part
+               of this old approach)
+
+   LQRTA       start adr of the memory available to the Relocation table
+               init to LQWKTB by MZTABM
+   LQRTE       end+1 adr of the memory available to the Relocation table
+               init to LQMTA-10 by MZTABM
+               both are updated by MZTABH if the tables are moved
+
+   LQTA        start adr of the Link Relocation table,
+               init to LQRTA+1 by MZTABM
+   LQTE        end+1 adr of the Link relocation table,
+               init to LQRTE    by MZTABM
+
+               parameters driving MZTABC, set by MZTABR
+   LQMTC1      start adr of first bank
+   LQMTC2      end+1 adr of  last bank
+   LQTC1       first table word available, init to LQRTA+1 by MZTABM
+   LQTC2       last  table word available, init to LQRTE   by MZTABM
+
+   MQDVGA      flag word indicating the divisions with garbage collection
+               bit j, j=1,2,...,20 for garbage collection in division j
+
+   MQDVWI      flag word indicating the divisions to be wiped
+               bit j, j=1,2,...,20 for wiping division j
+
+   MQDVAC      flag word indicating the active divisions
+               constructed from MQDVGA + MQDVWI by MZTABM
+               and updated by MZTABS and MZTABR
+               seems to be used only for printing
+
+   NQDVMV      move divisions JQDVM1/2 by that many words, -ve: left
+               init to zero by MZTABM if JQSTMV < 0 on entry
+
+   NQFREE      number of words to become free, init to zero by MZTABM
+   NQFRTC      number of words found free by MZTABC (per call)
+
+   NQGAPN      number of normal gaps available in IQGAP
+   NQGAP       number of all gaps, including forbidden, in IQGAP
+
+   NQLIVE      number of live banks found by MZTABC (per call)
+
+   NQNOOP      no-operation flag constructed by MZTABF
+               = zero normally
+               = -7 really no operation
+               = +7 only a memory shift with no garbage collection
+                    and no links pointing into the shifted region
+                    for example: left-shift empty division 2
+               usage in MZMOVE: if non-zero update the division tables
+                                 without execution of MOVE
+\end{verbatim} 
+
+\Filename{H2-MZFORM-data-structure}
+\section{MZFORM data structure}
+
+\begin{verbatim}
+
+  IQ(LID+1)  n = number of ID's stored
+         2   ji  of the last characteristic retrieved
+         3   IDH of the last characteristic retrieved
+         4   IDH  #1
+             ...
+       n+3   IDH  #n
+
+
+  IQ(LIX+1)  ji in QIOD for IDH #1
+         2   ji         for IDH #2
+             ...
+
+
+ IQ(LIOD+1)  n = number of words occupied;          j1 = 1
+      j1+1   start of 1st characteristic, n1 words, j2 = j1 + n1
+      j2+1            2nd                 n2 words, j3 = j2 + n2
+             ...
+
+    characteristic i is stored at ji in QIOD as NW+1 words:
+
+         word 1:   16 bits: control-byte |
+                    | 5 bits: NW | 5 bits: NW+1 | 6 bits: 1
+         word 2:   first extra I/O word (if any)
+                    ...
+      word NW+1:   last  extra I/O word
+
+
+                                 LID
+
+                                  |
+                                 / \
+                ______________         ______________
+               |              |       |              |
+LQFORM ---->   |     QID      |       |     QID      |  list of
+               | for +ve ID's |       | for -ve ID's |  identifiers
+            -- |______________|       |______________|
+           |
+           |      |                      |
+           | -2   | -1                   | -1
+           |    ______________         ______________
+           |   |              |       |              |
+           |   |     QIOX     |       |     QIOX     |  adr in QIOD
+           |   |     +ve      |       |     -ve      |  corresponding
+           |   |______________|       |______________|
+           |
+           |                     \ /
+           |                      |
+           |
+           |                     LIX
+          __________
+         |          |
+LIOD ->  |   QIOD   |   I/O characteristics
+         |__________|   stored
+\end{verbatim} 
+
+% Local Variables: 
+% mode: latex
+% TeX-master: "zebramain"
+% End: 

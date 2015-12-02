@@ -1,0 +1,561 @@
+head     1.1;
+access   ;
+symbols  ;
+locks    goossens:1.1; strict;
+comment  @@;
+
+
+1.1
+date     93.11.15.20.37.23;  author goossens;  state Exp;
+branches ;
+next     ;
+
+
+desc
+@Initial entry
+@
+
+
+
+1.1
+log
+@Initial revision
+@
+text
+@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%   EPIO User Guide -- LaTeX Source                               %
+%                                                                 %
+%   Chapter 2                                                     %
+%                                                                 %
+%   The following external EPS files are referenced:              %
+%                                                                 %
+%   Editor: Michel Goossens / CN-AS                               %
+%   Last Mod.: 15 Nov 1993 20:30 mg                               %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ 
+\Filename{H1EPIO-Examples}
+\chapter{Examples}
+\label{sec:H1Examples}
+
+\Filename{H2EPIO-Examples-32-bit-computer}
+\section{Write EPIO file on a 32-bit computer}
+\label{sec:write32bit}
+
+Floating point numbers are generated and written to unit~20
+in the standard EP format using default values.
+Note the dimension of \Lit{IBUF(900)} to accept the default blocksize
+of 1800 16-bit units. 
+The user's data is stored in the array \Lit{A}.
+
+\begin{XMP}
+      PROGRAM EPEXA1
+      DIMENSION IBUF(900),A(300)
+      CALL EPINIT
+      DO 10  I=1,20
+      CALL USER(A,NW)
+ C
+ C   ROUTINE -USER- HAS STORED NW VALUES IN A TO BE WRITTEN OUT
+ C
+      CALL EPOUTS(20,3,NW,A,IBUF,IERR)
+      IF(IERR.NE.0)STOP 1
+   10 CONTINUE
+ C **********************************************************
+ C
+ C                THE FOLLOWING CALL IS ESSENTIAL
+ C
+ C **********************************************************
+      CALL EPCLOS(20,IBUF,IERR)
+ C
+ C   FOLLOWING CALL ONLY NECESSARY ON SOME COMPUTERS (UNIVAC,IBM)
+ C
+      CALL EPEND(20,IBUF,IERR)
+      IF(IERR.NE.0)STOP 2
+      STOP
+      END
+\end{XMP}
+
+\newpage
+
+\Filename{H2EPIO-Examples-write-60-bit-computer}
+\section{Write on a 60-bit computer}
+
+Essentially similar to the previous example, a file is
+created using all defaults. 
+Note the dimension of \Lit{IBUF(480)}.
+
+\begin{XMP}
+      PROGRAM EPEXA2
+      DIMENSION IBUF(480),IA(300)
+      CALL EPINIT
+      DO 10  I=1,30
+      NW=10*I
+      CALL USER(IA,NW)
+ C
+ C   ROUTINE -USER- HAS STORED NW VALUES IN A TO BE WRITTEN OUT.
+ C   .....
+      CALL EPOUTS(20,3,NW,IA,IBUF,IERR)
+      IF(IERR.NE.0)STOP 1
+   10 CONTINUE
+ C **********************************************************
+ C
+ C                 THE FOLLOWING CALL IS ESSENTIAL
+ C
+ C **********************************************************
+      CALL EPCLOS(20,IBUF,IERR)
+ C
+ C    FOLLOWING CALL ONLY NECESSARY ON SOME COMPUTERS (IBM, UNIVAC)
+ C
+      CALL EPEND(20,IBUF,IERR)
+      IF(IERR.NE.0)STOP 2
+      STOP
+      END
+      SUBROUTINE USER(IA,NW)
+      DIMENSION IA(NW)
+      DO 5 J=1,NW
+      IA(J)=J
+  5   CONTINUE
+      RETURN
+      END
+\end{XMP}
+
+\newpage
+
+\Filename{H2EPIO-Examples-read-long-block-tape-format}
+\section{Read Long Block Tape Format}
+This example treats data written with "long" blocks
+with a maximum size of 14400 bytes. 
+Note the call to \Rind{EPSETW} to specify
+the buffer size correctly for a 32-bit computer.
+
+\begin{XMP}
+      PROGRAM EPEXA3
+      DIMENSION IA(300),BUF(3600)
+      CALL EPINIT
+      CALL EPSETW(10,1,7200,IERR)
+C --- LOOP UNTIL EOF, OR ANY OTHER ERROR
+    1 CONTINUE
+      CALL EPREAD(10,3,NW,IA,BUF,IERR)
+      IF(IERR.NE.0)  GOTO 20
+C --- PROCESS CONTENTS OF A
+C
+      CALL USER(IA,NW)
+C
+C --- LOOP
+      GOTO 1
+   20 STOP
+      END
+      SUBROUTINE USER(IA,NW)
+      DIMENSION IA(NW)
+      PRINT*,NW,(IA(I),I=1,5)
+      RETURN
+      END
+\end{XMP}
+
+\newpage
+
+\Filename{H2EPIO-Examples-Default-Format}
+\section{Read a File in Default Format.}
+Read the file of section~\ref{sec:write32bit}.
+Note the the conversion routine \Rind{CFRIBM}.
+
+\begin{XMP}
+      PROGRAM EPEXA4
+      DIMENSION A(300),BUF(480)
+      CALL EPINIT
+ C--- LOOP UNTIL EOF, OR ANY OTHER ERROR
+     1 CONTINUE
+      CALL EPREAD(10,3,NW,A,BUF,IERR)
+      IF(IERR.NE.0)  GOTO 20
+      CALL CFRIBM(A,NW,3)
+ C--- PROCESS CONTENTS OF A
+ C
+      CALL USER(A,NW)
+ C
+ C--- LOOP
+      GOTO 1
+    20 STOP
+      END
+\end{XMP}
+
+\newpage
+
+\Filename{H2EPIO-Examples-write-long-blocks-32bits}
+
+\section{Write a file with long blocks on a 32-bit computer}
+
+Do the same as in the example in section~\ref{sec:write32bit},
+but this time with a bigger buffer 
+abd convert data to IBM format for portability (\Rind{CTOIBM}).
+
+\begin{XMP}
+      PROGRAM EPEXA5
+      DIMENSION IBUF(4500),A(3000)
+      CALL EPINIT
+ C--- INCREASE OUTPUT BUFFER = PHYSICAL BLOCK LENGTH TO 9000 16-BIT
+ C    WORDS (18000 BYTES), CORRESPONDING TO 4500 32-bit words
+      CALL EPSETW(20,1,9000,IERR)
+      IF(IERR.NE.0)  STOP 1
+      DO 10  I=1,20
+      CALL USER(A,NW)
+ C
+ C   ROUTINE -USER- HAS STORED NW VALUES IN A TO BE WRITTEN OUT.
+ C   .....
+ C--- NOW CONVERT TO IBM FLOATING POINT FORMAT + WRITE
+      CALL CTOIBM(A,NW,3)
+      CALL EPOUTS(20,3,NW,A,IBUF,IERR)
+      IF(IERR.NE.0)STOP 2
+   10 CONTINUE
+ C **********************************************************
+ C
+ C                THE FOLLOWING CALL IS ESSENTIAL
+ C
+ C **********************************************************
+      CALL EPCLOS(20,IBUF,IERR)
+      IF(IERR.NE.0)STOP 3
+      STOP
+      END
+\end{XMP}
+
+\newpage
+
+\Filename{H2EPIO-Examples-read-back-long-blocks-32bits}
+
+\section{Reading back the file from the previous example}
+
+Read the file written in the previous example (\Lit{EREXA5})
+on a 32-bit computer, using \Rind{CFRIBM} to convert the real numbers
+to the local representation.
+
+\begin{XMP}
+      PROGRAM EPEXA6
+      DIMENSION A(3000),BUF(4500)
+      CALL EPINIT
+ C--- INCREASE INPUT BUFFER = PHYSICAL BLOCK LENGTH TO 9000 16-BIT
+ C    WORDS (18000 BYTES), CORRESPONDING TO 4500 32-bit words
+      CALL EPSETW(10,1,9000,IERR)
+      IF(IERR.NE.0)  STOP 1
+ C--- LOOP UNTIL EOF, OR ANY OTHER ERROR
+     1 CONTINUE
+      CALL EPREAD(10,3,NW,A,BUF,IERR)
+      IF(IERR.NE.0)  GOTO 20
+ C--- THE FOLLOWING CALL HAS NO EFFECT ON IBM (MAY BE LEFT
+ C    IN FOR CODE COMPATIBILITY)
+      CALL CFRIBM(A,NW,3)
+ C--- PROCESS CONTENTS OF A
+ C
+      CALL USER(A,NW)
+ C
+ C--- LOOP
+      GOTO 1
+    20 STOP
+      END
+\end{XMP}
+
+\newpage
+
+\Filename{H2EPIO-Examples-16bit-Input-32bit}
+
+\section{16-bit Input and 32-bit Output}
+
+Read a tape on unit 10, with a maximum event size of 1000 words,
+unpacked as 16-bit words. 
+After some reduction results are stored
+in array \Lit{IRECO} with a limit of 300 words. 
+These results  are  then output to unit 20 packed 32-bits/word. 
+The block size for both
+units is the EP package default (1800 16-bit words). 
+Note the
+mandatory call to \Rind{EPCLOS} for the output unit at the end. 
+
+\begin{XMP}
+      PROGRAM EPEXA7
+      DIMENSION IBUF(900),IBUFO(900),IRECI(1000),IRECO(300)
+      CALL EPINIT
+ C--   SET INPUT STATUS WORDS \ SETTING WORD 2 PREVENTS PROGRAM
+ C--   OVERWRITING SHOULD YOU HAVE BAD DATA
+      CALL EPSETW(10,2,1000,IERR)
+      IF(IERR.NE.0)STOP 1
+ C        THE FOLLOWING CALL IS OPTIONAL; USEFUL TO VERIFY OPTIONS
+      CALL EPSTAT
+ C--   READ A RECORD, UNPACK AS 16-BIT WORDS
+  50  CALL EPREAD(10,2,NW,IRECI,IBUF,IERR)
+      IF(IERR.NE.0)GOTO 500
+      PRINT*,NW
+ C--   DATA REDUCTION PART \ NWO WORDS OF DATA ARE STORED IN IRECO
+ C--   NWO CAN VARY BUT THE MAXIMUM IS 300, DEFINED BY EPSETW CALL
+ C--    NWO WORDS
+ C--
+      CALL USER(NWO,IRECO)
+ C--    THE OUTPUT IS PACKED 32-BITS PER WORD
+      CALL EPOUTS(20,3,NWO,IRECO,IBUFO,IERR)
+      IF(IERR.NE.0)GOTO 600
+      GOTO 50
+ C--   READ ERRORS
+ C--     PARITY AND OTHER
+  500 IF(IERR.NE.1)GOTO 50
+ C--     EOF
+      CALL EPCLOS(20,IBUFO,IERR)
+      CALL EPEND(20,IBUFO,IERR)
+      STOP
+ C--   WRITE ERRORS
+  600 STOP 600
+      END
+\end{XMP}
+
+\newpage
+
+\Filename{H2EPIO-Examples-Read-and-Write-ASCII-Hollerith-Strings}
+
+\section{Read and Write ASCII Hollerith Strings}
+
+The package provides utility routines to convert to and from ASCII 8-bit
+character code, which is the way we recommend to write text.
+ 
+Since the package uses a 16-bit word as basic unit,
+the user should read and write Hollerith strings as bit
+strings (\Lit{MODE=1}), and pad with a
+blank to an even number of characters if necessary.
+ 
+Of the computers for which this package exists, only IBM and CDC do not
+use the ASCII code internally. 
+IBM uses 8-bit EBCDIC, CDC uses 6-bit
+DISPLAY code. 
+However, when reading and writing on VAXes, the bytes in
+successive pairs of bytes have to be swapped in order to come out
+correctly, since they get swapped again when reading or writing, to make
+16-bit words look correct.
+ 
+Consequently, there exist two routines, \Rind{SFRASC} and 
+\Rind{STOASC} on IBM, CDC,
+and VAX which perform the necessary conversion or swapping. The
+following examples show how they are used.
+ 
+The previous routines \Rind{CFRASC} and \Rind{CTOASC}, working on blown-up
+strings will continue to exist.
+
+\newpage
+
+\Filename{H2EPIO-Examples-Write-two-successive-Hollerith-strings}
+
+\section{Write two successive Hollerith strings}
+\label{sec:exahollerith}
+
+\begin{XMP}
+      PROGRAM EPEXA9
+      DIMENSION STRING(22)
+      DIMENSION IBIG(1000),ISMALL(1000),IBUF(1000)
+      DATA STRING/
+      1 'ABCD','EFGH','IJKL','MNOP','QRST','UVWX','YZab','cdef',
+      2 'ghij','klmn','opqr','stuv','wxyz','0123','4567','89+-',
+      3 '*/()','$=,.','#[]:','"_!&',4H'?<>,'@@---'/
+      PRINT 2000
+ 2000 FORMAT(//' *********** START OF EXECUTION ************'/)
+ C
+ C   NW IS THE NUMBER OF CHARACTERS
+ C
+      NW= 88
+      CALL EPINIT
+ C
+ C   USE PREVIOUS ROUTINES ( BLOW, CONVERT, BUNCH )
+ C
+      CALL BLO8W(STRING,1,IBIG,1,NW)
+      CALL CTOASC(IBIG,NW)
+      CALL BUN8W(IBIG,1,ISMALL,1,NW)
+ C
+ C   WRITE AS-BIT STRING (NOTE NUMBER OF 16-BIT WORDS ! )
+ C
+      CALL EPOUTS(11,1,(NW-1)/2+1,ISMALL,IBUF,IERR)
+ C
+ C--- STRING CONVERSION ROUTINES
+ C
+ C   ADD THE SAME STRING BEHIND FIRST ONE, WRITE AGAIN
+ C
+      CALL STOASC(STRING,1,ISMALL,NW+1,NW)
+      CALL EPOUTS(11,1,NW,ISMALL,IBUF,IERR)
+      CALL EPCLOS(11,IBIG,IERR)
+      CALL EPEND(11,IBIG,IERR)
+      STOP
+      END
+\end{XMP}
+
+\newpage
+
+\Filename{H2EPIO-Read-convert-text-strings}
+
+\section{Read and convert text strings}
+
+This example shows the use of \Rind{SFRASC} to read and convert the 
+character strings from the file created in the example in 
+section~\ref{sec:exahollerith}.
+
+\begin{XMP}
+      PROGRAM TEST
+      DIMENSION IBUF(1000),IASC(1000)
+      CALL EPINIT
+   10 CONTINUE
+      CALL EPREAD(11,1,NW,IASC,IBUF,IERR)
+      IF(IERR.NE.0)  STOP
+      CALL SFRASC(IASC,1,IASC,1,2*NW)
+      NW=NW/2
+      PRINT 2001,NW,IERR
+ 2001 FORMAT(/" NO. OF WORDS =",I5,"  ERROR =",I3)
+      PRINT 2002,(IASC(I),I=1,NP)
+ 2002 FORMAT(/1X,25A4)
+      GOTO 10
+      END
+\end{XMP}
+\index{character string}\index{string!of characters}
+\newpage
+
+\Filename{H2EPIO-Examples-Read-old-format-tapes}
+\section{Read old Format Tapes}
+
+This example shows typical values to use for OLD format HP or NORD
+tapes read on the CDC. Note \Lit{IBUF(512)} and the corresponding number
+of 16-bit words is 1920, and the call to \Rind{EPREAD} with \Lit{MODE=2}. 
+Long events up to 5000 16-bit words are expected. 
+Most data acquisition systems were converted
+to the new format in the early eighties.
+
+\begin{XMP}
+      PROGRAM EPTEST(TAPE10,OUTPUT)
+      DIMENSION IBUF(512),IRECI(5000)
+      CALL EPINIT
+ C       SET STATUS WORDS FOR INPUT
+      CALL EPSETW(10,1,1920,IERR)
+      IF(IERR.NE.0)STOP 1
+      CALL EPSETW(10,2,5000,IERR)
+      IF(IERR.NE.0)STOP 2
+ C    SUPPRESS BYTE SWAPPING
+      CALL EPSETW(10,27,0,IERR)
+      IF(IERR.NE.0)STOP 3
+ C        THE FOLLOWING CALL IS OPTIONAL; USEFUL TO VERIFY OPTIONS
+      CALL EPSTAT
+ C       READ A RECORD, UNPACK AS 16-BIT WORDS
+  50  CALL EPREAD(10,2,NW,IRECI,IBUF,IERR)
+      IF(IERR.NE.0)GOTO 500
+      JJ=NW-5
+      PRINT*,NW,(IRECI(I),I=1,5),(IRECI(I),I=JJ,NW)
+      GOTO 50
+ C       READ ERRORS
+ C         EOF
+  500 IF(IERR.EQ.1)STOP
+ C         PARITY AND OTHER
+      GOTO 50
+      END
+\end{XMP}
+
+\newpage
+
+\Filename{H2EPIO-Examples-Data-Selection-User-Defined-Header}
+\section{Data Selection and User Defined Header.}
+
+This example starts by skipping to a selected block on the input
+unit \Lit{10} using \Lit{MODE=30} in \Rind{EPREAD}. 
+Then a further selection is
+made on the logical record header (looking for \Lit{ID=0}) 
+using \Lit{MODE=20}.
+The data for these events are then unpacked as 16-bit words, and
+only the first 100 words are written to the output unit (\Lit{20})
+and packed in 32-bits. In addition a user defined header (\Lit{IH}) is
+used where \Lit{IH(1-4)} are the default package header, \Lit{IH(5)} is the
+original number of data words and \Lit{IH(6)} the original record
+sequence number.
+
+\begin{XMP}
+      PROGRAM EPTEST
+      DIMENSION IBUF(900),IBUFO(900),IRECI(1000),IH(6)
+      CALL EPINIT
+ C       SET STATUS WORDS FOR INPUT
+      CALL EPSETW(10,2,1000,IERR)
+      IF(IERR.NE.0)STOP 1
+ C--    SKIP TO BLOCK 15
+    5 CALL EPREAD(10,30,NW,IRECI,IBUF,IERR)
+      IF(IERR.NE.0)STOP 5
+      IF(IRECI(3).LT.15)GOTO 5
+ C-- READ THE RECORD HEADER AND SELECT RECORDS WITH TYPE ID=0
+   50 CALL EPREAD(10,20,NW,IRECI,IBUF,IERR)
+      IF(IERR.NE.0)GOTO 500
+      IF(IRECI(2).NE.0)GOTO 50
+      IH(6)=IRECI(4)
+ C-- READ DATA OF CURRENT RECORD, UNPACK AS 16-BIT WORDS
+      CALL EPREAD(10,12,NW,IRECI,IBUF,IERR)
+      IF(IERR.NE.0)GOTO 500
+      JJ=NW-4
+      PRINT*,NW,(IRECI(I),I=1,5),(IRECI(I),I=JJ,NW)
+      IH(5)=NW
+ C-- WRITE AS 32-BIT WORDS
+      CALL EPOUTL(20,3,6,IH,100,IRECI,IBUFO,IERR)
+      IF(IERR.NE.0)GOTO 600
+      GOTO 50
+ C       READ ERRORS
+ C         PARITY AND OTHER
+  500 IF(IERR.NE.1)GOTO 50
+ C         EOF
+      CALL EPCLOS(20,IBUFO,IERR)
+      STOP
+ C       WRITE ERRORS
+  600 STOP 600
+      END
+\end{XMP}
+
+\newpage
+
+\Filename{H2EPIO-Examples-Writing-32bit-physical-Headers}
+\section{Writing 32 bit physical Headers, logical Headers and Data.}
+
+This example also shows the control language to run in VM/CMS.
+
+\begin{XMP}
+/* Test 32 bit headers */
+'exec cernlib'
+'vfort out32 (noprint '
+'filedef iofile20 disk out32 data a4 ( recfm u lrecl 32400 block 32400'
+'load out32 ( start '
+'erase load map '
+'erase out32 text a1'
+/*BEGIN OUT32 FORTRAN A3 */
+       DIMENSION IBUF(8100),A(50000)
+       CALL EPINIT
+       CALL EPSETW(20, 1,16200,IERR)
+       CALL EPSETW(20, 2,100000,IERR)
+       CALL EPSETW(20, 3,  32 ,IERR)
+       CALL EPSETW(20,29,   1 ,IERR)
+C   OUTPUT 4 long LOGICAL RECORDS
+C
+       DO 10  I=1,4
+        NW=10000 * (I+1)
+        CALL USER(A,NW,I)
+C  .................................................
+C     ROUTINE -USER- HAS STORED NW VALUES IN A TO BE WRITTEN OUT.
+C   .........................................
+        CALL EPOUTS(20,3,NW,A,IBUF,IERR)
+C       IF(IERR.NE.0)STOP 1
+   10  CONTINUE
+C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+C
+C                THE FOLLOWING CALL IS ESSENTIAL
+C
+C++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+       CALL EPCLOS(20,IBUF,IERR)
+C  .........................................................
+C   FOLLOWING CALL ONLY NECESSARY ON SOME COMPUTERS (UNIVAC,IBM)
+C    ON VM (AND MVS?) WE THINK THIS SHOULD BE EPRWND(20,IBUF,IERR)
+C    WITH APPROPRIATE FILEDEF (IODD IN MVS)
+C  .........................................................
+C      CALL EPEND(20,IBUF,IERR)
+       CALL EPRWND(20,IBUF,IERR)
+       IF(IERR.NE.0)STOP 2
+       STOP
+       END
+       SUBROUTINE USER(A,NW,I)
+       INTEGER A(1)
+       DO 10 J=1,NW
+       A(J)=I
+   10  CONTINUE
+       RETURN
+       END
+\end{XMP}
+@

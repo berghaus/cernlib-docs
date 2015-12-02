@@ -1,0 +1,148 @@
+ \chapter[Multiple scattering]{Multiple scattering}
+
+ The G4MultipleScattering class simulates the multiple scattering of
+charged particles  in material.It uses a new multiple scattering (MSC)
+model which  does not use the
+Moliere formalism(\cite{msc.moliere}).This MSC model simulates the scattering of the 
+particle after a given step , computes the mean path length 
+correction and the mean lateral displacement as well.
+
+ Let us define a few notation first.
+
+ The true path length ('t' path length) is the total length travelled
+by the particle. All the physical processes restrict this 't' step.
+
+ The geometrical ( or 'z') path length is the straight distance between
+the starting and endpoint of the step , if there is no magnetic field.
+The geometry gives a constraint for this 'z' step. It should be noted,
+that the geometrical step length is meaningful in the case of magnetic
+field, too, but in this case it is a distance along a curved 
+trajectory.
+
+ The mean properties of the multiple scattering process are determined
+by the transport mean free path , \(\lambda\) , which is a function of the 
+energy in a given material.Some of the mean properties - the mean lateral
+ displacement and the second moment of cos(theta) - depend on the second
+ transport mean free path, too. (The transport mean free path is called
+ first transport mean free path as well.)
+
+  The 't'\(\Rightarrow\)'z' (true path length -- geometrical path length) transformation is given by the simple equation
+
+   \begin{equation}
+         z = \lambda*(1.-exp(-t/\lambda))                \label{msc.a}
+   \end{equation}
+
+ which is an exact result for the mean values of z , if
+the differential cross section has an axial symmetry and the energy loss
+can be neglected .
+  This formula and some other expressions for the first moments of the spatial
+distribution after a given 'true' path length t have been taken from the excellent
+paper of Fernandez-Varea et al. \cite{msc.fernandez}, but the expressions have been
+calculated originally by Goudsmit and Saunderson \cite{msc.goudsmit} and Lewis
+\cite{msc.lewis}.
+  Inverting eq. \ref{msc.a} the 'z'\(\Rightarrow\)'t' transformation can be written as
+
+   \begin{equation}
+        t = -\lambda*ln(1.-z/\lambda)                     \label{msc.b}
+   \end{equation}
+
+ where \(z < \lambda\) should be required (this condition is fulfilled
+ if z has been computed from eq. \ref{msc.a}).
+
+  The mean value of \(cos(\theta)\) - \(\theta\) is the scattering angle after a
+true step length t - is
+
+   \begin{equation}
+          <cos(\theta)> = exp(-t/\lambda)               \label{msc.c}  
+   \end{equation}
+
+  The transport mean free path values have been calculated by Liljequist et al.
+\cite{msc.liljequist2},\cite{msc.liljequist1} for electrons and positrons in the kinetic
+energy range \(0.1 keV -- 20 MeV\) in 15 materials . The MSC model uses these
+values with an appropriate interpolation or extrapolation in the atomic number
+\(Z\) and in the velocity of the particle \(\beta\) , when it is necessary.
+  
+ The quantity \(cos(\theta)\) is sampled in the MSC model according to a model function
+ \(f(cos(\theta))\). The shape of this function has been choosen in such a way,
+that\(f(cos(\theta))\) reproduces the results of the direct simulation ot the particle
+transport rather well and eq. \ref{msc.c} is satisfied.
+ The functional form of this model function is
+
+  \begin{equation}
+      f(x) = p \frac{(a + 1)^2 (a - 1)^2}{2 a} \frac{1}{(a-x)^3}
+            + (1-p) \frac{1}{2}                            \label{msc.d}
+  \end{equation}
+
+ where  \( x= cos(\theta)\) , \( 0 \leq p \leq 1\) and \( a > 1\) . The model
+ parameters \(p\) and \(a\) depend on the path length t , the energy of the
+ particle and the material.They are not independent parameters , they should
+ satisfy the constraint
+
+  \begin{equation}
+        \frac{p}{a} = exp(-\frac{t}{\lambda})              \label{msc.e}
+  \end{equation} 
+
+ which follows from eq. \ref{msc.c} .
+
+  The mean lateral displacement is given by a more complicated formula
+(see the paper \cite{msc.fernandez} ), but this quantity also can be calculated
+ relatively easily and accurately.
+ 
+  It is worth to note that in this MSC model there is no step limitation
+ originated from the multiple scattering process. Another important feature
+ of this model
+ that the total 'true' path length of the particle does not depend the
+ length of the steps . Most of the algorithms used in simulations do not have
+ these properties.
+  
+ In the case of heavy charged particles ( \(\mu,\pi,proton,etc.\) ) the
+ mean transport free path is calculated from the \(e+/e-\)  \(\lambda\) values
+ with a 'scaling'.
+
+ In its present form the model computes and uses {\em mean}  path length
+ corrections and lateral displacements, the only {\em random} quantity is
+ the scattering angle \(\theta\) which is sampled according to the model
+ function \( f \).   
+
+  The G4MultipleScattering process has  'AlongStep' and  'PostStep'
+parts.
+
+  The AlongStepGetPhysicalInteractionLength function performs the\linebreak
+ \mbox{'t' step \(\Rightarrow\) 'z' step} transformation . It should be called after the
+other physics GetPhysicalInteractionLength functions but before
+the GetPhysicalInteractionLength of the transportation process.The
+reason for this restriction is the following: The physics processes
+'feel' the true path length travelled by the particle , the geometry
+(transport) uses the 'z' step length.If we want to compare the minimum
+step size coming from the physics with the constraint of the geometry,
+we have make the transformation.
+
+  The AlongStepDoIt function of the process performs the inverse,
+ 'z'\(\Rightarrow\)'t' transformation.This function should be called after the 
+AlongStepDoIt of the transportation process , i.e. after the particle
+relocation determined by the geometrical step length, but before applying
+any other (physics) AlongStepDoIt.
+
+  The PostStepGetPhysicalInteractionLength part of the multiple
+scattering process is very simple , it sets the force flag to 'Forced'
+in order to ensure the call of the PostStepDoIt in every step and
+returns a big value as interaction length (that means that the multiple
+scattering process does not restrict the step size).
+
+\section{Status of this document}
+  9.10.98  created by L. Urb\'an.
+
+\begin{thebibliography}{99}
+\bibitem[Mol48]{msc.moliere}
+   {\em Z. Naturforsch. 3a (1948) 78. }
+\bibitem[Fer93]{msc.fernandez}J. M. Fernandez-Varea et al.
+   {\em NIM B73 (1993) 447.}
+\bibitem[Goud40]{msc.goudsmit}S. Goudsmit and J. L. Saunderson.
+   {\em Phys. Rev. 57 (1940) 24. }
+\bibitem[Lew50]{msc.lewis} H. W. Lewis. 
+   {\em Phys. Rev. 78 (1950) 526. }
+\bibitem[Lil87]{msc.liljequist1} D. Liljequist and M. Ismail.
+   {\em J.Appl.Phys. 62 (1987) 342. }
+\bibitem[Lil90]{msc.liljequist2} D. Liljequist et al.
+   {\em J.Appl.Phys. 68 (1990) 3061. }
+\end{thebibliography}

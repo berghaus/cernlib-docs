@@ -1,0 +1,65 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%  GEANT manual in LaTeX form                              %
+%                                                                 %
+%  Michel Goossens (for translation into LaTeX)                   %
+%  Version 1.00                                                   %
+%  Last Mod. Jan 24 1991  1300   MG + IB                          %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\Origin{F.Carminati}
+\Submitted{14.12.93}       \Revised{14.12.93}
+\Version{Geant 3.16}       \Routid{TRAK310}
+\Makehead{Altering the order of tracking secondary particles}
+
+When secondary particles are produced during particle transport, if
+the user wants to transport them in turn, they must be stored by
+a call to \Rind{GSKING} or \Rind{GSKPHO} onto the temporary stack
+{\tt JSTAK}. As explained in {\tt [TRAK310]}, this is a LIFO
+structure, where the last particle introduced is the first to be extracted
+to be transported. It may be sometimes interesting to alter the order
+of tracking, for instance to decide whether the current event is
+worth completing or whether it should be skipped to go to next one.
+
+It is possible in {\tt GEANT} to alter the behaviour of the {\tt JSTAK}
+structure using one of the words of the stack, normally reserved for
+the user. Stack ordering is activated via the data record {\tt SORD 1}.
+This will set to 1 the variable {\tt ISTORD} in common \FCind{/GCSTAK/},
+which is by default initialised to 0.
+
+When stack ordering is activated, the routine \Rind{GLTRAC}, which
+fetches the next particle to be tracked from {\tt JSTAK}, instead
+of the last one, will select the one with the maximum value of the
+user word. This user word must be set by the user in the variable
+{\tt UPWGHT} in the common \FCind{/GCTRAK/} prior to the call to
+\Rind{GSKING} to store each secondary.
+
+If, for instance, all the protons must be tracked first, in order of
+production, and all the other particles after, again according to their
+time of production, the following code should appear in \Rind{GUSTEP}:
+
+\begin{verbatim}
+      SUBROUTINE GUSTEP
++SEQ,GCTRAK,GCKING
+      .
+      .
+      .
+      DO 10 IG=1,NGKINE
+*---         Younger particles tracked first
+*---         Add to the current time of flight the time delay of
+*---         the secondary
+         UPWGHT = -TOFG-TOFD(IG)
+         IPART = GKIN(5,IG)
+         IF(IPART.EQ.14) THEN
+*---         This is a proton, add a 100 microseconds to have it
+*---         tracked first
+            UPWGHT = UPWGHT+1E-4
+         ENDIF
+*---         Now store the particle in the GEANT stack
+         CALL GSKING(IG)
+  10  CONTINUE
+\end{verbatim}
+
+Users should be aware of the fact that ordering the stack will change the
+results, because transport depends on random numbers which will be different
+for the same particle in the two cases.

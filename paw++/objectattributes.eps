@@ -1,0 +1,402 @@
+%!PS-Adobe-2.0 EPSF-2.0
+%%Title: objectattributes.eps
+%%Creator: xpick Version 1.00  Rev: 22/03/93 - by Evgeni Chernyaev
+%%BoundingBox: 2 12 390 495
+%%EndComments
+%***********************************************************************
+%*                                                                     *
+%* Object: Image decoding PS-routine                                   *
+%* Author: Evgeni CHERNYAEV (chernaev@vxcern.cern.ch)                  *
+%*                                                                     *
+%* Function: Display a Lempel-Ziv Welch (LZW) encoded color image.     *
+%*           The image is displayed in color on viewers and printers   *
+%*           that support color Postscript, otherwise it is displayed  *
+%*           as grayscale.                                             *
+%*                                                                     *
+%***********************************************************************
+/CriticalSize 7000 def
+systemdict /colorimage known { /incr 3 def } { /incr 1 def } ifelse
+/Length 81 81 mul def
+/Table Length array def
+/Prefix Length array def
+/Length Length incr mul def
+/String Length string def
+%***********************************************************************
+/ReadCode                % Read next code from file                    *
+%***********************************************************************
+{
+  { currentfile read pop
+    dup dup 42 ge exch 123 lt and { exit } { pop } ifelse
+  } loop
+  42 sub 81 mul
+  currentfile read pop 42 sub add
+  /CurCode exch def
+} bind def
+%***********************************************************************
+/DecodeCodeA             % Decode CurCode (fast, but memory demanding) *
+%***********************************************************************
+{
+  ReadCode
+  CurCode Ncol eq {
+    ReadCode
+    /FreeCode Ncol 1 add def
+  }{
+    //Table FreeCode L incr add string
+    dup 0 Table OldCode get putinterval
+    dup L Table CurCode FreeCode lt { CurCode } { OldCode } ifelse get
+    0 incr getinterval putinterval put
+    /FreeCode FreeCode 1 add def
+  } ifelse
+  /OldCode CurCode def
+  Table CurCode get dup length /L exch def
+} bind def
+%***********************************************************************
+/DecodeCodeB         % Decode CurCode (not memory demanding, but slow) *
+%***********************************************************************
+{
+  /iout //Length //incr sub def
+  ReadCode
+  CurCode Ncol eq {
+    /FreeCode Ncol 1 add def
+    ReadCode
+    /OldCode CurCode def
+    /FinChar CurCode def
+    String iout Table CurCode get putinterval
+  }{
+    /InCode CurCode def
+    CurCode FreeCode eq {
+      /CurCode OldCode def
+      String iout Table FinChar get putinterval
+      /iout iout //incr sub def
+    } if
+    iout //incr neg 0 {
+      CurCode Ncol lt { exit } if
+      String exch Table CurCode get putinterval
+      /CurCode Prefix CurCode get def
+    } for
+    /iout exch def
+    /FinChar CurCode def
+    String iout Table FinChar get putinterval
+    Prefix FreeCode OldCode put
+    Table FreeCode Table FinChar get put
+    /FreeCode FreeCode 1 add def
+    /OldCode InCode def
+  } ifelse
+  String iout //Length iout sub getinterval
+}bind def
+%***********************************************************************
+/DisplayImage            % Display a LZW-encoded color image           *
+%***********************************************************************
+{
+  gsave
+  /buffer 72 string def
+  currentfile buffer readline pop
+  token { /degrees exch def pop } { } ifelse
+  degrees rotate
+  currentfile buffer readline pop
+  token { /x exch def } { } ifelse
+  token { /y exch def pop } { } ifelse
+  x y translate
+  currentfile buffer readline pop
+  token { /x exch def } { } ifelse
+  token { /y exch def pop } { } ifelse
+  x y scale
+  currentfile buffer readline pop
+  token { /columns exch def } { } ifelse
+  token { /rows exch def pop } { } ifelse
+  currentfile buffer readline pop
+  token { /Ncol exch def pop } { } ifelse
+  systemdict /colorimage known {
+    0 1 Ncol 1 sub {
+      Table exch
+      currentfile 3 string readhexstring pop put
+    } for
+    columns rows mul CriticalSize lt {
+      columns rows 8
+      [ columns 0 0 rows neg 0 rows ]
+      { DecodeCodeA } false 3 colorimage
+    }{
+      columns rows 8
+      [ columns 0 0 rows neg 0 rows ]
+      { DecodeCodeB } false 3 colorimage
+    } ifelse
+  }{
+    /color 3 string def
+    0 1 Ncol 1 sub {
+      Table exch
+      1 string dup 0
+      currentfile color readhexstring pop pop
+      color 0 get 0.299 mul
+      color 1 get 0.587 mul add
+      color 2 get 0.114 mul add
+      cvi put put
+    } for
+    columns rows mul CriticalSize lt {
+      columns rows 8
+      [ columns 0 0 rows neg 0 rows ]
+      { DecodeCodeA } image
+    }{
+      columns rows 8
+      [ columns 0 0 rows neg 0 rows ]
+      { DecodeCodeB } image
+    } ifelse
+  } ifelse
+  grestore
+} bind def
+%***********************************************************************
+%*                          Image decoding                             *
+%***********************************************************************
+DisplayImage
+0.00
+50 50
+296.00 444.00
+296 444
+256
+000000 ffffff 00ffff 9f0028 870022 d18598 460012 ffffff 53559e 474887
+b0b1d3 28294c ffffff e1e3bc bfc1a0 f2f3e3 7e7f69 000000 f0b550 cc9a44
+f8dfb2 7f602a ffffff 645fa2 55518a b8b5d4 312e50 ffffff b53560 9a2d51
+dda2b6 57192e ffffff 7f7f9b 6c6c84 c5c5d2 3f3f4e ffffff 700070 5f005f
+ba85ba 320032 ffffff f5f5dc e1e3bc afafaf 7d7d7d 4b4b4b 969696 646464
+c8c8c8 e1e1e1 323232 ff00ff ffff00 ff0000 0000ff 00ff00 71725e 00003f
+00007f 0000be 0000fe 003f00 003f3f 003f7f 003fbe 003ffe 007f00 007f3f
+007f7f 007fbe 007ffe 00be00 00be3f 00be7f 00bebe 00befe 00fe00 00fe3f
+00fe7f 00febe 00fefe 3f0000 3f003f 3f007f 3f00be 3f00fe 3f3f00 3f3f3f
+3f3f7f 3f3fbe 3f3ffe 3f7f00 3f7f3f 3f7f7f 3f7fbe 3f7ffe 3fbe00 3fbe3f
+3fbe7f 3fbebe 3fbefe 3ffe00 3ffe3f 3ffe7f 3ffebe 3ffefe 7f0000 7f003f
+7f007f 7f00be 7f00fe 7f3f00 7f3f3f 7f3f7f 7f3fbe 7f3ffe 7f7f00 7f7f3f
+7f7f7f 7f7fbe 7f7ffe 7fbe00 7fbe3f 7fbe7f 7fbebe 7fbefe 7ffe00 7ffe3f
+7ffe7f 7ffebe 7ffefe be0000 be003f be007f be00be be00fe be3f00 be3f3f
+be3f7f be3fbe be3ffe be7f00 be7f3f be7f7f be7fbe be7ffe bebe00 bebe3f
+232375 bebe7f bebebe bebefe befe00 befe3f befe7f befebe befefe fe0000
+fe003f fe007f fe00be fe00fe fe3f00 fe3f3f fe3f7f fe3fbe fe3ffe fe7f00
+fe7f3f fe7f7f fe7fbe fe7ffe febe00 febe3f febe7f febebe febefe fefe00
+fefe3f fefe7f fefebe dfe1ba 1f6431 7e7f69 f0f1e1 00fd00 d08497 460012
+b80000 9e0028 f7deb1 efb450 7f602a 607070 efcf30 30df30 405050 707070
+f9f9f9 f3f3f3 ededed e7e7e7 dbdbdb d4d4d4 cecece c2c2c2 bcbcbc b6b6b6
+b0b0b0 aaaaaa a4a4a4 9e9e9e 989898 929292 8c8c8c 868686 808080 797979
+737373 6d6d6d 676767 616161 5b5b5b 555555 4f4f4f 494949 434343 3d3d3d
+373737 313131 2b2b2b 242424 1e1e1e 181818 121212 0c0c0c 060606 0000cc
+0013cc 0027cc 003acc 004ecc 0061cc 0075cc 0088cc 009bcc 00afcc 00c2cc
+00ccc2 00ccaf 00cc9b 00cc88 00cc75 00cc61
+-7*/-8-9-:-;-<-=->-?-@-A-B-C-D-E-F-G-H-I-J-K-L-M-N-O-P-Q-R-S-T-U-V-W-T*0
+-8*--\-]-^-_-`-a-b-c-d-e-f-g-h-i-j-k-l-m-n-o-p-q-j*0-Z*/-r-w-x-y-z.*.+.,
+.-..-a-t-[*--t.4.5.6.7.8.9.:.;.<.=.>.?.@.A.B.C.D.E.F.G.H.>-\.1-v.3-X.O.P
+.Q.R.S.T-R.K-u.K.M-s.Z./.].^._.`.a.b.Y.W.2-Z-l.g.c.j.k.l.m.n.d.3.X.N.h.\
+.o.v.w.x.y-i.i.L.p.[.w*1/0*1-_/0-a/4-z/6-m/6/8.b/1/2-o/;.z-d/+.r.i/..n/1
+-\/;/@/I/>-j/K/L/M/L-]/O/R*-/T-b/W-h/8/Y/V/M/[/Q/A-c/C.f.u-g/E.k/@/:/`-q
+/O/4/J/^/k-`/\/r/q-i/o-e/_/a-k/c.M/g-h0-/</k/j/]/p/S/H05/j06-^/n/>/=0=/2
+0;/]/R09/y0=/P/Q/=/5/T0H030>0?0<0N0G0@0F.j0+/--B-]0/.a/K08/U020A0_0^/30O
+050d0F0N/P0]040_0`0c0k0:090i/U0k0\0l0h0u.b0U.s-\/e-^*00X1+._/m0P0e0R0A/y
+0n130j0s0Q030d/w0w1?-d0C0j161?141@.c0y/E1/.K1..l0[0m0B0O0K1O0I180e0n0a15
+1C/p0K0v1A08061D0a1c0Q/u.]1I.Z*/.<1M/h011P021T/t/t0>0r1D1E1o0m/\/s1F1W16
+0D1;0b0T0,/D1K/b24.//i1P0u1q1Z1U1=191X0g2>1V0r2,/`28171:0o1u2A1Q1W.a1h.t
+.m0t1<0w0^2V1n201b2/1a1y1d0q2H1>2W2E2K0i2].k2P0*26.]1]1Q192l2o2F2q2d2@2m
+0o2L/_/o0J2l0L2J2_2Z2w0p0x22/d2Q/z/X1f3538/l371H320,2j-`0Y/z30393D-l1v.v
+2h/F3E/s3E3M-c0E.z1h.D1j.I3U3V3W3X3Y3Z3[3\.=3=.W3]3a3b3c3d3e3f3]3_.q*>3k
+3l3m3n3o3p3q3r3s3t3u3v3w3x3y3z4*4+4,4-4.4/3q.f/D*0*>*<464748494:4;4<4=4>
+4?4@4A4B4C4D4E4F4G4H4I4J4K4:*?4242454L4R4S4T4U4V4W4X4Y4V4N3i-t4Q4Z4`4a4b
+4c4d4e4U4\.e224_4f4l4m4n4o4p4L4h.q4P4q4v4w4x4y4m4s/,3j4z5.5/50514E5+434k
+525758594w544u5:5>5?5@4a5<4j5A5E5F5G4H5C.W564I**5N**475N4:5R5H4c5T4C5W5U
+4f5J5-4L5T5_5P495Y4B5a5Z5X5e4>5e5c5f4b5\4^5^5h5R5k4G5s5l4;5O5h5w5y5v4e5n
+445p485r5x5Q5j5O635`656+4=5a5q685x5P676;6?6*694F6-5L4F5Y61465`6K6A*<6L6O
+6C6D6M6T6Q6U5W6J6V655u6S4A6F48*?6a6b6c5i6<6V6g6@6Y606R6`6c6n6o6p6q6r6n4M
+6r4@6P5k6X6B6T6P4=6s7.7/7071726b7-4O5D47*?3r6e6k6h6N6g635S6l47404-4M7:6e
+6>7*5b647=7M4>7D7P7Q754]6.786G6w7>6x7Y7J7,5.797F5t6f7Z7@6L7]6]497_4<6_7V
+4H626M687?7n6Q6I6\4o7i6`7W4?7t7o6<7\6=7>7g7`7j765K7x4a7u5A7w7l805@897h83
+5]468=4W878<5L8B8;578G8A8?5o8:4Y8D8E818H5:8J*<7k8A7y8S4G8B8U8Z4z8U8W8V8Y
+8^4D8\8c8d4v8`8L7U8X8h4r8F8g8n7v7y8a8]8r4@8f8w508j7T4k8v8z7-8p9/7^8t8k9-
+8q927h91984x9+4i848N9;6^9:9A4q9=4t778m9D9B8R9J4n9F5,8M9I9M4>8y9S9N949,85
+4D977g9U9V4l9O559Z4B3l9/9^9_6,9X9>8@8b4C3n8z9g9h4c9a5=9R4?9e9e6:6>6+9q9r
+5B9j9G9?9v4=9y*<:47A7@5l:,:-4Z9t9H9m9w3k49:67<6U5f:::;4X:=:1:?:3:A4::C:E
+6@:Q7B5;9C:H4`:J9l8]:P786a7A7n7c8P9E:V:W4Y:Y9Q:L7j:^6u*?5z7d8/7p8I:d:e4W
+:g8l:i:j:m6m:z:77+:p:b:c9L:t:u:/9P:w9.8V:k;8;+;,6Z7[7?52:G;24R:v964B7474
+9z7r:`7L:r;1;B4T;D9c8x6d8w;A:O7Q;X;Y;Y4C;Q9@;S;;8n;V:B;Z;d;e4+;`9T;49b;^
+8x92;b48:N:W;98x;j9u:x:;;o7C9\9;;s4?;]:2;x:s:M:t<,;i7S9k:h;79J;y46;q:H<4
+90<6:0:Z<*<+<14<<=;x;h<@829Y;l:-<;:5<D;n<J7j;u:><99D<P<H7;:E6H6l:*5d:T4K
+<?<U<A;5;E<3<F4;<[9z:84<7B5u6z5Q<\:f<T4;<.;w<O<j;W5g<n;<:n=/6K<]=.:u<v;N
+7895;R<>=*;c=,6W8.=?6N6y7t6[=A6A;/6^=599<f;k</<z=6<G9\7I5y7,7e6j66;L7M6Y
+=G<-=I=96`=8<N9r<Z=Q;L<`<r:D<q7]6;;-7r4r=]=a8V=`=M=b=;;p=d:o=>=-7N=1:8=C
+=E:I=o=s=q<M>19_=c==;==y=y=j=e=S7L=U>9;F>0<y8K>3>C9h>6<a>,;J:R>*8+8,<n>L
+7c;\>B<x<X9A>H5G=[4J<d<w<V:K>V<E=O<k<R4y>Z>[>T>^<C53;n=u;z5H>f4I>\>b8u<*
+;H;U>m<<>d9p>h=K;v<X6t>w>b=+:e>r=J<L<7;6976b*c>v=0=V5F>X<>?+?6<B<88q?:*c
+?;>\<r7u<b8i>x<Q<3?B<w=r>F:]*??H?X?<:D;?<o?M;0?54A3k73?c?d?e?f?g?R4M?T8v
+?G?X?H?Z:S7=6i8+=W7*=F>.?\8e?O*>?h@,@-@.?e;\>i?E9T6a?n@6:P=R>8>+=g=Z6B6*
+61@>?y;F?O;O?z?,<W8c3l@6?H:\?K@>6f>:?x>N7N>p<P@E@1@G>_8g@J?n:\7q7J7s;.;-
+@c@Q>@53@D@W9K?C<g=^>c*>?X@^@_6Z>J@t>?@e>M@F?`@i;C@2?89d3k*c@q@r>L7o?t@S
+>-8-=2@X@zA*<cA,<h?a3m4q>pA=?1A<@y?S>E>VA14Z7f4d@VAF<KAH?7A?9d4p=m5[@hAP
+>]@Y>j<iAEAZ;tA\@3A^A;A`@gAbA-Ad@mAf@CAhAT=:A_Al<e@k=L?U9VAOAr>1>t;2AxAy
+>U>z9pAYB-A>Ak>GB1ArB.B+B6AlB8Aj=pAyAQ?jAIB/?0AeB?<-B3B>AwB:AfB<?3BKA`BM
+;rBOAZBQApBEBFB@8>BBB9AqBXAz?k<DBC:FBSAPBU:@Bb5UB,B7BH>4;cAK80BjB;BlAv;z
+45A18*=3=0?_B4B^BW>2ASC+BuC1?]?[C4C3:UB]B^Bf;W56@qAM@a5?BqBLBs8v:\@^C>=k
+?qA3AXC8BXC:C2<w<dAW>@@=7q5*@*;fCXCY3tA:AR?DAi7-<??pC5@t66:oACADC-C;CZCk
+Ck?iBZC/BI;:7h?45s=R64=XCR5mCW?QC\BACpBm8A;9Cb7KBz@v5r=z9sD*?3Cn=_B[=H:m
+D2D3=.6j@=Cg>qD9;rD;=7D=D>?4BpDG?AD,CoC^Ao=\>B6S?@<IDQD<D.Bt7h>lC8<l>GDI
+>DD\>`98DX4XCyD77^DcC.DSC09SDh4VC>A9DlDZDJDeBh8hDr4TBxByDvAmAt?-Dz8dE+4S
+=i7Z7e9EDmB*B=D/>nAL6C>?=U?^:<E;B`B\Ci=<E@=/6J@vE:DwDdDoCq9ME54R8*EB@R4p
+DM=pE<BND`E3<m@T?v@R>REEEPDn@lES<:DO8O:q;KA5@<8/<uEgE]BRE_D+E0C]EiE>EkEw
+D:EtEGE=D]>yEx@jEzAuDfD_EI=vF4AaE1@HEHDpE?DHF/DKEvF:FBDPEyD-ERF+<YEl<OEF
+FE?aF9FA>y@/FWFXFYE[B_FRBg9f@*FZFaFb?fFDDy9nAABDFUC9CC979xDaA9Cu<bDE8oCL
+BFCNBnCOD46R8DFsChFjCMFl4@:CBwEr6kG,:.FuB?Fw>y6GG36\CHA2?w9`BdAFG:@qD@@B
+CSA86XCKFGC,G:Cr:l7HG*Er7p@@ED;PGCA<GOGP?V<\=B7ICe:SG6FJFMG/AnFA>vGGE-<]
+D56?Dk:<GYA*G[D0D?>r=BC4DC8-GcGdF2FkGgEj;:F[DWGq@iGsG]B0G8B2H.Ge8VFTH/Gf
+F>@ZF@H>FvG0F1F8BkH:H,>WH3@WH5FNH8HHH@A]E^GMH-HRAcHTG.HDHIHGH7HUH?F6E2HB
+H;G9HEHYHCHeH\E`8ZCABPHfFFHZHiHWC_HpHhH9HsDT=NH_H[HxHqH=HdHwHaF?HFHkH4Ho
+BVI-HQI1HA9[I.HJI+I:HSA@I48QI*HrI@HXG1Fh8rHmBTI6:MBvFo@aH*H*AGHvI9FKF*D]
+:4C=GW6wGoCzHPBrHjIIC<DaGcIT5IHL@EGOCE<l5cEX=WA6GA@:4[CWClIwCYFeFL?UGF<4
+G`EC@:=TGJ?>A+E_IxJ6;ZFQFf@4<JCbIo?xJ3@N@dIhEUDqJ9J*9.?ZD2J>JB@`>PJ2DuG-
+H/IQJEIzIY;7Gi?J>=7s=Y;>JL@xJ4HUJSETJFJV?9:^Gj@?Ec=>=C?rJ]4gFO=bJdF79\?/
+IKJpDbJUJs8eH1H2F-FCH+DxJG<DDVK,Ja<*G`E@=gCc>/JyHbI3Fg4DK95MELG4GH5i6EJr
+K=HgFMJb?[DEGw=x6/53KHI2KJH,KLJNA5C?Ep=mEW>KIqK[:q;SK<KTHuKKK6=fEdEbDBA8
+KjEe>SKcI;KU<XKWCI:*>KEoDAJ^JmJ@I];8KpIAI7JRKgKP7KL+KkKj?\KOK*L.IHL0KfK@
+>>=AKPCGJ]>RCTKEC`L;HtL=KVL2JkCwLOG5:_LOCxGUEn=GH1HNHKK->oL,8[KSKqKeLL5f
+IhCPLIHy=tL[5FLdLeK/EQJeHcLbF.LmEhJzK>A.F<BGIcLvA@Lx<5I,IVH^FjKt<+L_L/<0
+E_FcM8M96sLfHZICIDM1M:MAMBLXIN7OM26DILBeME=PBo9]Ij;OH5Fn8YKhBcIaCBLzF^G;
+EaJ3608TMO;BG[G2IfKDE.5/MIGDMKFyMj@w;K=D@cIsANM_LpK0LoIOC`;hMTEeJ/J_GpMV
+HnMX:yCP<JJKL9ENK7D8N-IMN/N0;*C6L3KXItLkLyIEI0IXLuDUH6BzJ0@bMn@fG7NCIWDR
+Mu;_G\NICJ8.ItKZMqN8MJN:J;K+69MgGZMiN1F_N[MhN]<-I=H]MWM.I/NeNOIbNmI>DgMr
+F1MtNFLaNkN.NrNz;aNuKUNwKINyM>MPNcBJNfNbNhLhNpNlIGLJM6O;O*O=LgB5O7GrO5Dq
+O.LaO0KdLKO,N\O+O3MNOEI5H\MCOVM88FOWOZO[?fBsJ7O_;ZCjO`OcOd7GOBC,Oh8[?TOi
+Ol<-OkOmOpNE;vOqOtOK:KOuOu8aOxOtOzP*OpP,P-OlP/4WMGP04nP45IOo4V3lK3P54mIJ
+:<P94S3mN_P=4l3o:XPA4K3m5NPDPE4e3k5NP?4gPI4HPK5OPMPN4cPP5OPR;CPT4EPV5xPX
+PY4aP[5xP]>[P_A.Pf6>PcPd4ZPlPgMM6^PjBg*>CvPLP<PoPePwPxPh53PuMLQ,Px**PnQ*
+P3Q2Q-PsNrFgPqPxQ5Q64UQ=CvQ.8xQ0BuQ8Q3Py4KJA5/JK4EGk?>FqE,L]=PQI6>QDHIPv
+QV7IQ5QL<o4nQNL?GxJMCUJP<^QT>cQ[QWQ:LtOsQ1QjQ\PzKMFrQh4JG6>Q<_@b5pGcQBQ[
+QXD[J*@nQHQpQJQvL@K`A3KvGnKZLF=zEMLPDAKx?sR9LGI^R+R2R3R.Qm:>BnRGR3Q4Qr?u
+R><s@rNJJ[D3=DJMN3RRL8JORU@_Qd=,RFRN=RJbP2:56bRcQqQKR6K\><J\G5LFGkRUN6<s
+E9KzEq7mQf4FR,R3DMRfGt*?RiPWRPKuK_RxN5J?GTJZEN5zR8KlRx7aDjS*RMQj;T9TPu6c
+S1Q]RlCdRoN@S8GlS:SOL6LBQzKNQu;cSIGGR/IYDUS0RNSJSTJlNYRC?uL7>NJjJmN=;??s
+A4Dt>74LS+Q>SZNQAuDLS,S34bNA:tSqQqPDS.MwS^QVQ?8CMdOpT+S2PXT.N^T1SxEmSzT*
+SCT7S3T9S]Q3T2Q@4RSqSE>qQFT:=RTFTGPJRMTJPi>E<cRhPmT<TPSpR2TS<cTLSvS2TZ4v
+PlT]4rT_>A6aR4Tb4oP[TeP^TU4gJuTkP>@+SsTTD\>/TOTsP`TvT^TpK;U*P>TYPtU.U0Ik
+TgU5>5U7U8DqU:U;<:U=U>>WU@UADgUCUD9fUFUG;UUIUJ;aULUME4UOUPHlURUS8HTC5?Rt
+UVTfU4QKAVSWU[OrRKEVU`5MUeUaOv9lUd=@SeD6R;KlKyUhU\TxUd@u=EJiJ[NLK:UrOjU]
+N^6oRTCTA7Sf:8O\V5V6V76pQEV-903qV0R]SMAM5TOeVCVDOcV:UtF5;<GmV>V3RzV+BtUX
+CiUlIrRpS>UxVOBYOg6EDzT>VXF:VQI8N+V^:f8gV`M/NYVcI`OnV;AsViC@VeU7ONVnNZVk
+VHF=VsM^VGR0LsVx93VzS\W+W,4yJHVqOQW14SW3VlA[W6;MVuW*VIW;MfVpW9OSW@GXW.Su
+W0WE8sWGQnW?WJ9<WBVvNBWO8_WQW>VwWTWPWLUcWN;*V8W_W`Wa@/M-SFWCCiWbWhWiWj7/
+8YW8WRWdLlWYTHWmWVW/W]:]WrPBWtW[OwW+TzWTIQWnWWWSWqWy4JX0WuWHWwD0X5T[WpQ;
+X-;+R:X<K?VYUbX,X:L-RSXCXDVmQYX@XK4IX7X+UjXOXJXPIIX>VZAgLHXWSBXYXFXTXH;s
+UgWEXRW=WvWX6uX]X^XEStWMXiCsM]Xk:@X_XnW\Xp6mXs9[X*XgX9XxWxXVXz?2XMX?XbU2
+WrXfWeWoXmX;Y0Y1F;Y;Ui:hEgXIY>XtY@LnY-X3XjY=YE?PYGRJXGY.Y<YM<2YOVf>4:kGn
+XdW6Y8XNY5YTMFXuS[YIYbYDY`Y2W:Y9X2YeX.WOY]Y4YRYfYgY?Y3XZIUYKYsEJYuX`YBXU
+YyYtYiY^Yq6aVEZ4Z5Z64+YeYHXoYJ99Z7Z>Z?Z@A1X1XhZ<Z.JQYpZEZFDFXSZ,XHZJX[Yj
+ZDZ9ZOYCZ:XwZIZTZPZ1ZXZYZUYPXaYqZ]ZNZ_ZMZaZbZ\ZVYQZhZgZSYWNsZlD/ZnWkZsZt
+ZuO]ZL:wQ<ZA[*[+[,3sZxW5ZpP8Wf[1ANUU[4U-Y:[75[[6[:[2[9[=9s[<[@Q/[3[C:I[B
+[F;F[H[I[/[L7v[K[NZ[[QP@[E[SUsYk[V:u[P[YYcZ;[\4[[[[_ZdZy[b[G9,Zv[h[i[jMA
+95[-[n[o[p;XZn[e8e[a[_[s[t[J[U[y;\[v[\[x\+Y,[^\0TK\*\3\1ZW\6[>[X\9[D[?\<
+[z\>\?[M\B[WZR\D\@\;\G\7ZjQ1[-Wz[o\O[n\,[E[pU2\U\Q[,>TT_P79N\V[0;P\^C@\Z
+\T\_W7\a5>TF\\5*\c\AF3\h\g8T\p59LX\[\e;C\r58\i\v=n\S\mYN\qWz\b]0\o],\IZ/
+\y\x8I]8;@\l]5FH5X5t>g]27XSAEfWsQOLU5m]<\FYh5d]@]A]F4AKARyKo]P>IVbTq]4]K
+Yz]ML]Qu\z]VRD7XL:]U]bN>Es\H]Z]6]?=1XB]mXJED]_]Q><6z]t?w?^]q]rKC]uK_>A]Y
+Yd>cQO]oRu^15j]cX=]rRA@`VV^5TQSoSTCUSnYx\CXL]Q^1>+6O^2^F^;X697@N62KwNW]T
+^6]y:7ECLS]p]J^.]LKFYZ^3^E^GGW]x7zR6LR?yLW]:SjR[^*>f\t\dK@5b^G^F^4=SKR]B
+^b^>^c^@^A^KQbV@]mUpKb]h^Y][7z^o]l^2^4^I^,]d<tS=^*Ga_/^R<aEq_=Vh_?^BLwU^
+5S_3^JXQ]*TV^u]7^-\2^Z]NYLXr_KPU_M]O_@_P_0_R_2_T_V_IKG_O]9_d];_Q\8^/]3_:
+_e_l_g_]_i_S51^a_\_[_mU3]-\j9`^g9*`+Mf^X_^]j_o_v`2^<_k_x]=FV[jWz[k`;`:_p
+\L<k[k\V`BPB`D`?Z`\J`GZe`I`7]i`LZ+[d`O`M_1`RXv`@`U`P_Y[S\/\J`\\G`^\D``\B
+`b\?`d\<`f\9`h\6`j\3`l\06F`B`q`r`s?c8k.U`w`x`y`za*-O<7a+a.a/a0a1`w9k3Na5
+a6a7.^5,a8a;a<a=-n.L3gaAaBaCaDaE3f3TaFaIaJaKaLaM-t
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+/annot { %                    p.j 25-07-93
+%  this procedure requires 5 arguments
+% 1. the number to be printed (between 1 and 10)
+% 2. a flag 1= black numbers with serif on white background
+%           2= black numbers without serif on white background
+%           3= white numbers with serif on black background
+%           4= white numbers without serif on black background
+% 1. the size of the ZapfDingbats font
+% 4. x1  
+% 5  y1
+% 6. x2
+% 7. y2
+% there are 2 additionnal quantities that I compute as a
+% function of the font size, namely
+%    - the linewidth =font size / 5.  ( to be tuned at your taste) 
+%    - the head of the arrow is an equilateral triangle,
+%       size of triangle = 0.75 * font size  ( to be tuned at your taste)
+/y2 exch def /x2 exch def /y1 exch def /x1 exch def
+/fs exch def /flag exch def /num exch def
+%
+%
+% define the white border arrowd the arrow
+/border 1 def 
+%
+% define for the arrow itself, a line width depending on the font size
+/arr_width fs 5 div def
+% 
+% define the head size
+/head 0.75 fs mul def 
+% auxiliary procedure to draw a triangle
+/tri {% pile x1,Y1 ,x2 y2 x3 y3
+1 setlinewidth newpath moveto lineto lineto closepath fill } def
+ 
+%   fetch in the ZapfDingbats font which character to be printed 
+%          according to the flag value
+ flag 1 eq { num 171 add } if   flag 2 eq { num 191 add } if 
+ flag 3 eq { num 181 add } if   flag 4 eq { num 201 add } if 
+ /num exch def
+ 
+ 
+%  print the number by centering it at x1,y1
+/ZapfDingbats findfont fs scalefont setfont
+/car 1 string def num car 0 3 -1 roll put 
+ x1 car stringwidth pop 2 div sub y1 fs 3 div sub moveto 
+car show
+ 
+gsave
+ 
+% compute arrow angle and length from x2,y2 to middle of character box
+/r { x2 x1 sub dup mul y2 y1 sub dup mul add sqrt } def 
+/ang { y2 y1 sub x2 x1 sub atan } def
+% translate refr. frame 
+gsave
+ x2 y2 translate ang 180 add rotate
+ 
+% draw the border of the arrow, then arrow
+newpath arr_width border 2 mul add setlinewidth 
+ 1 setgray 0.5 head mul  0 moveto r fs 0.5 mul sub border add 0 lineto
+  stroke 
+% newpath arr_width setlinewidth   0 setgray 0.5 head 
+% mul  0 moveto r fs 0.5 mul sub 0 lineto stroke
+ 
+% draw the triangles
+/x+  border 2 mul def /p border 1.73 div def /g border 0.87 div def  
+newpath 1 setgray
+ 0 x+ sub 0  
+ 0.87 head mul  border add 0.5  head mul p add g add 
+ 0.87 head mul  border add 0.5  head mul p add g add neg tri
+newpath 0 setgray 0 0  
+ 0.87 head mul  0.5 head mul
+ 0.87 head mul 0.5 head mul neg tri
+% re-draw the arrow
+newpath arr_width setlinewidth    0 setgray 0.5 head mul  
+                 0 moveto r fs 0.5 mul sub 0 lineto stroke
+grestore } def
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ 
+ 
+%num     flag     size     x1     y1     x2     y2
+/Y1 19 def
+   1        4       19    105     Y1    105     77  annot
+   2        4       19    152     Y1    152    148  annot
+   3        4       19    198     Y1    198     77  annot
+   4        4       19    290     Y1    290     77  annot
+/X1 382 def
+   5        4       19     X1    230    316    230  annot
+/X2 311 def
+   6        4       19     X1    294     X2    294  annot
+   7        4       19     X1    356     X2    356  annot
+   8        4       19     X1    413     X2    413  annot
+/X1 11 def
+/X2 79 def
+   1        2       19     X1    275     X2    275  annot
+   2        2       19     X1    306     X2    306  annot
+   3        2       19     X1    338     X2    338  annot
+   4        2       19     X1    368     X2    368  annot
+   5        2       19     X1    399     X2    399  annot
+   6        2       19     X1    431     X2    431  annot
+
+showpage

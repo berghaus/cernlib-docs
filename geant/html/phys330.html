@@ -1,0 +1,497 @@
+<PRE>
+
+
+
+
+<H2>Geant  3.16  Routine  PHYS330</H2>
+
+
+<PRE>
+
+
+Origin:  L.Urban                                       Submitted:  26.10.84
+Revision:                                                            Revised:  16.12.93
+Documentation:
+
+
+</PRE>  <HR>  <H2>Ionisation  processes  induced  by
+
+
+e     </H2>
+
+
+<PRE>
+
+
+</PRE>
+
+
+<H2>Subroutines</H2>
+
+
+<PRE>
+
+
+
+       CALL  GDRELA
+
+
+
+GDRELA  initialises  the  ionisation  energy  loss
+tables  for  different  materials  for  muons,
+electrons  and  positrons  and  other  particles.  The
+energy  binning  is  set  within  the  array  ELOW
+(common  /GCMULO/)  in  the  routine  GPHYSI.  The
+tables  are  filled  with  the  quantity  dE/ dx  in
+GeV/cm  (formula  (??    )  below)  which  is  valid  for  an
+element  as  well  as  a  mixture  or  a  compound.  In  the
+tables  the  dE/dx  due  to  ionisation  is  summed  with
+the  energy  loss  coming  from  bremsstrahlung.  For
+energy  loss  of  electrons  and  positrons,  it  calls
+GDRELE  using  the  following  pointers:
+
+
+
+                                                                            th
+    JMA  =  LQ(JMATE-I)                                  pointer  to  the  I        material
+
+
+
+    JEL1  =  LQ(JMA-1)                                   pointer  for  dE/dx  for  electrons
+
+
+
+    JEL1+90                                              pointer  for  dE/dx  for  positron
+
+
+
+GDRELA  is  called  at  initialisation  time  by
+GPHYSI.
+
+
+
+       CALL  GDRELE                         (EEL,CHARGE,JMA,DEDX)
+
+
+
+GDRELE  computes  the  ionisation  energy  loss  (DEDX)
+
+
+
+for  electrons  (CHARGE  =  -1)  and  positrons  (CHARGE
+=  +1)  with  kinetic  energy  EEL  in  the  material
+indicated  by  I  in  JMA  =  LQ(JMATE-I).  It  is  called
+by  the  routine  GDRELA.
+
+
+
+       CALL  GDRSGA
+
+
+
+CDRSGA  calculates  the  total  cross-section  in  all
+materials  for  delta  rays  for oM"ller  (e-e-)  and
+Bhabha  (e-e+)  scattering  and  for  muons.  It
+tabulates  the  mean  free  path,  lambda            = 1/ Sigma           (in
+cm)  as  a  function  of  the  medium  and  the  energy.
+The  energy  binning  is  set  within  the  array  ELOW
+(common  /GCMULO/)  in  the  routine  GPHYSI.  The
+following  pointers  are  used  (see  JMATE  data
+structure):
+
+
+
+                                                                                                                     th
+    JMA  =  LQ(JMATE-I)                                                                           pointer  to  the  I        materi*
+ *al
+
+
+
+    JDRAY  =  LQ(JMA-11)                                                                          pointer  to  delta         -ray  *
+ *cross-sections
+
+
+
+    JDRAY                                                                                         pointer  for  electrons
+
+
+
+    JDRAY+90                                                                                      pointer  for  positrons
+
+                                                                                                                      +         -
+    JDRAY+180                                                                                     pointer  for  mu       / mu      .
+
+
+
+The  routine  is  called  during  initialisation  by
+GPHYSI.
+
+
+</PRE>
+
+
+<H2>Method</H2>
+
+
+<PRE>
+
+
+Let:
+                                      ((dsigma         (E, T))/ (dT))
+
+be  the  differential  cross-section  for  the
+ejection  of  an  electron  with  kinetic  energy  T  by
+
+
+an  incident  e       of  total  energy  E  moving  in  a
+medium  of  density  rho     .
+
+
+The  variable  DCUTE  in  common  /GCCUTS/  is  the
+kinetic  energy  cut-off  for  the  generated
+delta         -rays.  Below  this  threshold  the  soft
+electrons  ejected  are  simulated  as  continuous
+
+
+
+
+energy  loss  by  the  incident  e     ,  and  above  it  they
+are  explicitly  generated.
+
+
+The  mean  value  of  the  energy  lost  by  the  incident
+
+
+e       to  the  soft  delta         -rays  is:
+
+
+                                        DCUTE
+  E            (E, DCUTE         ) = R                ((dsigma         (E, T))/ (dT))T dT
+   soft
+                                        0
+
+                                                                                                                            (1)
+whereas  the  total  cross-section  for  the  ejection
+of  an  electron  of  energy  T>DCUTE           is:
+
+
+                                           T
+
+    sigma         (E, DCUTE         ) = R   Max          ((dsigma         (E, T))/ (dT)) dT
+
+
+
+                                           DCUTE
+
+                                                                                                                            (2)
+where  T           is  the  maximum  energy  transferable  to
+        Max
+
+the  free  electron:
+
+
+
+                                              E- m                        for        e +
+                            T          = -                                                        .                         (3)
+                             Max              (E- m)/ 2                   for        e- ,
+
+
+
+where  m  is  the  electron  mass.  The  method  of
+calculation  of  the  continuous  energy  loss  and  the
+total  cross-section  are  explained  below.
+[PHYS331]  deals  with  the  explicit  simulation  of
+the  delta         -rays.
+
+
+</PRE>
+
+
+<H3>Continuous  energy  loss</H3>
+
+
+<PRE>
+
+
+The  integration  of  (??    )  leads  to  the
+Berger-Seltzer  formulae  :
+
+
+
+                         2                   2                                      2
+((dE)/ (dx)) = ((2pi    r   mn)/ (beta           ))[ln    ((2(tau      +2))/ ((I/ m)   ))+F   (tau      , Delta         )- delta   *
+ *      ],
+
+
+                         0
+
+                                                                                                                            (4)
+where
+
+
+
+    gamma                   ((E)/ (m))
+
+               2                                    2
+    beta                    1- ((1)/ (gamma            ))
+
+
+
+    tau                     gamma         - 1
+
+
+
+    tau                     ((DCUTE         )/ (m))
+            c
+
+    DCUTE                   energy  cut  for                      e
+
+
+
+    tau                     maximum  possible  energy  transfer  in  e-mass:  tau       for  e+,  tau     / 2  for  e-
+            max
+
+
+    Delta                   min      (tau         , tau              )
+                                               c            max
+
+
+    n                       electron  density  of  the  medium
+
+
+
+    I                       average  mean  ionisation  energy
+
+
+
+    delta                   density  effect  correction                                         .
+
+
+
+
+The  functions  F     are  given  by
+
+
+ +                                                                                                     2                           *
+ *                     @
+F   (tau      , Delta         )              =         ln   (tau      Delta         )- ((Delta            )/ (tau      ))[tau      *
+ *+ 2Delta         - ((@
+
+
+
+ -                                                                     2                                                           *
+ *                     @
+F   (tau      , Delta         )              =         - 1- beta           + ln   [(tau      - Delta         )Delta         ] + ((t*
+ *au      )/ (tau      @
+
+
+where  y = 1/ (gamma          + 1).
+
+
+The  density  effect  correction  is  calculated  as
+in  :
+
+
+
+                      0                                                                                      if     x<x
+                                                                                                                       0
+                                                     m
+delta          = -    2 ln    10 + x + C + a(x   - x)                                                               x   < =    x< =*
+ *    x           .
+
+                                              1                                                                      0             *
+ *     1
+
+
+                      2 ln    10 + x + C                                                                            x   <x,
+                                                                                                                     1
+
+                                                                                                                            (7)
+
+                                2
+where  x = ln    (gamma            - 1)/ (2 ln    10)  The  quantities  n,
+I  and  the  parameters  of  the  density  effect
+
+
+
+correction  (x   , x   , C, a, m)  are  computed  in  the
+              0     1
+
+routine  GPROBI,  and  we  give  the  corresponding
+formulae  here.  The  electron  density  of  the
+medium,  n,  can  be  written  as
+
+
+
+         N      rho      ((Z)/ (A))                                                               for  elements
+          Av
+n = -                                                                                                                              *
+ *                     @
+         N      rho      ((sum        n   Z   )/ (sum        n   A   ))                           for  compounds/mixtures,
+          Av                   i       i   i          i       i   i
+
+
+                                                                                                                            (8)
+
+
+where
+
+
+N                Avogadro's  number;
+Z                atomic  number;
+ i
+
+A                atomic  weight;
+ i
+
+rho              density  of  the  material;
+
+                                                   th
+n                proportion  by  number  of  the  i        element  in
+ i
+
+                 the  material  (for  a  mixture  n    = Wp   / A
+                                                   i       i     i
+
+                 where  p     the  proportion  by  weight  and  W  is
+                         i
+
+                 the  molecular  weight).
+
+
+The  average  mean  ionisation  energy  can  be
+calculated  as       :
+
+
+
+                    -9      0.9
+              16  10       Z                                                                              for  a  chemical  element
+
+I(GeV) = -                                                                                                                         *
+ *                     @
+              exp       [sum        n   Z    ln    I(Z   )/ sum       n   Z   ]                           for  a  compound  or  mix*
+ *ture
+                             i       i   i            i        i       i   i
+
+
+                                                                                                                            (9)
+
+
+The  density  effect  correction  parameters  can  be
+computed  (for  condensed  medium  )  as
+
+
+
+                                                  -9    p  =========
+   C         =         1 + 2 ln   ((I)/ (28. 8  10         rho      sum        n   Z   / sum       n   A   ))
+                                                                                i   i               i   i
+
+
+
+   m         =         3
+
+
+x            =         ((C)/ (2 ln    10))
+ a
+
+
+                                                                 m
+   a         =         2 ln    10(((x   - x   ))/ ((x   - x   )))
+                                     a     0         1     0
+
+
+
+             ___________________________________________________________________________________________________________
+             |                       |                           |                                      |             |
+             |           I           |             C             |                 x                    |     x       |
+             |                       |                           |                                      |             |
+             |_______________________|___________________________|__________________0___________________|______1______|_|||||
+             |         -7         |                      |                                            |              |
+             |      <10           |         <3. 681      |                        0. 2                |        2     |
+             ||                   ||                     ||                                 |         |              ||
+             |         -7         |                       |                                 |                        |
+             |      <10           |       > =   3. 681    |              - 0. 326C- 1       |                  2     |
+             |____________________|_______________________|_________________________________|________________________|__|||||
+             |            -7        |                     |                                           |              |
+             |    > =   10          |        5. 215       |                       0. 2                |        3     |
+             ||                     ||                    ||                             |            |              ||
+             |            -7        |                     |                              |                           |
+             |    > =   10          |     > =   5. 215    |           - 0. 326C- 1. 5    |                     3     |
+             |______________________|_____________________|______________________________|___________________________|__
+
+
+</PRE>
+
+
+<H3>Total  cross-sections</H3>
+
+
+<PRE>
+
+
+The  integration  of  formula  (??    )  gives  the  total
+cross-section  ,    for oM"ller  scattering  (e- e-):
+
+
+                                                 2                   2                                                   2         *
+ *                     @
+sigma         (Z, E, DCUTE         ) = ((2pi    r   mZ)/ (beta           (E- m)))[(((gamma         - 1))/ (gamma            ))(((1)*
+ */ (x))- 1)+((1)/ (x))@
+
+
+                                                 0
+
+                                                                                                                         (10)
+and  for  Bhabha  scattering  (e + e-):
+
+
+                                                 2                                   2                                             *
+ *            2        @
+sigma         (Z, E, DCUTE         ) = ((2pi    r   mZ)/ ((E- m)))[((1)/ (beta           ))(((1)/ (x))- 1)+B   x+B   (1- x)- ((B   *
+ *)/ (2))(1- x   )+((B @
+                                                                                                            1     2             3  *
+ *                    4
+                                                 0
+
+                                                                                                                         (11)
+where
+
+
+
+                                                                                                                    2              *
+ *               2
+    gamma          = ((E)/ (m))                                                                          beta           = 1- ((1)/ *
+ *(gamma            ))
+
+
+
+    x = ((DCUTE         )/ (E- m))                                                                       gamma         = ((1)/ (gam*
+ *ma          + 1))
+
+
+               2                                                                                                             2
+    B    = 2- y                                                                                          B    = (1- 2y)(3 + y   )
+     1                                                                                                    2
+                  2            3                                                                                       3
+    B    = (1- 2y)    + (1- 2y)                                                                          B    = (1- 2y)
+     3                                                                                                    4
+
+
+
+The  formulae  [??    ]  and  [??    ]  give  the  total
+cross-section  of  the  scattering  above  the
+threshold  energies
+
+
+
+ thr                                                                                                       thr
+T                  = 2DCUTE                                        and                                    T                  = DCUTE
+
+
+ Moller                                                                                                    Bhabha
+
+                                                                                                                         (12)
+The  interaction  length  for  the  production  of
+delta         -rays  is  calculated  during  initialisation
+by  routine  GDRSGA.
+</PRE>

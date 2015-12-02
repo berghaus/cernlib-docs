@@ -1,0 +1,729 @@
+<HEAD>
+<TITLE> Format specifications</TITLE>
+</HEAD>
+<BODY><P>
+ <HR> <A NAME=tex2html21 HREF=tex2htmlindex2_2.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/next_motif.gif"></A> <A NAME=tex2html19 HREF=ZEBFZ4.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/up_motif.gif"></A> <A NAME=tex2html13 HREF=ZEBFZ4.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/previous_motif.gif"></A>  <A NAME=tex2html23 HREF=tex2htmlindex2_2.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/index_motif.gif"></A><BR>
+<B> Next:</B> <A NAME=tex2html22 HREF=tex2htmlindex2_2.html>Index</A>
+<B>Up:</B> <A NAME=tex2html20 HREF=ZEBFZ4.html>No Title</A>
+<B> Previous:</B> <A NAME=tex2html14 HREF=ZEBFZ4.html>No Title</A>
+<HR> <P>
+<H1><A NAME=SECTION0010000000000000000> Format specifications</A></H1>
+<P>
+<A NAME=secH1FZformatspecs><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<P>
+<H1><A NAME=SECTION0011000000000000000> Native mode</A></H1>
+<P>
+In native mode
+a data-structure is represented by a series of logical records (LR).
+These records are written and read by Fortran <tt>WRITE</tt> and <tt>READ</tt>
+statements.
+<P>
+Since indefinitly large records would cause problems in
+auxiliary programs,
+<A HREF=../../zebra/ZEBFZ2/chapter2_1.html#FZOUT>FZOUT</A> will make sure that no record exceeds the maximum
+logical record size declared for the file with <A HREF=../../zebra/ZEBFZ2/chapter2_1.html#FZFILE>FZFILE</A>,
+breaking a chunk of information into several records if necessary.
+Independently, the pilot record may not exceed 1024 words.
+<P>
+A data-structure starts with the 'pilot' record (type 2 or 3),
+<A NAME=55><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=56><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>which may be continued with 'pilot continuation' records (type 4)
+<A NAME=57><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=58><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>if necessary; this is followed by as many 'bank material' records
+<A NAME=59><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=60><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>as needed (type 7 for all except the last which has type 8).
+<P>
+<H2><A NAME=SECTION0011100000000000000> Native mode, logical records: general format</A></H2>
+<P>
+<PRE><TT>word -1:  NWLR, the number of words in this record,
+            excluding the first two (!) words
+            (except for padding records in exchange file format)
+
+ word 0:  logical record type LRTYP:
+
+            LRTYP= 1: record 'start or end of run'
+
+                   2: pilot record for d/s 'start of event'
+
+                   3: pilot record for d/s 'event continued'
+
+                   4: pilot continuation record
+
+              5 or 6: padding records, ignored on input,
+                       (not used in native mode)
+
+                   7: bank material record, with more to come
+
+                   8: last bank material record of a d/s
+
+                   9: emergency-stop record
+
+words 1 -&gt; NWLR:  data words of the logical record</TT></PRE>
+<P>
+<H2><A NAME=SECTION0011200000000000000> Native mode, logical records: start-of-run and end-of-run</A></H2>
+<P>
+<PRE><TT>word -1:  NWLR, the record length
+
+      0:  LRTYP=1, the record type
+
+      1:  NRUN, the run number, a positive integer
+          NRUN=0 signals 'end-of-run'
+
+      2 -&gt; NWLR:  user information, integers only</TT></PRE>
+<P>
+A record <tt>LRTYP=1</tt> with <tt>NRUN</tt> positive may be used to mark the beginning
+of a run; this is not obligatory.
+<P>
+A record <tt>LRTYP=1</tt> with <tt>NRUN=0</tt> may be used to signal the end of a run.
+<P>
+<H2><A NAME=SECTION0011300000000000000> Native mode, logical records: the pilot record</A></H2>
+<P>
+<PRE><TT>word -1:  NWLR, record length limited to NWLR &lt; 1020
+
+      0:  LRTYP = 2 or 3, the record type
+
+      1:  the floating point number 12345.0 as a check word
+
+      2:  Zebra version number, integer = 10000. * QVERSIO
+           zero if written by a user routine
+
+      3:  processing option bits
+
+      4:  zero (reserve word)
+
+      5:  NWTX, number of words in the text-vector, may be zero
+
+      6:  NWSEG, number of words in the segment table,
+           = 3 * number of table entries
+
+             if NWSEG=0: no table, but not necessarily empty d/s
+
+      7:  NWTAB, number of words in the relocation table,
+           = 2 * number of table entries
+
+             if NWTAB=0:  linkless data-structure
+
+      8:  NWBK, total number of words occupied by the bank material,
+           both on memory and on the file, may be zero if empty d/s
+
+      9:  LENTRY, entry address into the d/s
+
+     10:  NWUHIO = NWUH + NWIO, number of words in the user header
+           vector plus its I/O characteristic, zero if no header
+
+           11: control-word for the I/O characteristic
+                either: immediate, NWIO=1,
+                         the whole vector is of the same type
+                         = 1  all bits
+                           2  all integer
+                           3  all floating
+                           7  self-decriptive
+
+                    or: complex, start of the I/O characteristic
+                         as delivered by MZIOCH, NWIO words in all
+
+           11 + NWIO: start of the user header vector,
+                       NWUH &lt; 401 words
+
+     11+NWUHIO:  start of the segment table, NWSEG words
+
+     11+NWUHIO+NWSEG:  start of the text-vector, NWTX words
+
+     11+NWUHIO+NWSEG+NWTX: start of the relocation table, NWTAB words</TT></PRE>
+<P>
+<H2><A NAME=SECTION0011400000000000000> Native mode, logical records: the pilot continuation records</A></H2>
+<P>
+If the text vector is too large to fit into the pilot record
+it is written out as a separate <tt>LRTYP=4</tt> continuation record:
+<P>
+<PRE><TT>word -1:  NWTX
+             0:  LRTYP=4
+             1:  start of the text vector, NWTX words</TT></PRE>
+<P>
+The relocation table is written as a separate <tt>LRTYP=4</tt> continuation
+record (or even several such records in the very unlikely case
+that the table is larger than the maximum record length) if:
+<P>
+<UL><LI> text vector did not fit into the pilot record
+<LI> table is too large to join the pilot record
+<LI> table is longer than 40 words (because the buffer space for
+      the 'early table words' in the control-bank associated to the
+      file has this size) as follows:
+<PRE><TT>word -1:  NWTAB
+            0:  LRTYP=4
+            1:  start of the relocation table, NWTAB words</TT></PRE>
+</UL><H2><A NAME=SECTION0011500000000000000> Native mode, logical records: the bank material records</A></H2>
+<P>
+<PRE><TT>word -1:  NWLR, the number of words in this record,
+            excluding the first two words
+
+      0:  LRTYP = 7 or 8, record type
+
+      1 -&gt; NWLR:  the bank material</TT></PRE>
+<P>
+The bank material is dumped directly in sequential order
+into either one or several records;
+all but the last record are given the type <tt>LRTYP=7</tt>,
+the last has <tt>LRTYP=8</tt>.
+<P>
+<H2><A NAME=SECTION0011600000000000000> Pilot: The segment table</A></H2>
+<P>
+Each entry has 3 words:
+<P>
+<UL><LI>    2 words are the Hollerith name of the division of origin,
+<LI>    1 word indicates the number of words of bank material for 
+         this segment.
+</UL>The table on the file gives first the names of the divisions
+for the segments, followed by the size indicators;
+in both cases in the order in which the segments occur on the file,
+which is also the order in which they where in memory at <A HREF=../../zebra/ZEBFZ2/chapter2_1.html#FZOUT>FZOUT</A> time.
+<P>
+For example: suppose data from two divisions,
+called <tt>'BGO'</tt> and <tt>'CALORIM'</tt>, where written.
+Division <tt>BGO</tt> was physically lower in the store at output time
+and delivered 21469 words, whilst division <tt>CALORIM</tt> gave 9199 words.
+The segment table for this would consist of six words:
+<P>
+<PRE><TT>4HBGO , 4H    , 4HCALO, 4HRIM , 21469, 9199</TT></PRE>
+<P>
+If all the bank material comes from one single division only
+the segment table is suppressed.
+<P>
+<H2><A NAME=SECTION0011700000000000000> Pilot: The text vector</A></H2>
+<P>
+This is stored as a series of lines,
+each line is preceded by a word-count indicating the number of
+4-character Hollerith words to follow (this corresponds to the
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZIOCH>MZIOCH</A> format <tt>'/*H'</tt>).
+<P>
+<H2><A NAME=SECTION0011800000000000000> Pilot: The relocation table</A></H2>
+<P>
+There is one entry for each contiguous section of memory,
+containing an integral number of banks, which has been written
+to the file. The entry consists of the original start address
+of the section, followed by the end+1 address.
+The entries follow each other in the table, thus:
+<P>
+<PRE><TT>word 1:  start adr of first storage region
+            2:  end+1 adr of first storage region
+            3:  start adr of second storage region
+                 ...           ...
+        NWTAB:  end+1 adr of last storage region</TT></PRE>
+<P>
+<H1><A NAME=SECTION0012000000000000000> Exchange mode</A></H1>
+<P>
+The exchange mode provides an interface between computers of
+different architecture, through which data-structures can travel.
+This interface has two distinct components:
+<P>
+<UL><LI> The <b>exchange data format</b> defines the representation
+       of the data for the data-types allowed with ZEBRA:
+       bit pattern, integer, floating, double-precision, Hollerith.
+ <LI> The <b>exchange file format</b> defines the organisation of
+       the data into logical records,
+       and their blocking into physical records.
+</UL>Normal blocking methods, such as IBM's VBS,
+use control-information associated to every physical record;
+for good reasons, because this provides safe and easy recovery to the
+next logical record in case a physical record is lost.
+In ZEBRA this could not be used because the intention was to provide
+a format which would allow data-taking computers to dump rapidly
+large amounts of data directly from memory to the file,
+without copying through a buffer and without distroying the data
+in the store,
+which implies the use of physical records without
+any control-information.
+Such physical records we call 'fast blocks'.
+We do however need a different kind of physical record,
+which does provide control information,
+and which can be used for recovery.
+Such blocks are called 'steering blocks'.
+Any data-structure starts on a steering block and may continue on as
+many fast blocks as needed,
+their number being recorded in the control-information of the
+steering block.
+<P>
+To permit recovery, the steering blocks carry a particular bit
+pattern on the first 4 words,
+i.e. a pattern of 128 bits.
+This reduces the a priori chance of a fast block
+simulating a steering block to 1 in <PRE><TT>4.*10^{38}</TT></PRE>.
+This is further reduced by contraints on the contents of the control
+information for the steering block.
+(To keep this probability low the user must not deliberately
+use elements of this pattern as signals,
+such as end markers.)
+<P>
+Some copy utilities copy a magnetic tape with suppression of faulty
+blocks.
+If a fast block of a particular data-structure is lost in this way,
+<A HREF=../../zebra/ZEBFZ2/chapter2_1.html#FZIN>FZIN</A> would read the copy without getting an error signal
+for the fast block,
+and it would try to absorb the first block after the d/s,
+a steering block, using it as data.
+To prevent this, <A HREF=../../zebra/ZEBFZ2/chapter2_1.html#FZIN>FZIN</A> is programmed never to accept as fast
+a block which looks like a steering block.
+If a d/s contains a genuine fast block simulating a steering block,
+it will be lost.
+The chance of this happening is sufficiently low to be tolerable,
+as shown above.
+<P>
+A file to be read by <A HREF=../../zebra/ZEBFZ2/chapter2_1.html#FZIN>FZIN</A> is not necessarily the result of <A HREF=../../zebra/ZEBFZ2/chapter2_1.html#FZOUT>FZOUT</A>,
+it may have been produced by a user program,
+and this may not yet be fully debugged.
+FZIN has been programmed to catch hopefully all logical errors
+possible in the user's output routines,
+and to give full diagnostics with logging level 4.
+<P>
+Whilst files in native mode can be written and read by identical
+code on all machines,
+specific code is provided for each type of machine
+to read and write files in exchange mode.
+Idiosyncracies of any given machine (like the ones of the VAX)
+must remain local to the specific code of that machine.
+This is an important principle,
+as it avoids the combinatorial problem of every machine
+having to know about all other machines.
+Also,
+it provides for a clean solution to the advent of a new machine,
+or the disappearance of an obsolete machine.
+<P>
+<H1><A NAME=SECTION0013000000000000000> Exchange Data format</A></H1>
+<P>
+The unit of information is a word of 32 bits,
+(double-precision numbers require two words each).
+A word may contain:
+<P>
+<PRE><TT>- positive integer:  true binary
+ - negative integer:  two's complement of the absolute value
+ - floating point:    IEEE standard as shown below
+ - Hollerith:         4 character 8-bit ASCII, stored left to right
+ - bit pattern:       32 bits of zero or one (no conversion)</TT></PRE>
+<P>
+The following reduction may occur when transforming
+to the exchange representation on machines with a word-size
+larger than 32 bits:
+<P>
+<PRE><TT>- integer:     'bad conversion' if more than 31 significant bits
+ - floating:    reduced precision, but correctly rounded
+ - Hollerith:   only the first 4 characters are taken
+                 (trailing characters should be blank anyway)
+ - bit pattern: only the right-hand 32 bits are taken</TT></PRE>
+<P>
+The following expansions may occur for the inverse transformation:
+<P>
+<PRE><TT>- Hollerith:   blank fill
+ - bit pattern: zero-fill of the leading bits</TT></PRE>
+<P>
+The IEEE representation of
+single and double precision floating-point numbers is:
+<P>
+<PRE><TT>Single precision:  1  bit  32       the sign-bit 's'
+                   8  bits 31 - 24  the characteristic 'c'
+                  23  bits 23 -  1  the mantissa 'm'
+
+Double precision:  1  bit  64       the sign-bit 's'
+                  11  bits 63 - 53  the characteristic 'c'
+                  52  bits 52 -  1  the mantissa 'm'</TT></PRE>
+<P>
+A normal floating point number is represented by 3 fields
+on one or two 32-bit words:
+<P>
+<tt>'m'</tt> is the fractional part of the mantissa M;
+the binary point is assumed to be immediately to the left
+of the most significant bit of m,
+preceded by an implied 1 (hidden bit), for example:
+<P>
+<PRE><TT>m             M mantissa       decimal value
+
+         0000...0      1.0000...0       1.
+         1000...0      1.1000...0       1.5
+         1100...0      1.1100...0       1.75</TT></PRE>
+<P>
+<tt>'c'</tt> is the characteristic, being the binary exponent with a bias of
+127 or 1023 added, for example:
+<P>
+<PRE><TT>c             exponent        c              exp
+
+         011...101     -2              100...000      1
+         011...110     -1              100...001      2
+         011...111      0              100...011      3</TT></PRE>
+<P>
+A normal floating-point number does not have a c of all ones
+or all zeros, such characteristics are used to represent Exceptions.
+<P>
+<tt>'s'</tt> is the sign-bit, the number is negative if this bit is on.
+The representation of floating-point numbers is of the
+sign/magnitude form, ie. only the sign-bit is complemented
+to change the sign of the number.
+<P>
+The Exceptions are:
+<PRE><TT>c=0, m=0            floating-point zero
+   c=0, m= not 0       'de-normalized number',
+                       value:   +/-  0.m  *  2**(-126 or -1022)
+   c=all 1, m=0        signed infinity  (c=255 or 2047)
+   c=all 1, m= not 0   'not a number (NaN)'</TT></PRE>
+<P>
+<H1><A NAME=SECTION0014000000000000000> Exchange File Format</A></H1>
+<P>
+The logical records of the exchange file format look much like those
+of the native mode,
+except that a data-structure may be represented by a single LR
+of type 2 or 3.
+LR type 4 is used for bank material continuation,
+LR types 7 and 8 do not exist.
+<P>
+<H2><A NAME=SECTION0014100000000000000> Exchange File Format, logical records: general format</A></H2>
+<P>
+<PRE><TT>word -1:  NWLR, the number of words in this record,
+          excluding the first two (!) words, except:
+          excluding the first word only for padding records
+          for NWLR = 0  the LR type 5 is implied
+
+ word 0:  logical record type LRTYP:
+
+            LRTYP= 1: record 'start or end of run'
+
+                   2: (start of) data-structure 'start of event'
+
+                   3: (start of) data-structure 'event continued'
+
+                   4: data-structure continued
+
+              5 or 6: padding records, ignored on input,
+
+words 1 -&gt; NWLR:  data words of the logical record</TT></PRE>
+<P>
+<H2><A NAME=SECTION0014200000000000000> Exchange File Format, logical records: start-of-run and end-of-run</A></H2>
+<P>
+<PRE><TT>word -1:  NWLR, the record length
+
+      0:  LRTYP=1, the record type
+
+      1:  NRUN, the run number, a positive integer
+          NRUN = 0  signals 'end-of-run'
+          NRUN =-1  signals 'Zebra end-of-file'
+
+      2 -&gt; NWLR:  user information, integers only</TT></PRE>
+<P>
+A record <tt>LRTYP=1</tt> with <tt>NRUN</tt> positive may be used to mark the beginning
+of a run; this is not obligatory.
+<P>
+A record <tt>LRTYP=1</tt> with <tt>NRUN=0</tt> may be used to signal the end of a run.
+<P>
+<H2><A NAME=SECTION0014300000000000000> Exchange File Format, logical records: (start of) data-structure</A></H2>
+<P>
+<PRE><TT>word -1:  length NWLR = 10 + NWIO + NWUH + NWSEG + NWTX + NWTAB
+                           + NWBKST  (bank material in this record)
+
+      0:  LRTYP = 2 or 3, the record type
+
+      1:  the floating point number 12345.0 as a check word
+
+      2:  Zebra version number, integer = 10000. * QVERSIO
+           zero if written by a user routine
+
+      3:  processing option bits
+           = 0  normally
+             1  Direct-access-Table record
+             2  DaT forward reference record
+
+      4:  zero (reserve word)
+
+      5:  NWTX, number of words in the text-vector, may be zero
+
+      6:  NWSEG, number of words in the segment table,
+           = 3 * number of table entries
+
+      7:  NWTAB, number of words in the relocation table,
+                  = 2 * number of table entries,
+           if = 0:  linkless data-structure
+
+      8:  NWBK, total number of words occupied by the bank material,
+           both on memory and on the file, may be zero if empty d/s
+
+      9:  LENTRY, entry address into the d/s
+
+word 10:  NWUHIO = NWUH + NWIO, number of words in the user header
+           vector plus its I/O characteristic, zero if no header
+
+           11: control-word for the I/O characteristic
+               either: immediate, NWIO=1,
+                         the whole vector is of the same type
+                         = 1  all bits
+                           2  all integer
+                           3  all floating
+                           7  self-decriptive
+
+                    or: complex, start of the I/O characteristic
+                         as delivered by MZIOCH, NWIO words in all</TT></PRE>
+<P>
+The 10 words of basic pilot information are followed by
+these data sectors:
+<P>
+<DL COMPACT>
+<DT>NWIO
+<DD>   words of the I/O characteristic for the user header vector
+<DT>NWUH
+<DD>   words of the user header vector
+<DT>NWSEG
+<DD>  words of the segment table
+<DT>NWTX
+<DD>   words of the text-vector
+<DT>NWTAB
+<DD>  words of the relocation table
+<DT>NWBKST
+<DD> words of bank material in this record, at most = <tt>NWBK</tt>
+</DL>A decription of the contents of the segment table, the text vector,
+and the relocation table is found in the format decription of the
+native mode.
+The bank material is a direct copy
+(but normally transformed to exchange data format)
+of the data in the dynamic store.
+<P>
+<H2><A NAME=SECTION0014400000000000000> Exchange File Format, logical records: data-structure continued</A></H2>
+<P>
+<PRE><TT>word -1:  NWLR, the record length
+
+         0:  LRTYP=4, the record type
+
+         1 -&gt; NWLR:  further bank material</TT></PRE>
+<P>
+<H2><A NAME=SECTION0014500000000000000> Exchange File Format, logical records: padding records</A></H2>
+<P>
+Padding records must be used to mark unused areas of
+physical records.
+<P>
+<PRE><TT>word  0:  NWLR, the record length (excluding the first word only!)
+
+         1:  LRTYP = 5 or 6, the record type
+
+         2 -&gt; NWLR:  words to be ignored on input</TT></PRE>
+<P>
+The total size of a padding record is <tt>NWLR+1</tt>,
+including the LR length and the <tt>LR</tt> type;
+thus a padding record with <tt>NWRL=1</tt> occupies two words.
+To pad exactly one word, <tt>NWRL=0</tt>  should be stored,
+in this case the <tt>LR</tt> type 5 is implied
+without being present in the data.
+<P>
+The maximum size of a padding record is the size of a
+physical record.
+<P>
+There must not be more than 4 consecutive padding records.
+<P>
+<H2><A NAME=SECTION0014600000000000000> Exchange File Format: physical records</A></H2>
+<P>
+A file in exchange file format is supported by physical records of
+identical length (fixed-length records), this being the only
+format which can safely be read on all machines.
+A physical record consists of <tt>NWPHR</tt> words;
+the word size is 32 bits for the Exchange Data Format,
+for the Native Data Format it is the word size of the machine.
+<P>
+The physical record size <tt>NWPHR</tt> is 900 words standard,
+but a different size may be specified at OPEN time.
+For the Exchange Data format, <tt>NWPHR</tt> must be a multiple of 90 words,
+ie. 360 bytes = 64x5x9 bits,
+this being the smallest size compatible with all machines.
+<P>
+The following table shows, for the Exchange Data Format,
+some possible values of <tt>NWPHR</tt>, being multiples of 90 words.
+On machines with a word size of more than 32 bits the apparent
+record size, which may be needed in JCL, will be less;
+this is also shown, supposing that packing is dense.
+<P>
+<PRE><TT>n  NWPHR   bytes  is words of  36    48    60    64  bits
+
+        1     90     360               80    60    48    45
+       10    900    3600              800   600   480   450
+       20   1800    7200             1600  1200   960   900
+       40   3600   14400             3200  2400  1920  1800
+       50   4500   18000             4000  3000  2400  2250
+       64   5760   23040 = 512*45    5120  3840  3072  2880
+       80   7200   28800             6400  4800  3840  3600</TT></PRE>
+<P>
+<b>Note</b>: with Zebra version 3.61
+the '90 word rule' has been relaxed such that the size of
+physical recods is required to be a multiple of 30 words only.
+One should not take advantage of this if one has 36-bit machines
+in the experiment.
+<P>
+There are two kinds of physical records:
+the <b>steering</b> blocks start with 8 words of control information;
+the <b>fast</b> blocks have no control information at all.
+<P>
+Several fast blocks in succession are called a <b>burst</b>;
+each burst of fast blocks is preceded by a steering block,
+whose control information indicates the number of fast blocks
+to be expected.
+<P>
+The format of a steering block is as follows:
+<P>
+<PRE><TT>L+0  word 1:  hex  0123CDEF
+ +1  word 2:       80708070
+ +2  word 3:       4321ABCD
+ +3  word 4:       80618061
+
+ +4  word 5:  bits  1 -&gt; 24: NWPHR, the physical record length
+                               (in 32-bit words)
+
+              bits 25 -&gt; 32: flag bits:
+                               32 emergency stop block
+                               31 end-of-run
+                               30 start-of-run in this block
+
+ +5  word 6:  physical record counter (fast blocks do not count)
+               to permit checking for blocks lost by read errors;
+               if zero: no checking
+
+ +6  word 7:  NWTOLR, the off-set to the first logical record
+               starting in this block:
+
+               unless NWTOLR=0, the first new LR in this block starts
+               at word NWTOLR+1, this word being its record size.
+
+               if NWTOLR = 0: the whole block continues data
+                               of the current logical record.
+
+ +7  word 8:  NFAST, the number of fast blocks to follow just behind
+               the current steering block
+
+ +8  words 9 -&gt; NWPHR:  the data body of the block</TT></PRE>
+<P>
+The decimal values of the steering block stamp,
+either as 16-bit half-words or as 32-bit words, unsigned or signed,
+are:
+<P>
+<PRE><TT>0123CDEF =  (  291 | 52719) =     19 123 695
+    80708070 =  (32880 | 32880) =  2 154 856 560  or  -2 140 110 736
+    4321ABCD =  (17185 | 43981) =  1 126 280 141
+    80618061 =  (32865 | 32865) =  2 153 873 505  or  -2 141 093 791
+
+    0123CDEF =  001 1074 6757  octal
+    80708070 =  200 3410 0160
+    4321ABCD =  103 1032 5715
+    80618061 =  200 3030 0141</TT></PRE>
+<P>
+<H1><A NAME=SECTION0015000000000000000> Example for coding dedicated on-line output</A></H1>
+<P>
+To see the implications of this format, let us sketch what
+an output routine would have to do which has <tt>NWD</tt> words
+in a vector <tt>MDATA</tt> in a common <tt>/DATA/</tt> already in exchange data format,
+say they are all integers,
+to be written out as a Zebra file in exchange file format.
+<P>
+It has to preceed this vector by four kinds of control information,
+going backward in this order:
+<P>
+<UL><LI> add the bank system words to make it into a Zebra bank
+<LI> add the pilot information
+<LI> add two words to make it into a logical record
+<LI> add eigth control words to make the first physical record,
+      a steering block
+</UL>Most of this information can be set up once by initialization,
+and only a few holes must be filled in for each data-structure.
+In particular, the user header vector which identifies the
+structure must be filled,
+in the example we chose a header of 4 words.
+Remember that all numbers must be in exchange representation;
+but most numbers are positive integers, and hence are no problem.
+Numbers where one has to be careful are flagged by <tt>!!</tt>,
+numbers which must be re-filled are marked by <tt>*</tt>.
+<P>
+<PRE><TT>COMMON /DATA/MPR(8),MLR(2),MPILI(15),MBK(10),MDATA(100000)
+   DIMENSION     MREC(100035)
+   EQUIVALENCE  (MREC(1),MPR(1))
+
+      PARAMETER (NWPHR=900)</TT></PRE>
+<P>
+<H3><A NAME=SECTION0015010000000000000> Initialize</A></H3>
+<P>
+Physical record control words
+<P>
+<PRE><TT>MPR(1) = hex 0123CDEF  (markers)
+      MPR(2) =     80708070
+      MPR(3) =     4321ABCD
+      MPR(4) =     80618061
+      MPR(5) = NWPHR         (block size)
+    * MPR(6) = 0             (block number)
+      MPR(7) = 8             (8 words before start of LR)
+    * MPR(8) no init         (no. of fast blocks to follow)</TT></PRE>
+<P>
+Logical record control words
+<P>
+<PRE><TT>* MLR(1) no init         (record size)
+      MLR(2)   = 3           (record type, d/s)</TT></PRE>
+<P>
+Pilot information
+<P>
+<PRE><TT>!! MPILI(1) = 12345.0     (check word, floating point)
+                              IEEE:  hex 4640E400
+      MPILI(2) = 0           (Zebra version, user origin)
+      MPILI(3) = 0           (processing option)
+      MPILI(4) = 0           (reserve)
+      MPILI(5) = 0           (no text vector)
+      MPILI(6) = 0           (no segment table)
+      MPILI(7) = 0           (no relocation table, linkless d/s)
+    * MPILI(8) no init       (total bank space)
+      MPILI(9) = 0           (no entry link)
+      MPILI(10)= 5           (length of the user header, =NWIO+NWUH)
+      MPILI(11)= 2           (I/O characteristic: all integer)
+    * MPILI(12-&gt;15)          (user header vector)</TT></PRE>
+<P>
+Bank system words
+<P>
+<PRE><TT>MBK(1) bits 17-32:  2      (I/O char., all integer, say,
+                                              cf book MZ, para 1.15)
+                   1-16: 12      (= NIO + NL + 12)
+      MBK(2) = 0             (next pointer)
+      MBK(3) = 0             (  up pointer)
+      MBK(4) = 0             (orig pointer)
+      MBK(5) = 0             (Numeric   bank ID)
+   !! MBK(6) = 4HDATA        (Hollerith bank ID)
+      MBK(7) = 0             (number of links)
+      MBK(8) = 0             (number of structural links)
+    * MBK(9) no init         (number of data words)
+      MBK(10)= 0             (status word)</TT></PRE>
+<P>
+<H3><A NAME=SECTION0015020000000000000> Event by event</A></H3>
+<P>
+Suppose now <tt>NWD</tt> words are received into the vector <tt>MDATA</tt>,
+just behind <tt>MBK(10)</tt>, in exchange data format, and the lot is to be
+written out. We first have to fill the variable part in the control
+information for this data structure:
+<P>
+<PRE><TT>MBK(9)   = NWD         (size of the data part of the bank)
+      MPILI(8) = NWD+10      (amount of bank space required)
+      MLR(1)   = NWD+25      (logical record size)
+      MPILI(12)= run number         (user header vector)
+      MPILI(13)= event number
+      MPILI(14)= date
+      MPILI(15)= time
+
+      NWT  = NWD + 35           (total number of words to be written)
+      NREC = (NWT-1)/NWPHR + 1  (number of physical records)
+      MPR(8) = NREC -1          (number of fast blocks)
+
+      NWPAD = NWPHR*NREC - NWT  (no. of unused words in last block)
+      MDATA(NWD+1) = NWPAD-1    (logical record length)
+      MDATA(NWD+2) = 5          (padding record)</TT></PRE>
+<P>
+and now we can dump the lot with
+<P>
+<PRE><TT>JD = 0
+      DO  19  JREC=1,NREC
+      write physical record, words (MREC(J+JD),J=1,NWPHR)
+   19 JD = JD + NWPHR
+      MPR(6) = MPR(6) + 1      (bump the block number)</TT></PRE>
+<P>
+ <H2>References</H2>
+<P><A NAME=BIBLIO HREF=../../general/biblio/bibliography.html>Global CERN library references</A><P>/user/goossens/cnasall/cnasbibl,/user/goossens/cnasall/textproc}    
+<HR> <A NAME=tex2html21 HREF=tex2htmlindex2_2.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/next_motif.gif"></A> <A NAME=tex2html19 HREF=ZEBFZ4.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/up_motif.gif"></A> <A NAME=tex2html13 HREF=ZEBFZ4.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/previous_motif.gif"></A>  <A NAME=tex2html23 HREF=tex2htmlindex2_2.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/index_motif.gif"></A><BR>
+<B> Next:</B> <A NAME=tex2html22 HREF=tex2htmlindex2_2.html>Index</A>
+<B>Up:</B> <A NAME=tex2html20 HREF=ZEBFZ4.html>No Title</A>
+<B> Previous:</B> <A NAME=tex2html14 HREF=ZEBFZ4.html>No Title</A>
+<HR> <P>
+<HR>
+
+</BODY>
+<P><ADDRESS>
+goossens@cern.ch
+</ADDRESS>

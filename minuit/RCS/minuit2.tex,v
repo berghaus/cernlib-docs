@@ -1,0 +1,2954 @@
+head     1.1;
+access   ;
+symbols  ;
+locks    goossens:1.1; strict;
+comment  @@;
+
+
+1.1
+date     94.03.14.14.50.44;  author goossens;  state Exp;
+branches ;
+next     ;
+
+
+desc
+@ Initial checkin
+@
+
+
+
+1.1
+log
+@Initial revision
+@
+text
+@ 
+                FUNCTION MINIMIZATION
+ 
+ 
+ 
+                      F. James
+ 
+              CERN, Geneva, Switzerland
+ 
+ 
+        Reprinted from the Proceedings of the
+   1972 CERN Computing and Data Processing School,
+Pertisau, Austria, 10-24 September, 1972 (CERN 72-21)
+ 
+ 
+                            CONTENTS
+ 
+INTRODUCTION
+ 
+1.1  The motivation
+ 
+1.2  Minimization, maximization,
+     and optimization
+ 
+1.3  Definition of the problem
+1.4  Definition of a minimum
+1.5  The shape of the function --
+     Taylor's series
+ 
+1.6  Non-existence of optimum in general
+1.7  The role of the computer
+ 
+ 
+ONE-DIENSIONAL MINIMIZATION
+ 
+2.1  Usefulness in n-dimensional problems
+2.2  Gri search
+2.3  Fiboacci and golden section searches
+2.4  Qu.dratic interpolation and extrapolation
+2.5  Ttle success-failure method
+ 
+ 
+STEPPING METHODS IN MANY VARIABLES
+ 
+3.1  Grid searches and random searches
+3.2  Single-parameter variation
+3.3  Rosenbrock's method
+3.4  The simplex method
+ 
+ 
+GRADIENT METHODS
+ 
+4.1  Calculating derivatives
+4.2  Steepest descent
+4.3  Newton's method
+4.4  Positive-definite quadratic forms
+4.5  Conjugate directions
+4.6  Conjugate gradients
+4.7   Variable metric methods (VMM)
+4.8   Davidon's rank-two formula
+4.9   The rank-one formula
+4.10  Fletcher's unified approach to VMM
+ 
+ 
+SPECIALIZED TECHNIQUES
+ 
+5.1   Chisquare minimization
+5.2   Likelihood maximization
+5.3   Models with separable computing
+5.4   Sets of related problems
+ 
+ 
+LOCAL AND GLOBAL MINIMA
+ 
+6.1   The problem of multiple minima
+6.2   The Gelfand algorithm
+6.3   The Goldstein-Price method
+ 
+ 
+CONCLUSION
+ 
+7.1   Global strategy
+7.2   Computer programs
+ 
+REFERENCES
+APPENDIX - SOME SAMPLE PROBLEMS FOR MINIMIZATION ROUTINES
+ 
+FUNCTION MINIMIZATION
+ 
+F. James
+CERN, Geneva, Switzerland
+ 
+ 
+ 
+ 
+INTRODUCTION
+1.1  The motivation
+     A large class of problems in many different fields of research can
+be reduced to the problem of finding the smallest value taken on by a
+function of one or more variable parameters.  Examples come from fields
+as far apart as industrial processing (minimization of production costs
+and general relativity (determination of geodesics by minimizing the
+path length between two points in curved space-time).  But the classic
+example which occurs so often in scientific research is the estimation of
+unknown parameters in a theory by minimizing the difference (chi-square)
+between theory and experimental data.  In all these examples, the function
+to be minimized is of course determined by considerations proper to
+the particular field being investigated, which do not concern us here.
+Our aim is to study the mathematical problem of minimization.
+ 
+ 
+1.2  Minimization, maximization, and optimization
+ 
+     Although traditionally one speaks of function minimization, some
+authors refer to maximization.  Of course the two are entirely equivalent
+since one can be converted to the other by changing the sign of the function.
+Thus the problems of minimizing chi-square, maximizing likelihood,
+minimizing cost, or maximizing efficiency can all be considered as
+minimization (or maximization).  To avoid committing oneself, it is
+fashionable to speak of optimization, to cover both cases.  This 
+unfortunately causes confusion with optimization in control theory where
+the principal techniques are analytical (calculus of variations) and
+hence bear little relationship to the numerical methods used in function
+minimization as treated here.
+ 
+      To add to the confusion there is the term "programming", which is
+also used to mean minimization (usually specified as linear programming,
+non-linear programming, or mathematical programming), a historical usage
+dating from the time when programmers in the modern sense did not exist,
+and computer users were not programming but coding.
+ 
+      Other terms used for minimization are extremization and 
+hill-climbing.  Since these can also be used to mean other things, the
+general conclusion is that in this field you can not tell a book from
+its title.  While waiting for general agreement as to what the subject
+should be called, we will stick to function minimization.
+ 
+ 
+1.3  Definition of the problem
+ 
+      Given a function F(x), the general problem is to find the value of
+the variable or variables x for which the function F(x) takes on its
+smallest value.  [As pointed out above, this is entirely equivalent to
+finding the x for which the function -F (x) takes on its largest value,
+but for consistency we will always consider only minimization.]  The
+rules of the game are the following:
+ 
+  i) The function F(x) is assumed not to be known analytically, but is
+     specified by giving its value at any point x.
+ 
+ ii) The allowed values of the variable or variables x may be restricted
+     to a certain range, or to satisfy certain conditions,
+     in which case one speaks of constrained
+     minimization.  In these lectures we limit ourselves to the un-
+     constrained problem.
+ 
+iii) In some cases additional information about the function F may be
+     available, such as the numerical values of the 
+     first or second derivatives at any point x.  
+     Such knowledge cannot in general be assumed, but
+     should be used when possible.
+ 
+ iv) The function F(x) is repeatedly evaluated at different points x
+     until its minimum value is attained.
+ 
+The method which finds the minimum (within a given tolerance) after the
+fewest function evaluations is the best.  Occasionally other considerations
+may be important, such as the amount of storage required by the
+method  or the amount of computation required to implement the method,
+but normally the dominating factor will be the time spent in evaluating
+the function.
+ 
+ 
+1.4  Definition of a minimum
+ 
+     The theorems of elementary calculus tell us that the function
+must take on its smallest value at a point where either:
+ 
+  i) all derivatives aF/ax = O (a stationary point), or
+ ii) some derivative aF/ax does not exist (a cusp), or
+iii) the point x is on the boundary of the allowed region (an edge)
+ 
+     Although we will sometimes find it useful to consider points 
+satisfying the above properties, this approach of considering essentially
+the analytic properties of the function is clearly not well adapted
+the rules of the game as outlined above.  Indeed, when one considers that
+there may be any number of stationary points, cusps, and edge points,
+all of which may be arbitrarily hard to find by simply sampling the
+function value, the whole problem begins to appear hopeless unless some
+simplifying assumptions are made.
+ 
+     The usual simplification consists in abandoning the attempt to find
+the global minimum and being satisfied with a local minimum.  A local
+minimum may be defined as a point xo, where for all points x in some
+neighbourhood around xo we have F(x) > F(xo).
+ 
+     Now the situation looks much brighter since the very definition
+a local minimum suggests a general strategy for finding one:  we vary x
+by small steps in a direction which causes F to decrease, and continue
+until F increases in all allowed directions from some point xo.  This
+does not yet tell us how to vary x, but at least it suggests that a solution
+can be found.
+ 
+ 
+1.5  The shape of the function -- Taylor's series
+ 
+     With a view to making an intelligent minimizing method, it is of
+interest to consider what we might reasonably expect about the behaviour
+of F.  If F represents a physically meaningful function, we would certainly
+expect all the derivatives of F to exist everywhere in the region of
+interest.  Under these conditions we can write down the Taylor series
+expansion for F about some point xl, assuming for the moment that x re-
+presents just one variable:
+ 
+ 
+               F(x) = F(xl) + aXl  (x-xl) + 2 |  (x-xl)  +
+                       Xl             Xl
+ 
+ 
+Although we do not know anything a priori about the domain of convergence
+of this series, we do know that as the distance (x -xl) becomes smaller,
+the higher order terms become less important, so that we would expect
+that predictions based on the low-order terms should not be very wrong,
+at least for small steps.  Before considering these terms in more detail
+let us generalize the variable x to a vector of n variables x.  Then we
+have
+ 
+          F(x) = F(Xl) + T(x-xl) + 2 (x -xl)  |(x - xl) + 
+ 
+ 
+          where the matrix G is defined by Gij = a2F/axiaXi and
+          the gradient vector g is gi = aF/axi, all derivatives
+          being evaluated at xl.  The T denotes transposition
+          which turns a column vector into a row vector.  Note
+          the difference between xi (the ith variable) and x
+          (the position vector at the point i).
+ 
+Now the first term of the above series is constant, so it will not tell
+us much about where to look for a minimum.  The second term is propor-
+tional to the gradient  and tells us in which direction the function is
+decreasing the fastest, but since it is linear in x, it does not predict
+a minimum and therefore does not tell us what step size to take.  More-
+over, as we approach the minimum g ) O (if it exists) so we will have to
+go further and consider the next term.  The third, or quadratic term
+describes a parabolic behaviour and is therefore the lowest term to
+predict a minimum.  Unlike g we can expect G to be roughly constant over
+small regions, since it would be exactly constant if higher-order terms
+were zero.
+ 
+     We mention, in passing, one class of problems in which the above
+analysis would not hold at all.  This is in the field known as linear
+programming, which limits itself to minimizing functions which are linear
+in the parameters, subject to constraints which are also linear.  A
+linear function can not have a minimum in the sense described above (a
+stationary point) but must take on its minimum at a constraint boundary
+(edge point).  For such problems the description of the constraints therefore
+takes on greater importance than the analysis of the function
+itself, and will not be considered in these lectures.
+ 
+ 
+1.6  Non-existence of optimum in general
+ 
+     Although we will be studying and comparing
+different minimization algorithms (recipes), the reader should be warned
+at the outset that in the strict sense of the rules of the game as stated
+in Section 1.3 above, we will not be able to show any algorithm to be
+superior to any other for all functions.  In principle at least, no
+matter how bad one algorithm is, or how good another, we can always find
+a function which will be minimized faster by the bad method than by the
+good one.  We should keep such essentially theoretical considerations in
+mind, but should not be overly discouraged by them.  In particular,
+certain objective criteria will emerge for comparing methods even though
+the principal criterion -- minimization speed -- depends on the function.
+In the past there has in my opinion been an overemphasis on such objective
+criteria in an attempt to find the ideal universal minimization
+algorithm.  More recently, the tendency is to adapt the algorithm to
+the function, even to the point of introducing a super-algorithm which would
+choose a sub-algorithm appropriate to the function at hand.  Such questions
+of global strategy will be considered later.
+ 
+     The reader should also be warned that in presenting part|cular
+algorithms I will often omit details which are unimportant to an
+understanding of the algorithm although they may be crucial in actually
+making it work.  The original references should therefore be consulted
+before programming such alorithms.
+
+ 
+1.7  The role of the computer
+ 
+     While our subject is essentially a mathematical one, it has been so
+profoundly influenced by the existence of high-speed electronic computers
+that it would certainly be unfair  not to mention them here.  Indeed,
+real progress in the solving of large-scale practical problems has come
+only in the last fifteen years, although much of the basic theory dates
+back to Newton's time or even earlier.  This is, of course, because of
+the renewed interest in numerical minimization techniques for use on
+computers.  As it is no longer even thinkable to use these techniques
+for hand calculations, it is best to place ourselves immediately in the
+computer context and to conceive of our function F(x) rather as a sub-
+routine which returns a value of F (and perhaps some other information
+such as numerical values of derivatives) for given input values of the
+arguments x.
+ 
+     One unpleasant consequence of the computer-oriented approach is th
+we will sometimes have to worry about rounding-off errors in the functi
+value due to the finite word length of digital computers.  This roundin
+error is usually of the order of 10 8 of the function value for compute
+with 36-bit words in single precision, but the cumulative effects of
+rounding inside a complicated function subroutine may be much larger.
+In addition there may be problems of overflow or underflow.
+ 
+ 
+ 
+ONE-DIMENSIONAL MINIMIZATION
+_
+ 
+2.1  Usefulness in n-dimensional problems
+     We will first consider functions of just one variable, since some
+general problems can be seen more easily in this simplest case and also
+because some n-variable algorithms contain steps which require one-
+dimensional minimization.  The one-variable problem is therefore both
+instructive and useful even though our prime consideration will be that
+of more complex problems.
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1522        0  100.00
+ 
+ 
+2.2  Grid search
+ 
+     The most elementary search technique consists in choosing k equ
+spaced points within the range of the parameter x, evaluating the fu
+tion at each of the points, and retaining the lowest value found.  I
+the spacing between points is x, one of the points is sure to be wi
+x/2 of the true minimum, although in principle it may not be the pc
+corresponding to the lowest value.  Still, if the function does not
+too wildly over the distances of the order of x, one generally assu
+that this method gives the minimum within a range of about x.
+ 
+     Of course the grid search method has some difficulties.  It is
+directly applicable to the usual case where the range of x is infini
+But in this case a simple remedy is to choose a reasonable range in
+middle of the allowed range, and later to shift the sampling range i
+minimum comes out at an end point.
+ 
+     The most serious objection to the grid method is its inefficie
+Given the assumption that F does not vary too much over a distance
+many of the function evaluations are certainly unnecessary, namely
+that are in regions where the function value is known to be large.
+other words, the algorithm takes no account of what it has learned ;
+the function.  This inefficiency becomes more striking, in fact prol
+tive, when extended to many variables.
+ 
+     On the other hand, this method has the prized virtues of extre
+simplicity and absolute stability.  It always converges within the
+desired tolerance in a known number of steps and is quite insensiti
+the detailed behaviour of the function.
+ 
+     The efficiency of the grid method may be greatly improved by
+proceeding in several stages, using a smaller range and smaller ste
+size in each succeeding stage.  In this way each stage takes accoun
+the least value found in the preceding stage, and the method can be
+to converge in the usual sense of increasing accuracy due to decrea
+step size.  In the next section we consider optimum ways to arrange
+staging in order to obtain the fastest decrease in step size.
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1638        4   99.76
+ 
+ 
+2 3  Fibonacci and golden section searches
+ .
+ 
+     In order to optimize the grid search, we want to minimize the
+number of function evaluations per stage, compatible with maintaining
+a constant reduction of a factor t in the step sizes at each stage.
+This will yield the fastest reduction in step size.  One function evalu
+tion tells us nothing about the possible location of a minimum, but as
+long as we restrict ourselves to local minima in a given range of x, tw
+points are sufficient as shown in the diagram below.  If F(xl) < F(x2),
+                                      then there must be at least one
+                                      local minimum somewhere in the
+                                      range O < x < X2. Now in this
+                                      new range, we already have one
+O          Xl     X2          l       point (xl), so that a further
+                                      reduction in range is possible
+                                      with only one new function eval
+tion, and the procedure can now be continued with only one new evaluati
+per stage.  It remains to be shown that this can be continued indefinit
+with a constant reduction in step size, and to calculate what that red
+tion will be.  Clearly we would get the maximum reduction on the first
+step if xl and x2 were very close together, but we must not forget that
+Xl (or X2) will then be used for the next stage and should therefore
+close to the middle of this new interval as well.  The situation is
+illustrated in the diagram below, where the distances indicated are
+imposed by the symmetry of the intervals and the condition that the
+reduction in range must be a factor of t in each stage.  The new range
+after evaluation of F(x3) will be X3 < x < x2 and its length must be t
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+O         Xl     X2        1        0     X3 Xl     X
+                                 q                  ,l _|2 _ q
+                                             2
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1258        4   99.68
+ 
+ 
+This will be possible since there is a real root to the equation:
+                                  t2 = 1- t
+                                  t  = g2 1  0.616 .
+ 
+ 
+Since this ratio t is known as the goZden section, the minimization
+technique is called a golden section search.  If the number of stages
+to be taken is known in advance, it is possible to improve very slig
+on this technique by using a Fibonacci seorch, as described for examF
+in Kowalik and Osbornel).  Although Fibonacci can be shown to be opti
+(in a sense described below), the slight improvement is probably not
+worth the added complication.  The golden section search is optimal
+among algorithms where the stopping point is not decided in advance.
+ 
+     The above techniques are optimal only in the minimox sense, that
+they minimize the maximum number of function evaluations necessary tc
+obtain a given accuracy.  It might be called the pessimists optimalit
+since in game theory it is the best strategy against an intelligent
+opponent who is trying to make you lose.  It should therefore be effe
+in minimizing pathological functions, but in more normal cases we sha
+expect other methods to be better.  Such methods are described in the
+following sections.
+ 
+ 
+2.4  Quadratic interpolation and extrapolation
+ 
+     A more optimistic approach consists in studying the expected
+behaviour of the function and then hoping that the deviations of the
+real funct_on from this behaviour are not too great.  From the Taylor
+series analysis of Section 1.5, it would be reasonable to proceed by
+assuming that the function is nearly quadratic.
+ 
+     Since a parabola is determined by three points, this method requ
+the function to have been evaluated for three different values xl, x2
+and X3.  It then predicts the minimum to be at the minimum of the
+parabola passing through these points.  If the three function values
+Fl, F2, and F3, the predicted minimum is at X4, given by
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1518        3   99.80
+ 
+                            - 10 -
+ 
+ 
+            (X2 + x3)Fl      +     (Xl + x3)F2      +      (Xl + X2)F3
+  x4 =  (xl - x2)(xl - x)      (X2 - xl)(x2 - X3)      (X3 - Xl)(X3- X2)
+ 
+              2 r Fl         +          F2          +          F3
+        L(xl - X2)(Xl - X3)     (X2 - xl)(x2 - x3)     (x3 - xl)(x3 - X2)J
+ 
+ 
+Considerable simplification results when the three points are equally
+spaced, a distance d apart, in which case
+ 
+ 
+                    x4   X2   2 (Fl + F3 - 2F2) -
+ 
+ 
+The function is then evaluated at X4 this point replaces one of the
+first three, and a new point is predicted, again by quadratic interpola-
+tion using the new set of three points.  The method terminates when the
+predicted function value at some new point agrees with the actual value
+within a specified tolerance.
+ 
+     This algorithm usually performs quite well when applied to easy
+(nearly quadratic) functions, but suffers from a number of instabilitie
+which can be quite serious, as follows:
+ 
+  i) At any step the three points may determine a parabola with a maxim
+     rather than a minimum, in which case the method diverges.
+ 
+ ii) If the three points lie nearly in a straight line, the algorithm
+     takes an enormous step which may cause numerical difficulties as
+     well as diverging.
+ 
+iii) After each step there is a choice of which two of the three previo
+     points to retain for the next step.  It is usually more convenient
+     and logical to retain the most recent points, but this may also le
+     to instabilities by throwing away the best points.
+ 
+ iv) Even without any of the above difficulties, the method may oscilla
+     about the minimum instead of converging toward it.
+ 
+     All the problems can be fixed by including checks and safeguards i
+the algorithm, but the remedies always involve abandoning, at least tem
+rarily, the quadratic interpolation step.  The best remedy is probably
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1371        2   99.85
+ 
+ 
+to reserve the method for well-behaved functions and to abandon it
+entirely as soon as trouble arises.  It is most often used as the l
+step in algorithms which depend principally on other methods, since
+physical functions are usually quite parabolic in the immediate vic
+of the minimum.
+ 
+     When derivatives of the function are available, variations of 
+ratic interpolation are possible, using instead of three points to t
+termine the parabola, either two function values and one first deri
+or the function value and the first two derivatives at one point.
+variations tend to be even more unstable than the basic method, sin
+they use information from fewer points.
+ 
+ 
+2.5  The success-failure method
+ 
+     A good compromise between the stability of the grid search and
+rapid convergence of quadratic interpolation is found with the succ
+failure technique of Rosenbrock2).  A start point xO and initial st
+d are required, and the function is evaluated at xO and xo + d.  Th
+step is termed a success if F(xO + d) ' F(xO), otherwise it is a fa
+If it is a failure, d is replaced by -d, where  is a contraction
+less than one, and the test is repeated.  If it is a success, xo is
+placed by xO + d, d is replaced by d, where  is an expansion fact
+greater than one, and the test is repeated.  The process continues
+this way until the function values change by less than a specified
+The numerical values usually used for the expansion and contraction
+meters are   3.0 and   0.4.
+ 
+     An interesting feature of this method is that a local minimum
+always bracketed whenever a success is followed by a failure.  When
+happens, the middle one of the last three points is always lower th
+outer two, so that one is in a favourable position for trying a qua
+interpolation step.  The success-failure method, with one quadratic
+polation step each time a success is followed by a failure, is prob
+the most effective one-dimensional technique for use on general fun
+although in special cases other methods may be superior.
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1639       17   98.96
+ 
+                                     - 12 -
+   STEPPING METHODS IN MANY VARIABLES
+   3.1  Grid searches and random searches
+        An excellent illustration of the enormous increase in complexity in
+   going to spaces of high dimensionality is afforded by the grid search
+   technique in many variables.  In order to localize a minimum to 1% of
+   the range of one variable by this technique requires 100 function evalua-
+   tions;  in ten variables the number of points required is 102|.  Clearly
+   we can forget about this method when more than one or two parameters are
+   involved.
+ 
+        In fact it is a general rule in function minimization, as in func-
+   tion integration, that one should not expect good one-dimensional tech-
+   niques to be good when extended to higher dimensionality.  Experience
+   with integration suggests that a Monte CarZo search is more efficient
+   than a grid search in many dimensions.  The Monte Carlo technique con-
+   sists in choosing points randomly according to some distribution
+   (usually uniform or normal).
+ 
+        But even when these methods are refined by using variable search
+   ranges, they prove far too slow for general use and we must turn to more
+   efficient techniques.
+ 
+ 
+   3.2  Single-parameter variation
+ 
+        Since the condition for a minimum which is a stationary point in
+   n variables xi is the vanishing of all n first derivatives aF/xi, it is
+   natural to try to make each derivative vanish separately, one after the
+   other.  This is the old method of single
+   parameter variation, where one seeks a
+   minimum with respect to one variable at a
+       /           time using one of the techniques described
+2 / /   MIN earlier.  Of course when you have finished
+                                  minimizing with respect to X2 you may no
+               -  / /            longer be at a minimum with respect to xl,
+                    / /           so you generally have to start all over
+       /                        again, but the process usually does con-
+   SAR                          verge, as illustrated for two variables in
+                           X l
+                                  this diagram. Here the curves represent
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1533       11   99.28
+ 
+                                - 13 -
+ 
+ 
+contours of equal function value, and the straight lines show the step
+taken in minimizing F with respect to xl, then X2, then xl, etc.  In
+this case the method converges nicely after only four single-parameter
+minimizations.
+ 
+     Consider now the function represented by the contours shown below
+Here the method proceeds much more slowly because of the narrow valley
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+                     S T `. V                '
+                                              Xl
+ 
+ 
+ 
+Such behaviour in many dimensions causes this method to be generally
+considered as unacceptably slow.
+ 
+     Two of the more successful improvements aimed at avoiding such
+behaviour are due to Hooke and Jeeves3) and Rosenbrock2).  We discuss
+the latter below.
+ 
+ 
+3.3  Rosenorock's method
+ 
+     Rosenbrock's algorithm2) starts by performing single-parameter
+minimizations as above.  Then when one full cycle of all parameters ha
+been completed, a new set of orthogonal axes is defined with one axis
+taken as the vector from the start point to end point of the cycle.
+This vector points in the direction of previous over-all improvement a
+is expected to be a good direction for future improvement  In the cas
+of the narrow valley seen above, it should point more or less along th
+valley and avoid the zig-zag behaviour.  The next cycle of single-
+variable minimizations is performed using multiples of the newly defin
+axes as variables.
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1090       10   99.08
+ 
+                                - 14 -
+ 
+ 
+ 
+     The Rosenbrock method generally performs well, being quite stabl
+and capable of following narrow valleys, but as the number of variabl
+increases, the efficiency drops, probably because the new axis define
+by past improvement is based on points so far apart that it no longer
+points along a "hyper-valley" at the start point of the next cycle.
+Also, its terminal convergence is slow compared with the more ''quadra
+methods described in Section 4.
+ 
+     Another technique, that of Davies, Swann, and Campey4) (unpublisl
+see Ref. 4) is similar to Rosenbrock's and will not be described here
+ 
+ 
+3.4  The simplex method
+ 
+     One of the most successful stepping methods in many variables is
+that of Nelder and Meads), based on the simplex.  A simplex is an n-
+dimensional figure specified by giving its n + 1 vertices.  It is a
+triangle in two dimensions, a tetrahedron in three, etc.  The algorit
+takes the name simplex because at each step the information it carrie
+about the function consists of its values at n + 1 points.  One can
+easily visualize how the method works by considering the two-dimensio
+case as in the diagram below.  The three starting simplex points are
+somehow  chosen (perhaps randomly) and the function is evaluated at e
+point.  Let the point PH be that at which the function value is highe
+(worst) and PL that at which it is lowest.  Let P be the centre-of-ma
+of all points in the simplex except PH;  that is:
+ 
+ 
+                                 -n+l
+                               n '   i    H' -
+ 
+ 
+ 
+                                                                P-
+ 
+ 
+ 
+                   2  P 
+ 
+ 
+ 
+ 
+ 
+                             P1 =PL
+                   P3 Ph
+                                             xl
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1198        9   99.25
+ 
+                                 - 15 -
+ 
+ 
+From the original simplex, a new simplex is formed by replacing PH by
+better point if possible.  The first attempt to find a better point is
+made by reflecting PH with respect to P, producing P* = P + (P - PH).
+If F(P*) < F(PL), a new point is tried at P   = P + 2(P - PH).  If
+F(P*) > F(PH), a new point is tried at P** = P - (P - PH).  The best
+the new points then replaces PH in the simplex for the next step, unle
+none of them is better than PH.  In the latter case, a whole new simpl
+is formed around PL, with dimensions reduced by a factor of 0.5.
+ 
+     Variations on the method are possible by using different contract
+or expansion factors when searching along the line from PH through P
+(dotted in diagram).  Another interesting possibility is to attempt a
+quadratic interpolation step along the dotted line whenever three poir
+have been determined (PH, P*, P**).  However, one must be careful not
+accept a point too close to P, for then the simplex collapses into a ]
+(or in general a hyperplane of n- 1 dimensions) from which it can nev
+recover.
+ 
+     The simpl|x algorithm, being designed always to take as big step
+as possible, is rather insensitive to shallow local minima or fine
+structure in the function caused by rounding errors, statistical erro
+(lonte Carlo output), etc.  Another of its virtues is that of requiri
+few function evaluations, usudlly one or two per iteration.  In addit
+each search is in an "intellient" direction, pointing from the highe
+value to the average of the lowest values.  Com?are this with Rosenbr
+;lethod, where really only the principal axis is an "intelligent" dire,
+tion, and all other searches are for exploring along orthogonal axes
+determine a new principal axis.
+ 
+     A convenient convergence criterion for the simplex method is bas
+on the difference F(PH) - F(PL).  The iterations are stopped when thi
+difference is less than a preset value.  As a final step, the functio
+evaluated at P, which is often slightly better than F(PL).
+ 
+     In view of the danger mentioned above -- of the simplex collapsi
+into a hyperplane of dimension n       it has been suggested to use n
+or more points rather than n+ 1 at each step.  I have tested this ide
+which is equivalent to introducing a dummy parameter of which the fun
+tion is independent, and have always found the efficiency of the algo
+ 
+  ,           t l r : .  r  n rl i t i  n c 
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1908       13   99.32
+ 
+                                 - 16 -
+GRADIENT METHODS
+_
+ 
+4.1  Calculating derivatives
+ 
+     I will call a gradient method any technique which uses informatia
+from a very small range of the variables (i.e. essentially derivatives
+to predict good trial points relatively far away.  This does not neces
+ily mean that they follow the gradient, but only that the gradient, ar
+perhaps higher derivatives, are used or estimated.
+ 
+     It is of course possible in most cases to calculate analytically
+numerical values of the derivatives of a function, just as it is possi
+to calculate the value of the function itseif.  However, it is often i
+convenient and dangerous if the algebra is complicated, so that very
+often we are faced with minimizing a function for which no derivativec
+are provided.  Since the most powerful algorithms discussed below req
+derivatives, a general minimization program must be able to estimate t
+derivatives of the function by finite differences.
+ 
+     A first derivative may be estimated from
+ 
+ 
+                      aF      F(xo+ d) - F(xO)
+                        x              d
+ 
+                       x o
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+where d is a "small" displacement.  The error will be, to lowest orde
+in the Taylor's expansion,
+ 
+ 
+                                d   a2F
+ 
+ 
+ 
+It is therefore advantageous to make d as small as possible, but stil;
+large enough so that the rounding error in the computation of F does I
+become larger than the error introduced by o.  Since the second deriv-
+atives may not be known, it may not be possible to find an optimum st
+size d, so we may just have to close our eyes and guess.
+ 
+     A much safer method would be to use points chosen symmetrically
+either side of xo giving
+ 
+ 
+                      aF|     F(xo + d) - F(xo - d)
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1274        4   99.69
+ 
+ 
+ 
+for in this case the error  vanishes to second order and the lowest
+order term is proportional to the third derivative.  A disadvantage
+this method is that it requires 2n function calls to estimate the n
+derivatives, whereas the asymmetric steps require only n +l [or only
+F(xo) has to be evaluated anyway].  An advantage of the symmetric st
+method, however, is that it gives the second derivatives as a by-pro
+[assuming F(xo) known]:
+ 
+                 a2F   F(xO - d) + F(xO+ d) - 2F(Xo)
+                                      2
+ 
+ 
+and from the relationship for the error  in the asymmetric method,
+conservative upper limit of the uncertainty in the first derivative
+results assuming at least that the symmetric formula gives a smaller
+error than the asymmetric one.  A complete treatment of step sizes i
+beyond the scope of these lectures but can be found in a paper by
+Stewart6 ) .
+ 
+     The numerical evaluation of second derivatives is facilitated b
+the fact that they should be approximately constant over small regio
+so that symmetrical steps are usually not necessary.  Unfortunately,
+however, there are a lot of second derivatives to evaluate;  since t
+form a symmetric n x n matrix, there are n(n + 1)/2 independent comp
+nents, requiring at least n(n - 1)/2 points  in addition to those
+                                    required for the symmetric deriv
+                                    atives. For two parameters, a m
+                                    mum point pattern is shown in th
+                                    diagram at left. The odd point
+   2                 c             the mixed second derivative) cou
+                 O O dO           have been chosen in any corner.
+                                    two-dimensional diagram is somew
+                     |              misleading since for large n, th
+                                    number of "odd points" is n time
+                                    larger than the number of "symme
+                                    points.
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1297        6   99.54
+ 
+                                  - 18
+ 
+ 
+4.2  Steepest descent
+ 
+     As soon as the function's first derivatives are known, it is natura]
+to follow the direction of the negative gradient vector in seeking a
+minimum, since this is the direction in which the function is decreasing
+the fastest.  Such a technique was used by Cauchy more than a century
+ago, and is the basis of what is now known as the method of steepest
+descent.
+ 
+     This method consists of a series of one dimensional minimizations,
+each one along the direction of local steepest descent (gradient) at the
+point where each search begins.  Of course the direction of the gradient
+is not constant along a line even for a general quadratic function, so
+we expect many iterations to be necessary, but the method can be shown
+to converge for a quadratic func-
+tion.  Let us follow its progress
+                    / / / /  .-MIN  for a typical function whose con-
+                        / / /  / /  tours are shown in the diagram.
+                        / / /  / /  We immediately see an unfortunate
+                   STARI  / / / /  property of the successive search
+                        `J-' / /  directions: if each linear mini-
+                                  /  mization is exact, successive
+                                      searches must be in orthogonal
+                                      directions.  In two dimensions,
+                                      this yields steps which look just
+like the single parameter variation method with the axes rotated to
+line up with the gradient at the start point.  In many dimensions the
+situation is not quite so bad, but successive directions are still
+orthogonal and the algorithm cannot be considered acceptable.
+ 
+     It is in fact easy to draw contours for a reasonably well-behaved
+                    "'|           hypothetical function (as at left)
+ 
+ X2               / where the direction to the
+                /  ) minimum is just perpendicular to
+ 
+                                      the gradient.
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1333       11   99.17
+ 
+                            - 19 -
+ 
+ 
+4.3  Newton's method
+ 
+     It is clear that since a general quadratic function is determil
+by specifying its value, first derivatives, and second derivatives .
+point, it can be minimized in one step if and only if all this info
+tion (or its equivalent) is taken into account.  Let us write a qua
+ratic function as
+ 
+              F( )   F(  ) +  T | (    ) + l (    )T G(
+ 
+ 
+ 
+where the gradient  is evaluated at xo and the second derivative m
+G is a constant.  Then the minimum is given directly by
+ 
+ 
+                     Xm = xO- G lg = xO_,
+ 
+where the inverse of the second derivative matrix is the covorience
+matri v
+ 
+     This is then the many-dimensional equivalent of quadratic inteI
+tion discussed earlier, and it is subject to the same sort of diffic
+when applied as an iterative technique to general non-quadratic func
+But let us first point out its good features:
+ 
+  i) the step size is no longer arbitrary, but is prescribed precise
+     the method;
+ 
+ ii) the step directions are no longer necessarily along the gradier
+     vector but take account of parameter correlations (narrow valle
+     or ridges) through the mixed second derivative terms.
+ 
+     In practice, however, the method is unstable, essentially for t
+reasons given in Section 2.4.  In particular, it diverges whenever t
+matrix G (or V) is not positive-definite (see next section).  In its
+modified form  the method is used only when the minimum is known to
+very close or when the function is known to be positive quadratic (f
+linear least squares).  However, it is clearly a powerful technique
+and is worth studying in some detail since all the most successful
+algorithms are based on ewton-Zike steps, as discussed below.
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1327        7   99.47
+ 
+                                 - 20 -
+ 
+ 
+4.4  Positive-definite quadratic forms
+     We pause here briefly to consider the properties of quadratic forms
+useful for understanding the more powerful gradient methods.  In one
+dimension the description is simple;  a general quadratic form can be
+written
+ 
+                         F(x) z a + gx + 2 Gx2 ,
+ 
+ 
+where g = aF/ax at x = 0, and G = a2F/ax2 also at x = 0.  This function
+has a minimum if and only if G > 0.  If G = 0, the minimum is at infinity
+The minimum (if it exists) is at x = -g/G.  len using a quatratic ap-
+proximation to minimize a general non-linear function, it makes sense to
+take a step to x = -g/G only if G > O since otherwise we step to a pre-
+dicted maximum or to infinity.  A possible remedy if G < O is to take a
+step x = -g;  that is, to set G arbitrarily equal to unity so that the
+step will at least be in the right direction although it will now have
+arbitrary length.  Consideration of the sketch below shows that this is
+the only thing we can do unless more information is available, since the
+quadratic part of the function is not convex or positive-definite at
+the point xo:
+ 
+ 
+ 
+          F t Gc O   G|
+ 
+ 
+                  l  I
+                      -g/G   I   \
+ 
+                         -9 \
+ 
+ 
+ 
+                       xo                       x
+ 
+ 
+ 
+     These arguments may now be extended to many dimensions where g
+becomes the gradient vector , and G becomes the second terivative matrix
+G.  Then the Newton step to x - -G lg makes sense only if | (or | l) is
+a positive-definite matrix, since only then does the quadratic form
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1117       10   99.10
+ 
+ 
+                                   T      1  T
+                        F(x) = a + g | x + 2 x Gx
+ 
+ 
+have a minimum.  If G is singular, the predicted minimum (or maximur
+not unique.
+ 
+     Unfortunately there is no simple way of telling, in general, ii
+matrix is positive-definite by inspecting individual components, bu
+can at least state some of the many useful properties of such matri
+Two necessary (but not sufficient) conditions for a (square, symmet
+matrix to be positive-definite are:
+ 
+  i) the diagonal elements must be positive (this is in fact suffici
+     for a 1 x 1 matrix);
+ 
+ ii) the off-diagonal elements must obey Gij < GiiGjj.
+ 
+Properties (i) and (ii) together are sufficient for a 2 x 2 matrix
+While the above conditions are easy to check, they are not in gener.
+sufficient.  Some necessary ond sufficient conditions are the follo
+ 
+ iii) All the eigenvalues of the matrix are positive.  This is gener
+      a rather difficult calculation and is usually approximate.
+ 
+ iv) The determinants of all the upper left square submatrices (forr
+                                     as indicated in the diagram at
+                                     left) are positive.  This is p
+                     ..              ably the easiest method.
+ 
+ 
+  v) The scalar eT|e is positive for all vectors e.  This is usuall
+     taken as the definition of a positive-definite matrix, and exp]
+     why a positive-definite matrix yields a quadratic form with a r
+     mum:  the function increases in all directions from e  0.
+ 
+ vi) The inverse G 1 s V is positive-definite.
+ 
+     Now suppose that G-l is calculated for a Newton  step and turn
+to be non-positive-definite.  In analogy to the one dimen8ional cas
+would simply take G - I, the unit matrix, and the Newton step would
+become a steepest-descent step of arbitrary length, which is probab:
+not so bad an idea and is in fact often don.  But we can do better
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1383       12   99.13
+ 
+                                - 22 -
+ 
+ 
+trying to make a positive-definite matrix which is as "close" as possib
+o the unacceptable G   The ways in which this can be done depend on wh;
+is "wrong" with G.  For example:
+ 
+  i) If all the diagonal elements of G are positive, the off-diagonal
+     elements can simply be set - 0.  The resulting matrix will be bett
+     than the unit matrix, since it will at least produce a scale-
+     invariant step and non-arbitrary step length.
+ 
+ ii) If the only thing "wrong" with G is that one or more off-diagonal
+     elements of G or G 1 do not satisfy condition (ii) above, just the
+     off-diagonal elements can be set to zero.
+ 
+iii) The matrix (G +I) 1 can be used instead of G 1, where  is greate
+     than the largest negative eigenvalue of G   This requires a large
+     amount of calculation and so is not very convenient, but it is
+     quite appealing since it amounts to taking a step which is inter-
+     mediate between a Newton step and a steepest-descent step (for
+     large valueg of  the step becomes short and in the direction of
+     the gradient).
+ 
+ iv) If one or more of the diagonal second derivatives are negative, th
+     non-positive-definiteness can be turned into an advantage, since i
+     indicates a direction (or directions) in which the negative first
+     derivative is increaing in magnitude rather than decreasing.  Thi
+     suggests an especially fruitful direction for a single-parameter-
+     variation step which should not only lead to a good decrease of th
+     function value but should also lead more quickly to a region of
+     positive-definiteness.
+ 
+     Minimization methods based on variations of Newton's method as
+8uggested by the above considerations are usually called quasi-Newton
+methods.  Many such algorithms have been published and some are quite
+8ucce8sful, but the field is still open for new ideas.
+ 
+     The principal drawback of such techniques is the repeated evalua-
+tion and inversion of the second-derivative matrix.  The calculation of
+the second derivatives usually requires a rather long time, proportiona
+to n2, and the matrix inversion, although usually faster, increases wit
+n like n.
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1701        6   99.65
+ 
+                                - 23 -
+ 
+ 
+     One of the most interesting results concerning quadratic forms is
+the basis of a collection of related techniques described in the next
+sections, which do not require explicit repeated evaluations of G.
+ 
+ 
+4.5  Conjugate directions
+ 
+     The vectors di and dj are said to be conJugate with respect to a
+positive-definite symmetric matrix A if
+ 
+ 
+                        d Ad. = O   for   i  j .
+                            J
+ 
+ 
+If A is the unit matrix I, the conjugate vectors d would be orthogonal
+so conjugacy can be thought of as a generalization of orthogonality.
+set of n conjugate vectors span an n-dimensional space, and any point
+in the space can therefore be expressed as a linear combination of n
+conjugate vectors.
+ 
+     Although the matrix A does not uniquely define a set of conjugate
+vectors, such a set can always be constructed by a procedure similar t
+the Gram-Schmidt orthogonalization method.  Let us start for example w
+an arbitrary vector dl.  Then the vector
+ 
+ 
+                                    d Ad
+                      d2 = Adl -  T   1 d
+ 
+                                    dlAdl
+ 
+ 
+can be seen to be conjugate to dl since the product dlAd2 vanishes
+identically.  The process can then be continued in the same way to
+construct a d3 which will be conjugate to both dl and d2, and so forth
+up to dn.
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+     Such vectors become interesting for minimization problems when th
+are conjugate with respect to the hessian (second derivative) matrix G
+In this case a theorem of Fletcher and Reeves7) states that a sequence
+of linear minimizations in each of the n conjugate directions will
+minimize a general quadratic function of n variables.  That this is tr
+can be seen quite easily as follows.  Let the quadratic function be
+ 
+ 
+                      F(x) s F(O) + gTx + l XTG
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1304        6   99.54
+ 
+                                 - 24 -
+and the n directions di be conjugate with respect to |:
+diGdj - O, i  j .
+Then the vectors x and  can be expressed as linear combinations
+ 
+ 
+ 
+ 
+ 
+ 
+                              g =  C
+so that the general quadratic becomes
+      F(x) = F(O) + (  cidTJ ( yjdj) + 2 ( yidTi)G ( yjdi) .
+Now  if the last term above is regrouped as a double sum, the terms wi
+i  j drop out because of the conjugacy condition, so that the whole
+expression can be simplified as
+ 
+ 
+               F(x) = F(O) +     Cididjyj + 2  yjdj|d
+                       i j               i
+ 
+ 
+               = F(O) +   (bjyi + b;yj2)
+ 
+ 
+where
+                                     bj =  cidid
+ 
+ 
+and
+ 
+                               bj   dTGd
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+are constants.  By expressing the quadratic in terms of y instead of x
+we have separated it into a sum of independent one-parameter quadratic
+functions.  A minimization with respect to yi (a linear minimization
+along the direction di) will therefore be independent of the minimizat
+along the other conjugate directions, which demonstrates the validity
+the theorem.
+ 
+                 Seen Rejected  Percentage
+ 
+Characters        712       14   98.03
+ 
+                                - 25 -
+ 
+ 
+     The above theorem tells us what is "wrong" with the single-paramel
+variation method:  we should be using conjugate directions rather than
+simply orthogonal axes.  However, since the construction of conjugate
+vectors seems to require knowledge of the hessian G, this does not yet
+help very much in practice, for if we knew  (and g) we could minimize
+quadratic immediately by means of Newton's method, and would not need
+use n linear minimizations.
+ 
+     The usefulness of conjugate directions comes from the fact that
+there are ways of determining such directions implicitly, without firs
+evaluating the entire hessian matrix .  Of course, by the time all n
+conjugate directions are determined, by whatever method, information
+equivalent to the matrix G must have been determined.  However, by tha
+time considerable minimization may already have been performed, as in
+the method implied by the following theorem.
+ 
+     If xo and xl are minimum points in two parallel subspaces, then t
+                                    direction xl-xo is conjugate to a
+      X2                          vector which lies in either sub-
+                 /                 space. This can easily be seen i
+              / / / /              two dimensions as illustrated
+                 W /                in the figure at left. Since xo
+                                    is a minimum along the direction
+                 dl                 the gradient of F at xo must be
+                 x O
+ 
+         _                 | X     orthogonal to dl:
+ 
+ 
+                          dlT(g + Gxo) = O ,
+where g is the gradient at x = 0.  Similarly at xl:
+ 
+ 
+                          dl (g + GXl) = | -
+ 
+ 
+Subtracting the above equations, the first terms drop out and we have:
+ 
+ 
+                          dlG(xl- xo) = O,
+ 
+ 
+showing that (xl- xo) is conjugate to dl.
+     Unfortunately, extending this algorithm to three dimensions requi
+three additional minimizations in order that the third direction be
+conjugate to both of the first two, so that convergence for a general
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1381        8   99.42
+ 
+                                - 26 -
+ 
+ 
+quadratic in n variables is obtained only after n iterations involving
+ll n(n+ 1)/2 linear minimizations.  Since this is just the number of
+independent elements in the second derivative matrix, we would be bett
+off for quadratic functions to calculate this matrix directly and avoi
+the linear searches.  On the other hand, for non-quadratic functions tl
+conjugate directions method should be much more stable since it procee
+by a series of linear searches in independent directions and still
+guarantees convergence in a finite number of steps once a quadratic
+region is entered.  In addition, this method has the advantage of
+requiring neither first nor second derivatives of the function.
+(Strictly speaking, then, it should have been discussed in Section 3
+rather than in this section.)
+ 
+      A disadvantage of the algorithm described above is that for each
+iteration, n minimizations are performed in direction dl, whilst only
+one is performed in direction dn.  This undesirable asymmetry is large
+avoided in a variation due to Powell).
+ 
+ 
+4.6  Conjugate gradients
+ 
+      When the first derivatives of the function are calculated, a som
+what more elegant method can be used, known as the method of conugat
+gradients7). Suppose that the function and its gradient are evaluatec
+at two points xo and xl, giving differences:
+ 
+ 
+                                                         x = Xl - XO
+ 
+                            g = gl - go .
+ 
+ 
+Then if the function were quadratic with hessian  we would have
+                                g = G x.
+ 
+ 
+Any vector dl orthogonal to g would then be conjugate to x:
+ 
+ 
+                         dl g = dTlG x = O ,
+ 
+ 
+which immediately suggests a method for obtaining conjugate direction
+without knowing G, based on the change in gradient along a previous
+direction.
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1373       16   98.83
+ 
+                                 - 27
+ 
+ 
+     In the method of conjugate gradients, successive one-dimensional
+minimizations are performed along conjugate directions with each direc-
+tion being used only once per iteration.  The first direction is taken
+as do = -go, the steepest descent vector at xo.  Let the minimum along
+this direction be at xl where the gradient is gl.  Then the next  searc
+direction dl, which we want to be conjugate to do must be a linear
+combination of the only vectors we have at hand, namely:
+ 
+                             dl = -gl + bdo .
+ 
+ 
+The conjugacy condition is
+ 
+ 
+                        dlGdo = dTlG(xl - xo) = O
+or
+                (-gl + bd)Gdo = (-gTl - bgTo)(gl - go) = O .
+ 
+ 
+Since xl is a minimum along direction do = -go, the direction go is
+orthogonal to the gradient at xl, so that glgO = 0.  We are then left
+with
+ 
+                                b =
+                                    gogo
+so that the new conjugate direction is
+ 
+ 
+                      dl = -gl + () do .
+                                _ o _ o
+ 
+ 
+This process can be continued to generate n directions, each one conju-
+gate to all the others.  It turns out that the same simple formula hold
+for all the successive conjugate directions
+ 
+ 
+ 
+ 
+                  -i+l -i+l + (8i+l) di .
+ 
+                 Seen Rejected  Percentage
+ 
+Characters        825        5   99.39
+ 
+                                 - 28 -
+ 
+ 
+4.7  Variahle metric methods (VMM)
+ 
+     In analogy with the methods of differential geometry and general
+relativity, it is convenient to consider the properties of the functio]
+F(x) as being in fact properties of the space of the variables x.  We
+have already made some rudimentary use of this idea when we generalize
+from the usual orthogonal coordinate axes to a system defined by axes
+pointing in conjugate directions.  We now wish to go further and be ab
+to express the properties of the function F geometrically as the prop-
+erties of the non-Euclidean space of its variables x.
+ 
+     The fundamental invariant in a non-Euclidean space is the squared
+distance element
+ 
+                               d 2   d TAd
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+where dx is a differential coordinate displacement and A is the covari
+metric tensor which determines all the properties of the space under
+consideration.  When A is just the unit matrix I, the above formula fc
+ds2 just expresses the Pythagorean theorem for an n-dimensional Euclid
+space.  When off-diagonal elements of A are non-zero and when the
+elements are allowed to vary as functions of x, a generalized non-
+Euclidean space is generated.
+ 
+     It is easily verified that the second derivative (hessian) matri
+behaves under coordinate transformations like a covariant tensor and
+will identify it with the metric tensor of our space.  The inverse
+v = | 1 is a contravariant tensor and becomes the contravariant metri
+tensor.  (For a discussion of covariant and contravariant tensors, se
+for example chapter 10 of reference 9.)  This immediately enables us 1
+construct two scalar (invariant under coordinate transformations)
+quantities:
+a)    ds  = _d_x _Gd_x_
+ 
+is the square of the generalized distance between the point x and the
+point x + dx.  When F is a chisquare function which is minimized to
+determine some best parameters x, then the physical meaning of the
+generalized distance ds is just the number of "standard deviations"
+x + dx is away from x.  That is, the use of the metric tensor _G enabl
+us to scale the distance dx so that it comes out as a physically (or
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1692        4   99.76
+ 
+                               - 29 -
+ 
+ 
+statistically) meaningful invariant quantity instead of being expre
+in arbitrary units (or a mixture of arbitrary units').
+ 
+And                       b)    p = g Vg
+ 
+is twice the difference between the function value at the point whe
+and the gradient g are calculated and the minimum of a quadratic foI
+with hessian matrix  = V l.  That is, p/2 is the expected (vertica]
+distance to the minimum if the function F were quadratic.  This pro
+us with an important scale-free convergence criterion for any method
+which provides approximations to V and g.
+ 
+     When the function F is quadratic, G is constant everywhere and,
+the sense outlined above, this is equivalent to working in a space 
+a constant metric.  For real non-linear functions we expect higher-c
+terms to be small but not negligible, so that we can think of workir
+a space with a slowly-varying metric tensor.  Minimization methods
+on this approach are known as variabZe metric methods.  They differ
+the basic Newton-Raphson method in that the matrix G is not complete
+re-evaluated at each iteration, but is assumed to be well approximat
+taking the G of the previous iteration and applying a correction bas
+new information from the current iteration.  This correction is know
+the matrix updating formuZa, which in general differs from method to
+method.
+ 
+     Variable metric methods therefore proceed generally by the foll
+steps:
+ 
+  i) A starting point xo is given, the gradient go at that point is
+     calculated, and some approximation to  1, say VO, is construct
+     The starting Vo may be only the unit matrix, or it may actually
+     the inverse of the full second derivative matrix.
+ 
+ ii) A step is taken to xl = xo - Vogo, which would be the minimum i
+     were quadratic and if Vo were the true covariance matrix.  Sinc
+     is not the position of the minimum in the general case, it is u
+     to perform a linear search along this direction, finding the a
+     which minimizes F(xO - aVgO).  In either case let the new point
+     called xl and let the gradient calculated at xl be gl.
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1629        8   99.51
+ 
+                                 - 30 -
+ 
+ 
+iii) The matrix V is corrected using an updating formula of the form
+                       Vl = Vo + f(voxoxlgogl) -
+     Then go is replaced by gl. xo by xl, and VO by Vl, and steps (ii)
+     and (iii) are repeated until some convergence criteria are satisfi
+ 
+     The different methods differ chiefly in the choice of updating
+function f, as described in the following sections, and in the extent t
+which linear minimizations are necessary.  Less important variations
+involve the starting approximation VO and various safeguards against
+"unreasonable" steps and non-positive-definiteness as for the Newton
+techniques.
+ 
+ 
+4.8  Davidon's rank-two formula
+ 
+     Probably the first -- and perhaps still the best -- variable metri
+method was developed in 1959 by Davidon and later published in simplifi
+form in 1963 by Fletcher and Powelll|).  Davidon's updating formula for
+the covariance matrix is the following:
+ 
+ 
+                         V 1 = V O +  T     T
+                             y y Voy
+ 
+ 
+where the changes in position and gradient on the last step were
+ 
+ 
+                               = Xl - Xo
+and
+y = gl - go.
+ 
+and Vo was the previous estimate of the covariance matrix.  This is
+called a rank-two formula since the correction Vl -Vo is a matrix of
+rank two in the space of  and Voy as can be seen directly by inspec-
+tion of the formula.
+ 
+     One fundamental requirement of an updating formula is that the new
+matrix satisfies the relationship
+ 
+                           VlY  .
+ 
+ 
+since y - G for a quadratic with hessian G.  It is easily seen that
+Davidon's formula satisfies this requirement:
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1188       14   98.82
+ 
+                                 - 30
+ 
+ 
+iii) The matrix V is corrected using an updating formula of the fcrm
+                       Vl = Vo + f(voxoxlgogl) -
+     Then go is replaced by gl, xo by xl, and VO by Vl, and steps (ii
+     and (iii) are repeated until some convergence criteria are sati
+ 
+     The different methods differ chiefly in the choice of updating
+function f, as described in the following sections, and in the exten
+which linear minimizations are necessary.  Less important variations
+involve the starting approximation VO and various safeguards against
+"unreasonable" steps and non-positive-definiteness as for the Newton
+techniques.
+ 
+ 
+4.8  Davidon's rank-two formula
+    _
+ 
+     Probably the first -- and perhaps still the best -- variable me
+method was developed in 1959 by Davidon and later published in simpl
+form in 1963 by Fletcher and Powelll|).  Davidon's updating formula
+the covariance matrix is the following:
+ 
+ 
+                        Vl = V| +  T     T
+                              y y Voy
+ 
+ 
+where the changes in position and gradient on the last step were
+ 
+                               = Xl - Xo
+and
+y = gl - go.
+ 
+and Vo was the previous estimate of the covariance matrix.  This is
+called a rank-two formula since the correction Vl -Vo is a matrix o
+rank two in the space of  and Voy as can be seen directly by insp
+tion of the formula.
+ 
+     One fundamentat requirement of an updating formula is that the
+matrix satisfies the relationship
+ 
+                              VlY_ ,
+ 
+since y  G for a quadratic with hessian G.  It is easily seen tha
+Davidon's formula satisfies this requirement:
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1166       15   98.71
+ 
+ 
+VlY = [Vo    T
+          j    V
+ 
+ 
+ 
+ 
+ 
+   = Voy + -- Y _ oW o_y
+ 
+                                     y    _y V o _y
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+                       = voy +  - voy =  -
+ 
+ 
+ 
+     An unfortunate feature of the Davidon algorithm is the need to
+perform at each iteration a linear minimization along the direction
+given by a Newton step, -Vg.  This linear search step is, however,
+necessary in order to assure convergence for general functions.  Fle
+and Powell showl|) that if the starting approximation to V is positi
+definite, then V will remain positive-definite after all updatings,
+they have to use the fact that each iteration is a linear minimizati
+that is                         T
+                                              glVogo = O .
+ 
+ 
+     It can be shown that this method is quadratically convergent, a
+most n iterations (n linear searches and n gradient calculations) be
+required for an n-dimensional quadratic form.
+ 
+ 
+4.9  The rank-one formula
+ 
+     In an effort to avoid the linear minimizations required by Davi
+algorithm, several workers have independently developed an interesti
+updating formula of rank one.  In this case Davidon in 1968 was the
+to publish an algorithmll) based on the formula, and Powelll2) has s
+marized the properties of this formula and of algorithms based on it
+ 
+     The rank-one updating is:
+ 
+ 
+                  Vl  Vo + (- VoY      Voy)T
+                                     y ( - VoY)
+ 
+ 
+It can be shownl2) that this is the only formula of rank two (or les
+for which not only Vly =  but:
+                           Vl-y 
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1042       11   98.94
+ 
+                                 - 32 -
+ 
+ 
+where i and Yi are the step and gradient changes at any previous itera-
+-ion.  This is known as the hereditary property, since Vl can be said to
+inherit the fundamental property Vy =  with respect to all previous
+iterations (up to n).
+ 
+     The hereditary prcperty assures that after n iterations, Vl will be
+the true covariance matrix if F is quadratic, no matter what steps were
+taken (almost), so that if Newton steps are taken, convergence for a
+quadratic function is assured after n iterations, without the need for
+ 
+         .
+1 lnear mlnlml zat lons .
+ 
+     In addition, the rank-one formula is symmetric, in the sense that
+the expression for Vll in terms of Vol is the same as that for Vl in
+terms of Vo, provided  and y are interchanged.  The meaning of this
+symmetry property will be discussed in the next section.
+ 
+     But, as nothing is perfect, so the elegance and mathematical beauty
+of the rank-one formula hide a number of numerical and practical dif-
+ficulties which can make it highly unstable when applied to a general
+function.  In particular, if the vector y happens to be orthogonal to th
+vector (- VOy), the denominator goes to zero in the updating formula,
+and an unbounded correction is possible.  Since these vectors may be
+orthogonal, even for a quadratic function, the problem of numerical
+instability is a serious one.
+ 
+     Moreover, the matrices Vl do not really converge to the true co-
+variance matrix in the usual meaning of the term convergence.  Although
+it is true that Yl will be equal to the true covariance matrix at the
+nth step for a quadratic function (barring numerical difficulties), the
+intermediate matrices V may vary wildly from step to step, so that on
+any particular iteration Vl may be a rather poor approximation.  This is
+especially dangerous when the function is not quadratic, since the large
+corrections necessary in later iterations will generally not compensate
+properly the fluctuations in early steps.  Also, there is no guarantee
+that intermediate matrices will remain positive-definite, and hence no
+guarantee of a reduction in the value of F at each step, even for a
+quadratic F.
+ 
+     All these difficulties can, of course, be overcome by programming
+enough safeguards into the algorithm, but this can only be done at the
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1865        6   99.68
+ 
+                               - 33 -
+ 
+ 
+expense of efficiency and sometimes only by abandoning temporarily t:
+updating formula itself, which makes it lose some of its appeal.
+Different approaches are possible depending on whether it is conside
+important to maintain positive definiteness as in the Davidon
+algorithmll), or important not to abandon the exact rank-one formula
+in Powell's methodl2).
+ 
+ 
+4.10 Fletcher's unified approach to VMM
+ 
+     The existence of two different updating formulas with very diff
+properties generated a lot of interest in variable metric methods (
+during the years 1967-1971, since it showed VMM to be very promising
+left many questions unanswered, such as:
+ 
+  i) How can it be that the rank-one and rank-two formulas have such
+     different properties?  What is the relationship between them?
+ 
+ ii) Is there a way to combine the best properties of both formulas?
+ 
+iii) Are there other good formulas?  Is it possible to define a clas
+     of "admissible" formulas?
+ 
+     A certain understanding of the above problems has recently been
+made possible by the work of a number of people.  In particular, a r
+paper by Fletcherl3) presents a unified approach to VMM, which will
+given here.
+ 
+     Recall that the rank-one equation is symmetrical (in a sense de
+in Section 4.9), but as we shall now see, the rank-two formula is no
+Indeed the asymmetry suggests a way to construct a possible third fo
+by taking the "mirror image" of the rank-two formula.  The basic ide
+that a new formula should satisfy the fundamental relationship
+ 
+                           VlY =  .
+ 
+ 
+and therefore its inverse should satisfy
+ 
+                                 V 
+ 
+ 
+We can indeed write down the updating formula for ll which correspo
+to the rank-two formula for Vl:
+ 
+ 
+ 
+                 V           Vnl rI |  + Y _ Y
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1378        8   99.42
+ 
+                                 - 34 -
+ 
+ 
+This matrix Vll can now be thought of as a mapping from  ) y since
+y = Vll.  If we interchange y and  in the formula, it will then give
+a mapping from y  , thereby producing a new updating formula where
+Vly = .  The new duaZ formuZa will be just
+ 
+ 
+                        '    yT`   '   yT   T
+                     V          T  Y| I    T      T
+                           Y   Y,  Y
+ 
+ 
+If we try this trick with the rank-one formula, we just get the same
+rank-one formula back again, since it is symmetric in this sense, or
+dual to itself.  But with the rank-two formula, the process of inverting
+and interchanging yields a new formula, also of rank-two, which is also
+a valid updating forr__ula in the sense that it gives rise to a quadrat-
+ically convergent VM1 algorithm.
+ 
+     Now we go further and consider the class of formulas which includes
+both rank-two and dual formulas as special cases.  Let us introduce the
+notation
+                   Vl = T(Vo)   for the rank-two formula ,
+and
+                   Vl = D(Vo)   for the dual formula ,
+ 
+ 
+and consider the class of updating expressions as introduced by
+ 
+Fletcherl 3):
+ 
+                         V,        ) T +  (D)
+ 
+ 
+where  is some parameter which determines the exact formula.  Broydenl4
+using a somewhat different notation, has also considered the same class
+of formulas.]
+ 
+     It then turns out that the rank-one formula is also in this class,
+ 
+with
+                                          Ty
+                       (rank-one) 
+                               ( y y_ Voy-)
+ 
+ 
+ 
+     Having now constructed a wide class of updating formulas, which in
+fact includes all formulas known to the author, it will prove interestin
+to consider their properties as a function of the generating parameter
+Probably the most important property, and the only one we will consider
+here, is that of monotonic convergence of V toward the true covariance
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1325       28   97.89
+ 
+matrix for a quadratic function.  [This is called Property 1 in Flet
+paperl3) which should be consulted for details of the definition an
+theorems concerning it.]  The use of an updating formula with this p
+erty will guarantee an improvement in the approximation y at each it
+tion (for a quadratic function).
+ 
+     Any formula V with  in the interval [0,1] possesses the monot
+convergence property.  Such a formula is said to belong to the conve,
+cZss of formuZas. For any V with  outside the range [0,1], there
+exists some quadratic function for which V diverges from the true co
+variance matrix.
+ 
+     From what we have already seen about the rank-one formula, it i
+not surprising to find that it does not belong to the convex class.
+Since  y > O for any step which is an improvement, and since yTvoy
+if VO is positive-definite, it can be seen immediately from inspecti
+of the equation for (rank-one) that it must either be less than zer
+or greater than one.
+ 
+     Ihe aboe considerations lead Fletcher to propose a new algorit
+which is probably the most elegant and powerful of any VMM algorithm
+Basically, he uses the genera] updating formula V, with the value o
+chosen accord.n to the followirg clle!re:  If ,(rank-one) < 0, set
+corresponding to the usua rdn-two formula.  If (rank-one) > 1, se
+ = 1, corresponding to the dual formula.  In this way, one always u
+a formula in the convex class, and chooses that one which is "closes
+to the rank-ne formula.  It seems that the linear searches can then
+eliminated and replaced simply by Newton's steps, unless the functio
+highly non-quadratic.  The latter condition can easily be detected b
+comparing the actual improvement with the expected improvement at ea
+iteration.
+ 
+ 
+ 
+SPECIALIZED TECHNIQUES
+ 
+          All the methods outlined so far in these lectures are of rather
+     general applicability, the only assumption being -- for some methods
+     a predominantly quadratic behaviour in the immediate vicinity of the
+      mihimum.  In order to develop more powerful methods than those alrea
+     presented, we will have to give up some of this generality and explo
+ 
+                                  ,, m;n;m   l  Tn  thi c  crt;
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1746       23   98.68
+ 
+                                 - 36 -
+ 
+ 
+we discuss a few specialized techniques which are still of rather wide
+applicability in the sense that most functions of physical interest
+fall in one or more of these classes.
+ 
+5.1  Chisquare minimization
+ 
+     Probably the most common application of minimization in scientific
+research is in least squares fitting, where the function to be minimized
+is the sum of squares of deviations, between measured values and predic-
+tions of a model containing variable parameters:
+ 
+ 
+                          K           K   Yk - Tk(x) 2
+                 F(_x) =   fk(_x) =
+ 
+                     k=l         k=l `         '
+ 
+ 
+where Yk and k are measured values and errors, and Tk(x) are the values
+predicted by the model, depending on some parameters x.  Minimizing F
+then yields best values (estimates) of the n parameters x, based on K
+measurements Y with random errors , where K must be greater than or
+equal to n, and is usually much greater than n.
+ 
+     Let us now consider the second derivative matrix for F(x), expressec
+in terms of the individual fk(x):
+ 
+                 2F a a 2
+              ax ax  = axi ax   fl;
+ 
+ 
+ 
+                                           a        afk
+                    = aX  2fk aX
+ 
+                              k
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+                                            2
+                    =   2 aXk aXk +  2fk ax ax
+                           k      i       k        1  J
+ 
+ 
+In the above r.h.s., it is usual to make the approximation that the
+second sum, involving second derivatives, is small compared with the
+first term involving products of first derivatives.  This is called
+ZinearizQtion.  [Note that it is the mode1, T(x) that is being linearized,
+not the function F(x).]  In the important special case of 1,inear Zeast
+quare, the second sum is exactly zero, so that F (x) is quadratic, and
+the whole minimization problem reduces to the inversion of the above
+matrix a2F/axjaxi (i.e. the taking of one Newton step).
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1300       12   99.08
+ 
+ 
+     In the more general case of non-Zinear Zeast squares, the linea
+tion approximation consists in taking
+ 
+                     a2F        afk afk
+                     ax ax   ax ax -
+ 
+ 
+This has the advantage of being easy to calculate and, moreover, it
+always positive-definite (under rather weak conditions such as the
+existence of the derivatives, and provided it is non-singular).  In
+in many cases the use of the above approximation in computing Newton
+steps is actually more effective than using the exact second derivat
+matrix because of the positive defiteness.  Of course it must be
+remembered that the covariance matrix obtained by inverting this apF
+imate matrix does not in general converge to the true covariance mat
+even though the minimization  based on it may converge to the true
+minlmum.
+ 
+ 
+5.2  Likelihood maximization
+ 
+     An increasingly important alternative to the least squares met
+in data fitting is the method of maximum likelihood.  In this case
+function to be minimized is of the form
+ 
+ 
+ 
+                          F(x) = -  ln fk(X) ,
+                                       kSl
+ 
+ 
+that is, a sum of logarithms.  Here again, an approximation for the
+second derivative matrix can be found which involves only products
+first derivatives:
+ 
+ 
+                        S - axi ax   ln fk
+ 
+ 
+ 
+                         a l k
+                        axi  f k axj
+ 
+ 
+ 
+                            1 k afk 1 a2fk
+                            k aXi axj     fk aXiaxi  -
+ 
+                 Seen Rejected  Percentage
+ 
+Characters        991       11   98.89
+ 
+                                - 38 -
+ 
+ 
+As with least squares, we can neglect the second sum, involving second
+derivatives.  In the case of the likelihood function, the second deriv-
+atives of f are never exactly zero over any finite range (exactly linea
+maximum likelihood does not exist, essentially because the likelihood
+function must be normalized so that its integral over the space of
+measurements is independent of the parameters x).  However, the approxi
+mation
+a2F        1 afk afk
+                         ax.ax.  k2 ax. ax.
+                                   k
+ 
+ 
+has the same advantages as in the non-linear least squares case, namel
+speed of calculation and assured positive-definiteness.
+ 
+ 
+5.3  Models with separable computing
+ 
+     It often happens that the computation of the function value F can
+be arranged so that large parts of the calculation depend on only a fe
+of the variable parameters x.  These parts will then remain unchanged
+the corresponding parameters have not changed since the previous funct
+evaluation.  An important special case of this is when the calculation
+can be separated into n pieces, each depending on only one parameter.
+ 
+     Whenever the computing is separable in the above sense, large por
+tions of the computation may be avoided by testing which parameters ha
+not varied since the previous function call, and using the previous
+results of the corresponding sub-calculation when appropriate.  The ov
+all saving in computer time will then depend, of course, on the minimi
+tion method used, and some otherwise inferior methods, such as single-
+parameter variation, may become relatively efficient because of the ti
+saved in computing the function.
+ 
+     In particular, the cost of computing derivatives by finite dif-
+ferences will generally be much lower when the computing is separable,
+and in the extreme case of complete separability, all n first derivati
+may be computed in a time comparable with that of one full function
+evaluation.
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1559        4   99.74
+ 
+                                - 39 -
+ 
+ 
+5.4  Sets of related problems
+ 
+     Many applications involve a series of minimizations for which t
+functions involved are closely related.  For example, in determining
+confidence intervals for a parameter y in a statistical problem inva
+additional parameters x also to be estimated, one determines the cuc
+p(y) traced by the minima of the chisquare function F with respect t
+for different values of y:
+p(y) = min F(x,y) .
+ 
+ 
+A series of points on this curve is then determined by fixing y at
+several different values, and for each of these, minimizing F as a f
+tion of x.  Clearly then, information from the first minimization ca
+used as a starting point for the second, and then extrapolated to gc
+starting point for the third, and so on.  In particular, one does nc
+expect the covariance matrix to vary considerably from point to poir
+so this is an especially valuable piece of information to carry ove
+one problem to the next.
+ 
+     Similarly, if an experiment is repeated with new, independent,
+identically distributed data, the minimizations involved in the datc
+analysis can be speeded up by supplying covariance matrices from th
+analysis of the first experiment.
+ 
+ 
+ 
+LOCAL AND GLOBAL MIN
+6.1  The problem of multiple minima
+     All the methods presented so far have been designed to find a
+minimum, without any consideration of whether or not other local mi
+exist, or whether the minimum found is actually the global minimum.
+If the function has more than one local minimum, there is not even ,
+guarantee that these methods will find the minimum closest to the
+starting point, let alone the global minimum.  In fact, it is usual
+assumed, when using these algorithms, that the function is unimodal
+(has one minimum) in the region of interest likely to be explored d
+the minimization.
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1470        3   99.80
+ 
+                                 - 40 -
+ 
+ 
+     Whenever the function may have more than one local minimum, new
+problems arise in addition to the problem  of local minimization.  Firs
+of all, the user must decide what he wants to know about the function.
+The following four possibilities are the most common and will be
+discussed here:
+ 
+  i) it is sufficient to know the location of any one local minimum;
+ ii) only the global minimum is of interest;
+ iii) only one minimum is of interest (the "physical solution"), but it
+ need not be the global minimum; or
+ iv) all local minima, including the global one, must be found and
+ catalogued.
+ 
+     The first possibility, (i), is quite rare, but is easy to deal wit
+since any local min;mization routine is sufficient.
+ 
+     Possibility (ii) is much more common, particularly in system
+optimization where the cost must be the smallest possible, not just
+small compared with other near-by solutions.  Several methods exist for
+finding global minima, of which two will be discussed in the next sec-
+tions.  All such methods suffer from the absence of a stopping rule:
+even if the global minimum is found there is no way of recognizing it
+unless the function is known to be bounded and has reached its lower
+bound.
+ 
+     Possibility (iii) often arises in scientific research where the
+approximate values of some parameters are known in advance and one seeks
+a solution not too far from these values, corresponding to "the right
+valley" where the function may have several faraway valleys which may
+be deeper.  The usual technique for making sure of staying in the right
+valley is first to fix the approximately known parameters at their
+assumed values and minimize with respect to all other variables, then
+starting from this point minimize in the entire variable space.
+ 
+     Possibility (iv), of having to find and record all local minima,
+is the most difficult of all.  It arises, for example, in energy-depende
+phase-shift analyses where all "solutions" are recorded at each energy,
+and a continuous set of solutions is sought, one at each energy, which
+have a smooth energy dependence.  Although the techniques described belo
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1742        2   99.89
+ 
+ 
+ 
+may help in this problem, no exhaustive method is known to the author
+except for the prohibitive one of using many starting points equally
+spaced on an n-dimensional grid.
+ 
+ 
+6 . 2 The Ge 1 f and a 1 gor i thm
+ 
+      Relatively few minimization methods are specifically designed for
+non-local search in many parameters. Probably the most successful of
+the ad hoc stepping methods is that of Gelfandl S) . It is non-local
+because it provides a natural way to allow for function increases as
+well as decreases in any one step, while tending generally to decrease
+the f unc t ion val ue .
+ 
+      The procedure is as follows. From the starting point xo, a local
+minimization is begun (for example along the gradient) until the func-
+tion differences between steps become small (at the point aO). Then,
+ 
+                        X 1
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+                              X2
+ 
+ 
+                           1      ?
+ 
+                  aO              a   X
+                                 _ 2     _3
+ 
+ 
+ 
+going back to the starting point, a "long" random step is taken to the
+point xl, and another rough local minimization is performed to reach t
+point al (see figure above). Then the so-called "precipitous step" is
+taken along a line from aO to al, some distance past al to x2 . Then f'
+X2 another rough local minimization is performed, yielding a2, and anol
+precipitous step is taken from al past a2 to X3  and the search contin
+in this way.
+ 
+      The choice of the "precipitous step" length is important in deter-
+mining whether the method will "roll over small ridges, but skirt a hi
+mountain", as its authors say it should. But no precise way is given,
+except that "the choice of the length of the precipitous step is carri
+out experimentally (by trials) and it constitutes an important charact
+istic of the function".
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1332       10   99.25
+ 
+                                - 42 -
+ 
+ 
+     Moreover, there is no stopping rule, since the method is essenti
+ly searching rather than converging.  In practice one usually stops a
+a given length of computer time, but one would also stop if the progr
+went around in circles repeating itself (which is very possible but n
+so easy to detect) or if a predetermined "acceptably small" function
+value was attained.  This problem of stopping seems to be common to a
+non-local minimization methods.
+ 
+ 
+6 3  The Goldstein-Price method
+ .
+ 
+     Goldstein and Pricel6) have proposed an elegant yet simple metho
+for seeking other local minima after one local minimum has been found
+It is based on a consideration of the analytic (Taylor series) prope
+of the function.  Let us assume that the function can be represented
+a Taylor series about a local minimum xl, where the first derivativec
+vanish:
+                F(x) = F(xl) + 2 (x - xl) G(x -xl) + h.t. .
+ 
+ 
+Now the higher terms (h.t.), involving third and higher derivatives,
+important since these are the terms that will give rise to other locc
+minima.  In fact, we seek a way of transforming the function so that
+the higher terms remain.  Such a transformed function is Fl such that
+ 
+ 
+                           2(F(x) - F(Xl))
+            Fl(xl,_x) =        T         = 1 + h.t. .
+                          (X -Xl) G(x - xl)
+ 
+ 
+By means of this transformation, we have "removed" the minimum at xl,
+and the way is cleared to search for other minima generated by the hi
+terms of the expansion about xl.  The method therefore consists of
+seeking a local minimum of the function Fl.  (It is required to know
+second derivative matrix G at the local minimum xl.)  Since the quad
+form (x -xl) G(x - xl) is always positive for positive-definite G, th
+function Fl will become negative as soon as an improvement on xl is
+found.  Then starting from this improved point, the original functio
+can be minimized locally to yield a new, improved local minimum of F
+ 
+     If the minimum value found for Fl is positive, then it may cor-
+respond to a new local minimum of F, but not an improvement over xl.
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1609        2   99.88
+ 
+                               - 43 -
+ 
+ 
+In this case the procedure may be continued from this new point, fo
+a new function F2, related to Fl just as Fl was related to F.  As us
+no stopping rule is given by the theory.
+ 
+     The method seems to work in practice, although experience with
+is limited and no conditions are known under which it is guaranteed
+work.  It is appealing for reasons of its elegance and simplicity, c
+could prove to be an important tool in global minimization.
+ 
+ 
+ 
+CONCLUSION
+7.1  Global strategy
+     After having studied the properties of many minimization methoc
+we are finally faced with the problem of choosing one of them.  As
+have already stated, no one method can be optimum in the sense of b
+best for all functions.  And even for one given function, it is unli
+to find a method which works well in all regions, far from the minin
+as well as near.
+ 
+     All this suggests that we should try to tailor the programs to
+function's needs.  If we expect to be doing a lot of minimization,
+several programs should be prepared, based on different methods wit
+properties suited to different kinds of functions.  Then a decision
+to which method to use would depend on a consideration of the parti
+function to be minimized.  A decisio tree, enabling the user to ch
+a method for his function, has been given in the review of Fletcher
+Certainly no two experts would agree on the details of such a logic
+diagram, since everyone has his own personal preferences in this fi
+but the general idea is a good one and indicates a way in which a
+routine could be chosen.
+ 
+     In large problems, the properties of the function may change
+drastically from one region to another, so that a good method far f
+the minimum, for example, may converge very slowly in the vicinity
+the minimum.  In particular, the simplex and Rosenbrock methods are
+quite insensitive to the exact shape of the function, and so should
+work as well in non-quadratic regions as in quadratic regions.
+However, once the region of the minimum is reached, the function sh
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1633        8   99.51
+ 
+                               _ 44 _
+ 
+ 
+be reasonably quadratic so that a method with quadratic convergence
+should certainly be used.
+ 
+     With the present state of the art, the decision as to which meth
+to use, or when to change methods if more than one is used, must be
+based on a priori knowledge of the function.  Ultimately one could
+imagine designing a super-algorithm which could examine the function
+follow the progress of the minimization and choose the best method on
+the basis of what it finds out, rejecting those whose progress is too
+slow in favour of more suitable techniques.  At present this is some-
+times done, but only in a most rudimentary way, in the sense that som
+algorithms can tell when they are going astray and can signal this to
+main program which can then try a safer method.
+ 
+ 
+7.2  Computer programs
+ 
+     The purpose of this last section is not to suggest particular
+programs which may be available for general use, but rather to indica
+in very general terms several ways in which such programs may be org2
+nized.  The implementation and use of the techniques described in thc
+lectures implies their being programmed for high-speed computers, wit
+the program structure depending again on the nature of the problem tc
+solved.
+ 
+     One traditional program structure is that of the Zarge autonomoz
+progro which as far as possible takes care of all details of initia]
+tion, input-output formats, error returns, and other organizational
+The function to be minimized is submitted by the user in the form of
+subroutine which returns a function value F on each call, depending
+the values of the formal parameters x.  Another formal parameter is
+flag informing the function subroutine when the first and last calls
+being made, so that the subroutine may do any private initialization
+printing of final results if necessary.  The starting values and ste
+sizes of the function parameters are usually read in by the main pro
+on data cards, and there may be more data cards specifying which of
+several options are requested if the main program is capable of perf
+a variety of different tasks.  Programs organized in this way are po
+in laboratories where the principal task to be performed in a typica
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1792        2   99.89
+ 
+ 
+job is a single large minimization problem, for then the main program
+can easily contain logic permitting change-over from one algorithm to
+another in case of failure to converge, and can contain many other
+features which relieve the user of a large amount of trivial "house-
+keeping" work.
+ 
+     A different approach is that of the smaZZ minimizing subroutine,
+designed to save memory space and to allow the user maximum flexibili
+In this case the user must write the main program which calls the
+minimizer, as well as the function subroutine called by the minimizer
+In return for the extra work, he then has complete control over the
+organizational details, and the minimizer is more likely to be machin
+independent when available in a higher-level language such as FORTRAX
+This approach is especially adapted to jobs consisting of a series of
+many related minimizations, or when the minimization is only a small
+intermediate step in a larger calculation.
+ 
+     A more recent development is that of interactive minimization,
+where the user can follow the progress of the search by means of a CF
+screen or other output device, and modify the search procedure ac-
+cordingly.  Although this appears a potentially powerful technique, i
+is rather expensive in terms of real-time computer resources, and I c
+skeptical about its ultimate efficiency for two reasons:
+ 
+  i) Computer output devices and human geometric insight are both
+     notoriously poor in spaces of high dimensionality, and cases of
+     many variables are usually the only ones difficult enough to
+     warrant the use of expensive computing techniques.
+ 
+ ii) If a human is able to direct a many-dimensional search more
+     efficiently than a computer, it is probably a sign of deficienc
+     in the numerical methods used by the computer rather than brilli
+     insight on the part of the human.
+ 
+     However, interactive minimization is still relatively new, and
+could prove very useful for some problems, including the development
+new  algorithms for off-line minimization programs.
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1676        1   99.94
+ 
+                           - 46 -
+                              REFERENCES
+(References 18-31 ce not referred to specificaZZy in the textJ but a
+added as usefuZ generaZ references.)
+ 
+ 
+ l)  J. Kowalik and M.R. Osborne, Methods for unconstrained optimizat
+        problems (American Elsevier Publishing Co., Inc., New York,
+        1968) .
+ 
+ 2) H.H. Rosenbrock, An automatic method for finding the greatest or
+        least value of a function, Comput. J. 3, 175 (1960).
+ 
+ 3)  R. Hooke and T.A. Jeeves, Direct search solution of numerical an
+        statistical problems, J. Assoc. Comput. Mach. 8, 212 (1961).
+ 
+ 4)  L.C.W. Dixon, Non-linear optimization  (English Universities Pre
+        London, 19 7 2 ) .
+ 
+ S)  J.A. Nelder and R. Mead, A simplex method for function minimizat
+        Comput . J. 7, 308 (1965) .
+ 
+ 6) G.W. Stewart, A modification of Davidon's method to accept dif-
+        ference approximations of derivatives, J. Assoc. Comput. Mach
+        14, 72 (1967).
+ 
+ 7)  R. Fletcher and C.M. Reeves, Function minimization by conjugate
+        gradients, Comput . J . 7, 149 (1964) .
+ 
+ 8) M.J.D. Powell, An efficient method for finding the minimum of a
+        function of several variables without calculating derivatives
+        Comput . J. 7, 155 (1964) .
+ 
+ 9) L.D. Landau and E.M. Lifshitz, The classical theory of fields
+        (Addison-Wesley Publ. Co., Inc., Reading, Mass., 1951) .
+ 
+10)  R. Fletcher and M.J.D. Powell, A rapidly converging descent meth
+        for minimization, Comput. J. 6, 163 (1963) .
+ 
+11)  W.C. Davidon, Variance algorithm for minimization, Comput. J. lC
+        406 (1968).
+ 
+12) M.J.D. Powell, Rank one methods for unconstrained optimization,
+        appearing in Integer and Non-linear Programming, J. Adabie
+        editor (North-Holland Publ. Co., Amsterdam, 1970) .
+ 
+13) R. Fletcher, A new approach to variable metric algorithms,
+        Comput. J. 13, 317 (1970).
+ 
+14) C.G. Broyden, Quasi-Newton methods and their application to func
+        tion minimization, Math. Comput. 21, 368 (1967) .
+ 
+15)  I.M. Gelfand and f.L. Tsetlin, The principle of non-local searc
+        in automatic optimization systems, Soviet Phys . Dokl . 6, 192
+        (1961) .
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1634        3   99.82
+ 
+                              - 47 -
+ 
+ 
+16) A.A. Goldstein and J.F. Price, On descent from local minima, Ma
+        Comput . 25, 569 (1971) .
+ 
+17) R. Fletcher, Methods for the solution of optimization problems,
+        Comput. Phys. Commun. 3, 159 (1972).
+ 
+18)  M.J.D. Powell, Minimization of functions of several variables,
+        appearing in Numerical Analysis, an Introduction, J. Walsh
+        editor (Academic Press, Inc., New York, 1966) .
+ 
+19)  M.J. Box, D. Davies, and W.H. Swann, Non-linear optimization
+        techniques (Oliver and Boyd, Edinburgh, 1969).
+ 
+20) D.J. Wilde and C.S. Beightler, Foundations of optimization
+        (Prentice-Hall, Inc., Englewood Cliffs, N.J., 1967) .
+ 
+21) M.J. Box, A comparison of several current optimization methods
+        the use of transformations in constrained problems, Comput.
+        9, 67 (1966) .
+ 
+22) R. Fletcher, Function minimization without evaluating derivativ
+        a review, Comput . J . 8, 33 (1965) .
+ 
+23) R. Fletcher (editor), Optimization - Symposium of the Institute
+        Mathematics and its Applications  (Academic Press, Inc. ?
+        iew York, 1969).
+ 
+24) H.A. Spang, A review of minimization techniques for non-linear
+        functions, SIAM Rev. 4, 343 (1962).
+ 
+25) M.J.D. Powell, A survey of numerical methods for unconstrained
+        optimization, SIAM Rev. 12, 79 (1970) .
+ 
+26) M.J.D. Powell, A method for minimizing a sum of squares of non-
+        linear functions without calculating derivatives, Comput. J.
+        303 (1965).
+ 
+27) J. Greenstadt, On the relative efficiencies of gradient methods
+        Math. Comput . 21, 360 (1967) .
+ 
+28) R.W.H. Sargent and B.A. Murtaugh, Computational experience wit
+        quadratically convergent minimization methods, Comput. J.
+        185 (1970).
+ 
+29) J.D. Pearson, Variable metric methods of minimization, Comput.
+        12, 171 (1969).
+ 
+30) R. Bass, A rank two algorithm for unconstrained minimization,
+        Math . Comput . 26, 129 (1972) .
+ 
+31) A.A. Goldstein and J.F. Price, An effective algorithm for minir
+        tion, Nurr . Math. 10, 184 (1967) .
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1582        2   99.87
+ 
+                                - 48 -
+ 
+ 
+APPENDrX
+ 
+ 
+           SOME SAMPLE PROBLEMS FOR MINIMIZATION ROUTINES
+ 
+ 
+     We assemble here a collection of test problems which found to be
+useful in verifying and comparing different minimization routines.
+Many of these are standard functions upon which it has become
+conventional to try all new methods, quoting the performance in the
+publication of the algorithm.
+ 
+ 
+Al   Rosenbrock's curved valley
+  .
+ 
+ 
+                  F(x,y)  lOO(y - x2)2 + (1 - x)2
+ 
+start point:              F(-1.2,1.0) = 24.20
+minimum:                  F(l.O,l.O)  = O .
+     This narrow, parabolic valley is probably the best known of all 1
+cases.  The floor of the valley follows approximately the parabola
+y = x2 + 1/200, indicated by the dashed line in the diagram.  In the
+cross-hatched area above the dashed line, the covariance matrix is no
+positive-definite.  On the dashed line it is singular.  Stepping meth
+tend to perform at least as well as gradient methods for this functio
+ 
+[Reference:  Comput. J. 3, 175 (1960).]
+ 
+ 
+ 
+ 
+ 
+   s 
+ 
+                 Seen Rejected  Percentage
+ 
+Characters        772        3   99.61
+ 
+                                - 49 -
+ 
+ 
+A2.  Wood's function of four parameters
+ 
+ 
+  F(Wx,y,z) = lOO(x -w2)2 + (w _l)2 + 9o(    2)2
+               + (1- y)2 + lO.l[(x -1)2 + (z -1)2] + 19.8(x -l)(z - 1
+start point:            F(-3,    3,-1) = 19192
+minimum:                F(l,l,l,l)     = O .
+ 
+     This is a fourth-degree polynomial which is reasonably well-beh
+near the minimum, but in order to get there one must cross a rather
+four-dimensional "plateau" which often causes minimization algorithm
+get "stuck" far from the minimum.  As such it is a particularly good
+test of convergence criteria and simulates quite well a feature of m,
+physical problems in many variables where no good starting approxima
+is known.
+ 
+[Reference:  Unpublished.  See IBM Technical Report No. 320-2949.]
+ 
+ 
+ 
+A3.  Powell's quartic function
+ 
+ 
+     F(w,x,y,z) = (w + lOx)2 + S(y- Z)2 + (X - 2y)4 + lO(w -z)4
+start point:               F(3,-1,0,1) = 215
+minimum:                   F(O,O,O,O)  = O .
+ 
+     This function is difficult because its matrix of second derivati
+becomes singular at the minimum.  Near the minimum the function is gi
+by (w +lOx)2 + S(y _Z)2 which does not determine the minimum uniquel
+ 
+[Reference:  Comput. J. 5, 147 (1962).]
+ 
+ 
+ 
+A4.  Fletcher and Powell's helical valley
+ 
+ 
+          F(x,y,z) = lOOz -10(X,y)2 + (x2 + y2 _ l)2 + z2
+where               2(x,y) = arctan (y/x) for x > O
+                       =  + arctan (y/x) for x< O
+ 
+start point:               F(-l,O,O) = 2500
+minimum:                     F(l,O,O) = O .
+ 
+F is defined only for -0.25 <  < 0.75.
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1091       13   98.81
+ 
+                                - so -
+ 
+ 
+     This is a curved valley problem, similar to Rosenbrock's, but in
+three dimensions.
+ 
+[Reference:  Comput. J. 6, 163 (1963).]
+ 
+ 
+ 
+AS. Goldstein and Price function with four minima
+ 
+ 
+     F(x,y) = (1 + (x + y + 1) 2 * (19-14x + 8x2 _ 14y + 6xy + 3y2)
+             * ( 30 + (2x _ 3y) 2 * (18-32x + 12x2 + 48y - 36xy + 27y2
+local minima:          F (1. 2, O . 8) = 840
+                       F(1.8,0.2)   = 84
+                       F(-0.6,-0.4) = 30
+global minimum:        F (O ,-1. 0) = 3
+ 
+     This is an eighth-order polynomial in two variables which is well
+behaved near each minimum, but has four local minima and is of course
+non-positive-definite in many regions.  The saddle point between the t
+lowest minima occurs at F(-0.4,-0.6) = 35, making this an interesting
+start point.
+ 
+[Reference:  Math. Comp. 25, 571 (1971).]
+ 
+ 
+ 
+A6. Goldstein and Price function with many minima
+ 
+ 
+    F(x,y) = exp 2 (x2 + y2 _ 25)2 + sin4 (4x  3y)  +  1  (2     1  )2
+ 
+ 
+ 
+gl obal minimum:             F ( 3, 4 )
+      This function has "many" local minima.
+[Reference:  Math. Comp. 25, 571 (1971).]
+ 
+ 
+ 
+A7. Quadratic function in four parameters
+ 
+ 
+ 
+        F(x,y,z,w) = 7l (21x2 + 20y2 + 19z2 _ 14xz - 20yz) + w2
+ 
+                 Seen Rejected  Percentage
+ 
+Characters        839        3   99.64
+ 
+                                 - 51 -
+minimum:                    F(O,O,O,O) = O
+                            4 1 2
+                             1 5 3
+covariance matrix:                   6
+ 
+ 
+                                O O O
+ 
+ 
+ 
+     Except for the reasonably strong parameter correlations, this f
+tion poses no special problem to any minimization routine.  But the
+author has found it useful in debugging programs based on quadratica
+convergent methods, since these programs should minimize the functioT
+exactly in one iteration.  It is also used to check the calculation c
+the covariance matrix.
+ 
+     A variation consists of adding |x| - 1 whenever |x| > 1, and
+similarly with the other variables.  This introduces in a reasonably
+smooth way terms which alter the quadratic behaviour far from the miT
+while leaving it unchanged inside the unit cube, Chus providing a te
+for those methods which are supposed to converge to the correct
+covariance matrix by updating.
+ 
+ 
+ 
+A8.  Chebyquad
+ 
+ 
+ 
+               F(x) =    Ti(X ) dx          T (x )
+ 
+                      i=l O              =l
+ 
+ 
+where Ti(x) are shifted Chebyshev polynomials of degree i;
+start point:                 Xj = j/(n + l) .
+     This function is designed to have a variable and possibly large
+number of parameters, and to resemble functions encountered in actua
+practice rather than being contrived to be especially difficult.  Eac
+term of F represents the squared difference between the true integra
+of a polynomial of degree i and the integral estimated by Chebyshev
+(equal-weight) quadrature on n points:
+ 
+ 
+                      J P(x) dx | P(xj) .
+                    O                                   =l
+ 
+                 Seen Rejected  Percentage
+ 
+Characters       1115       15   98.65
+ 
+                                - ;2 -
+ 
+ 
+The starting values correspond to equally spaced points Xj which is r
+too far away from the solution.  Fletcher gives a complete Algol-codec
+procedure for this function in the reference quoted below.
+ 
+[Reference:  Comput. J. 8, 33 (1965).]
+A9.  Trigonometric functions of Fletcher and Powell
+                    n r n                                 -2
+                                  (Aij sin Xj + Bij cos Xj)
+                i=l  j=l
+ 
+where
+ 
+ 
+                  E. = '  (A.. sin x . + B.. cos x .) .
+                               0 1     0
+ 
+ 
+ 
+B   and A.  are random matrices composed of integers between -100 and
+ ij      l
+ 
+100;  for j = 1, ..., n:  Xj are any random numbers, - < Xoj < ;
+ 
+start point:         xj = x j + O.l     n < j <
+minimum:             F(x = xO) = O .
+ 
+     This is a set of functions of anv number of variables n, where t
+minimum is always known in advance, but where the problem can be chan
+by choosing different (random) values of the constants Aij, Bij, and .
+The difficulty can be varied by choosing larger starting deviations
+In practice, most methods find the "right" minimum, corresponding to
+x = xo, but there are usually many subsidiary minima.
+ 
+Reference:  Comput. J. , i63 (1963).
+ 
+                 Seen Rejected  Percentage
+ 
+Characters        831       18   97.83
+@

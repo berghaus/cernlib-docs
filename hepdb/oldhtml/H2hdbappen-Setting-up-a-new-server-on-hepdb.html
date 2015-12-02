@@ -1,0 +1,238 @@
+<TITLE>HEPDB -- H2hdbappen-Setting-up-a-new-server-on-hepdb </TITLE>
+<P>
+<H2><A NAME=H2hdbappen-Setting-up-a-new-server-on-hepdb.html>Setting up a new server on hepdb</A></H2>
+<P>
+The hepdb system is a dedicated IBM RS6000 that only runs HEPDB servers
+and associated jobs. The database files are maintained in the /hepdb file
+system. This is nfs exported and should be mounted on other Unix systems,
+such as CSF, as follows:
+<P>
+<PRE>
+                  <B>Mounting the /hepdb file system</B>
+                                  </PRE>
+<P>
+<PRE>
+mount hepdb:/hepdb /hepdb
+</PRE>
+<P>
+New servers can be setup using the following script, which creates the
+necessary directory structure and configuration files.
+<P>
+<PRE>
+        <B>Creating the files and directories for a new server</B>
+                                  </PRE>
+<P>
+<PRE>
+#
+# Setup the directory and file structure for a new
+# server
+#
+iam=`whoami`
+#
+# Are we root?
+#
+if [ "$iam" != "root" ]
+then
+   echo $0: This script must be run from root
+   exit
+fi
+#
+# Did we get any arguments?
+#
+if [ $# != 1 ]
+then
+   echo $0: usage $0 group
+   exit
+fi
+#
+# Does this directory exist?
+#
+if [ -d /hepdb/$1 ]
+then
+   echo $0: Directory /hepdb/$1 already exists
+   exit
+fi
+#
+# No, so make it
+#
+mkdir /hepdb/$1
+#
+# and the subdirectories...
+#
+mkdir /hepdb/$1/bad
+mkdir /hepdb/$1/log
+mkdir /hepdb/$1/queue
+chmod o+w /hepdb/$1/queue
+mkdir /hepdb/$1/todo
+mkdir /hepdb/$1/save
+ls -F /hepdb/$1
+#
+# now create the names file
+#
+echo :nick.config > /hepdb/$1/hepdb.names
+echo :list.aa     >> /hepdb/$1/hepdb.names
+echo :log./hepdb/cdtest/log >> /hepdb/$1/hepdb.names
+echo :queue./hepdb/cdtest/queue >> /hepdb/$1/hepdb.names
+echo :todo./hepdb/cdtest/todo >> /hepdb/$1/hepdb.names
+echo :save./hepdb/cdtest/save >> /hepdb/$1/hepdb.names
+echo :bad./hepdb/cdtest/bad >> /hepdb/$1/hepdb.names
+echo :loglevel.3 >> /hepdb/$1/hepdb.names
+echo :wakeup.60 >> /hepdb/$1/hepdb.names
+echo :nick.aa >> /hepdb/$1/hepdb.names
+echo :file./hepdb/cdtest/aa.dbs >> /hepdb/$1/hepdb.names
+echo :desc.Description of the database >> /hepdb/$1/hepdb.names
+echo :servers. >> /hepdb/$1/hepdb.names
+cat /hepdb/$1/hepdb.names
+#
+# Link the server script
+#
+ln -s /cern/new/bin/cdserv.sh /hepdb/$1/cdserv
+#
+# and the server module
+#
+ln -s /cern/new/bin/cdserv /hepdb/$1/cdsrv
+</PRE>
+<P>
+The servers are started at boot time by adding the file /etc/inittab as
+follows:
+<P>
+<PRE>
+                     <B>Extract from /etc/inittab</B>
+                                  </PRE>
+<PRE>
+rcnfs:2:wait:/etc/rc.nfs > /dev/console 2>&1 # Start NFS Daemons
+hepdb:2:wait:/etc/rc.hepdb > /dev/console 2>&1 # Start HEPDB
+cons:0123456789:respawn:/etc/getty /dev/console
+</PRE>
+<P>
+This invokes the following script:
+<P>
+<PRE>
+                             <B>rc.hepdb</B>
+                                  </PRE>
+<P>
+<PRE>
+#!/bin/sh
+#
+#               Start HEPDB servers
+#
+#
+if [ -x /cern/pro/bin/cdstart ]
+then
+        echo Start HEPDB servers ...
+        su - hepdb /cern/pro/bin/cdstart 2>&1
+fi
+</PRE>
+<P>
+One may execute cdstart at any time, as it will only restart servers that
+are not already running.
+<P>
+<PRE>
+                          <B>cdstart script</B>
+                                  </PRE>
+<P>
+<PRE>
+#!/bin/ksh
+start=" "
+stop=" "
+run=" "
+nolog=" "
+noscr=" "
+b="."
+#
+#   Ensure that variables are defined...
+#
+for i in /hepdb/cd*
+   do
+echo
+typeset -u cdgrp
+cdpath=$i
+cdgrp=`basename $i`
+echo Setting $cdgrp to $cdpath ...
+eval $cdgrp=$cdpath;export $cdgrp
+#
+# and start the servers
+#
+if [ -x $i/cdserv ]
+   then
+#
+# does a log file exist?
+#
+   if [ -f /hepdb/$cdgrp.log ]
+      then
+      echo '>>> log file exists - looking for existing process'
+      log=$log$b$cdgrp
+      pid=`cat /hepdb/$cdgrp.log | awk 'printf "%s
+n",$13'`
+      if (test $pid)
+         then
+         echo Looking for server process for $cdgrp
+         if(ps -ae  | grep -s $pid )
+            then
+            echo CDSRV running PID = $pid
+            run=$run$b$cdgrp
+            else
+            echo No existing server found for $cdgrp - starting server
+            if [ -f $i/todo/signal.stop ]
+               then echo but signal.stop file found!
+               else echo Starting server for $cdgrp
+               nohup $i/cdserv $cdgrp > $i/cdserv.log &
+               start=$start$b$cdgrp
+            fi
+         fi
+         else
+         echo No existing server found for $cdgrp - starting server
+         if [ -f $i/todo/signal.stop ]
+            then echo but signal.stop file found!
+            stop=$stop$b$cdgrp
+            else echo Starting server for $cdgrp
+            nohup $i/cdserv $cdgrp > $i/cdserv.log &
+            start=$start$b$cdgrp
+         fi
+      fi
+      else
+      echo No server log found in $i
+      if [ -f $i/todo/signal.stop ]
+         then echo but signal.stop file found!
+         stop=$stop$b$cdgrp
+         else echo Starting server for $cdgrp
+         nohup $i/cdserv $cdgrp > $i/cdserv.log &
+         start=$start$b$cdgrp
+      fi
+   fi
+   else
+   echo No cdserv script found in $i - cannot start server
+   scr=$scr$b$cdgrp
+fi
+done
+echo
+echo Log files found for $log | tr '.' ' '
+echo Started servers for $start | tr '.' ' '
+echo Servers already running for $run | tr '.' ' '
+echo Servers stopped $stop | tr '.' ' '
+echo No scripts found for $scr | tr '.' ' '
+</PRE>
+<P>
+The servers can be checked by running the following script:
+<P>
+<PRE>
+                    <B>Looking for running servers</B>
+                                  </PRE>
+<PRE>
+echo 'HEPDB server                                        Elapsed     CPU time   %CPU'
+echo '==============================================================================='
+ps -aef -F "args,etime,time,pcpu" | grep "/cdsrv" | sort +2 -r
+</PRE>
+<P>
+<PRE>
+                   <B>Output from the above script</B>
+                                  </PRE>
+<P>
+<PRE>
+HEPDB server                                        Elapsed     CPU time   %CPU
+===============================================================================
+/hepdb/cdnomad/cdsrv                              7-02:19:29    00:04:44   0.0
+/hepdb/cdchorus/cdsrv                             7-02:19:29    00:04:43   0.0
+/hepdb/cdcplear/cdsrv                             7-02:19:29    00:04:41   0.0
+</PRE>
+<P>

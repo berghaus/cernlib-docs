@@ -1,0 +1,305 @@
+<PRE>
+
+
+
+
+<H2>Geant  3.16  Routine  PHYS530</H2>
+
+
+<PRE>
+
+
+  Origin:  T.Gabriel,  C.Zeitnitz,  K.Lassila-Perini
+                                        Submitted:  17.12.93
+Revision:                                                            Revised:  17.12.93
+Documentation:  K.Lassila-Perini
+
+
+</PRE>  <HR>  <H2>The  GEANT/MICAP  interface</H2>
+
+
+<PRE>
+
+
+</PRE>
+
+
+<H2>Subroutines</H2>
+
+
+<PRE>
+
+
+
+       CALL  GMORIN
+
+
+
+GMORIN  initialises  the  MICAP  variables  and  reads
+the  cross-section  file  for  the  materials  that
+have  been  defined.  It  is  called  from  GFMDIS  when  a
+neutron  with  kinetic  energy  below  20  MeV  enters
+there  first  time.
+
+
+
+       CALL  GFMDIS
+
+
+
+GFMDIS  computes  the  distance  to  the  next
+interaction  points.  It  calls  the  FLUKA  routines
+to  compute  the  cross-sections  for  all  particles
+except  neutrons  with  kinetic  energy  below  20  MeV
+for  which  MICAP  function  SIGMOR  is  called.  GFMDIS
+is  called  from  the  user  routine  GUPHAD  where  the
+hadronic  package  can  be  chosen.  The  only
+difference  between  GFLDIS  (see  [PHYS520])  and
+GFMDIS  is  that  for  the  former,  GHEISHA  hadronic
+package  is  called  for  the  neutrons  below  20  MeV,
+and  for  the  latter,  the  low-energy  neutrons  are
+handled  by  MICAP.
+
+
+
+       CALL  GFMFIN
+
+
+
+GFMFIN  calls  the  FLUKA  routines  to  generate  the
+hadronic  interaction.  For  the  neutrons  with
+kinetic  energy  below  20  MeV  GMICAP  is  called.  The
+
+
+
+only  difference  between  GFLFIN  (see  [PHYS520])
+and  GFMFIN  is  that  for  the  former,  GHEISHA
+hadronic  package  is  called  for  the  neutrons  below
+20  MeV,  and  for  the  latter,  the  low-energy
+neutrons  are  handled  by  MICAP.  GFMFIN  is  called
+from  the  user  routine  GUHADR.
+
+
+
+       CALL  GMICAP
+
+
+
+GMICAP  calls  the  MICAP  routines  to  handle  the
+low-energy  interaction  of  neutrons.  It  writes  the
+eventual  secondaries  to  the  GEANT  stack.  GMICAP
+is  called  from  GFMFIN.
+
+
+</PRE>
+
+
+<H2>Method</H2>
+
+
+<PRE>
+
+
+MICAP  (A  Monte  Carlo  Ionization  Chamber  Analysis
+Package)  ,    is  a  Monte  Carlo  system  to  analyze
+ionisation  chamber  responses.  As  a  standalone
+program  it  contains  the  code  for  formatting  the
+cross-section  files,  neutron  and  photon
+transport,  the  geometry  definitions  and  the  code
+for  the  chamber  response.  In  GEANT,  only  the
+sampling  of  the  neutron  interactions  from  the
+already  prepared  cross-section  file  is  included.
+The  interface  between  GEANT  and  MICAP  has  been
+extracted  from  GCALOR  package  by  C.Zeitnitz  and
+T.  Gabriel.
+
+
+When  using  GEANT-MICAP  interface  the  low-energy
+neutrons  are  handled  in  MICAP  routines.  Other
+hadrons  and  high-energy  neutrons  are  passed  to
+FLUKA  interaction  routines.  For  low-energy
+neutrons,  the  total  cross-section  is  given  by
+MICAP  and  if  the  neutron  interaction  is  chosen  by
+GEANT  tracking  routine,  GMICAP  reads  the
+cross-section  for  neutron  interactions
+processes,  samples  and  generates  the  interaction
+and  the  returns  the  secondary  particles
+(nucleons,  heavy  fragments,  or  photons)  to  GEANT.
+Information  on  the  recoil  nucleus  (atomic  number
+AMED,  charge  ZMED  and  kinetic  energy  ERMED)  can
+be  found  in  MCRECO  common  block.  The  program  flow
+is  shown  in  figures  ??     and  ??    .
+
+
+MICAP  uses  pointwise  cross-section  data  (as  a
+difference  to  so  called  group  cross-sections
+where  the  data  are  averaged  over  certain  energy
+intervals).  This  method  has  the  advantage  that
+
+
+
+                                                                            ______________________________________
+                                                                            |         GTNEUT                       |
+                                                                            |_____________________________________ |
+                                                                                               |
+                                                                            ___________________|?_________________
+                                                                            |         GUPHAD                       |
+                                                                            |_____________________________________ |
+                                                                                               |
+                                                                                               |
+ _|I__n__t__e__rf__a__c__e__r__ou__t__i__n__e__s __ __ __ __ __  __ __ __ __  __ __ __ __ __  _|___ __ __ __  __ __ __ __ __  __ __*
+ * __ __  __ __ __ __ __@
+ ||                                                                         ___________________|?_________________                 *
+ *                      @
+ ||                                                                         |         GFMDIS                       |               *
+ *                      @
+ ||                                                                         |_____________________________________ |               *
+ *                      @
+ ||                                         n,  E         <  20  MeV                           |                                   *
+ *                      @
+ ||                                         _____kin___________________________________________|___________________________________*
+ *_______________       @
+ ||                 Only__once______________||_______________________||                                                   Only__onc*
+ *e______________||_____@
+ ||                 |                                               |                                                     |        *
+ *                      @
+ ||                 ||                                              ||                                                    ||       *
+ *                      @
+ ||                 |                                               |                                                     |        *
+ *                      @
+ ||                 ||                                              ||                                 ___________________|?_______*
+ *__________            @
+ ||                 ||                                              ||                                 ||__________________________*
+ *__________F||LINIT    @
+ |                  |                                               |                                                     |        *
+ *                      @
+ _||__ __ __ __  __ __|__|__ __  __ __ __ __ __  __ __ __ __ __  __ __|__|__  __ __ __ __ __  __ __ __ __ __  __ __ __ __ __||__ __*
+ * __ __  __ __ __ __ __@
+                    |                                               |                                                     |        *
+ *                      @
+ ___________________|?_________________          ___________________|?_________________                __|__ __  __ __ __ |?___  __*
+ * __ __ __|          __@
+ |          GMORIN                      |        |          SIGMOR                      |              |           FLUKA           *
+ *         |          | @
+ |                                      |        |                                      |              |                           *
+ *         |          | @
+i|nitialisation                         |        |cross  sections                       |             i||nitialisation             *
+ *         ||         ||@
+ |       of  MICAP                      |        |     from  MICAP                      |              |      routines             *
+ *         |          | @
+ |_____________________________________ |        |_____________________________________ |              __|__ __  __ __ __ __ __  __*
+ * __ __ __|          __@
+
+
+
+ Figure  1:  Program  flow  for  calculation  of  the
+ distance  to  the  next  interaction  point
+
+
+
+                                                                                   ______________________________________
+                                                                                   |         GTNEUT                       |
+                                                                                   |_____________________________________ |
+                                                                                                      |
+                                                                                   ___________________|?_________________
+                                                                                   |         GUHADR                       |
+                                                                                   |_____________________________________ |
+                                                                                                      |
+                                                                                   ___________________|?_________________
+                                                                                   |         GFMFIN                       |
+                                                                                   |                                      |
+                                                                                   |     Interface                        |
+                                                                                   |        routine                       |
+                                                                                   |_____________________________________ |
+                                                                                                      |
+                                                                                                      |
+                                                        n,  E         <  20  MeV                      |
+                                                        ______________________________________________|____________________________*
+ *________________
+                                                        |    kin                                                                   *
+ *                |
+                                                        |                                                                          *
+ *                |
+                                                        |                                                                          *
+ *                |
+                                   _____________________|?_____________________                                                  __*
+ *|__ __ __  __ __|?_ _@
+                                   |            GMICAP                         |                                                 | *
+ *         FLUKA       @
+                                   |                                           |                                                 | *
+ *                     @
+                                low|-energy  neutron                           |                                                 ||*
+ *     hadronic        @
+                                   |    interactions                           |                                                 | *
+ *interactions         @
+                                   |___________________________________________|                                                 __*
+ *|__ __ __  __ __ __ _@
+
+
+
+Figure  2:  Program  flow  for  generating  secondary
+particles
+
+
+
+the  resonances  are  not  smoothed  by  averaging  the
+data.  The  neutron  cross-section  are  available  for
+the  following  isotopes:
+
+
+
+    Hydrogen  (bound)                                                         Sodium                                               *
+ *   Copper
+
+
+
+    Hydrogen  (free)                                                          Magnesium                                            *
+ *   Molybdenum
+
+
+
+    Lithium  (5)                                                              Aluminium                                            *
+ *   Barium
+
+
+
+    Lithium  (6)                                                              Silicon                                              *
+ *   Tantalum
+
+
+
+    Boron  (10)                                                               Chlorine                                             *
+ *   Tungsten
+
+
+
+    Boron  (11)                                                               Argon                                                *
+ *   Lead
+
+
+
+    Carbon                                                                    Calcium                                              *
+ *   Uranium  (235)
+
+
+
+    Nitrogen                                                                  Chromium                                             *
+ *   Uranium  (238)
+
+
+
+    Oxygen                                                                    Iron
+
+
+
+    Fluorine                                                                  Nickel
+
+
+
+If  the  cross-sections  are  not  found  for  some  of
+the  defined  materials,  a  warning  is  printed  first
+at  the  initialisation  time  telling  which
+cross-section  are  used  (the  closest  Z  available)
+instead.  Then,  an  additional  warning  is  printed
+each  tracking  step.
+</PRE>

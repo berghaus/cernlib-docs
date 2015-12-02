@@ -1,0 +1,534 @@
+<HEAD>
+<TITLE> Global operational aids</TITLE>
+</HEAD>
+<BODY><P>
+ <HR> <A NAME=tex2html19 HREF=tex2htmlindex2_2.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/next_motif.gif"></A> <A NAME=tex2html17 HREF=ZEBMZ3.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/up_motif.gif"></A> <A NAME=tex2html11 HREF=ZEBMZ3.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/previous_motif.gif"></A>  <A NAME=tex2html21 HREF=tex2htmlindex2_2.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/index_motif.gif"></A><BR>
+<B> Next:</B> <A NAME=tex2html20 HREF=tex2htmlindex2_2.html>Index</A>
+<B>Up:</B> <A NAME=tex2html18 HREF=ZEBMZ3.html>No Title</A>
+<B> Previous:</B> <A NAME=tex2html12 HREF=ZEBMZ3.html>No Title</A>
+<HR> <P>
+<H1><A NAME=SECTION0010000000000000000> Global operational aids</A></H1>
+<P>
+<A NAME=secH1MZGlobaloperationalaids><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<P>
+<H1><A NAME=SECTION0011000000000000000> ZPHASE - set program phase</A></H1>
+<P>
+Primarily to avoid recovery to 'next event' at the wrong moment,
+ZEBRA needs to know in which phase the user program is at any
+given moment.
+We distinguish three phases:
+<P>
+<OL><LI> during the initialization phase the user prepares the context for
+<LI> the operation phase of his program;
+<LI> during the termination phase accumulated results are output,
+      files are closed, etc.
+</OL>The user may subdivide the operation phase for his own purpose.
+With the change to 'termination' one may request <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZPHASE>ZPHASE</A> to take
+action of tidying up the primary store,
+to make room for end-processing routines (like output of histograms)
+which may need a large amount of working memory.
+<P>
+<P><A NAME=ZPHASE>CALL ZPHASE (JPH)</A><P>
+<P>
+signals to Zebra a change of phase, preset by <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZEBRA>MZEBRA</A> to 'initialization'.
+<P>
+<PRE><TT>Normal operation phase:  JPH .GE. 0
+
+   Termination phase:       JPH .LT. 0
+
+      JPH = -1:  reset the working space to be of zero length,
+                  but leave the store as it is;
+
+            -2:  reset the working space,
+                  wipe all user short-range divisions;
+
+            -3:  reset, wipe, and collapse upwards all short-range user
+                  divisions to be of zero length, giving their space to
+                  division 1 for use by termination routines; perform
+                  clean-up garbage collection in all other divisions.</TT></PRE>
+<P>
+The program phase is recorded on the variable <tt>NQPHAS</tt> of <A HREF=#ZSTATE>ZSTATE</A>
+and has the following significance :
+<PRE><TT>NQPHAS =   0  initialisation phase
+             &gt;0  = MAX(JPH,1):  normal operation phase
+             &lt;0  = JPH: termination phase</TT></PRE> 
+If the user whishes to subdivide the operation phase,
+he can pick up the current state from this variable.
+<P>
+<A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZPHASE>ZPHASE</A> prints a log message at level -1 for major phase changes,
+and at level 2 for minor changes.
+<P>
+<H1><A NAME=SECTION0012000000000000000> ZEND - normal program end</A></H1>
+<P>
+<P><A NAME=ZEND>CALL ZEND </A><P>
+<P>
+The routine <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZEND>ZEND</A>, which has no parameters, is defined to be the 
+entry-point for normal run termination.
+It is normally provided by the user
+to close files and print accumulated results.
+It is important that all closing down operations are
+done through this routine,
+if the user wants them to happen even in abnormal
+run termination.
+It would normally look like this:
+<P>
+<PRE><TT>SUBROUTINE ZEND
+ +CDE, ZSTATE.
+
+       CALL ZPHASE (-3)           start termination
+       . . .                      any user termination code
+
+       CALL MZEND
+       IF (NQERR.NE.0)  CALL ABEND
+       STOP
+       END</TT></PRE>
+<P>
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZEND>MZEND</A> is a little routine which prints statistics about
+the usage of all divisions.
+<P>
+<tt>NQERR</tt> in <A HREF=#ZSTATE>ZSTATE</A> is zero for normal run termination,
+it is non-zero if <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZEND>ZEND</A> has been reached via <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZFATAL>ZFATAL</A>.
+On some machines the recovery system of the machine
+expects the user to re-enter it.
+The KernLib routine ABEND (Z 035) looks after this.
+<P>
+The Zebra system contains a little default routine
+<A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZEND>ZEND</A> which is the above without any user termination.
+<P>
+A user routine similar to <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZEND>ZEND</A> is defined for taking over control
+of fatal error termination. 
+It is called <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZABEND>ZABEND</A> and it is
+described in the next paragraph.
+This should perform in there any extra operations needed
+for fatal termination and then it should transfer
+to <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZEND>ZEND</A> for closing down.
+<P>
+<H1><A NAME=SECTION0013000000000000000> ZABEND - abnormal program end through ZFATAL</A></H1>
+<P>
+<P><A NAME=ZFATAL>CALL ZFATAL </A><P>
+is defined to be the entry point for fatal run termination.
+<P>
+<P><A NAME=ZFATAM>CALL ZFATAM (chMESSAGE)</A><P>
+<P>
+is identical to <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZFATAL>ZFATAL</A>,
+except that it prints a message,
+given in the parameter as a character
+string of not more than 30 characters,
+terminated by the character '.'.
+<P>
+These routines are supplied by the system;
+they are protected against recovery loops,
+and they must not be supplied by the user.
+They should only be called when the run cannot usefully continue.
+If the application program discovers such a fatal condition
+it too should call <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZFATAL>ZFATAL</A> or <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZFATAM>ZFATAM</A>,
+preceded with some diagnostic printing or
+with loading to <tt>IQUEST</tt><A NAME=252><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=253><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=254><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=255><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A> some clue to the trouble.
+<P>
+<P><A NAME=ZABEND>CALL ZABEND </A><P>
+<P>
+and
+<P>
+<P><A NAME=ZPOSTM>CALL ZPOSTM chOPT</A><P>
+<P>
+This routine receives control from <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZFATAL>ZFATAL</A> to handle fatal run termination.
+This routine may be supplied by the user.
+<P>
+The Zebra system contains the standard routine as follows:
+<P>
+<PRE><TT>SUBROUTINE ZABEND
+ +CDE, ZSTATE.
+
+       CALL ZPOSTM ('TCWM.')
+       IF (NQPHAS.LE.0)  CALL ABEND
+       NQPHAS = -2
+       CALL ZEND
+       RETURN
+       END</TT></PRE>
+<P>
+This is not just a dummy,
+it causes a post-mortem dump,
+including a subroutine trace-back (if possible),
+followed by any normal user output programmed in <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZEND>ZEND</A>.
+Transfer to <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZEND>ZEND</A> takes place only if the break-down happened
+during normal operation,
+but not if the program is still in the initialisation phase
+or if it is already under <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZEND>ZEND</A> control.
+<P>
+The parameter to <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZPOSTM>ZPOSTM</A> is passed from there to <A HREF=../../zebra/ZEBDZ1/chapter2_1.html#DZSNAP>DZSNAP</A>
+to select the options for dumping the dynamic store,
+see section <A HREF=#secDZSNAP><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/cross_ref_motif.gif"></A> for details.
+<P>
+<H1><A NAME=SECTION0014000000000000000> ZTELL  - recover trouble through ZTELL-ZTELUS</A></H1>
+<P>
+During normal operation any request from the user for space
+with <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZWORK>MZWORK</A>, <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZLIFT>MZLIFT</A> <i>et al.</i> is satisfied,
+after garbage collection if necessary and possible.
+If however the request cannot be satisfied,
+the normal course of the program must be broken.
+To deliver the user from the burden of checking for success
+after each space request,
+the garbage collector sends control to the user at the
+entry-point <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#QNEXT>QNEXT</A> (via <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZTELL>ZTELL</A> 
+and the KERNLIB routine <A HREF=#QNEXTE>QNEXTE</A>),
+where he can program the recovery of the problem.
+Normally this will be to skip the current event and to continue
+with processing the next one.
+<P>
+Other Zebra packages, apart from MZ, and maybe the user himself,
+have similar problems.
+Therefore a general trouble control routine <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZTELL>ZTELL</A> has been
+included into Zebra.
+This is a switching routine with several modes of continuation,
+one of which is to send control to <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#QNEXT>QNEXT</A>.
+<A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZTELL>ZTELL</A> can also be called by the user program, thus:
+<P>
+<P><A NAME=ZTELL>CALL ZTELL (ID,IFLAG)</A><P>
+<P>
+<PRE><TT>ID     is an integer between 101 and 999,
+           ID's below 100 are reserved for system usage,
+           ID=99 for 'no memory left' from MZGARB.
+
+    IFLAG  is a flag indicating whether the calling code can
+           accept a RETURN from ZTELL:
+           = 0 ZTELL may return;
+           = 1 the calling code is not capable to accept a RETURN;
+           = 2 fatal error, the run must stop.</TT></PRE>
+<P>
+<A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZTELL>ZTELL</A> prints a message,
+sets up a reasonable exit mode as a function of <tt>ID</tt> 
+and <tt>IFLAG</tt> into the little labelled common <A HREF=#ZTELLC>ZTELLC</A>
+and calls <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZTELUS>ZTELUS</A> to give the user a chance to modify this mode.
+On the <b>obligatory</b>
+return from <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZTELUS>ZTELUS</A> it takes the selected exit as follows:
+<P>
+<PRE><TT>COMMON /ZTELLC/ ID, MODE
+
+    ID     is a copy of the first parameter to ZTELL;
+    MODE   is the selected exit mode:
+           = 0 RETURN to let the calling routine continue;
+           = 1 CALL QNEXTE to enter QNEXT
+           = 2 CALL ZFATAL
+           = 3 CALL ZEND</TT></PRE>
+<P>
+The exit mode to <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#QNEXT>QNEXT</A> is enabled only if <tt>NQPHAS</tt> in <A HREF=#ZSTATE>ZSTATE</A>
+is larger than zero, indicating that the program is
+in the normal operation phase.
+During the initialisation or the termination phase of the program
+transfer is to <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZFATAL>ZFATAL</A> instead,
+to avoid a program crash to be 'recovered' into normal operation.
+<P>
+The pre-loading of <tt>MODE</tt> is  <tt>MODE=IFLAG</tt>  for user calls 
+<tt>(ID&gt;100)</tt>;
+and for system calls <tt>(ID&lt;100)</tt> it is as shown
+in the diagnostics chapter for <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZTELL>ZTELL</A>.
+<P>
+<P><A NAME=ZTELUS>CALL ZTELUS </A><P>
+<P>
+Here is an example of a <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZTELUS>ZTELUS</A>
+which is happy with the default modes,
+except that it wants to go to <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZEND>ZEND</A> for <tt>ID=8</tt>:
+<P>
+<PRE><TT>SUBROUTINE ZTELUS
+      COMMON /ZTELLC/ ID,MODE
+
+      IF (ID.EQ.8)  MODE=3
+      RETURN
+      END</TT></PRE> 
+The default subroutine <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZTELUS>ZTELUS</A> on the library is a do-nothing dummy.
+The default subroutine <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#QNEXT>QNEXT</A> goes straight to <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZFATAL>ZFATAL</A>.
+<P>
+<P><A NAME=QNEXT>CALL QNEXT </A><P>
+<P>
+On most machines repeated recovery directly to <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#QNEXT>QNEXT</A> causes
+trouble with the Fortran trace-back and the subroutine stack.
+For this reason ZEBRA relies on the KERNLIB routine <A HREF=#QNEXTE>QNEXTE</A>,
+which implies an organization for event processing as follows:
+<P>
+<PRE><TT>_________________________
+|                         |          Program flow with QNEXT recovery
+|    MAIN program         |
+|                         |
+|    CALL MZEBRA (0)      |
+|    CALL MZSTOR (...)    |
+|                         |
+|    program              |                                _________
+|    initialization       |                               |         |
+|                         |                               |         |
+|    CALL ZPHASE (0)      | first entry           recover |         |
+|    CALL QNEXTE          | ------       _________       _|         |
+|_________________________|      `----&gt; |         |     |           |
+                                        | routine |     |  routine  |
+          &lt;---------------------------&lt; | QNEXTE  | &lt;-- |  ZTELL    |
+         |                              |_________|     |_          |
+ ________|________________                                |         |
+|                         |                               |         |
+|    subr QNEXT           |                               |         |
+|                         |                               |         |
+| 11 CALL MZWIPE (0)      |       requests                |         |
+|    read event           | ----------------------------&gt; |  Zebra  |
+|    IF (end) CALL ZEND   |                               |  system |
+|    process event        | &lt;---------------------------- |         |
+|    output event         |               normal RETURN's |         |
+|    GO TO 11             |                               |         |
+|_________________________|                               |         |
+         |                                                |         |
+ ________|________________        __________              |         |
+|                         |      |          |             |         |
+|    subr ZEND            | &lt;--- |  subr    | &lt;---        |         |
+|                         |      |  ZABEND  |     |      _|         |
+|    CALL ZPHASE (-3)     |      |__________|     |     |           |
+|                         |                       |     |  routine  |
+|    program              |                       `---&lt; |  ZFATAL   |
+|    termination          |                             |_          |
+|_________________________|                               |_________|</TT></PRE> 
+The initialisation part prepares the program to be ready
+for execution and then calls itself 
+<A HREF=#QNEXTE>QNEXTE</A> for entry to <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#QNEXT>QNEXT</A>
+to process the 'next event',
+being the first event in this case.
+<A HREF=../../zebra/ZEBMZ3/chapter2_1.html#QNEXT>QNEXT</A> loops internally to process all events.
+<P>
+CALL's from the processing program to the Zebra system
+are normally satisfied,
+and control comes back to the user with normal RETURN.
+Abnormal returns are either via <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZFATAL>ZFATAL</A> to <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZEND>ZEND</A>,
+or straight to <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZEND>ZEND</A>,
+or to <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#QNEXT>QNEXT</A> via <A HREF=#QNEXTE>QNEXTE</A>.
+<P>
+The Fortran version of <A HREF=#QNEXTE>QNEXTE</A> 
+is a simple <tt>CALL <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#QNEXT>QNEXT</A></tt>
+followed by RETURN.
+If necessary on a given computer,
+<A HREF=#QNEXTE>QNEXTE</A> is a machine-language or a C routine to unwind to itself
+the Fortran trace-back and the subroutine stack.
+So, if the user wishes at some point to abandon himself
+the curent event and to go to the next one,
+he should <tt>CALL <A HREF=#QNEXTE>QNEXTE</A></tt> and not <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#QNEXT>QNEXT</A>.
+<P>
+<A HREF=../../zebra/ZEBMZ3/chapter2_1.html#QNEXT>QNEXT</A> is a user routine to the KERNLIB routine <A HREF=#QNEXTE>QNEXTE</A> and
+has thus the usual problem of user routines called
+from a library routine in that it must be loaded explicitely:
+<PRE><TT>either:  compile it together with the other material
+       or:  if it resides on a user library it must be
+             INCLUDEd explicitly, for example on the VAX with
+             $ LINK  ...   MYLIB/INC=QNEXT/LIB  ...</TT></PRE>
+<P>
+This flow-diagram is only an example for the most common case
+of actual usage of Zebra.
+If one's program is not of the event-processing type
+one has to look at <A HREF=#QNEXTE>QNEXTE</A>/<A HREF=../../zebra/ZEBMZ3/chapter2_1.html#QNEXT>QNEXT</A> from a different angle:
+program flow from MAIN has to go to <A HREF=#QNEXTE>QNEXTE</A> to initialize
+for re-entry.
+Entry and all re-entries are then to <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#QNEXT>QNEXT</A>,
+which has to control the further program flow according
+to some flags,
+conveniently <tt>ID</tt> in <A HREF=#ZTELLC>ZTELLC</A> and <tt>NQPHAS</tt> in <A HREF=#ZSTATE>ZSTATE</A>.
+ID is not initialized by <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZEBRA>MZEBRA</A>,
+it is only changed by <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZTELL>ZTELL</A> which copies its first parameter to <tt>ID</tt>.
+This number is an integer in the range 1 to 99 for calls
+from the Zebra system.
+<tt>NQPHAS</tt> is initialized to zero by <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZEBRA>MZEBRA</A>,
+it is then changed only by the user (or the default <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZABEND>ZABEND</A>)
+either directly or with <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZPHASE>ZPHASE</A>.
+<P>
+<H1><A NAME=SECTION0015000000000000000> ZVERIF - check logical integrity of Zebra stores</A></H1>
+<P>
+<P><A NAME=ZVERIF>CALL ZVERIF (IXDIV,IFLRTN,chTEXT)</A><P>
+<P>
+<PRE><TT>with   IXDIV  1) the index of a single division to be verified;
+              2) the index of the store to be verified;
+                 = -1: all stores
+                        (other negative values are reserved)
+
+      IFLRTN  return flag, see below;
+
+      chTEXT  identifying text to be printed if trouble.</TT></PRE>
+<P>
+This routine has two somewhat different modes of operation:
+<P>
+Normally <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZVERIF>ZVERIF</A> checks all the data in and relevant to a complete
+store, or even several stores. It goes to <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZFATAL>ZFATAL</A> if it finds
+trouble.
+<P>
+But if verification is for one single division only, only the banks
+of this division are checked and control is given back to the caller
+if the flag <tt>IFLRTN</tt> is non-zero, in which case the number of
+normally fatal conditions is delivered in <tt>IQUEST(1)</tt>.
+This is intended to be used if one receives a data-structure
+in memory (with <A HREF=../../zebra/ZEBFZ2/chapter2_1.html#FZIN>FZIN</A>, say) which may be bad. Rather than letting
+the program run to crash one can realize the situation and
+wipe the division. This must be done with <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZWIPE>MZWIPE</A> because this
+is the only way to get rid of the data without Zebra looking
+at them.
+<P>
+This routine inspects all link areas and all banks in the stores
+selected, performing the following checks:
+<P>
+<PRE><TT>(0)  process and store control tables intact;
+    (1)  bank chaining intact;
+    (2)  a non-zero structural link must point to a true bank address;
+    (3)  consistency of &quot;up&quot; and &quot;origin&quot; links;
+    (4)  a link in a bank in division A pointing to division B
+         is checked for consistency with the cross-reference matrix;
+    (5)  a non-zero reference link in a bank must not point
+         into a reserve area;</TT></PRE>
+<P>
+<A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZVERIF>ZVERIF</A> is used by the automatic verification procedure
+<A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZVAUTO>ZVAUTO</A>, see next section.
+<P>
+<H1><A NAME=SECTION0016000000000000000> ZVAUTO - running with automatic verification</A></H1>
+<P>
+The routines of this complex are provided as the <i>ultima ratio regis</i>
+for finding program errors which destroy data in a Zebra store
+by faulty handling of links; they consume a lot of CPU time.
+<P>
+With automatic verification switched on calls to the Zebra system
+transfer to <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZVAUTY>ZVAUTY</A>,
+which handles the verification process:
+<P>
+The &quot;verify identifier&quot; (<tt>VID</tt>) is constructed by counting the number
+of entries to <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZVAUTY>ZVAUTY</A>. 
+The <tt>VID</tt> is a two-word object, because 32 bits
+may not be sufficient, it identifies every call to Zebra, it gives
+us a handle on where we are in the job, and it is available to the
+user via the common <A HREF=#ZVFAUT>ZVFAUT</A> to be printed together with the event
+number, for example. 
+<A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZVAUTY>ZVAUTY</A> will remember separately the <tt>VID</tt> for the
+last garbage collection, for the last <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZWIPE>MZWIPE</A>, and for the last <A HREF=../../zebra/ZEBFZ2/chapter2_1.html#FZIN>FZIN</A>,
+for printing on fatal error.
+<P>
+In &quot;active mode&quot; <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZVAUTY>ZVAUTY</A> will call <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZVERIF>ZVERIF</A> for the stores selected
+by the user initially, causing a transfer to <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZFATAL>ZFATAL</A> in case of trouble,
+which in turn will transfer control to the user by calling <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZABEND>ZABEND</A>,
+where he may code any display wanted.
+<P>
+In &quot;dummy mode&quot; the time-consuming calls to <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZVERIF>ZVERIF</A> will not take place,
+but the <tt>VID</tt> is checked to see whether the &quot;action threshold&quot; defined
+by the user is reached. If so, the mode is switched to &quot;active&quot;, and
+the log-level is set for all stores to be verified.
+From this point on one may get rather a lot of output, tracing the
+execution of the program step-by-step.
+<P>
+Suppose now one has a particular run, &quot;run A&quot; say, of a lengthy
+production job which collapses with the memory destroyed.
+The reason for this will be somewhere in the past.
+One could re-submit the job switching on true automatic verification 
+right away, but this could be excessively time consuming and produce
+much too much output.
+If so, it is better to re-submit the job first with &quot;dummy verification&quot;
+switched on by inserting a call to <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZVAUTO>ZVAUTO</A> at the point where one wants
+to start verification, after the initialization phase for example,
+and with the connection routine <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZVAUTX>ZVAUTX</A> supplied,
+&quot;run B&quot; say.
+Dummy verification goes through the
+same motion as active verification, but it does not call <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZVERIF>ZVERIF</A>
+and hence costs only little more time than run A. This run should also
+end up in <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZFATAL>ZFATAL</A>, which will now print the <tt>VID</tt>'s remembered for the last
+garbage collection, for the last wipe, for the last <A HREF=../../zebra/ZEBFZ2/chapter2_1.html#FZIN>FZIN</A>,
+and maybe other <tt>VID</tt>'s entered by the user with <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZVAUTU>ZVAUTU</A>.
+<P>
+One can now re-submit the job, &quot;run C&quot; say, having changed the call to
+<A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZVAUTO>ZVAUTO</A> by giving the action threshold, thereby defining the moment
+when active verification will start.
+<P>
+Automatic verification is initiated with
+<P>
+<P><A NAME=ZVAUTO>CALL ZVAUTO (MSTORE,IDVTH1,IDVTH2,LOGLEV)</A><P>
+<P>
+<PRE><TT>with  MSTORE  a bit-by-bit word indicating the stores to be verified,
+              store i = 0,1,2,... selected if bit (i+1) is set to one;
+              if MSTORE = 0: all stores
+
+    IDVTH1/2  the two-word VID at which true verification should start,
+              give both words zero if dummy verification only
+              (&quot;run B&quot; in the discussion above);
+              give 0,-1 if active verification is to start right away;
+
+      LOGLEV  set the log-level of the existing stores to be verified
+              to this value at the moment of changing to active mode,
+              give 2 for maximum logging.</TT></PRE>
+<P>
+To avoid loading the non-negligeable code of the <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZVAUTO>ZVAUTO</A> complex with
+normal production jobs, this trick is used: all relevant Zebra routines
+contain a conditional call to <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZVAUTX>ZVAUTX</A> (which does not take place if
+<A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZVAUTO>ZVAUTO</A> has not been called), and the Zebra library contains a dummy
+routine <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZVAUTX>ZVAUTX</A>. But the true process is controlled by <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZVAUTY>ZVAUTY</A>, which
+is not normally loaded. The user makes the connection by supplying
+this routine:
+<P>
+<PRE><TT>SUBROUTINE ZVAUTX
+      CALL ZVAUTY
+      END</TT></PRE> 
+as part of the material to be compiled and linked.
+<P>
+In the list of &quot;last <tt>VID</tt>s remembered&quot; there are 3 places for user
+triggered storage, which is done with
+<P>
+<P><A NAME=ZVAUTU>CALL ZVAUTU </A><P>
+<P>
+<P><A NAME=ZVAUTY>CALL ZVAUTY </A><P>
+<P>
+This will push the <tt>VID</tt> in position 2 to position 3, and the one in
+position 1 to position 2, entering the current <tt>VID</tt> into position 1.
+Thus, if one were to call <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZVAUTU>ZVAUTU</A> at the start of each event,
+one would see the start points of the last 3 events in a dump
+from <A HREF=../../zebra/ZEBMZ3/chapter2_1.html#ZFATAL>ZFATAL</A>.
+<P>
+The user has access to the verification parameters via this common:
+<P>
+<PRE><TT>COMMON /ZVFAUT/IQVID(2),IQVSTA,IQVLOG,IQVTHR(2),IQVREM(2,6)
+
+           IQVID  the current VID
+
+          IQVSTA  the verification status:
+                    zero  automatic verifying not running
+                      -1  dummy verification
+                      +1  active verification
+
+          IQVLOG  the log level to be set at the activation threshold
+          IQVTHR  the threshold VID
+
+     IQVREM(2,J)  VID remembered in position J,
+                    J = 1  last garbage collection
+                        2  last call to MZWIPE
+                        3  last call to FZIN
+                        4  last call to ZVAUTU
+                        5  last-but-one call to ZVAUTU
+                        6  last-but-two call to ZVAUTU</TT></PRE>
+<P>
+<P><B>Examples:</B><P><PRE><TT>Do not forget to supply the connection routine ZVAUTX !
+
+      CALL ZVAUTO (7,0,0,0)
+
+           to start a dummy verification run for store numbers 0, 1, 2;
+           &quot;run B&quot; of the discussion above.
+
+           Supposing that the ZFATAL output of this run tells us the
+           VID of the last-but-one event, by changing to
+ 
+      CALL ZVAUTO (7,0,123456,2)
+
+           we may start &quot;run C&quot; to give detailed logging for the
+           last two events.
+
+      CALL ZVAUTO (1,0,-1,0)
+
+           to start an active verification run for store number 0;
+           one might do this on a limited data sample before going
+           into production with a new program, just to verify that
+           the program is alright.</TT></PRE>
+<P>
+ <H2>References</H2>
+<P><A NAME=BIBLIO HREF=../../general/biblio/bibliography.html>Global CERN library references</A><P>/user/goossens/cnasall/cnasbibl,/user/goossens/cnasall/textproc}    
+<HR> <A NAME=tex2html19 HREF=tex2htmlindex2_2.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/next_motif.gif"></A> <A NAME=tex2html17 HREF=ZEBMZ3.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/up_motif.gif"></A> <A NAME=tex2html11 HREF=ZEBMZ3.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/previous_motif.gif"></A>  <A NAME=tex2html21 HREF=tex2htmlindex2_2.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/index_motif.gif"></A><BR>
+<B> Next:</B> <A NAME=tex2html20 HREF=tex2htmlindex2_2.html>Index</A>
+<B>Up:</B> <A NAME=tex2html18 HREF=ZEBMZ3.html>No Title</A>
+<B> Previous:</B> <A NAME=tex2html12 HREF=ZEBMZ3.html>No Title</A>
+<HR> <P>
+<HR>
+
+</BODY>
+<P><ADDRESS>
+goossens@cern.ch
+</ADDRESS>

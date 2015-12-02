@@ -1,0 +1,1299 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%   ZEBRA User Guide -- LaTeX Source                              %
+%                                                                 %
+%   Chapter MZ (Memory Manager)                                   %
+%                                                                 %
+%   The following external EPS files are referenced:              %
+%   fmzstor, fmzwork, fmzbok1, fmzbok2, fmzbok3, fmzbok4          %
+%                                                                 %
+%   Editor: Michel Goossens / AS-MI                               %
+%   Last Mod.:  7 Dec. 1990   mg                                  %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{MZ: The memory manager}
+\section{System initialization and end-of-run statistics}
+\par Routine MZEBRA must be called to initialize the ZEBRA system.
+In particular the ZEBRA standard input and output unit numbers are
+preset to the values they should have on any given machine.
+\par MZEBRA prints at log level -1 or above (see MZLOGL below)
+an initialization message
+showing, amongst other things, the version number of the
+current ZEBRA system.
+\par The parameter in the call to MZEBRA may select initialization
+options either with an integer constant or with a list as detailed below.
+\Subr{CALL MZEBRA (I)      or    CALL MZEBRA(LIST)}
+\index{MZ!MZEBRA}
+\index{initialization}
+\Idesc
+\begin{DL}{MM}
+\item[I]Integer variable specifying the output options
+\begin{DL}{MM}
+\item[ 0]Standard defaults
+\item[-1]Direct the ZEBRA system output to the terminal
+\item[-2]Print only error messages
+\item[-3]Combination of -1 and -2.
+\end{DL}
+\end{DL}
+See the ZEBRA reference guide for a description of the meaning
+of the parameters in the array LIST.
+\subsection{Example}
+\par The following call to initialise the MZEBRA system:
+\begin{verbatim}
+      CALL MZEBRA(-1)
+\end{verbatim}
+will print a message like the following on the terminal:
+\begin{verbatim}
+ZEBRA SYSTEM  3.6100      Date/Time 890801/1200
+ZEMQ     3.61  890626 17.10
+\end{verbatim}
+MZEBRA only initializes the general ZEBRA system commons,
+it does not initialize the dynamic store.
+Before any request to the ZEBRA system involving the store,
+the user must initialize it by calling MZSTOR (see below)
+\Subr{CALL MZEND}
+\index{MZ!MZEND}
+\par At the end of execution the user should issue a call to routine
+MZEND to obtain
+the statistics of usage of the dynamic store.
+\section{Initialization of a dynamic store}
+\par
+ZEBRA can handle up to 16 different dynamic stores. Each such store
+must reside in a COMMON block.
+Before any operation using a store
+it must be initialized by calling MZSTOR.
+All transactions with ZEBRA involving stores require the specification
+of the
+{\bf\it store index IXSTOR}
+(or IXDIV which identifies both the store and the division).
+The first store initialized is called the primary store and
+its store index IXSTOR will be zero, i.e.
+when one uses only one store then zero can be specified
+as store index in all calls to the ZEBRA routines.
+Further secondary stores, when initialized, will have
+non-zero IXSTOR values.
+\index{store!index}
+\index{store!initialization}
+\index{store!primary}
+\index{store!secondary}
+\par Each call to MZSTOR automatically creates two user short term
+divisions (called division 1 and 2) and a system division (see MZDIV
+for more details).
+\Subr{CALL MZSTOR}
+(IXSTOR*,CHNAM,CHOPT,FENCE,LQ(1),LQ(LR),LQ(LW),LQ(LIM2),LQ(LAST))
+\par Initialises a given dynamic store.
+\index{MZ!MZSTOR}
+\index{store!definition}
+\Idesc
+\begin{DL}{MMMM}
+\item[CHNAM]Character variable specifying the name of the store for
+printing purposes (8 characters maximum).
+\item[CHOPT]Character variable specifying the options selected
+\begin{DL}{MM}
+\item['Q']Quite, set the log level to -2 for this store
+\end{DL}
+\item[FENCE]Safety area immediately in front of the store to
+protect against illegal use of LQ(0), LQ(-1), etc.
+The fence extends from FENCE(1) to LQ(0).
+\item[LQ(1)]First word of the dynamic store
+\item[LQ(LR)]First permanent reference link, if any
+\item[LQ(LW)]First word in the store after the permanent links,
+this is the first word available to the working
+space, or to division 1. The following words are
+allocated as permanent user links, if any:\\
+LQ(1)  to LQ(LR-1)  structural links, if any\\
+LQ(LR) to LQ(LW-1)  reference links, if any.
+\item[LQ(LIM2)]Lowest position of the upper limit of division 2,
+to protect divisions 1 and 2 from being squeezed out
+of existence by other divisions created later.
+\item[LQ(LAST)]Last word of the dynamic store.
+\end{DL}
+\Odesc
+\begin{DL}{MMMM}
+\item[IXSTOR*]The index of the store,
+to be used when specifying this store in subsequent calls
+to the ZEBRA system. IXSTOR is set to zero for the primary store.
+\end{DL}
+\par The division indices for divisions 1 and 2 created by MZSTOR are:\\
+For division 1:  IXDIV = IXSTOR + 1\\
+For division 2:  IXDIV = IXSTOR + 2
+\subsection{Notes:}
+\par
+\begin{UL}
+\item The fence must have one word at least, but at most 1000 words.
+\item The data region of the store
+(i.e. the total store minus the permanent links)
+must be at least 2000 words.
+\item The sizes of the various parts of the store must be such
+that there are always at least 164 words of reserve area
+between divisions 1 and 2 available as working area for the system
+[40 words for a secondary store].
+\end{UL}
+\subsection{Layout of memory after a call to MZSTOR}
+\index{IQNIL}
+\par
+\begin{figure}[h]
+\epsffile{fmzstor.ps}
+\caption{Layout of memory after a call to MZSTOR}
+\label{FMZSTOR}
+\end{figure}
+The fence region is preset to contain IQNIL
+\footnote{IQNIL is a machine dependent bitstring which
+is as incompatible as possible with any acceptable data type on the
+given machine.}
+in every word, this must never be changed;
+the debug aids will check for over-writing.
+The permanent links are cleared to zero; the rest of the store is not
+touched.
+\subsection{Examples}
+\par For the primary store:
+\begin{verbatim}
+      PARAMETER   (NAQ = 120000)
+ 
+      COMMON //    FENDA(16),              the fence area
+     +             LMAIN, ...              the structural links
+     +             L1, ...                 the reference  links
+     +             DIV12(70000) , OTHER
+ 
+      DIMENSION    LA(NAQ) , IA(NAQ) , A(NAQ)
+      EQUIVALENCE (LMAIN   , LA(1))  , (A(1) , IA(1) , LA(9))
+ 
+      CALL MZSTOR (0,'//',' ',FENDA,LA,L1,DIV12,OTHER,A(NAQ))
+\end{verbatim}
+\par For a secondary store without permanent links:
+\begin{verbatim}
+      COMMON /BDYN/ IXBST     , IXBDV1 , IXBDV2 , IXBHIT ,
+     +              FENDB(16) , LB     , LASTB
+ 
+      DIMENSION     LB(40000) , IB(40000) , B(40000)
+      EQUIVALENCE  (B(1) , IB(1) , LB(9))
+ 
+      CALL MZSTOR (IXBST,'/BDYN/','Q',FENDB,LB,LB,LB,LB(30000),LASTB)
+      IXBDV1 = IXBST + 1
+      IXBDV2 = IXBST + 2
+\end{verbatim}
+\section{Set the log level for a store}
+\par Various parts of the ZEBRA system write log messages
+to the standard system output,
+and occasionally also to the on-line terminal, if any.
+\par Examples of messages provided for are:
+\begin{UL}
+\item Messages for recoverable errors: read errors, data errors
+\item Initialization messages for: stores, divisions, link areas, files
+\item Termination messages giving statistics of usage of
+various facilities like memory, files
+\item Operation messages: change in program phase, end-of-file
+\item Watch messages for hopefully rare, expensive events:
+garbage collection, MZPUSH with relocation
+\item Monitor messages to help the user debug his program
+\end{UL}
+\par To control the amount of information thus provided to the user,
+a log level is defined and can be set and reset by the user
+at execution time.
+The default log level zero enables the messages which one would
+usually like to see for record in a production run.
+The user may reduce the log level to cut out most or all messages;
+he may increase the level to watch the running of his program,
+or even to debug his data or his input files.
+\par Separate ZEBRA entities, such as dynamic stores or files,
+each have their own attached log level,
+which may be changed by the user at any time.
+By default they inherit the global system-wide default log-level
+set by MZEBRA, whose own default is zero.
+\par The log level attached to a particular dynamic store is initialized
+by MZSTOR, normally to the global default log level.
+The user may change it at any time with:
+\Subr{CALL MZLOGL (IXSTOR,LOGLEV)}
+\index{MZ!MZLOGL}
+\index{logging level}
+\Idesc
+\begin{DL}{MMMM}
+\item[IXSTOR]Index of the store
+for which the logging level has to be set
+\item[LOGLEV]Logging level
+\begin{DL}{MM}
+\item[-3]Suppress all log messages
+\item[-2]Error messages: \Rind{ZFATAL}, \Rind{ZPHASE}
+\item[-1]Terse logging: \Rind{MZEBRA}, \Rind{MZSTOR}, \Rind{ZPHASE}
+\item[ 0]Normal logging: \Rind{MZDIV}, \Rind{MZLINK}
+\item[ 1]Log to watch: \Rind{MZLINT}, \Rind{MZGARB}, \Rind{MZPUSH}, 
+\Rind{MZFORM}, \Rind{MZIOBK}, \Rind{MZIOCH}
+\item[ 2]Log to monitor ZEBRA calls: \Rind{MZLINT},
+\Rind{MZWORK}, \Rind{MZBOOK}, \Rind{MZLIFT}, \Rind{MZDROP},
+\Rind{MZPUSH}, \Rind{MZGARB}, \Rind{MZLOGL}
+\end{DL}
+\end{DL}
+\index{MZ!MZSTOR}
+\section{Creation of a division}
+\par A dynamic store can be physically subdivided into {\bf divisions}.
+Up to 20 divisions are allowed, which permits 17 divisions
+to be created by the user with \Rind{MZDIV}, beyond the 3 divisions
+created by \Rind{MZSTOR}.
+\index{division!creation}
+\index{division!mode}
+\begin{DL}{MMM}
+\item[Mode of a division:]\ Depending on whether a division grows
+at its higher or its lower end,
+a division is said to be of mode ``forward' or ``reverse'.
+By default a division is created with mode ``forward'.
+\item[Kind of a division:]\ Depending on its usage,
+we distinguish three kinds of divisions (apart from the
+system division, which is used by the ZEBRA system itself):
+\index{division!kind}
+\begin{DL}{MMM}
+\item[User short term]\ A division which will be wiped clean after every
+``event'(default);
+\item[User long term]\ A division for data associated to several events or
+needed throughout the program execution up to the termination phase;
+\item[Package]\ A division used by some service
+packages, and whose contents are not normally of any concern to the user.
+\end{DL}
+\item[Division cross-reference matrix:]\ As a default, links in a user division
+may point to any other user division in the same store,
+except that a linear structure must be contained within one division.
+More restricted inter-division cross-reference maps can be defined,
+either by using the
+'C' (contained) option of \Rind{MZDIV}, which indicates that the division
+in question does not reference any other division, or, for more general
+cases, by using routine \Rind{MZXREF}
+as described on page~\pageref{SR_MZXREF}.
+\index{MZ!MZXREF}
+\end{DL}
+\Subr{CALL MZDIV (IXSTOR,IXDIV*,CHNAM,NW,NWMAX,CHOPT)}
+\index{MZ!MZDIV}
+\index{division!initialization}
+\Idesc
+\begin{DL}{MMMM}
+\item[IXSTOR]Store index (zero for the primary store)
+\item[CHNAM]Character variable specifying the
+name of the division for printing purposes
+(8 characters maximum).
+\item[NW]Number of words (minimum 100) to be allocated to the division
+initially. Later the division
+may grow, but not beyond NWMAX.
+\item[NWMAX]Maximum size of the division (at least NW).
+\item[CHOPT]Character string specifying the options desired.
+\begin{DL}{MM}
+\item['R']Reverse division (default is Forward)
+\item['L']Long term division (default is user short term)
+\item['P']Package division (default is user short term)
+(P implies C, overrides L)
+\item['C']Division is Contained (i.e. no links point outside)\\
+Default: all user divisions point to all other user divisions.
+\end{DL}
+\end{DL}
+\Odesc
+\begin{DL}{MMMM}
+\item[IXDIV*]Index of the created division. This index
+must be used when specifying this division in subsequent calls
+to ZEBRA.
+\end{DL}
+\subsection{Examples}
+\par Create a user short term division called {\tt HITS} in
+forward mode in the primary store.
+\begin{verbatim}
+      CALL MZDIV (0 , IXHITS , 'HITS' , 10000 , 20000 , ' ')
+\end{verbatim}
+\par Create a user long term division called {\tt CALIB} in
+reverse mode in the secondary store with index {\tt IXCST}.
+\begin{verbatim}
+      CALL MZDIV (IXCST , IXCALI , 'CALIB' , 8000 , 8000 , 'RL')
+\end{verbatim}
+\section{The initialization of a link area}
+\par A link area is a vector of links outside any dynamic store, with
+all its links pointing to one particular store. A link area
+consists of NS structural links followed by NR reference links.
+Either NS or NR may be zero.
+\index{link area!initialization}
+\par We distinguish two kinds of link areas:
+\begin{OL}
+\item A {\bf permanent}
+link area is initialized once at the steering level
+and is valid for the whole program;
+\index{link area!permanent}
+\item A {\bf temporary}
+link area is requested and deactivated
+by lower-level code any number of times.
+\index{link area!temporary}
+\end{OL}
+A permanent link area consists of just the vector of links;
+a temporary link area has two words prefixed to the link-vector
+for efficiency:
+\begin{UL}
+\item {\bf Word 1}
+is a flag indicating whether the area is active or not;
+if this word is zero, the contents of the area will
+not be updated in case of a memory move.
+The user may reset this word to zero to de-active the link area.
+\item {\bf Word 2} is a key allowing the system to find easily the
+whereabouts of this area in the system tables without searching.
+This word must never be redefined by the user.
+\end{UL}
+A link area must be in COMMON storage;
+if it is in local storage there is a danger that FORTRAN
+optimization causes a register to preserve the old value of a link
+across a relocation operation,
+for garbage collection,
+but also for simple updating with Rind{MZDROP}, \Rind{ZSHUNT}, etc.
+\Subr{CALL MZLINK (IXSTOR,CHNAM,LAREA,LREF,LREFL)}
+\par Declares a permanent link area. It should only be {\bf called
+once} for any given area.
+\index{link area!declaration}
+\Idesc
+\begin{DL}{MMMM}
+\item[IXSTOR]Index of the store into which the links will point.
+\item[CHNAM]Character variable specifying the
+name of the FORTRAN COMMON in which the link area resides,
+for printing purposes (8 characters maximum).
+\item[LAREA]First word of the link area,
+being also the first link of this area
+\item[LREF]First reference link, if any;
+last structural link, if no reference links
+\item[LREFL]Last reference link, if any,
+if none: give LAREA in this parameter position
+\end{DL}
+\par \Rind{MZLINK} will clear the links to zero.
+\subsection{Examples [for the primary store]}
+\subsubsection{Mixed link area}
+\begin{verbatim}
+      COMMON /LAMIX/ LS1,...,LSN, LR1,...,LRN
+ 
+      CALL MZLINK (0,'/LAMIX/',LS1,LR1,LRN)
+\end{verbatim}
+\subsubsection{Structural link area}
+\begin{verbatim}
+      COMMON /LASTR/ LS1, ..., LSN
+ 
+      CALL MZLINK (0,'/LASTR/',LS1,LSN,LS1)
+\end{verbatim}
+\subsubsection{Reference link area}
+\begin{verbatim}
+      COMMON /LAREF/ LR1, ..., LRN
+ 
+      CALL MZLINK (0,'/LAREF/',LR1,LR1,LRN)
+\end{verbatim}
+\Subr{CALL MZLINT (IXSTOR,CHNAM,LAREA,LREF,LREFL)}\index{MZ!MZLINT}
+\index{link area!declaration}
+\par This call declares and initialises or re-initialises
+a temporary link area.
+\Idesc
+\begin{DL}{MMMM}
+\item[IXSTOR]Index of the store into which the links will point.
+\item[CHNAM]Character variable specifying the
+name of the FORTRAN COMMON in which the link area resides,
+for printing purposes (8 characters maximum).
+\item[LAREA]First word of the link area, with
+\begin{DL}{MMMM}
+\item[LAREA(1)]The user flag word
+\item[LAREA(2)]A system word, which must not be redefined by the user
+\item[LAREA(3)]The first link of the area
+\end{DL}
+\item[LREF]First reference link, if any;
+last structural link, if no reference links
+\item[LREFL]Last reference link, if any;
+if none: give LAREA in this parameter position
+\end{DL}
+\par \Rind{MZLINT} will clear the links to zero,
+set the flag-word {\tt LAREA(1)} to be non-zero,
+and set the system-word {\tt LAREA(2)} on first use.
+\par To deactivate a temporary link area the user sets {\tt LAREA(1)=0}.
+From then on the links in this area are no longer relocated,
+and hence will be meaningless.
+\par To reactivate the area the user should call \Rind{MZLINT} again.
+\subsection{Examples [primary store]}
+\subsubsection{Mixed link area}
+\begin{verbatim}
+      COMMON /LAMIX/ LAMIX(2), LS1,...,LSN, LR1,...,LRN
+ 
+      CALL MZLINT (0,'/LAMIX/',LAMIX,LR1,LRN)
+\end{verbatim}
+\subsubsection{Structural link area}
+\begin{verbatim}
+      COMMON /LASTR/ LASTR(2), LS1, ..., LSN
+ 
+      CALL MZLINT (0,'/LASTR/',LASTR,LSN,LASTR)
+\end{verbatim}
+\subsubsection{Reference link area}
+\begin{verbatim}
+      COMMON /LAREF/ LAREF(2), LR1, ..., LRN
+ 
+      CALL MZLINT (0,'/LAREF/',LAREF,LR1,LRN)
+\end{verbatim}
+\section{Working space allocation}
+\par The region at the beginning of a dynamic store just after
+the permanent links may be used as working space,
+consisting of a set of reference links followed by
+a set of data words.The use of this facility is as follows:
+\Subr{CALL MZWORK (IXSTOR,DFIRST,DLAST,IFLAG)}
+\index{working space!declaration}
+\Idesc
+\begin{DL}{MMMM}
+\item[IXSTOR]Index of the store where the working space has to be provided
+\item[DFIRST]First data word of the working space,
+the preceding words are taken as reference links;
+this parameter is ignored if IFLAG is 2 or -1
+\item[DLAST]Last data word,
+this parameter is ignored if IFLAG is -1
+\item[IFLAG]Integer constant defining action desired
+\begin{DL}{MM}
+\item[ 0]Define a new working space.
+The previous contents are not to be retained
+\item[ 1]Vary the limits of the working space and keep
+intact the links which are common to
+both the old and the new working space.
+\item[ 2]Vary only the DLAST limit of the working space and retain
+all links and the data words
+which are common to the old and the new working space.
+\item[-1]Reset the working space to null,
+i.e. zero links and zero data words
+\end{DL}
+\end{DL}
+\par A call to MZWORK destroys division 1 of the store
+{\bf without}
+a relocation pass to reset links pointing into division 1.
+This is for efficiency,
+hence normally only very temporary data should be kept in division 1,
+and only working space links should point to them.
+To say it differently : division 1 is logically part of the
+working space,
+its time of existence is the same as that of the working space,
+and it is good practice to maintain links into division 1
+only in the working space.
+If however it is necessary to hold such links elsewhere,
+one should either reset them explicitly or wipe the division with
+a call to \Rind{MZWIPE} before calling \Rind{MZWORK}.
+\par The links of the working space (if {\tt IFLAG=1:} the new links only)
+are initialized to  {\tt IQNIL+L},
+where L is the location of the link in the store.
+\index{IQNIL}
+\subsection{Example}
+\begin{verbatim}
+   COMMON /STORE1/ IFENCE , LQPERM(100),    fence and permanent links
+  +                LR1, ...                 working space reference links
+  +                DFIRST, ...              working space data words
+  +                DLAST
+ 
+   CALL MZWORK (0 , DFIRST , DLAST , 0)
+\end{verbatim}
+\begin{figure}[h]
+\epsffile{fmzwork.ps}
+\caption{Layout of the store after a call to MZWORK}
+\label{FMZWORK}
+\end{figure}
+\section{Bank creation}
+\par A bank may be created by calling either \Rind{MZBOOK} or \Rind{MZLIFT}.
+The functions of both routines are identical, and so is the
+significance of the parameters. The routines differ only in the way the
+input parameters are passed. They are both available since they
+answer different needs.
+\Subr{CALL MZBOOK (IXDIV,L*,*LSUP*,JBIAS,CHIDH,NL,NS,ND,NIO,NZERO)}
+\index{bank!booking}
+\par Routine
+\Rind{MZBOOK} is provided for local creation of a bank, with all parameters
+describing the bank present in the calling sequence itself.
+\Idesc
+\begin{DL}{MMMM}
+\item[IXDIV]Index of the division into which the bank is
+to be introduced, see below
+\item[*LSUP*]If {\tt JBIAS < 0}:  address of the supporting up bank\\
+If {\tt JBIAS = 0}:  address of the supporting previous bank\\
+If {\tt JBIAS = 1}:  supporting link
+\item[JBIAS]If {\tt JBIAS < 1}:  link bias in the supporting bank\\
+If {\tt JBIAS = 1}:  create top-level bank
+If {\tt JBIAS = 2}:  create stand-alone bank
+\item[CHIDH]Character variable specifying the bank Hollerith identifier
+\item[NL]Total number of links, {\tt NL < 64000}
+\item[NS]Number of structural links, {\tt NS $leq$ NL}
+(not counting the 3 links next, up, and origin)
+\index{link!next}
+\index{link!up}
+\index{link!origin}
+\item[ND]Number of data words
+\item[NIO]IO characteristic,
+describing the type of the data words given as:\\
+- An I/O characteristic itself, as returned by MZIOCH\\
+- The index of the I/O characteristic, as returned by MZFORM\\
+- An immediate value, if the whole bank is of the same type:
+\begin{DL}{MM}
+\item[ 0]Undefined data type (the bank cannot be transported between
+computers)
+\item[\ 1]The whole bank is of type {\bf bit string}
+\item[\ 2]The whole bank is of type {\bf integer}
+\item[\ 3]The whole bank is of type {\bf floating point}
+\item[\ 4]The whole bank is of type {\bf double precision}
+\item[\ 5]The whole bank is of type {\bf Hollerith}
+\item[\ 7]The whole bank is {\bf self describing}
+\item[\ 9]Retrieve the I/O characteristic by scanning the system
+bank created by \Rind{MZFORM} using the IDH identifier.
+\item[11]Take the I/O characteristic of any bank in the target
+linear structure, if this is empty act as for 9.
+\end{DL}
+\item[NZERO]Controls whether and how much of the data-part
+of the bank is preset to zero:
+\begin{DL}{MM}
+\item[-1]No presetting
+\item[ 0]The whole bank is cleared
+\item[>0]The first N words are preset
+\end{DL}
+The links of the bank are always cleared to zero.
+\end{DL}
+\Odesc
+\begin{DL}{MMMM}
+\item[L*]Address of the created bank.
+\item[*LSUP*]Address of the supporting bank.
+\end{DL}
+\Subr{CALL MZLIFT (IXDIV,L*,*LSUP*,JBIAS,MMBK,NZERO)}
+\index{MZ!MZLIFT}
+\index{bank!lifting}
+\par Routine
+MZLIFT is provided in the context of a centralized organization
+of bank descriptors, held normally in a COMMON block.
+\Idesc
+\begin{DL}{MMMM}
+\item[IXDIV]Index of the division into which the bank is
+to be introduced, see below
+\item[*LSUP*]If {\tt JBIAS < 0}:  address of the supporting up bank\\
+If {\tt JBIAS = 0}:  address of the supporting previous bank\\
+If {\tt JBIAS = 1}:  supporting link
+\item[JBIAS]If {\tt JBIAS < 1}:  link bias in the supporting bank\\
+If {\tt JBIAS = 1}:  create top-level bank
+If {\tt JBIAS = 2}:  create stand-alone bank
+\item[MMBK]The bank descriptor vector:
+\begin{DL}{MMMMMM}
+\item[MMBK(1) = IDH]Hollerith string
+\footnote{Hollerith
+constants are not explicitly part of the FORTRAN standard and
+hence their use in DATA or assignment statements can yield problems
+with some compilers. In that case routine \Rind{UCTOH}
+(available as CERN program library routine {\tt M409}) can be used
+to translate between character variables and Hollerith strings.}
+of the form {\tt 4Hxxxx} specifying the bank name
+\item[MMBK(2) = NL]Total number of links, {\tt NL < 64000}
+\item[MMBK(3) = NS]Number of structural links, {\tt NS $\leq$ NL}
+(not counting the 3 links next, up, and origin)
+\index{link!next}
+\index{link!up}
+\index{link!origin}
+\item[MMBK(4) = ND]Number of data words
+\item[MMBK(5) = NIO]IO characteristic,
+describing the type of the data words given as: \\
+- An I/O characteristic itself, as returned by \Rind{MZIOCH} \\
+- The index of the I/O characteristic, as returned by \Rind{MZFORM}\\
+- An immediate value, if the whole bank is of the same type:
+\begin{DL}{MM}
+\item[\ 0]Undefined data type (the bank cannot be transported between
+computers)
+\item[\ 1]The whole bank is of type {\bf\it bit string}
+\item[\ 2]The whole bank is of type {\bf\it integer}
+\item[\ 3]The whole bank is of type {\bf\it floating point}
+\item[\ 4]The whole bank is of type {\bf\it double precision}
+\item[\ 5]The whole bank is of type {\bf\it Hollerith}
+\item[\ 7]The whole bank is {\bf\it self describing}
+\item[\ 9]Retrieve the I/O characteristic by scanning the system
+bank created by \Rind{MZFORM} using the {\tt IDH} identifier.
+\item[11]Take the I/O characteristic of any bank in the
+target linear structure, if this is empty act as for 9.
+\end{DL}
+\end{DL}
+\item[NZERO]Controls whether and how much of the data-part
+of the bank is preset to zero:
+\begin{DL}{MM}
+\item[-1]No presetting
+\item[ 0]The whole bank is cleared
+\item[>0]The first N words are preset
+\end{DL}
+The links of the bank are always cleared to zero.
+\end{DL}
+\Odesc
+\begin{DL}{MMMM}
+\item[L*]Address of the created bank.
+\item[*LSUP*]Address of the supporting bank.
+\end{DL}
+\subsection{Settings of bank parameters after bank creation}
+\subsubsection{Division}
+\par The division in which the bank has to be created can be specified by
+the first calling sequence parameter IXDIV, which then corresponds
+to the index of a specific division.
+The user is, however, not obliged to do so, as he can ask
+ZEBRA to create the bank in the same division as the other banks of the
+surrounding data structure. This is done by giving as the first parameter
+the index of the store only, which in the case of the primary store is
+simply zero. Then, when no specific division is specified, the
+rules for selecting the division in which the bank will be created
+are as follows:
+\begin{UL}
+\item If the bank is to be part of a non-empty linear
+structure, then it will be created
+in the same division where the other banks reside.
+\item
+If this linear structure is empty, the bank will be created in the
+same division as its supporting bank.
+\item
+If there is no supporting bank (JBIAS=1 or 2) division 2 of the given
+store will be selected.
+\end{UL}
+\par {\bf Note:}
+All banks in a linear structure must reside in the same division, i.e.
+link zero of any bank is not allowed to point
+outside the division of that bank.
+\subsubsection{Input-output characteristic}
+\par The I/O characteristic describes the nature of the data of a bank to
+ZEBRA. This information is needed for sending the data across
+different computers, and also for interpretation dumps. The I/O
+characteristic can be specified directly with \Rind{MZBOOK}/\Rind{MZLIFT},
+or it can be created with \Rind{MZFORM}. A detailed discussion
+is given on page~\pageref{SR_MZFORM}.
+\subsubsection{The numeric and Hollerith bank identifiers}
+\par Each bank has a numeric and a Hollerith
+identifier IDN and IDH, which are stored respectively
+at IQ(L-5) and IQ(L-4). The IDH is specified explicitly
+in the calling sequences to \Rind{MZBOOK} (CHIDH) or \Rind{MZLIFT} (first
+element of the {\tt MMBK} vector) while the bank numberic identifier
+is set at bank creation as follows:
+\begin{UL}
+\item If the bank after creation has a 'next' bank, its IDN is taken
+and incremented by one.
+\item If the bank is created at the end of a linear structure, the IDN
+of its last bank is taken and incremented by one.
+\item If no such bank exits, the link number
+of the supporting link is taken.
+\item If there is no supporting bank IDN is set to one.
+\end{UL}
+In general banks in a linear structure will have the same IDH
+and different IDN. The user can change IDN,
+if he so wishes, by simply putting a new value into {\tt IQ(L-5)}.
+\subsection{Examples of MZBOOK}
+\subsubsection{Top level bank}
+\begin{verbatim}
+      CALL MZFORM('MAST',CHFORM,IOMAST)       -- at initialization
+ 
+      CALL MZBOOK(0,L,LMAST,1,'MAST',5,3,10,IOMAST,0)
+\end{verbatim}
+\par Create in division 2 of the primary store
+a bank supported by the link {\tt LMAST}, which must be part of a
+link area. The bank identifier is {\tt 'MAST'} and the bank
+consists of 5 links, of
+which 3 are structural and 10 data words. The format of
+the latter is described by the I/O index {\tt IOMAST} (as calculated
+by \Rind{MZFORM}) and all data words are to be preset to zero.
+The value of IDN will be set equal to 1.
+\par Supposing {\tt LMAST}
+to be zero initially, this will give the situation in
+Figure~\ref{MZBOOK1}.
+\begin{figure}
+\epsffile{fmzbok1.ps}
+\caption{The creation of a top level bank}
+\label{MZBOOK1}
+\end{figure}
+\subsubsection{First dependent bank}
+\begin{verbatim}
+      CALL MZBOOK(0,L,LMAST,-3,'DOWN',0,0,16,3,0)
+\end{verbatim}
+\par Create in the primary store and in the same division as 'MAST'
+a bank called 'DOWN', which should be attached as the third
+structural link to {\tt LMAST} (created in 1 above). It has zero links
+and 16 data words all of type floating.
+All data words are to be preset to zero.
+The bank at {\tt LDOWN} is said to be a ``down' bank of MAST; 
+its address could
+later be reobtained as {\tt LDOWN = LQ(LMAST-3)}.
+The IDN will be set equal to 3. Supposing link 3 of the bank at
+LMAST to be zero initially, this will give the picture of
+Figure~\ref{MZBOOK2}.
+\index{link!down}
+\begin{figure}
+\epsffile{fmzbok2.ps}
+\caption{The creation of a first dependent bank}
+\label{MZBOOK2}
+\end{figure}
+\subsubsection{Further dependent banks}
+\begin{verbatim}
+      CALL MZBOOK(0,L,LMAST,-3,'DOWN',0,0,16,3,0)
+\end{verbatim}
+creates a new bank in the primary store and in the same division
+as 'DOWN' and inserts it in the linear in front of the 'DOWN' bank
+of example 2.
+Its address could be obtained as {\tt LDOWN4 = LQ(LMAST-3)},
+while the address of the
+bank 'DOWN' created in example 2 could be obtained as {\tt LDOWN = LQ(LDOWN4)}.
+The IDN will be set equal to 4 (see Figure~\ref{MZBOOK3}).
+\begin{figure}
+\epsffile{fmzbok3.ps}
+\label{MZBOOK3}
+\caption{The creation of further dependent banks}
+\end{figure}
+\subsubsection{Add to end of linear structure}
+\begin{verbatim}
+C--     Calculate address of last bank in linear chain
+      L = LZLAST(0,LMAST-3)
+ 
+      CALL MZBOOK(0,L,L,0,'DOWN',0,0,16,3,0)
+\end{verbatim}
+creates a next bank in the primary store and in the same division
+as the other 'DOWN' banks.
+This bank has the same characteristics as bank
+'DOWN' created in 2 above. It is inserted in the linear chain
+behind bank 'DOWN' of example 2.
+The IDN will be set equal to 4 (see Figure~\ref{MZBOOK4}).
+\begin{figure}
+\epsffile{fmzbok4.ps}
+\caption{The creation of banks at the end of a linear structure}
+\label{MZBOOK4}
+\end{figure}
+\subsubsection{Stand alone bank}
+\begin{verbatim}
+      CALL MZBOOK(0,LSEUL,0,2,'SEUL',0,0,30,2,-1)
+\end{verbatim}
+books a bank in division 2 of the primary store,
+which is addressable only via the address LSEUL as returned by
+routine \Rind{MZBOOK}. It is not inserted in any data structure.
+No presetting of the 30 integer data words is requested.
+This can be useful for getting very short term working banks or for
+building complex data structures starting from individual unrelated
+banks, which are afterwards inserted into an
+existing data structure using routine \Rind{ZSHUNT}.
+The bank number will be set equal to zero.
+\index{MZ!ZSHUNT}
+\subsection{Examples of MZLIFT}
+\par The same examples described above with \Rind{MZLIFT} would look like this:
+\subsubsection{Top level bank}
+\begin{verbatim}
+C--     During initialization
+      COMMON /BANK/  MMMAST(7),MMDOWN(5),MMSEUL(5)
+ 
+      DATA  IMAST /4HMAST/
+      DATA MMDOWN /4HDOWN,0,0,16,3/
+      DATA MMSEUL /4HSEUL , 0 , 0 , 30 , 2/
+ 
+      MMMAST(1) = IMAST
+      MMMAST(2) = 5
+      MMMAST(3) = 3
+      MMMAST(4) = 10
+      CALL MZIOBK (MMMAST,7,'format')
+ 
+C--     During execution
+      COMMON /LINKS/ L , LDOWN , LMAST , LSEUL
+      COMMON /BANK/  MMMAST(7)
+      CALL MZLIFT (0,L,LMAST,1,MMMAST,0)
+\end{verbatim}
+\subsubsection{First dependent (down) bank}
+\par
+\begin{verbatim}
+      CALL MZLIFT (0,L,LMAST,-3,MMDOWN,0)
+\end{verbatim}
+\subsubsection{Further dependent banks}
+\par
+\begin{verbatim}
+      CALL MZLIFT (0,L,LMAST,-3,MMDOWN,0)
+\end{verbatim}
+\subsubsection{Insert bank in linear structure}
+\par
+\begin{verbatim}
+C--
+C--     Calculate address of last bank in linear chain
+      L = LZLAST(0,LMAST-3)
+ 
+      CALL MZLIFT (0,L,L,0,MMDOWN,0)
+\end{verbatim}
+\subsubsection{Stand alone bank}
+\begin{verbatim}
+      CALL MZLIFT (0,LSEUL,0,2,MMSEUL,-1)
+\end{verbatim}
+\section{Alter the size of a bank}
+\index{division!forward}
+\index{division!reverse}
+\par The size of a bank can be increased or decreased by using \Rind{MZPUSH}.
+Decreasing the size of a bank is done in situ. Increasing the data
+part of the last bank in a forward division, as well as increasing
+the link part of the first bank in a reverse division, is also done
+in situ.
+In all other cases a new bank with increased dimensions is lifted
+to receive a copy of the data from the original bank, which is then
+dropped. The new link and data words acquired are preset to zero.
+In general the operation of \Rind{MZPUSH} requires a relocation pass over all
+the links to update any link pointing to the bank for its new position.
+If the user knows that no such link exists, except for the immediate
+system links around this bank, he can signal this to \Rind{MZPUSH} with the
+'I' option, thus saving the relocation pass.
+\Subr{CALL MZPUSH (IXSTOR,*L*,INCNL,INCND,CHOPT)}
+\index{relocation}
+\index{bank!size increase}
+\index{bank!size decrease}
+\index{bank!size change}
+\Idesc
+\begin{DL}{MMMM}
+\item[IXSTOR]Index of the store with the bank whose size has to be changed
+\item[*L*]Address of the bank whose size has to be changed
+\item[INCNL]Number of additional links;
+zero for no change, negative for decrease.
+Additional links will be given type ``reference',
+unless the original bank has only structural links.
+\item[INCND]Number of additional data words;
+zero for no change, negative for decrease.
+\item[CHOPT]Character variable specifying the relocation strategy
+\begin{DL}{MM}
+\item[' ']Default - Any link may point to the bank
+\item['R']No link points into the abandoned bank region
+(in case of bank reduction)
+\item['I']Isolated case (especially efficient).
+No link other than the supporting
+structural link, the link passed in the parameter L,
+and the reverse links in the first level dependents,
+point to this bank.
+In this case the immediate links will be updated explicitly
+and the relocation pass will be saved.
+\end{DL}
+\end{DL}
+\Odesc
+\begin{DL}{MMMM}
+\item[*L*]Relocated address of the bank whose size has been changed
+\end{DL}
+\par The new link and data words acquired by the bank
+are cleared to zero.
+\section{Dropping complete divisions}
+\Subr{CALL MZWIPE (IXWIPE)}
+\index{division!wipe}
+\par A call tp MZWIPE deletes the
+contents of complete divisions.
+\Idesc
+\begin{DL}{MMMM}
+\item[IXWIPE]Index of the divisions in a particular store which have
+to be wiped out.
+A value of zero means wipe all short term divisions in the primary
+store.
+\end{DL}
+\par \Rind{IXWIPE} may be any of the three possible forms of a division index:
+\begin{OL}
+\item A specific division index, as returned by MZDIV
+\item A generic division index, [IXSTOR+] n with
+\begin{DL}{MMMM}
+\item[n = 21]all user short term divisions
+\item[n = 22]all user long  term divisions
+\item[n = 23]all package divisions
+\end{DL}
+\item A compound division index, as created by \Rind{MZIXCO},
+see page~\pageref{SR_MZIXCO} for details.
+\end{OL}
+Wiping divisions resets the divisions to be empty
+(but without reducing the space reserved for them),
+followed by a relocation pass to reset to zero all links
+pointing into the wiped divisions.
+Included in this pass are the links of all link areas,
+of the working space and of all divisions which are declared
+to point to the divisions in question
+(all of this for one particular store only, of course).
+\par Wiping several divisions should be done by a single call to \Rind{MZWIPE}
+rather than by several calls in succession,
+to save the time of multiple relocation passes,
+each of which would take longer than the single pass.
+\subsection{Examples}
+\subsubsection{Division 1}
+\begin{verbatim}
+      CALL MZWIPE (1)
+\end{verbatim}
+\subsubsection{Last event}
+\begin{verbatim}
+      CALL MZWIPE (21)          or          CALL MZWIPE (0)
+\end{verbatim}
+\subsubsection{All user's divisions}
+\begin{verbatim}
+      IX = MZIXCO (21,22,0,0)
+      CALL MZWIPE (IX)
+\end{verbatim}
+\subsubsection{Divisions IX1, IX2, IX3, IX4, and IX5}
+\begin{verbatim}
+      IX = MZIXCO (IX1,IX2,IX3,IX4)
+      IX = MZIXCO (IX,IX5,0,0)
+      CALL MZWIPE (IX)
+\end{verbatim}
+\section{User requested garbage collection}
+\par Garbage collection is triggered by the system if there is not
+enough space to satisfy an \Rind{MZWORK}, \Rind{MZBOOK}/\Rind{MZLIFT} or 
+\Rind{MZPUSH} request (although this should not normally occur).
+Thus the user does not have to worry about initiating
+garbage collection to gain space in the dynamic store.
+To remove the last event from the store,
+the user calls \Rind{MZWIPE} which is much more efficient
+than dropping the banks of the event followed by garbage collection.
+\par He may, however, occasionally want to force a garbage collection
+in order to tidy up his data,
+particularly during the initialization phase of his program.
+Again, as in \Rind{MZWIPE}, if there are several divisions to be tidied up,
+this should be done by {\bf one} call to \Rind{MZGARB}. Also,
+if one or several divisions are to be wiped out at the same time,
+this should be included into the call to \Rind{MZGARB};
+a single relocation pass can handle wiping
+and garbage collection simultaneously.
+\Subr{CALL MZGARB (IXGARB,IXWIPE)}
+\index{division!garbage collection}
+\Idesc
+\begin{DL}{MMMM}
+\item[IXGARB]Index of the divisions in a given store where a garbage collection
+is requested (none if 0).
+\item[IXWIPE]Index of the divisions in a particular store
+to be wiped (none if 0).
+\end{DL}
+\par
+Both IXGARB or IXWIPE may be any of the three possible forms
+of a division index as described for MZWIPE on page~\pageref{SR_MZWIPE}.
+\section{Compound division index creation}
+\par A compound division index permits an indication of several divisions
+of the same store in a single word,
+as used with \Rind{MZWIPE} for example.
+\Func{IXC = MZIXCO (IX1,IX2,IX3,IX4)}
+\index{MZ!MZIXCO}
+\index{division!compound index}
+\par Function \Rind{MZIXCO} joins up to four division indices into a compound:
+\Idesc
+\begin{DL}{MMM}
+\item[IXi]Index of the divisions in the same store which are to be
+combined.
+If less than 4 indices are to be joined trailing zeros
+should be given.
+If more than 4 indices are to be joined this is done by
+repeated calls.
+\end{DL}
+\Odesc
+\begin{DL}{MMM}
+\item[IXC*]The combined division index (function value).
+\end{DL}
+\par IXi can be one of the following forms of a division index:
+\begin{OL}
+\item A specific division index, as returned by \Rind{MZDIV}
+\item A generic division index, [IXSTOR+] n with
+\begin{DL}{MMMM}
+\item[n = 21]all user short term divisions
+\item[n = 22]all user long  term divisions
+\item[n = 23]all package divisions
+\end{DL}
+\item A compound division index, as created by previous call to \Rind{MZIXCO}.
+\end{OL}
+\subsection{Examples}
+\subsubsection{Divisions 1 and 2:}
+\begin{verbatim}
+      IXCO = MZIXCO (1,2,0,0)
+\end{verbatim}
+\subsubsection{Divisions 1, 2, and \tt IXHITS:}
+\begin{verbatim}
+      IXCO = MZIXCO (1,2,IXHITS,0)
+\end{verbatim}
+\subsubsection{All short term divisions and \tt IXCUMU:}
+\begin{verbatim}
+      IXCO = MZIXCO (21,IXCUMU,0,0)
+\end{verbatim}
+\subsubsection{All user divisions of store \tt IXSTOR}
+\begin{verbatim}
+      IXCO = MZIXCO (IXSTOR+21,IXSTOR+22,0,0)
+\end{verbatim}
+\section{Set the cross-reference matrix between divisions}
+\par To save time when wiping a given division (or divisions),
+and also on garbage collection,
+ZEBRA will relocate the links of only those divisions
+which reference the division(s) being changed.
+To know which division may have links pointing
+to which other division,
+ZEBRA keeps internally a cross-reference matrix;
+the entry for a given division is intialized by \Rind{MZDIV}
+and this may be modified by the user calling \Rind{MZXREF}.
+\Subr{CALL MZXREF (IXFROM,IXTO,CHOPT)}
+\index{division!cross-references}
+\Idesc
+\begin{DL}{MMMM}
+\item[IXFROM]Index of the division which contains links
+pointing to the divisions indicated by {\tt IXTO};
+this must be the index of one particular division.
+\item[IXTO]Index of the division(s) which are referenced
+\item[CHOPT]Character variable specifying the options
+\begin{DL}{MM}
+\item[' ']Normal - Set reference(s), i.e. overwrite the previous
+content of the matrix entry
+\item['A']Add reference(s), i.e. add to the matrix entry,
+keeping what was there before.
+\item['C']Contained division, i.e. clear the matrix entry
+(C over-rules A and R)
+\item['R']Remove reference(s), i.e. take the references
+out from the matrix entry, but keep the others (R over-rules A)
+\end{DL}
+\end{DL}
+\par
+{\tt IXTO} can be one of the following forms of a division index:
+\begin{OL}
+\item A specific division index, as returned by \Rind{MZDIV}
+\item A generic division index, {\tt[IXSTOR+] n} with
+\begin{DL}{MMMM}
+\item[n = 21]all user short term divisions
+\item[n = 22]all user long  term divisions
+\item[n = 23]all package divisions
+\item[n = 24]the system division
+\end{DL}
+\item A compound division index, as created by previous call to \Rind{MZIXCO}.
+\end{OL}
+When a division is created, the matrix row for this division
+is initialized by \Rind{MZDIV}
+as follows (unless the C option is given to \Rind{MZDIV}):
+\begin{DL}{MMMMMMMM}
+\item[User division]References all other user divisions.
+\item[Package division]No references at all.
+\end{DL}
+\subsection{Examples}
+\par
+\begin{OL}
+\item Suppose the user's division {\tt IXTHIS} may reference
+all other user divisions:
+\par
+\phantom{\tt\      }nothing needs to be done, this is the default assumption 
+\item Suppose division {\tt IXTHIS} references
+only banks in division 2:
+\begin{verbatim}
+      CALL MZXREF (IXTHIS, 2, '.')
+\end{verbatim}
+\item Suppose division {\tt IXTHIS} references only,
+but maybe all, the short term divisions:
+\begin{verbatim}
+      CALL MZXREF (IXTHIS, 21, '.')
+\end{verbatim}
+\item Suppose division {\tt IXTHIS} references all short term
+divisions and also the long term division {\tt IXLONG}:
+\begin{verbatim}
+      CALL MZXREF (IXTHIS, 21, '.')
+      CALL MZXREF (IXTHIS, IXLONG, 'A')
+\end{verbatim}
+\item Suppose division {\tt IXTHIS} references all short term
+divisions except division {\tt IXSH}:
+\begin{verbatim}
+      CALL MZXREF (IXTHIS, 21, '.')
+      CALL MZXREF (IXTHIS, IXSH, 'R')
+\end{verbatim}
+\end{OL}
+\section{Handle the bank I/O characteristic}
+\subsection{Bank format}
+\par The nature of the contents of any bank which is to be transported
+from one computer to another one has to be indicated to ZEBRA,
+so that it can carry out the necessary transformations.
+The bank format is also used for printing purposes by the DZ package.
+In the simplest case that all the data words of a bank are
+of the same type, this can be indicated by specifying a value between 0
+and 5 for the parameter NIO of \Rind{MZBOOK}/\Rind{MZLIFT}.
+For anything more complicated the user specifies the ``format''
+of the bank by calling \Rind{MZIOBK} or \Rind{MZFORM} which encode the format
+into a variable number of words to be included into each bank
+in the system part as the ``I/O characteristic''.
+Thus the content description is carried by each bank,
+and complicated bank formats require a relative large number
+of extra system words.
+This could represent a substantial overhead on memory
+or file space occupation,
+which the user can avoid in the design of his bank formats.
+Thus ZEBRA cannot handle arbitrary bank formats,
+but by using the concept of the ``self-describing'' sector (see below)
+the user can indeed store any combination in a bank
+and transport it from one computer to another one.
+\index{bank!I/O characteristic}
+\index{bank!sector}
+\par The basic element for setting up a bank descriptor is the
+{\bf\it sector},
+which is a number of consecutive words in the bank which are
+all of the same type.
+A sector is described in the ``format'' parameter to \Rind{MZFORM} et al.
+as a combination of its word-count
+{\tt 'c'} and its data type {\tt 't': 'ct'}.
+For example
+{\tt '24F'}
+is a sector of 24 single precision floating-point
+numbers, and {\tt '1I'}
+is a sector of one integer word.
+\index{bank!data type identifier}
+\par The possible types for the data type identifier 't'
+are listed in Table~\ref{MZFORMT}.
+\begin{table}[h]
+\caption{MZFORM data type identifier syntax}
+\label{MZFORMT}
+\begin{center}\begin{tabular}{|l|l|}
+\hline
+\rule{0mm}{5mm}B&bit string of 32 bits, right justified in a machine word\\
+I&integer\\
+F&floating-point\\
+D&double precision\\
+H&4-character Hollerith\\
+\rule{-2mm}{6mm}S&self-describing sector (see below)\\ \hline
+\end{tabular}\end{center}\end{table}
+\index{bank!sector!static}
+\par A {\bf static} sector is a sector of a fixed number of words,
+such as the {\tt '24F'} in the example above.
+\index{bank!sector!static}
+\index{bank!sector!indefinite-length}
+\par An {\bf indefinite-length}
+sector is a sector whose end is defined
+by the end of the bank.
+This is written as {\tt -t}, for example
+{\tt '-F'} signals that the rest
+of the bank is all floating-point words.
+\index{bank!sector!dynamic}
+\par A {\bf dynamic} sector is
+a sector which is preceded in the bank
+by a single positive integer word indicating the sector length;
+if this number is zero this means that the rest of
+the bank is currently unused.
+This is written as  {\tt *t}, for example
+{\tt '*F'} indicates a dynamic sector of type floating.
+\index{bank!sector!self-describing}
+\par A {\bf self-describing} sector is a dynamic sector whose type
+is also encoded into the word preceding the sector as follows:
+{\tt 16*NW + IT}, where {\tt NW} is the length of the
+sector and {\tt IT}, is a numeric descriptor of the type of
+data, as defined in Table~\ref{MZFORMS}
+(cf. \Rind{MZBOOK} and \Rind{MZLIFT}).
+\index{MZ!MZBOOK}
+\index{MZ!MZLIFT}
+\begin{table}[h]
+\caption{Numeric representation of data type in self-describing sector header word}
+\label{MZFORMS}
+\begin{center}\begin{tabular}{|c|l|c|l|}
+\hline
+{\bf 1}&bit string (as 'B')           &{\bf 2}&integer (as 'I')\\
+{\bf 3}&floating-point (as 'F')       &{\bf 4}&double precision (as 'D')\\
+{\bf 5}&4-character Hollerith (as 'H')&{\bf 6}&reserve\\
+{\bf 7}&special                       &&\\ \hline
+\end{tabular}\end{center}\end{table}
+The word-count {\tt 'c'} for a sector,
+which must {\bf always} be specified, can take the forms
+given in Table~\ref{MZFORMC}.
+It has to be stressed that this parameter {\tt c} is in units of
+``ZEBRA words'', hence 4 double precision data items,
+occupying 8 machine words, have to be specified as {\tt '8D'},
+and a string of 17 Hollerith characters as {\tt '5H'}.
+\index{bank!word-count}
+\begin{table}[h]
+\caption{MZFORM word count syntax}
+\label{MZFORMC}
+\begin{center}\begin{tabular}{|l|l|}\hline
+\tt n&numeric, n words: static length sector\\
+\tt -&all remaining words: indefinite length sector\\
+\tt *&dynamic length sector (see text)\\
+\tt /&signals the start of the trailing part of a bank format (see text)
+\\ \hline
+\end{tabular}\end{center}
+\end{table}
+Note that the form {\tt 'nS'} is meaningless;
+that the form {\tt '*S'}
+indicates one particular sector while
+{\tt '-S'}is {\bf special} and
+indicates that the rest of the bank is filled
+with self-describing sectors,
+as many as there may be.
+\par Looking at the bank as a whole,
+we divide it into a ``leading'' part and a ``trailing'' part,
+either of which may be empty.
+\index{bank!leading part}
+\par The {\bf leading}
+part consists of one region of maybe several sectors,
+occurring once at the beginning of the bank.
+This leading region may end with an indefinite-length sector,
+in which case the trailing part is empty.
+\index{bank!trailing part}
+\par The {\bf trailing} part of the bank may be empty or it may consist
+of an indefinite number of ``regions'' which
+{\bf all have the same structure},
+such that the same format description is valid for all of them.
+\index{bank!region}
+\par
+The symbol {\tt '/'} marks the break between the leading region
+and the trailing regions in the format parameter to \Rind{MZFORM} et al.
+\subsection{Specifying the bank format}
+\par Three routines are provided as an interface for the user to
+specify the bank format in a readable form.
+The I/O characteristic is included in any bank at creation time.
+\Subr{CALL MZIOCH (IOWDS*,NWIO,CHFORM)}
+\par Routine \Rind{MZIOCH} analyses the format {\tt CHFORM} to convert
+and pack it into the output vector {\tt IOWDS}.
+This is the basic routine,
+but it is usually called by the user only to specify formats
+of objects other than banks
+(e.g. the user header vector in the FZ routines).
+\Idesc
+\begin{DL}{MMMM}
+\item[NWIO]The maximum size of IOWDS
+\item[CHFORM]Character variable specifying the format
+\end{DL}
+\Odesc
+\begin{DL}{MMMM}
+\item[IOWDS*]A vector dimensioned to NWIO which is to receive the I/O characteristic
+\end{DL}
+\Subr{CALL MZIOBK (MMBK*,NWMM,CHFORM)}
+\par Routine \Rind{MZIOBK} is provided in the context of \Rind{MZLIFT};
+like\Rind{MZIOCH} it analyses the format {\tt CHFORM},
+but it stores the result as part of the bank-description vector
+{\tt MMBK} for \Rind{MZLIFT}.
+\Idesc
+\begin{DL}{MMMM}
+\item[NWMM]The maximum size of {\tt MMBKS}
+\item[CHFORM]Character variable specifying the format
+\end{DL}
+\Odesc
+\begin{DL}{MMMM}
+\item[MMBK*]The bank description vector for \Rind{MZLIFT}, 
+dimensioned to {\tt NWMM}.
+The resulting I/O characteristic will be stored
+in the vector starting at {\tt MMBK(5)}.
+The IDH contained in {\tt MMBK(1)} will be used if diagnostics are necessary.
+\end{DL}
+\Subr{CALL MZFORM (CHIDH,CHFORM,IXIO*)}
+\index{MZ!MZFORM}
+\par Routine \Rind{MZFORM} analyses the format {\tt CHFORM},
+but it does not return the result to the user.
+Instead, it stores the I/O characteristic in a system data structure,
+returning to the user only the index to the characteristic
+in the system.
+The user may then either pass this index to \Rind{MZBOOK} (or \Rind{MZLIFT})
+at bank creation time,
+or alternatively he may request \Rind{MZBOOK} (or \Rind{MZLIFT}) to search
+the system data structure for the I/O characteristic
+associated with the Hollerith identifier {\tt IDH} of the bank to be
+created.
+\index{bank!I/O characteristic}
+\Idesc
+\begin{DL}{MMMM}
+\item[CHIDH]Character variable specifying the Hollerith identifier of the
+bank whose data part is described by the given format
+\item[CHFORM]Character variable specifying the format of the data
+part of a bank with name identifier CHNAM.
+\end{DL}
+\Odesc
+\begin{DL}{MMMM}
+\item[IXIO*]The encoded index of the I/O characteristic stored in a system
+data structure.
+This index can be passed to MZBOOK/MZLIFT, in which case it must
+not be modified
+\end{DL}
+\subsubsection{CHFORM examples}
+{\bf Banks with an empty trailing part:}
+\begin{DL}{MMMMMMM}
+\item['-F']Whole bank is floating
+\item['3I -F']First 3 words are integer, the rest is F
+\item['*I -F']First word n=IQ(L+1) is a positive integer,
+words 2 to n+1 are integers, the rest is F
+\item['3B *I -F']First sector consists of 3 words bit-string,
+the second sector is dynamic of type integer,
+the rest of the bank is floating
+\end{DL}
+{\bf Banks with a leading as well as a trailing part:}
+\begin{DL}{MMMMMMM}
+\item['3B 7I / 2I 4F 16D']Leading region has 3 B and 7 I words,
+each trailing region consists of
+2 integer words, followed by 4 F words,
+followed by 16 D words, i.e. 8 double-precision numbers
+\item['4I / *H']Bank starts with 4 integer words,
+the rest is filled with dynamic Hollerith sectors
+\item['*I / 2I *F']Leading region is one dynamic I sector,
+each trailing region consists of 2 integers
+followed by a dynamic F sector
+(i.e. 3 integers plus a number of floating-point words,
+this number being indicated by the third integer)
+\end{DL}
+{\bf Banks with an empty leading part:}
+\begin{DL}{MMMMMMM}
+\item['/ *H']Bank is filled with dynamic Hollerith sectors
+\item['/ 4I 29F']4 integers and 29 floating-point numbers alternate
+\item['/ *S' or '-S']Data of the whole bank are self-describing
+\end{DL}
+ 

@@ -1,0 +1,119 @@
+<HEAD>
+<TITLE> System specific details</TITLE>
+</HEAD>
+<BODY><P>
+ <HR> <A NAME=tex2html20 HREF=chapter2_2.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/next_motif.gif"></A> <A NAME=tex2html18 HREF=ZEBRZA.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/up_motif.gif"></A> <A NAME=tex2html12 HREF=ZEBRZA.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/previous_motif.gif"></A>  <A NAME=tex2html22 HREF=tex2htmlindex2_3.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/index_motif.gif"></A><BR>
+<B> Next:</B> <A NAME=tex2html21 HREF=chapter2_2.html> Technical details of </A>
+<B>Up:</B> <A NAME=tex2html19 HREF=ZEBRZA.html>No Title</A>
+<B> Previous:</B> <A NAME=tex2html13 HREF=ZEBRZA.html>No Title</A>
+<HR> <P>
+<H1><A NAME=SECTION0010000000000000000> System specific details</A></H1>
+<P>
+<H1><A NAME=SECTION0011000000000000000> VM/CMS systems</A></H1>
+<P>
+<A NAME=50><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<P>
+On VM/CMS systems, RZ files should always have mode 6, i.e. ``update
+in place''. In addition, if a file is to be written by one user
+and simultaneously read by another, the <tt>'F'</tt> option of <A HREF=../../zebra/ZEBRZ2/chapter2_1.html#RZMAKE>RZMAKE</A> is 
+recommended. If this is not used, users reading the file will
+not see consistant information if the file is extended, unless
+the file is first closed and they reaccess the appropriate disk.
+<P>The <A HREF=../../zebra/ZEBRZ2/chapter2_1.html#RZOPEN>RZOPEN</A> routine should always be used to open an RZ file
+on VM/CMS systems, to ensure that more than the VS Fortran default
+of 50 records can be read and written.
+<P>
+<H1><A NAME=SECTION0012000000000000000> VAX/VMS systems</A></H1>
+<P>
+<A NAME=56><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<P>
+Shared access (in the VAX Fortran sense of <tt>OPEN(LUN,SHARED,..)</tt>)
+can give rise to excessive RMS lock traffic in VAXcluster systems.
+If shared read access with concurrent write is required, you
+might wish to consider the use of a read-only copy of the
+RZ file, updated at regular intervals from the ``master'' file,
+to avoid such problems.
+<P>
+<H2><A NAME=SECTION0012100000000000000> NFS access</A></H2>
+<P>
+<A NAME=59><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<P>
+Files residing on non-VMS systems that are accessed via NFS <A HREF=../../general/biblio/bibliography.html#bibNFS>[]</A>
+should be processed using C I/O (option <tt>'C'</tt> in <A HREF=../../zebra/ZEBRZ2/chapter2_1.html#RZOPEN>RZOPEN</A>).
+This is because such files are seen as <tt>STREAM_LF</tt> to VAX Fortran
+and cannot be read with Fortran direct access.
+<P>
+Note that files created on most Unix systems are automatically
+in exchange mode, as exchange mode corresponds to native on
+such systems (IEEE floating point format). When reading these
+files, the option 'X' must be given on both the <A HREF=../../zebra/ZEBRZ2/chapter2_1.html#RZOPEN>RZOPEN</A>
+and <A HREF=../../zebra/ZEBRZ2/chapter2_1.html#RZFILE>RZFILE</A> calls, as the file itself is not 'marked'
+as exchange mode.
+<P>
+<H1><A NAME=SECTION0013000000000000000> MVS systems</A></H1>
+<P>
+<A NAME=68><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<P>
+To enable shared access to an RZ (or any Fortran direct access) file
+on systems running MVS, the file should be created as a VSAM
+file using the following procedure.
+<P>
+<b>Creating an RZ file on MVS systems</b><PRE><TT>//CRVSAM    JOB  ,CLASS=E,TIME=(0,01),NOTIFY=F99ABC
+         /*JOBPARM LINES=2
+         //A EXEC PGM=IDCAMS,REGION=512K
+         //SYSPRINT DD SYSOUT=*
+         //SYSIN DD *
+          DELETE                  /* delete old file, if exists */ -
+          (F99ABC.KEYEDACC.FILE) -
+          PRG    CLUSTER
+ 
+          DEFINE CLUSTER          /* create new keyed access file */ -
+          (NAME(F99ABC.KEYEDACC.FILE) -
+          VOLUMES(STR012) -
+          INDEXED -
+          RECORDS(10 10)          /* primary secondary_space (in records) */ -
+          KEYS(20 20)             /* length and offset (in bytes) */ -
+           SHAREOPTIONS(4 3)       /* multi read + multi write */ -
+          SPEED -
+          SPANNED -
+          REUSE -
+          RECORDSIZE(23400 23400))      /* average maximum (in bytes) */ -
+          DATA -
+          (NAME(F99ABC.KEYEDACC.FILE.DATA)) -
+          INDEX -
+          (NAME(F99ABC.KEYEDACC.FILE.INDEX))</TT></PRE>
+<P>
+<H1><A NAME=SECTION0014000000000000000> Automatic record length determination</A></H1>
+<P>
+The routine <A HREF=../../zebra/ZEBRZ2/chapter2_1.html#RZOPEN>RZOPEN</A> can automatically determine the 
+record length of existing RZ files. This is triggered
+by specifying a value of zero for the parameter <tt>LRECL</tt>
+on input. The record length is determined as follows:
+<P>
+<P>
+<PRE>
+
+
+ -- IBM systems (Fortran I/O only). The file is first opened for
+    sequential access and a Fortran unformatted read is issued, using the
+    IBM extension NUM=nbytes, e.g.
+    <tex2html erbatim ark>XMP2Thefileisthenclosedandreopenedfordirect-accessI/O.VAX/VMSandApollosystems(SR9)(FortranI/ Oonly).Th fileisfirstopenedforsequentialaccessandaFortraninquirestatmentisissued,e.g.<tex2html erbatim ark>XMP3Thefileisthenclosedandreop nedfordirect- accessI/O.
+             v       m                                                                                                                                                                                               v       m
+All other systems plus VAX/VMS systems using C I/O. The record length is
+determined from the data in the file itself. For this reason, the RZ
+package must know if the file is in native or exchange format. For this
+reason, the option 'X' is recommended when processing exchange format
+files.
+
+</PRE><P>
+<HR> <A NAME=tex2html20 HREF=chapter2_2.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/next_motif.gif"></A> <A NAME=tex2html18 HREF=ZEBRZA.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/up_motif.gif"></A> <A NAME=tex2html12 HREF=ZEBRZA.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/previous_motif.gif"></A>  <A NAME=tex2html22 HREF=tex2htmlindex2_3.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/index_motif.gif"></A><BR>
+<B> Next:</B> <A NAME=tex2html21 HREF=chapter2_2.html> Technical details of </A>
+<B>Up:</B> <A NAME=tex2html19 HREF=ZEBRZA.html>No Title</A>
+<B> Previous:</B> <A NAME=tex2html13 HREF=ZEBRZA.html>No Title</A>
+<HR> <P>
+<HR>
+
+</BODY>
+<P><ADDRESS>
+goossens@cern.ch
+</ADDRESS>

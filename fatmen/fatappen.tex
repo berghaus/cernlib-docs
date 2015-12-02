@@ -1,0 +1,2601 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%   FATMEN User Guide and Reference manual                        %
+%                                                                 %
+%   Fatmen Part 5: Appendices                                     %
+%                                                                 %
+%   This document needs the following external EPS files:         %
+%   none                                                          %
+%                                                                 %
+%   Editor: Michel Goossens / CN-AS                               %
+%   Last Mod.: 19 January 1993 11:50 mg                           %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\Filename{H1fatmenappendix-fatcat-server}
+\chapter{The fatcat server}
+\Filename{H2fatmenappendix-overview-fatcat-files-and-directories}
+\section{Overview of FATCAT files and directories}
+
+At CERN, a dedicated system is used to host FATMEN servers and
+the associated catalogues. This system is currently an IBM RS6000
+with node name {\tt fatcat}. No user accounts exist on the machine -
+the {\tt /fatmen} file system is {\tt exported} and {\tt NFS-mounted}
+on all systems requiring access. At a later date, {\tt OSF-DFS} will
+be used for catalogue access.
+
+The {\tt /fatmen} file system contains a subdirectory for each
+experiment, as shown below.
+
+\begin{XMPt}{/fatmen directories}
+[fatcat] (209) ls -F /fatmen
+fmaleph/    fmcplear/   fmna31/     fmatlas/    fmna44/     fmna52/     fmcadd/     
+fmdelphi/   fmnomad/    fmcharm2/   fmopal/     fmrd5/      fmchorus/   fmkeops/    
+fmrd6/      fml3/       fmsmc/      fmcndiv/       
+\end{XMPt}
+
+Each of these directories contains the following files or directories:
+\begin{DLtt}{123456789AB}
+\item[cern.fatrz]The FATMEN catalogue for the experiment in question.
+\item[done]A directory where the server places update files after processing them.
+\item[fatserv]The script that runs the server for this experiment.
+\item[fatserv.log]The log file from the server process.
+\item[fatsrv]The server program (in fact a link to the server program).
+\item[fml3.names]A names file {\tt fm}experiment.names, e.g. fml3.names as here.
+\item[todo]A directory where updates are written by FATMEN clients (users) and which
+is scanned regularly by the server process.
+\item[tovm]Updates to be transferred to {\tt CERNVM} are placed here. This
+directory is optional, and requires server software on the VM node.
+\end{DLtt}
+
+In addition, one may also have the following configuration files:
+
+\begin{DLtt}{123456789012345}
+\item[fatmen.loccodes]A list of FATMEN location codes (integers) and associated
+text, e.g. 1=CERN Computer Centre.
+\item[fatmen.acl]An ACL file determining which users on which nodes may update
+the specified subdirectory structure.
+\item[fatmen.updates]A file controlling for which users and paths monitoring
+information is to be sent to the server.
+\item[fatmen.accounts]A list of account aliases.
+\end{DLtt}
+
+Furthermore, one needs a subdirectory for each remote server.
+In the particular case of {\tt fatcat} there are no remote servers,
+put the directories are called {\tt to}node, e.g. {\tt tovxcrna}.
+Provided that the names file is correctly configured, all
+missing subdirectories are automatically created by the server,
+with the exception of {\tt tovm} and {\tt todo}. {\tt todo} must
+be given the permission {\tt o+w} to allow all users the possibility
+to make catalogue updates. (With {\tt AFS} one could use ACLs to
+provide better security).
+
+\Filename{H2fatmenappendix-manage-servers}
+\section{Managing the servers}
+
+The FATMEN servers are started automatically at boot-time.
+This is done by adding the following line to the file {\tt /etc/inittab}.
+
+\begin{XMP}
+fatmen:2:wait:/etc/rc.fatmen > /dev/console 2>&1 # Start Fatmen
+\end{XMP}
+
+The file {\tt rc.fatmen} is show below:
+
+\begin{XMPt}{rc.fatmen}
+#!/bin/sh
+#
+#               Start FATMEN servers
+#
+#
+if [ -x /u/jamie/bin/fatstart ]
+then
+        echo Start FATMEN servers ...
+        su - jamie /u/jamie/bin/fatstart 2>&1
+fi
+\end{XMPt}
+
+Normally, no other operation is required. Should it be necessary to
+stop the servers, the following script may be used:
+
+\begin{XMPt}{fatstop}
+#!/bin/ksh
+#
+#   Stop all FATMEN servers that are running and create a
+#   file 'restart_fat' in the CWD that can be used to restart them.
+#
+stop=" "
+run=" "
+nolog=" "
+noscr=" "
+b="."
+d=`date`
+#
+#   Ensure that variables are defined...
+#
+if [ -f restart_fat ]
+   echo Remove old restart_fat file...
+   then rm -i restart_fat
+fi
+ 
+for i in /fatmen/fm*
+   do
+ 
+typeset -u fatgrp
+typeset -l fatman
+fatpath=$i
+fatgrp=`basename $i`
+fatman=$fatgrp
+eval $fatgrp=$fatpath;export $fatgrp
+#
+# and stop those servers that are running...
+#
+if [ -x ${i}/fatserv ]
+   then
+#
+# does a log file exist?
+#
+   if [ -f /fatmen/${fatgrp}.log ]
+      then
+      echo Log file exists for ${fatgrp} - looking for existing process
+      log=${log}${b}${fatgrp}
+      pid=`cat /fatmen/${fatgrp}.log | awk '{printf "%s\\n",$13}'`
+      if (test $pid)
+         then
+         echo Looking for server process for $fatgrp
+         if(ps -ae  | grep -s $pid )
+            then
+            echo FATSRV running PID = $pid
+            run=${run}${b}${fatgrp}
+            echo rm /fatmen/${fatman}/todo/signal.stop >> restart_fat
+            echo Server stopped at $d > /fatmen/${fatman}/todo/signal.stop
+            else
+            echo No existing server found for $fatgrp
+            echo Removing old log file...
+            rm   /fatmen/${fatgrp}.log
+            if [ -f ${i}/todo/signal.stop ]
+               then echo signal.stop file found!
+               rm ${i}/todo/signal.stop
+               echo '(removed)'
+            fi
+         fi
+      fi
+   fi
+fi
+ 
+done
+ 
+echo
+echo Log files found for $log | tr '.' ' '
+echo Servers already running for $run | tr '.' ' '
+echo fatstart >> restart_fat
+if [ -f restart_fat_fat ]
+   then chmod +x restart_fat_fat
+   echo restart reservers by typing restart_fat
+fi
+\end{XMPt}
+
+Should a server abend, it can be restarted (after curing the problem) by
+rerunning the {\tt fatstart} script that is invoked at boottime.
+
+\Filename{H2fatmenappendix-monitor-servers}
+\section{Monitoring the servers}
+
+A simple script may be used to look for active servers and their
+CPU usage. The fact that each server runs its 'own' {\tt fatsrv}
+module is used by this script, which reduces to three lines:
+
+\begin{XMPt}{fatps}
+echo 'FATMEN server                                       Elapsed     CPU time   %CPU'
+echo '==============================================================================='
+ps -aef -F "args,etime,time,pcpu" | grep "/fatsrv" | sort +2 -r
+\end{XMPt}
+
+One may also inspect the log files, e.g. {\tt tail -f fatserv.log}.
+
+\Filename{H1fatmenappendix-catalogue-recovery}
+\chapter{Catalogue recovery}
+
+On rare occasions a FATMEN catalogue may become corrupted. 
+To recover, one can simply restore the most recent backup
+copy and reapply all journal files since the time of the
+backup. (Simply copy or move them from the {\tt done}
+directory to the {\tt todo} directory. The time stamp
+in the filenames will ensure that they are processed
+in the correct order).
+
+Alternatively, one can attempt to 'repair' a catalogue.
+This may be necessary if the corruption is not noticed
+for some time. This can happen if a systematic check of
+the catalogue is not made before every backup as corruption
+typically affects only a few entries which may well not
+be accessed for some time.
+
+Repairing a corrupted catalogue consists of the following
+steps:
+\begin{OL}
+\item
+Identifying which directories and/or entries are corrupted
+\item
+Copying the catalogue skipping these directories and/or entries
+\item
+Recovering the corrupted information from journal files or
+from a backup copy of the catalogue
+\end{OL}
+
+\Filename{H2fatmenappendix-find-corrupted-entries}
+\section{Finding the corrupted entries}
+
+Normally, the corrupted entries are either reported
+by a user (e.g. I cannot access files in this directory),
+or are found by the server. Should the server abend,
+it will automatically send a mail message to the FATMEN
+manager. (Tailor the {\tt fatabend} script as appropriate).
+The server log will then show which directory and/or entries
+were giving problems. Should this information be unavailable,
+one can find the corrupted entries by running the 
+program {\tt fatloop2}, as shown below (for a Unix system).
+
+\begin{XMPt}{Running FATLOOP2}
+
+export FMLOGL=1
+export FATSYS=CERN
+export FATGRP=L3
+fatloop2 > fatloop2.log
+
+\end{XMPt}
+
+This program attempts to retrieve each catalogue entry in
+turn. Should a directory or catalogue entry be corrupted,
+then it will terminate abnormally (via ZFATAL). Thus
+it is good practice to run this program on a regular basis,
+e.g. before a periodic backup.
+
+An example of the log is shown below.
+
+\begin{XMPt}{Output of the FATLOOP2 program}
+
+ FATMEN system defaulted to CERN
+ FATMEN group:  L3
+
+ FMINIT.  Initialisation of FATMEN package
+ FATMEN   1.81/07 930203 08:50 CERN PROGRAM LIBRARY FATMEN=Q123
+          This version created on      930203  at         852
+ FMLOGL. setting log level to           1
+ Get: //CERN/L3/CDREMM/CC132563
+ Get: //CERN/L3/CDREMM/CC132563
+ Get: //CERN/L3/CDREMM/CC132563
+ Get: //CERN/L3/CDREMM/CC132564
+
+ ...
+
+ Get: //CERN/L3/PROD/DATA/SDRETT/CC02H8G2
+ Get: //CERN/L3/PROD/DATA/SDRETT/CC02H8IU
+ Get: //CERN/L3/PROD/DATA/SDRETT/CC02HBJ6
+ Get: //CERN/L3/PROD/DATA/SDRETT/CC02HBGE
+ Get: //CERN/L3/PROD/DATA/SDRETT/CC02HBJ6
+ Get: //CERN/L3/PROD/DATA/SDRETT/CC02HBGE
+ Get: //CERN/L3/PROD/DATA/SDRETT/CC02HBLY
+
+ !!!!! ZFATAL called from MZGAR1
+              called from FZIMTB
+
+ !!!!! ZFATAL reached from MZGAR1    for Case=  1
+
+          IQUEST(11) = *********         DFE0035F   пр^C_
+
+          Current Store number =  0  (JQDIVI=19)
+1ZEBRA SYSTEM Post-Mortem from ZPOSTM.
+
+ /QUEST/
+              0            1         3835           47            0            1         1030           10
+     1297762113   1378951200   -538967201            0           19    981191424        12309       930127
+           1428          180            0         1019          644          645          646          647
+            648          649          650          651          652          653          654          655
+            656          657         3742         3836          203          204          205          206
+       00000000     00000001     00000EFB     0000002F     00000000     00000001     00000406     0000000A
+       4D5A4741     52312020     DFE0035F     00000000     00000013     3A7BCB00     00003015     000E314F
+       00000594     000000B4     00000000     000003FB     00000284     00000285     00000286     00000287
+       00000288     00000289     0000028A     0000028B     0000028C     0000028D     0000028E     0000028F
+       00000290     00000291     00000E9E     00000EFC     000000CB     000000CC     000000CD     000000CE
+
+\end{XMPt}
+
+\Filename{H2fatmenappendix-recover-corrupted-entries}
+\section{Recovering from corrupted entries}
+
+Once the bad directories or entries have been identified,
+one can make a new catalogue using a special version of
+the {\tt RTOX/RFRX} tools. Here we simply exclude directories
+and/or entries that have been identified as bad.
+
+In the above example, we clearly see that there are problems 
+in the directory {\tt //CERN/L3/PROD/DATA/SDRETT}
+We can now use the FATMEN shell to localise the corrupted entries.
+
+First, we use the {\tt ls} command to list all files in
+this directory.
+
+\begin{XMPt}{Using the ls command to locate corrupted entries}
+
+ls -w output=sdrett.log
+
+\end{XMPt}
+
+The server log has told use that the first bad entry is 
+{\tt CC02HBLY}. As the catalogue entries take 163 words
+and the record length is 1024 words, we would expect 
+7 corrupted entries if an entire record was corrupt.
+That means that we should be able to retrieve the entry
+{\tt CC02HJ0M} correctly. This we can test using the
+{\tt ls} command, e.g.
+
+\begin{XMP}
+
+ls CC02HJ0M -a
+
+\end{XMP}
+
+However, if we attempt to retrieve the previous entry, we
+get the following:
+
+\begin{XMP}
+FM> ls CC02HJ66 -a
+ 
+ Directory: //CERN/L3/PROD/DATA/SDRETT
+ 
+ FMRZIN. Error in RZIN for directory //CERN/L3/PROD/DATA/SDRETT
+ Object:
+ Key serial number =   1670 filename = CC02HJ66             data repr. =   0 media type =  2 location code =      1
+ 
+ Generic filename: CC02HJ66
+ Data repr.:  0 Media type: 2 Location code:      1 File serial number:   1670
+ Device group: CT1     
+ Comment: 
+ Start record:          0 End record:          0
+ Start block :          0 End block :          0
+ File format:  user format: 
+ VSN:  VID:  FSEQ:    0
+ Fileid:      
+ Created by:   ACCT:  on node:  by job: 
+ RECFM:   LRECL:     0 BLKSIZE:     0 Filesize:     0 Use count:     0
+ File protection mask:          00000000
+ Date and time of creation:          0    0
+ Date and time catalogued:           0    0
+ Date and time last accessed:        0    0
+ User words:  00000000 00000000 00000000 00000000 00000000
+              00000000 00000000 00000000 00000000 00000000
+
+\end{XMP}
+
+We can extract all of the good entries in this directory
+by using the {\tt extract} or {\tt touch} commands.
+
+\begin{XMPt}{Extract good entries from a corrupted directory}
+
+FM>ls output=sdrett.log
+FM>edit sdrett.log
+
+(delete the lines corresponding to bad entries)
+(add the command 'touch' to the beginning of every line)
+(save as sdrett.kumac)
+
+FM>update 9999 9999 0
+FM>exec sdrett
+
+\end{XMPt}
+
+\Filename{H2fatmenappendix-skipping-bad-directories}
+\section{Skipping bad directories}
+
+As described above, we can skip bad directories by modifying
+the program {\tt RTOX}.
+
+\begin{XMPt}{Extracting the source for RTOX}
+ypatchy /cern/new/src/car/zebra.car r2x.f :go <<!
++use,qcde.
++use,qmuix,ibmrt,*rtox.
++use,p=rz,d=rzcdes.
++use,p=rz,d=rztofz.
++use,p=rz,d=rztof1.
++use,p=rztofrfz,d=blankdek.
++exe.
++pam,11,t=c.
++quit
+!
+\end{XMPt}
+
+We then modify the routine {\tt RZTOFZ} to exclude the directories
+that contain corrupted entries.
+
+\begin{XMPt}{Modifying RTOX}
+CDECK  ID>, RZTOFZ. 
+      SUBROUTINE RZTOFZ(LUNFZ,CHOPT)
+*
+************************************************************************
+*
+*        Copy the CWD tree to a sequential FZ file
+*        The FZ file must have been declared with FZOPEN
+* Input:
+*   LUNFZ   Logical unit number of the FZ sequential access file
+*   CHOPT   default save only the highest cycle to LUNFZ
+*           'C' save all cycles
+*
+* Called by <USER>
+*
+*  Author  : R.Brun DD/US/PD
+*  Written : 14.05.86
+*  Last mod: 26.06.92 JDS - protect against RZPAFF problems
+*
+************************************************************************
+      PARAMETER      (IQDROP=25, IQMARK=26, IQCRIT=27, IQSYSX=28)
+      COMMON /QUEST/ IQUEST(100)
+      COMMON /ZVFAUT/IQVID(2),IQVSTA,IQVLOG,IQVTHR(2),IQVREM(2,6)
+      COMMON /ZEBQ/  IQFENC(4), LQ(100)
+                              DIMENSION    IQ(92),        Q(92)
+                              EQUIVALENCE (IQ(1),LQ(9)), (Q(1),IQ(1))
+      COMMON /MZCA/  NQSTOR,NQOFFT(16),NQOFFS(16),NQALLO(16), NQIAM
+     +,              LQATAB,LQASTO,LQBTIS, LQWKTB,NQWKTB,LQWKFZ
+     +,              MQKEYS(3),NQINIT,NQTSYS,NQM99,NQPERM,NQFATA,NQCASE
+     +,              NQTRAC,MQTRAC(48)
+                                       EQUIVALENCE (KQSP,NQOFFS(1))
+      COMMON /MZCB/  JQSTOR,KQT,KQS,  JQDIVI,JQDIVR
+     +,              JQKIND,JQMODE,JQDIVN,JQSHAR,JQSHR1,JQSHR2,NQRESV
+     +,              LQSTOR,NQFEND,NQSTRU,NQREF,NQLINK,NQMINR,LQ2END
+     +,              JQDVLL,JQDVSY,NQLOGL,NQSNAM(6)
+                                       DIMENSION    IQCUR(16)
+                                       EQUIVALENCE (IQCUR(1),LQSTOR)
+      COMMON /MZCC/  LQPSTO,NQPFEN,NQPSTR,NQPREF,NQPLK,NQPMIN,LQP2E
+     +,              JQPDVL,JQPDVS,NQPLOG,NQPNAM(6)
+     +,              LQSYSS(10), LQSYSR(10), IQTDUM(22)
+     +,              LQSTA(21), LQEND(20), NQDMAX(20),IQMODE(20)
+     +,              IQKIND(20),IQRCU(20), IQRTO(20), IQRNO(20)
+     +,              NQDINI(20),NQDWIP(20),NQDGAU(20),NQDGAF(20)
+     +,              NQDPSH(20),NQDRED(20),NQDSIZ(20)
+     +,              IQDN1(20), IQDN2(20),      KQFT, LQFSTA(21)
+                                       DIMENSION    IQTABV(16)
+                                       EQUIVALENCE (IQTABV(1),LQPSTO)
+C
+      COMMON /RZCL/  LTOP,LRZ0,LCDIR,LRIN,LROUT,LFREE,LUSED,LPURG
+     +,              LTEMP,LCORD,LFROM
+                   EQUIVALENCE (LQRS,LQSYSS(7))
+C
+      PARAMETER (NLPATM=100)
+      COMMON /RZDIRN/NLCDIR,NLNDIR,NLPAT
+      COMMON /RZDIRC/CHCDIR(NLPATM),CHNDIR(NLPATM),CHPAT(NLPATM)
+      CHARACTER*16   CHNDIR,    CHCDIR,    CHPAT
+C
+      COMMON /RZCH/  CHWOLD,CHL
+      CHARACTER*255  CHWOLD,CHL
+C
+      PARAMETER (KUP=5,KPW1=7,KNCH=9,KDATEC=10,KDATEM=11,KQUOTA=12,
+     +           KRUSED=13,KWUSED=14,KMEGA=15,KIRIN=17,KIROUT=18,
+     +           KRLOUT=19,KIP1=20,KNFREE=22,KNSD=23,KLD=24,KLB=25,
+     +           KLS=26,KLK=27,KLF=28,KLC=29,KLE=30,KNKEYS=31,
+     +           KNWKEY=32,KKDES=33,KNSIZE=253,KEX=6,KNMAX=100)
+C
+      CHARACTER*(*) CHOPT
+      DIMENSION ISD(NLPATM),NSD(NLPATM),IHDIR(4)
+*
+*-----------------------------------------------------------------------
+*
+      IQUEST(1)=0
+      IQ1=0
+      IF(LQRS.EQ.0)GO TO 99
+*
+      CALL UOPTC(CHOPT,'C',IOPTC)
+      NLPAT0=NLPAT
+      DO 5 I=1,NLPAT0
+         CHPAT(I)=CHCDIR(I)
+   5  CONTINUE
+      ITIME=0
+      CALL RZCDIR(CHWOLD,'R')
+*
+*        Garbage collection in user short range divisions
+*        in primary store
+*
+      CALL MZGARB(21,0)
+*
+*            Write general header
+*
+      IHDIR(1)=12345
+      IHDIR(2)=NLPAT0
+      CALL FZOUT(LUNFZ,JQPDVS,0,1,'Z',1,2,IHDIR)
+      IF(IQUEST(1).NE.0)THEN
+         IQ1=IQUEST(1)
+         GO TO 90
+      ENDIF
+*
+*            Set CWD to the current level
+*
+  10  CONTINUE
+      IF(ITIME.NE.0)THEN
+         CALL RZPAFF(CHPAT,NLPAT,CHL)
+      IF(IQUEST(1).NE.0)THEN
+         IQ1=IQUEST(1)
+         NLPAT=NLPAT-1
+         GO TO 20
+      ENDIF
+         CALL RZCDIR(CHL,' ')
+      ENDIF
+      ISD(NLPAT)=0
+      NSD(NLPAT)=IQ(KQSP+LCDIR+KNSD)
+*
+*     Skip bad directories
+*
+      if(chl(1:lchl).eq.'//RZ/L3/PROD/DATA/SDRETT') goto 20
+*
+*            Write current directory
+*
+      CALL RZTOF1(LUNFZ,IOPTC)
+      IF(IQUEST(1).NE.0)THEN
+         IQ1=IQUEST(1)
+         NLPAT=NLPAT-1
+         GO TO 20
+      ENDIF
+*
+*            Process possible down directories
+*
+  20  ISD(NLPAT)=ISD(NLPAT)+1
+      IF(ISD(NLPAT).LE.NSD(NLPAT))THEN
+         NLPAT=NLPAT+1
+         LS=IQ(KQSP+LCDIR+KLS)
+         IH=LS+7*(ISD(NLPAT-1)-1)
+         CALL ZITOH(IQ(KQSP+LCDIR+IH),IHDIR,4)
+         CALL UHTOC(IHDIR,4,CHPAT(NLPAT),16)
+         ITIME=ITIME+1
+         GO TO 10
+      ELSE
+         NLPAT=NLPAT-1
+         IF(NLPAT.GE.NLPAT0)THEN
+            LUP=LQ(KQSP+LCDIR+1)
+            CALL MZDROP(JQPDVS,LCDIR,' ')
+            LCDIR=LUP
+            GO TO 20
+         ENDIF
+      ENDIF
+*
+*             Write final trailer
+*
+      NLPAT=NLPAT0
+      CALL FZOUT(LUNFZ,JQPDVS,0,1,'Z',1,1,99)
+      IF(IQUEST(1).NE.0)THEN
+         IQ1=IQUEST(1)
+         GO TO 90
+      ENDIF
+      LCORD=LQ(KQSP+LTOP-4)
+      IF(LCORD.NE.0)THEN
+         CALL MZDROP(JQPDVS,LCORD,'L')
+         LCORD=0
+      ENDIF
+*
+*            Reset CWD
+*
+  90  CONTINUE
+      CALL RZCDIR(CHWOLD,' ')
+      IF(IQ1.NE.0.AND.IQUEST(1).EQ.0)IQUEST(1)=1
+*
+  99  RETURN
+      END
+\end{XMPt}
+
+We now perform the following steps:
+
+\begin{OL}
+\item
+Convert the catalogue to sequential (FZ) format,
+skipping bad directories in the process
+\item
+Convert the sequential file back to RZ format.
+If this is done on VM, the program {\tt FATFROMX}
+should be used in preference to {\tt RFRX}
+\item
+Extract all good entries in the bad directories, as
+shown above
+\item
+Move this file to the input directory ({\tt /todo}) of
+the server
+\end{OL}
+
+Now we have almost completed the catalogue recovery,
+with the exception of the corrupted entries.
+
+\index{FATFROMX}
+\index{preformatting}
+When creating an RZ file on a VM system, it is important
+that
+\begin{itemize}
+\item
+The RZ file is mode 6 (update in place)
+\item
+Records are preformatted so that the file is not extended
+but updated in place
+\end{itemize}
+
+This is done using the program {\tt FATFROMX}.
+
+The {\tt PARAMETER} NPRE should be set as follows:
+
+\begin{XMPt}{Obtaining an appropriate value for {\tt NPRE}}
+/* Calculate NPRE. This assumes a default blocksize of 4096
+   bytes, both for the mini-disk and the FATMEN RZ file     */
+
+npre = "QDISK"("191","BLKTOT") * .85
+
+\end{XMPt}
+
+
+
+
+\Filename{H2fatmenappendix-restoring-corrupted-entries}
+\section{Restoring the corrupted entries}
+
+In the example above we are now searching for only 7
+catalogue entries. Here we have the following possibilities:
+\begin{OL}
+\item
+Is there a copy of the catalogue on another node in which
+these entries exist?
+\item
+Do we have a backup copy, e.g. on tape, in which these entries 
+exist?
+\item
+Can we find the journal files corresponding to these entries?
+\end{OL}
+
+We can scan journal files for the entries we need as follows.
+
+\begin{XMPt}{Printing the headers of the journal files}
+
+for i in $FML3/done
+   do
+      fathead $i >> l3.journal
+   done
+
+\end{XMPt}
+
+We then simply {\tt grep} the file {\tt l3.journal} for the
+entries in question and then moved the corresponding files
+to the {\tt /todo} directory.
+
+\Filename{H1fatmenappendix-cheops-interface}
+\chapter{CHEOPS interface}
+
+If FATMEN has been installed with the \Lit{CHEOPS} option,
+users may request that files are copied between sites via
+the CHEOPS system. Requests will only be accepted at sites
+which also have the correct server configuration.
+
+On VM/CMS systems, this requires a special service machine
+with username \Lit{FMCHEOPS}. This service machine receives
+copy requests from users on the local VM/CMS system and forwards
+them to the local CHEOPS server.
+
+On Unix and VAX/VMS systems, an environmental variable/symbol
+\Lit{FMCHEOPS} must be defined. This points to a directory
+into which the copy requests will be automatically written
+by the FATMEN software.
+
+The following steps are involved:
+\begin{OL}
+\item
+When a copy request is made, e.g. using the shell command \Rind{COPY}
+with the \Lit{TRANSPORT=CHEOPS} parameter or the \Rind{FMCOPY}
+subroutine with the \Lit{K} option, the FATMEN catalogue is updated
+with an entry corresponding to the destination file. The comment
+field contains the text
+\begin{XMP}
+Copy request queue to CHEOPS on YYMMDD at HHMM
+\end{XMP}
+\item
+Once the request has been processed by the CHEOPS server,
+the comment is changed to
+\begin{XMP}
+copy successfully queued to CHEOPS.
+\end{XMP}
+\item
+If there are errors processing the request, the comment
+becomes
+\begin{XMP}
+ERROR: <cheops error message>
+\end{XMP}
+\item
+Finally, once the transfer has been performed, the original
+comment as specified by the user is restored.
+\item
+If the actual transfer failed, the reason for the failure
+is instead written into the comment string of the corresponding
+FATMEN entry.
+\end{OL}
+
+\Filename{H2fatmenappendix-build-fatmen-cheops-interface-on-unix}
+\section{Building the FATMEN/CHEOPS interface on a Unix system}
+The following script may be used to build the FATMEN/CHEOPS
+interface on a Unix system.
+\begin{XMPt}{Script to build the FATMEN/CHEOPS interface}
+ypatchy /cern/pro/src/car/zebra.car cheops2f.f :go <<!
++use,qcde.
++use,ibmrt,*cheops2f.
++exe.
++pam,11,r=qcde,t=c.
++pam,12,t=c,a. fatmen.cards
++quit
+!
+xlf -q extname cheops2f.f -L/cern/pro/lib -lpacklib -o cheops2f
+\end{XMPt}
+This server may be run with the following script.
+\begin{XMPt}{Running the server}
+#!/bin/sh
+#
+# script to run the FATMEN/CHEOPS interface.
+#
+t=`date`
+h=`hostname`
+echo
+echo FATMEN/CHEOPS server starting at $t on $h
+echo
+FMWAKEUP=30;   export FMWAKEUP
+FMLOGL=3;      export FMLOGL
+FMCHEOPS=/fatmen/fmcheops; export FMCHEOPS
+echo Wakeup interval is $FMWAKEUP seconds
+echo
+$HOME/fatmen/cheops2f
+\end{XMPt}
+\Filename{H2fatmenappendix-build-FMCHEOPS-server-on-vmcms}
+\section{Building the FMCHEOPS server on a VM/CMS system}
+The FMCHEOPS server can be built using the following EXEC.
+\begin{XMPt}{FMCHEOPS EXEC}
+/*       BUILD THE FMCHEOPS SERVER     */                                      
+'EXEC YPATCHY PAM1="ZEBRA CAR *" PAM2="FATMEN CARDS" ',                        
+    'CRADLE="FATKEOPS CRADLE" ASM="FATKEOPS FORTRAN A1"'                       
+'EXEC VFORT FATKEOPS'                                                          
+'GIME TCPVMA'                                                                  
+'CERNLIB PACKLIB!NEW COMMTXT IBMLIB CMSLIB EDCBASE ( LINK'                     
+'GLOBAL LOADLIB VSF2LOAD EDCLINK'                                              
+'LOAD FATKEOPS'                                                                
+'GENMOD FATKEOPS'
+\end{XMPt}
+The server should be set up as for other FATMEN servers,
+i.e. it should have a \Lit{NAMES} file defining who may
+issue privileged commands, as follows:
+\begin{XMPt}{Example of a NAMES file for the FMCHEOPS server}
+:nick.FATOPERATORS
+               :list.fatop1 fatop2
+                                 
+:nick.FATOP1                                                                   
+               :userid.console
+               :node.cernvm 
+                           
+:nick.FATOP2              
+               :userid.opsutil
+               :node.cernvm 
+                                                                               
+:nick.FATOWN1                                                                  
+               :userid.fatone
+               :node.cernvm 
+                                                                               
+:nick.FATOWN2              
+               :userid.hrrcr
+               :node.cernvm
+                          
+:nick.FATOWN3            
+               :userid.jamie
+               :node.cernvm
+                          
+:nick.FATOWNERS          
+               :list.fatown1 fatown2 fatown3
+                                           
+\end{XMPt}
+The server may be run using the following EXEC.
+\begin{XMPt}{Running the FMCHEOPS server}
+/*                      F A T _ S T A R T                     */               
+Address Command                                                                
+   If QCONSOLE("DISCO") then nop                                               
+                        else do                                                
+                        Say "+++ Type #CP DISC to disconnect +++"              
+                        Say "+++ Type #CP DISC to disconnect +++"              
+                        Say "+++ Type #CP DISC to disconnect +++"              
+                        end                                                    
+'IDENTIFY (STACK'                                                              
+Parse pull . . locnode .                                                       
+                                                                               
+If locnode = 'CERNVM' then do                                                  
+                                                                               
+/* Start FATCAT FORTRAN Program, which calls FATSERV EXEC */                   
+   'GLOBALV SELECT *EXEC GET PWD'                                              
+   'GLOBALV SELECT *EXEC GET USER'                                             
+   'FATKEOPS'                                                                  
+   end                                                                         
+                                                                              
+   else do                                                                     
+                                                                               
+   Say "FMCHEOPS can only be run on CERNVM..."                                  
+   end                                                                         
+\end{XMPt}
+\Filename{H1fatmenappendix-cheops-interface-to-fatmen}
+\chapter{CHEOPS interface to the FATMEN system}
+The CHEOPS software uses the information passed from FATMEN
+to stage in files pending transfer to the requested remote site.
+Similar, once the file has been transferred, a request is made
+through the FATMEN software to stage the file out to tape.
+
+To simplify the interface between the CHEOPS software, written
+in C, and the FATMEN package, written primarily in FORTRAN,
+a special interface has been provided. This interface is intended
+only for use by the appropriate CHEOPS software and should not
+be called from user programs.
+\Filename{H2fatmenappendix-stage-file}
+\section{Stage in a file}
+\Shubr{FMSTGI}{(GENAME,
+     CFQNFA,CHSNFA,ICPLFA,IMTPFA,ILOCFA,CHSTFA,CHOSFA,
+     CVSNFA,CVIDFA,IVIPFA,IDENFA,IVSQFA,IFSQFA,ISRDFA,
+     IERDFA,ISBLFA,IEBLFA,CRFMFA,IRLNFA,IBLNFA,CFLFFA,
+     CFUTFA,ICRTFA,ICTTFA,ILATFA,CCURFA,CCIDFA,CCNIFA,
+     CCJIFA,IFPRFA,ISYWFA,IUSWFA,CUCMFA,
+     CHLINK,CHOPT,IRC)}
+\begin{DLtt}{1234567}
+\item[GENAM]Character variable of maximum length 255 specifying the generic
+name of the file to be staged.
+\item[CFQNFA]Character variable of maximum length 256 specifying the
+fully qualified dataset name of the file to be staged.
+\item[CHSNFA]Character variable of maximum length 8 specifying the
+host on which the file resides (disk files).
+\item[ICPLFA]Integer variable specifying the copy level or data representation
+of the file to be staged.
+\item[IMTPFA]Integer variable specifying the media type code of the file to
+be staged.
+\item[ILOCFA]Integer variable specifying the location code of the file to be
+staged.
+\item[CHSTFA]Character variable of maximum length 16 specifying the
+host type of the system on which the file resides.
+\item[CHOSFA]Character variable of maximum length 12 specifying the 
+operation system of the host on which the file resides.
+\item[CVSNFA]Character variable of maximum length 8 specifying the
+volume serial number of the tape on which the file resides.
+\item[CVIDFA]Character variable of maximum length 8 specifying the
+visual identifier of the volume on which the file resides.
+\item[IVIPFA]Integer VID prefix of the volume
+\item[IDENFA]Integer density
+\item[IVSQFA]Integer volume sequence number
+\item[IFSQFA]Integer file sequence number
+\item[ISRDFA]Integer start record number
+\item[IERDFA]Integer end record number
+\item[ISBLFA]Integer start block number
+\item[IEBLFA]Integer end block number
+\item[CRFMFA]Character variable of length 4 specifying the record format
+\item[IRLNFA]Integer record length in 32 bit words
+\item[IBLNFA]Integer block length in 32 bit words
+\item[CFLFFA]Character variable of length 4 specifying the FATMEN file format
+\item[CFUTFA]Character variable of length 4 specifying the user defined file type
+\item[ICRTFA]Integer containing the file creation date and time in packed format
+\item[ICTTFA]Integer containing the date and time that the file was catalogued in packed format
+\item[ILATFA]Integer containing the date and time of last access in packed format
+\item[CCURFA]Character variable of length 8 specifying the user name of the
+file creator
+\item[CCIDFA]Character variable of length 8 specifying the account of the
+creator
+\item[CCNIFA]Character variable of length 8 specifying the node on which
+the file was created
+\item[CCJIFA]Character variable of length 8 specifying the name of the job
+that created the file
+\item[IFPRFA]Integer file protection mask
+\item[ISYWFA]Integer vector of length 10 containing the system words
+\item[IUSWFA]Integer vector of length 10 containing the user words
+\item[CUCMFA]Character variable of length 80 containing the user comment
+\item[CHLINK]Character variable specifying the link should point to the
+staged file
+\item[CHOPT]Character options
+\item[IRC]Integer return code
+\end{DLtt}
+\Filename{H2fatmenappendix-stage-out-file}
+\subsection{Stage out a file}
+\Shubr{FMSTGO}{(GENAME,
+     CFQNFA,CHSNFA,ICPLFA,IMTPFA,ILOCFA,CHSTFA,CHOSFA,
+     CVSNFA,CVIDFA,IVIPFA,IDENFA,IVSQFA,IFSQFA,ISRDFA,
+     IERDFA,ISBLFA,IEBLFA,CRFMFA,IRLNFA,IBLNFA,CFLFFA,
+     CFUTFA,ICRTFA,ICTTFA,ILATFA,CCURFA,CCIDFA,CCNIFA,
+     CCJIFA,IFPRFA,ISYWFA,IUSWFA,CUCMFA,
+     CHLINK,CHOPT,IRC)}
+\begin{DLtt}{1234567}
+\item[GENAM]Character variable of maximum length 255 specifying the generic
+name of the file to be staged.
+\item[CFQNFA]Character variable of maximum length 256 specifying the
+fully qualified dataset name of the file to be staged.
+\item[CHSNFA]Character variable of maximum length 8 specifying the
+host on which the file resides (disk files).
+\item[ICPLFA]Integer variable specifying the copy level or data representation
+of the file to be staged.
+\item[IMTPFA]Integer variable specifying the media type code of the file to
+be staged.
+\item[ILOCFA]Integer variable specifying the location code of the file to be
+staged.
+\item[CHSTFA]Character variable of maximum length 16 specifying the
+host type of the system on which the file resides.
+\item[CHOSFA]Character variable of maximum length 12 specifying the 
+operation system of the host on which the file resides.
+\item[CVSNFA]Character variable of maximum length 8 specifying the
+volume serial number of the tape on which the file resides.
+\item[CVIDFA]Character variable of maximum length 8 specifying the
+visual identifier of the volume on which the file resides.
+\item[IVIPFA]Integer VID prefix of the volume
+\item[IDENFA]Integer density
+\item[IVSQFA]Integer volume sequence number
+\item[IFSQFA]Integer file sequence number
+\item[ISRDFA]Integer start record number
+\item[IERDFA]Integer end record number
+\item[ISBLFA]Integer start block number
+\item[IEBLFA]Integer end block number
+\item[CRFMFA]Character variable of length 4 specifying the record format
+\item[IRLNFA]Integer record length in 32 bit words
+\item[IBLNFA]Integer block length in 32 bit words
+\item[CFLFFA]Character variable of length 4 specifying the FATMEN file format
+\item[CFUTFA]Character variable of length 4 specifying the user defined file type
+\item[ICRTFA]Integer containing the file creation date and time in packed format
+\item[ICTTFA]Integer containing the date and time that the file was catalogued in packed format
+\item[ILATFA]Integer containing the date and time of last access in packed format
+\item[CCURFA]Character variable of length 8 specifying the user name of the
+file creator
+\item[CCIDFA]Character variable of length 8 specifying the account of the
+creator
+\item[CCNIFA]Character variable of length 8 specifying the node on which
+the file was created
+\item[CCJIFA]Character variable of length 8 specifying the name of the job
+that created the file
+\item[IFPRFA]Integer file protection mask
+\item[ISYWFA]Integer vector of length 10 containing the system words
+\item[IUSWFA]Integer vector of length 10 containing the user words
+\item[CUCMFA]Character variable of length 80 containing the user comment
+\item[CHLINK]Character variable specifying the link should point to the
+staged file
+\item[CHOPT]Character options
+\item[IRC]Integer return code
+\end{DLtt}
+
+\Filename{H1fatmenappendix-security-issues}
+\chapter{Security issues}
+
+Limited security precautions are provided in FATMEN. They are as follows:
+
+\begin{OL}
+\item
+There are no restrictions on access to catalogue information,
+other than those provided at the file system level. That is,
+any use may inspect any catalogue. 
+\item
+Directories may only be deleted if they are completely empty,
+i.e. contain no subdirectories and no files.
+\item
+File entries may only be deleted by their creator. The creator
+is identified by the account field.
+\item
+Protection may be established on directory trees, as explained below.
+\end{OL}
+
+\Filename{H2fatmenappendix-restricting-read-access-to-catalogue-info}
+\section{Restricting read access to catalogue information}
+
+If such restrictions are required, they must be performed at the
+file system level. For example, on VAX/VMS systems one may use
+access control to restrict read access to specific users
+or users with a given rights identifier.
+
+\Filename{H2fatmenappendix-access-files-catalogues-in-fatmen}
+\section{Access to files catalogued in FATMEN}
+
+No restrictions on file access are provided by FATMEN itself.
+Volume access restrictions may be set up using the Tape Management System,
+if required. For disk files, the access restrictions of the file
+system again apply.
+\Filename{H2fatmenappendix-access-control-lists}
+\section{Access control lists}
+\index{ACL}
+\index{security}
+\index{protection}
+It is possible to restrict write access to the FATMEN catalogue
+using an ACL file. The ACL file consists of 3 fields.
+\begin{OL}
+\item
+User name
+\item
+Node name
+\item
+Path name
+\end{OL}
+Any of the fields may be wild-carded. When an update operation is
+attempted, FATMEN checks the username, nodename and pathname 
+against those defined in the file \Lit{FATMEN.ACL}. This file
+resides in the directory or on the mini-disk containing the
+catalogue for which the update is being attempted. Thus, in the
+case of the CDF experiment, the file will be in the directory
+pointed to by the symbol or variable \Lit{FMCDF}.
+
+Lines beginning with an exclamation mark, an asterix, a hash or
+slash asterix treated as comments.
+
+\begin{XMPt}{Example of an ACL file}
+
+/*              FATMEN.ACL file for CDF experiment at Fermilab         */
+
+! ! !
+! ! ! CDF FATMEN Superusers: can modify any directory
+! ! !
+LINGFENG * //FNAL/CDF
+! ! !
+! ! ! CDF FATMEN Test users: can modify the subtree //FNAL/CDF/FATMEN
+! ! !
+CDF_FATM * //FNAL/CDF/FATMEN    
+! ! !
+! ! ! CDF FATMEN General users: can modify <user> tree.
+! ! ! e.g. FRODO can modify //FNAL/CDF/USERS/FRODO
+! ! !
+<user> * //FNAL/CDF/USERS/<user>
+! ! !
+! ! ! CDF FATMEN General users: user ID does not match user name:
+! ! !
+GPYEH * //FNAL/CDF/USERS/YEH
+! ! !
+! ! ! CDF FATMEN TOP group Superusers:
+! ! !
+GPYEH * //FNAL/CDF/TOP
+! ! !
+! ! ! CDF FATMEN TOP DILEPTON subgroup Superusers:
+! ! !
+LUC * //FNAL/CDF/TOP/DILEPTON
+CHIKA * //FNAL/CDF/TOP/DILEPTON
+CENYI * //FNAL/CDF/TOP/DILEPTON
+\end{XMPt}
+\Filename{H2fatmenappendix-account-aliases}
+\section{Account aliases}
+\index{account}
+In addition to the above protection, catalogue entries may only
+be deleted by users whose account matches that of the catalogue
+entry. However, as shown in the following example, accounts are
+often not common across different systems. 
+\begin{XMP}
+FM> ls -o                                                                   
+ 
+ Directory: //CERN/CNDIV/TAPES
+ 
+ Generic filename: XTRACE91
+ Created by:  JAMIE    ACCT: JDS$CT   on node: CERNVM   by job: JAMIE   
+ 
+ Generic filename: XTRACE92
+ Created by:  jamie    ACCT: JDSCT    on node: zfatal   by job: jamie-15
+ 
+\end{XMP}
+To cater for this situation,
+account aliasing is possible. An alias file, \Lit{FATMEN.ACCOUNTS},
+consists of 2 fields.
+\begin{OL}
+\item
+Account name
+\item
+List of aliases
+\end{OL}
+Note that this scheme is not designed for large numbers of users
+with different accounts on each machine. It is intended for use
+by a small number of production managers.
+\begin{XMPt}{Example of an account alias file}
+EMC$XV=CCA$XV,PRO$XV                                                            
+CCA$XV=EMC$XV,PRO$XV                                                            
+PRO$XV=CCA$XV,EMC$XV                                                            
+\end{XMPt}
+
+\Filename{H2fatmenappendix-update-control}
+\section{Update control}
+
+\index{updates}
+\index{update}
+
+By default, all file accesses that use the routine \Rind{FMOPEN}
+or the shell \Rind{FIND} or \Rind{MAKE} commands result in
+a logging record being sent to the servers. This record contains
+information which includes how the file was accessed, the time taken to access
+the file and updates the usage count and last access date and time.
+
+Such updates can be controlled by a file named {\tt FATMEN.UPDATES}
+which has the same format as
+the {\tt FATMEN.ACL} file. If such a file exists, then the logging
+information will only be sent if there is an appropriate line
+in this file.
+\begin{XMPt}{Example of an update control file}
+
+!
+! Log monitoring information only for production users
+!
+DELPROD * //CERN/DELPHI
+!
+! but also for users accessing their private files
+!
+<user> * //CERN/DELPHI/USERS/<user>
+
+\end{XMPt}
+\Filename{H1fatmenappendix-tms-at-cern}
+\chapter{TMS at CERN}
+\par
+The following information describes the TMS as installed at CERN.
+In general, the description is also valid for outside sites where
+the TMS is also installed, such as the Rutherford Appleton Laboratory
+in the UK, where the product originated, and IN2P3 and Saclay in France.
+\par
+The Tape Management System (TMS) has been installed at CERN
+to manage the tapes and cartridges used at CERN. Information on some 450,000
+volumes is held in a central database and may be queried and, in some cases,
+updated by users.
+\par
+Note that FATMEN automatically issues TMS commands where necessary,
+and so a detailed knowledge of the TMS and the command syntax is
+not required. However, it may be useful to have a general overview
+of the system.
+{\bf Note that all access to TMS information through FATMEN is via
+a generic name, and not a tape number.}
+\par 
+The TMS system runs in a special service machine and, as is the case for other
+service  machines, does not accept commands directly but rather through a
+special interface. For other service machines the interface is SMSG, but TMS
+uses instead the SYSREQ interface (again from RAL) which handles automatic
+continuati of responses to queries and which allows (following modifications at
+CERN) queries from other CERN machines.
+\par
+The SYSREQ interface is also available on remote machines, such as the
+central VAXcluster VXCERN, the Cray, the Siemens, SHIFT etc. This
+remote interface runs over TCP/IP and is contained in the CERN Program
+Library entry CSPACK. 
+
+A TMS query may be issued as follows:
+\begin{XMP}
+   SYSREQ TMS QUERY VID YZ0001
+\end{XMP}
+and similarly for  other TMS commands.  Note that descriptions  of TMS commands
+in the various help  files generally omit the "SYSREQ TMS",  but this is always
+needed.
+
+A list of all TMS commands is available via the command \underline{XFIND TMS} 
+on CERNVM.  On remote systems, this information is available
+through the www browser. To access the XFIND information directly, 
+use a script such as
+\begin{XMP}
+# XFIND script
+www "http://crnvmc/FIND" $@
+\end{XMP} 
+and then use the command \underline{XFIND TMS} as on CERNVM.
+\par
+In either case you can  then find information on a specific command
+of interest.  To  find information about a particular TMS  command directly use
+the  commands \underline{XFIND TMS  command}, e.g.
+\begin{XMP}
+xfind tms query
+\end{XMP}
+
+\Filename{H2fatmenappendix-TMS-volume-organisation}
+\section{Volume Organisation in TMS}
+
+The logical  organisation of  volumes within TMS  follows closely  the physical
+organisation   and  is  therefore  based  around  volume  prefixes.   For  each
+different  volume  prefix   a  number  of  TMS  LIBRARIES   are  defined,  each
+corresponding to a  possible location for volumes in that  series.  Most series
+will have the libraries/locations (where xx is the two lette VID prefix)
+\begin{XMPt}{Examples of TMS libraries}
+ 
+xx_VAULT the location  for volumes physically in the tape  vault.  Only volumes
+         in these libraries will be able to mounted on the central systems.
+ 
+xx_REST  a general location for volumes not in the vault
+ 
+\end{XMPt}
+\par
+In  some cases  there will  be libraries  such as  xx\_EXPT for  volumes at  the
+experiment - but  this depends on the  way an individual experiment  chooses to
+manage its own volumes.
+
+Certain FATMEN routines require a TMS library as an argument, such
+as \Rind{FMALLO}, which allocates a volume from a named pool (see below)
+from a given library.
+
+\Filename{H2fatmenappendix-TMS-volume-ownership}
+\section{Volume Ownership in TMS} 
+
+As well as recording the location of a volume TMS also holds ownership details.
+Ownership of  a volume  is by  ACCOUNT and  OWNER.  ACCOUNT  is the  usual CERN
+accounting group, gg  - all Delphi volumes,  for example, are owned  by account
+XX.
+
+The OWNER  field in the  TMS database is a  little more special,  however.  All
+registered CERN computer users have an individual user code, or UUU, and if the
+owner  field  is  a three  character  UUU  then  the  volume is  owned  by  the
+corresponding individual.
+
+If the owner field  is longer than 3 characters this  then it cannot correspond
+to a  UUU and so  no real person  owns the volume,  instead the owner  field is
+being used  to group  the volume  into a  POOL for  a particular  purpose.  For
+example  most experiments  wish to  maintain a  pool  of volumes  which can  be
+allocated to  users on  request. These  volumes can  be given  the TMS  'owner'
+GG\_USER and  it is then  easy to see  which volumes remain  in the pool  and to
+choose one for allocation - perhaps  with the GETPOOL command, or better,
+using the routine \Rind{FMALLO}.  The FATMEN shell command
+{\bf ALLOCATE} may also be used to allocate volumes. {\bf Note that
+FATMEN only retains information on volumes by generic name.
+That is, there must be at least one file in the FATMEN catalogue
+on a given volume}.
+Another example
+would be  to have  the 'owner'  for all DST  volumes as  GG\_DST so  users could
+easily list the available  DSTs (and even for a given  location using the QUERY
+CONTENTS command).
+\par
+Volumes may be moved between pools using the routine \Rind{FMPOOL}.
+\Filename{H2fatmenappendix-TMS-access-rules}
+\section{Volume Access Rules in TMS}
+\par 
+TMS always permits read access to all volumes by all users.
+{\bf N.B. this may not be the case outside CERN!}
+\par 
+Write access is normally allowed to all members of the account group owning the
+volume, but access  may be restricted by using PROTECTION  GROUPS. A protection
+group allows access to be limited to  a small number of individuals or extended
+to  members of  other groups.   The QUERY  VID command  gives the  name of  the
+protection  group governing  write access  to a  volume and  the QUERY  PROTECT
+command can  be used to  see the users permitted  access by a  given protection
+group.
+\par 
+The owner of a  volume (or an authorised user for  'pool' volumes) may globally
+disable write access using the LOCK command  - a software equivalent of the "Do
+not write on this tape" sticker. This functionality is provided
+by the routine \Rind{FMLOCK}. Volumes may be unlocked using the routine
+\Rind{FMULOK}. LOCK and UNLOCK commands also exist in the FATMEN shell.
+\Filename{H2fatmenappendix-TMS-create-pool}
+\section{Creating TMS pools for use with FATMEN}
+\par
+The following TMS commands may be used to create TMS pools for use
+with the routine \Rind{FMALLO} or the shell {\tt ALLOCATE} command.
+Note that one may also allocate tapes from these pools by issuing
+TMS commands directly without causing any conflict.
+\par
+Note that these commands require privilege and may normally only
+be issued by the tape librarian.
+\par
+If the tapes are already known to the TMS, the following commands
+should be used.
+\begin{XMPt}{Creating a TMS pool}
+
+PROTECT poolname ACCOUNT gg CREATE
+
+PROTECT poolname ACCOUNT gg GRANT AUTHORITY CONTROL ACCOUNT gg
+                                                 or USERID  uuu
+
+TRANSFER VID vid1 - vid2 FROMUSER owner TO USERID poolname
+
+\end{XMPt}
+\par
+The {\tt poolname} is the name of the pool, e.g. {\tt XU\_FREE}.
+{\tt gg} and {\tt uuu} have their usual meanings. The two
+{\tt GRANT AUTHORITY} commands differ in that the first permits
+and member of the group {\tt gg} to allocate tapes from this pool,
+where as the second enables only a specified user.
+\par
+If the tape volumes are not yet known to the TMS, they must be
+entered using the {\tt ENTER} command. At this time, one may
+also specify the {\tt OWNER} and hence avoid the {\tt TRANSFER}
+command described above. For example, if the tapes are to be
+in pool {\tt XX\_FREE}, then they should be entered with
+{\tt USERID XX\_FREE}.
+However, the {\tt PROTECT} commands are still required.    
+
+\Filename{H2fatmenappendix-TMS-return-codes}
+\section{TMS return codes}
+\begin{verbatim}
+#ifndef STNDMESG_H_INCLUDED
+/************************************************************/
+/*                                                          */
+/* Object : Definition of the  standard  messages used  by  */
+/* =======  various standard parts of the TMS system.  For  */
+/*          inclusion in local message repositories         */
+/*                                                          */
+/* Attrib : TMS system header file.                         */
+/* =======                                                  */
+/*                                                          */
+/* Author : (c)  Jonathan  Wood,  Systems  Group, CCD, RAL, */
+/* =======  5_Nov_1988                                      */
+/*                                                          */
+/* ANSI C Version : Martin Ellerker, IBM Support Section,   */
+/* ===============  Software Group, CERN.                   */
+/*                  28_April_1993                           */
+/*                                                          */
+/************************************************************/
+/*  File:          "stndmesg.h"                             */
+/*  Dependencies:  "message.h"                              */
+/************************************************************/
+#define STNDMESG_H_INCLUDED 1
+ 
+#include "message.h"
+ 
+ 
+#ifndef EXCLUDE_convert_msgs
+    #define EXCLUDE_convert_msgs 1
+ 
+    QMSG(1,"Input fileid is missing")
+    QMSG(2,"Unable to open input file")
+    QMSG(3,"\nSyntax{%d:%d}. Expected '%s' "\
+"found instead '%.*s'")
+    QMSG(4,"%*.*s%c")
+    QMSG(5,"Unable to open output file")
+    QMSG(6,"Processed %d clauses in %d records to "\
+"output file '%s'")
+    QMSG(7,"Processing input file %s")
+    QMSG(8,"Processed %d clauses in %d records "\
+"with %d errors")
+ 
+    #endif
+ 
+#ifndef EXCLUDE_parser_msgs
+    #define EXCLUDE_parser_msgs 1
+ 
+    QMSG(20,"Syntax Error")
+    QMSG(21,"Found '%.*s' where expected")
+    QMSG(22,"%c<%-8.8s>")
+    QMSG(23,"%c'%-8.8s'")
+    QMSG(24,"%c %-8.8s ")
+    QMSG(25,"Parser Error: %s :OPR %-8.8s")
+    QMSG(27,"Parser Error: %s :OPT %-8.8s")
+    QMSG(28,"Syntax fallacy at token: %-8.8s")
+    QMSG(29,"Unable to load DLCS syntax file '%s'")
+    QMSG(30,"Unexpected clause type during load at block %d")
+ 
+    #endif
+ 
+#ifndef EXCLUDE_index_msgs
+    #define EXCLUDE_index_msgs 1
+    QMSG(35,"Rebuild attempted for indices on: %.*s code %d")
+    QMSG(36,"Routine for index rebuild on: %.*s not provided")
+    #endif
+ 
+#ifndef EXCLUDE_util_msgs
+    #define EXCLUDE_util_msgs 1
+ 
+    QMSG(40,"Getcor failure for %d * %d bytes")
+    QMSG(41,"Message buffer too small: Msg number %5.5d")
+    QMSG(42,"Host command complete rc=%d")
+ 
+    #endif
+ 
+ 
+#ifndef EXCLUDE_comms_msgs
+    #define EXCLUDE_comms_msgs 1
+ 
+    QMSG(45,"**** Possible command retry: may have been "\
+"executed")
+    QMSG(50,"Schedule table error. Item number %d."\
+"      SQLCODE %d")
+ 
+ 
+    #endif
+ 
+#ifndef EXCLUDE_sched_msgs
+    #define EXCLUDE_sched_msgs 1
+ 
+    QMSG(55,"Recurrence interval too large!")
+    QMSG(56,"Permission Denied: Scheduled request %d")
+    QMSG(57,"Command too long to schedule!")
+ 
+    QMSG(58,"Reqnum   Userid   Command  Last_Date       "\
+"Next_date       Recursion")
+    QMSG(59,"-------- -------- -------- --------------- "\
+"--------------- -----------------")
+    QMSG(60,"%8.1d %-8.8s %-8.8s %15.6f %15.6f %8.8s %-8.8s")
+    QMSG(61,"%.*s %1.8d")
+    QMSG(62,"%.*s")
+ 
+    #endif
+ 
+#ifndef EXCLUDE_feature_msgs
+    #define EXCLUDE_feature_msgs 1
+ 
+    QMSG(65,"Invalid feature type: %.*s")
+    QMSG(66,"Unsupported feature: %.*s")
+    QMSG(67,"Feature change rejected: %.*s")
+    QMSG(68,"%-8.8s")
+    QMSG(69,"%.*s %-8.8s")
+ 
+    #endif
+ 
+#ifndef EXCLUDE_secure_msgs
+    #define EXCLUDE_secure_msgs 1
+ 
+    QMSG(70,"Permission denied: Command %.*s")
+    QMSG(71,"Not you again?")
+    QMSG(72,"You are becoming a nuisance")
+    QMSG(73,"Your activity is being logged")
+    QMSG(74,"Desist!  You have been warned")
+    QMSG(75,"Your file has been passed to "\
+"the Fraud Squad")
+ 
+    QMSG(76,"Authorisation not found")
+    QMSG(77,"Authorisation already exists")
+    QMSG(78,"%-9.8s")
+    QMSG(79,"%.*s %-8.8s")
+ 
+ 
+    #endif
+ 
+#ifndef EXCLUDE_dbase_msgs
+    #define EXCLUDE_dbase_msgs 1
+ 
+    QMSG(80,"Severe SQL error SQLCODE=%d Attempting recovery")
+    QMSG(81,"Severe SQL error SQLCODE=%d Unable to recover")
+    QMSG(82,"SQL Diagnostic error report:\n"\
+" SQLCAID: %-8.8s SQLCABC: %d SQLCODE: %d SQLERRP: %-8.8s")
+    QMSG(83," SQLERRM: %.*s")
+    QMSG(84," SQLERRD: %d %d %d %d %d %d")
+    QMSG(85," SQLEXT : %-5.5s")
+    QMSG(86," SQLWARN: 0123456789A\n          %-11.11s")
+ 
+    #endif
+ 
+#ifndef EXCLUDE_main_msgs
+    #define EXCLUDE_main_msgs 1
+ 
+    QMSG(87,"Installation configuration complete")
+    QMSG(88,"Installation configuration already complete")
+    QMSG(89,"Initialisation already complete")
+    QMSG(90,"**** %.*s: Sub-Command implementation deferred")
+    QMSG(91,"**** %s stopped by %-8.8s on %-8.8s")
+    QMSG(92,"**** %.*s: Command implementation deferred")
+    QMSG(93,"**** %s initialisation complete")
+    QMSG(94,"**** Command processor restart: %d")
+    QMSG(95,"%s restarting at %.24s in '%s' mode")
+    QMSG(96,"**** New command accepted at %.24s from "\
+"%-8.8s (%-8.8s) on %-8.8s:\n%.*s")
+    QMSG(97,"**** Completion code %d at %.24s")
+    QMSG(98,"%s terminating at %.24s with code: %d")
+    QMSG(99,"**** The %s is temporarily unavailable")
+ 
+    #endif
+ 
+#endif                            /* ifndef x_H_INCLUDED     */
+ 
+/* UPDATES APPLIED AT 09:43:45 ON 12 AUG 1993
+UUU$GG
+*         STNDME$H UUU$GG   D1 REL191  08/12/93   09:40:06
+*/
+
+#ifndef APPLMESG_H_INCLUDED
+/************************************************************/
+/*                                                          */
+/* Object : Definition  of the  message repository for the  */
+/* =======  application server program.  Insert application */
+/*          specific messages.                              */
+/*                                                          */
+/* Attrib : Application system Header file.                 */
+/* =======                                                  */
+/*                                                          */
+/* Author : (c)  Jonathan  Wood,  Systems  Group, CCD, RAL, */
+/* =======  5_Nov_1988                                      */
+/*                                                          */
+/************************************************************/
+/*  File:          "applmesg.h"                             */
+/*  Included by:   "message.h"                              */
+/************************************************************/
+#define APPLMESG_H_INCLUDED 1
+ 
+QMSG(101,"%s")
+ 
+/*************************************************************/
+/*  Msgs for QTAPE command                                   */
+/*************************************************************/
+QMSG(102,"%-8.8s %9.1ld %-8.8s %-8.8s %8.1ld %8.1ld")
+QMSG(103,"Unknown volume : %-6.6s")
+ 
+/*************************************************************/
+/*  Msgs for QUERY VID command                               */
+/*************************************************************/
+QMSG(104,"Volume(s) not found")
+QMSG(105," %-8.8s")
+QMSG(106," %-6.6s")
+QMSG(107," %-3.3s")
+QMSG(108," %-1.1s")
+QMSG(109," %-12.12s")
+QMSG(110," %015.6f")
+QMSG(111," %8.1ld")
+QMSG(112," %5.1hd")
+QMSG(113,"%.*s %.6s - %.6s %.*s")
+QMSG(114,"%-6.6s")
+QMSG(115," %8.8s")
+ 
+/*************************************************************/
+/*  Msgs for LIBRARY and QUERY LIBRARY commands              */
+/*************************************************************/
+QMSG(119,"Library not empty: %-.8s")
+QMSG(120,"Duplicate library name: %-.8s")
+QMSG(121,"Unknown library: %-.8s")
+QMSG(122,"Library not empty: %-.8s")
+QMSG(123,"Library size change invalid: %-8.8s")
+QMSG(125,"Library  Czar     Group    R A L S M Target   "\
+"Retain Racks  Slots    Spare")
+QMSG(126,"-------- -------- -------- - - - - - -------- "\
+"------ ------ -------- --------")
+QMSG(127,"%-8.8s %-8.8s %-8.8s %c %c %c %c %c %-8.8s "\
+"%6.1ld %6.1ld %8.1ld %8.1ld")
+QMSG(128,"%.*s")
+QMSG(129,"%.*s %-8.8s %-8.8s")
+ 
+/*************************************************************/
+/*  Msgs for RACK    command                                 */
+/*************************************************************/
+QMSG(130,"Slot(s) in use: %-8.8s %1.1d %1.1d")
+QMSG(131,"Unracked library: %-8.8s")
+QMSG(132,"Unknown rack: %-8.8s %1.1d")
+QMSG(133,"Invalid status change: %-8.8s %1.1d %1.1d")
+QMSG(134,"Invalid split/join for rack: %-8.8s %1.1d %1.1d")
+QMSG(135,"Rack too large: %-8.8s %1.1d %1.1d")
+QMSG(136,"Slot was not in use: %-8.8s %8.1d")
+QMSG(137,"Invalid device model: %-6.6s")
+ 
+/*************************************************************/
+/*  Msgs for Rule validation functions.                      */
+/*************************************************************/
+QMSG(139,"Permission Denied: Account %-8.8s")
+QMSG(140,"Permission Denied: Volume %-6.6s")
+QMSG(141,"Permission Denied: No volumes found")
+QMSG(142,"Permission Denied: Library %-8.8s not found")
+QMSG(143,"Permission Denied: Library %-8.8s")
+QMSG(144,"Permission Denied: Group %-8.8s Account %-8.8s")
+ 
+/*************************************************************/
+/*  Msgs for Group Manipulation functions                    */
+/*************************************************************/
+QMSG(145,"Permission Denied: Volume account mismatch")
+QMSG(146,"Permission Denied: Group exists")
+QMSG(147,"Permission Denied: Group in use")
+ 
+/*************************************************************/
+/*  Msgs for Query Group(s) functions                        */
+/*************************************************************/
+QMSG(148,"*Account ")
+QMSG(149,"*Userid  ")
+QMSG(150,"*World   ")
+QMSG(151,"%-9.8s")
+QMSG(152,"%-7.6s")
+QMSG(153,"%.*s %c %-8.8s")
+ 
+/*************************************************************/
+/*  Msgs for Query RACK     function                         */
+/*************************************************************/
+QMSG(154,"Library  Start    End      Slots    Spare    "\
+"Model  Status")
+QMSG(155,"-------- -------- -------- -------- -------- "\
+"------ ------")
+QMSG(156,"%-8.8s %8.1d %8.1d %8.1d %8.1d %-6.6s %c")
+QMSG(157,"%.*s %8.1d ")
+ 
+/*************************************************************/
+/*  Msgs for MOVE           functions                        */
+/*************************************************************/
+QMSG(160,"Insufficient space: Library %-8.8s")
+QMSG(161,"Move initiated for %1.1d volumes out of %1.1d tried")
+QMSG(162,"Logical library: %-8.8s")
+QMSG(163,"Insufficient space in library")
+ 
+/*************************************************************/
+/*  Msgs for the REQUEST queue manipulation functions        */
+/*************************************************************/
+QMSG(170,"Duplicate action request for vid: %-6.6s")
+QMSG(171,"Request not found: vid %-6.6s")
+QMSG(172,"Permission denied: Request on vid %-6.6s")
+ 
+QMSG(173,"A C Target_1 Target_2 Requestr Jobname  Owner    "\
+"Date            Jobid   ")
+QMSG(174,"- - -------- -------- -------- -------- -------- "\
+"--------------- --------")
+QMSG(175,"%c %c %-8.8s %8.1d %-8.8s %-8.8s %-8.8s %15.6f"\
+" %-8.8s")
+QMSG(176,"%.*s %8.1d")
+ 
+QMSG(177,"%1.1d requests of type '%.*s' found")
+QMSG(178,"%-6.6s %-8.8s %8.1d %c %-8.8s %8.1d "\
+"%-8.8s %15.6f %-8.8s")
+QMSG(179,"%.*s %-8.8s %1.1d %-8.8s %1.1d "\
+"%-6.6s %1.1d")
+QMSG(180,"VID    Cur_lib  Cur_slot C Target_1 Target_2 "\
+"Userid   Date            Target_3")
+QMSG(181,"------ -------- -------- - -------- -------- "\
+"-------- --------------- --------")
+ 
+/*************************************************************/
+/*  Msgs for the MOUNT   command and subcommands             */
+/*************************************************************/
+QMSG(182,"Volume locked read-only: %-6.6s")
+QMSG(183,"Operating system unknown: %-8.8s")
+QMSG(184,"Volume preallocated: %-6.6s")
+QMSG(185,"Volume being deleted: %-6.6s")
+QMSG(186,"Volume absent: %-6.6s")
+QMSG(187,"Volume held: %-6.6s")
+QMSG(188,"Volume unknown to TMS: %-6.6s")
+QMSG(189,"Volume not in %.*s: %-6.6s")
+QMSG(190,"Volume busy: %-6.6s")
+QMSG(191,"Volume mount not (yet) active: %-6.6s")
+QMSG(192,"Volume ring status changed: %-6.6s")
+QMSG(193,"%-6.6s %-8.8s %8.1d %-6.6s %-3.3s %8.8s %-8.8s "\
+"%8.1d %8.1d %1.1c")
+QMSG(194,"Attempting auto-move to library: %-8.8s")
+QMSG(195,"Volume is not of type '%.*s': %-6.6s")
+ 
+/*************************************************************/
+/*  Msgs for the CLEAN   command                             */
+/*************************************************************/
+QMSG(196,"Clean initiated for %1.1d volumes out of %1.1d "\
+"tried")
+ 
+/*************************************************************/
+/*  Msgs for the ENTER/ISSUE commands                        */
+/*************************************************************/
+QMSG(200,"Rejected: Unknown device type: Model %-6.6s "\
+"Max_den %-6.6s Length %d")
+QMSG(201,"Rejected: Invalid density: %-6.6s")
+QMSG(202,"Rejected: Invalid VSN range %-.6s-%-.6s")
+QMSG(203,"Rejected: VID not the same as VSN")
+QMSG(204,"Rejected: VID wraparound")
+QMSG(205,"Rejected: Only %d slots available for %d volumes")
+QMSG(206,"Rejected: %d VIDs in range already exist")
+QMSG(207,"Rejected: Invalid Account(%-8.8s) or "\
+"Userid(%-8.8s)")
+QMSG(208,"Rejected: Congested VID range - pick another!")
+QMSG(209,"Rejected: Ran out of slots with %d volumes to go")
+QMSG(210,"Rejected: Unexpectedly entered no volumes!!")
+QMSG(211,"Rejected: Insufficient supply of requested "\
+"device type")
+QMSG(212,"Rejected: Unknown allocation series: %-8.8s")
+QMSG(213,"Rejected: Limit of %d volumes exceeded")
+QMSG(214,"Rejected: Foreign batch not found: Model %.6s "\
+"Max_den %-6.6s Length %d")
+ 
+/*************************************************************/
+/*  Msgs for the TAG     command                             */
+/*************************************************************/
+QMSG(220,"%d")
+QMSG(221,"%.*s")
+ 
+/*************************************************************/
+/*  Msgs for the REMOVE and RETURN commands                  */
+/*************************************************************/
+QMSG(225,"Remove initiated for %1.1d volumes out of %1.1d "\
+"tried")
+QMSG(226,"Return initiated for %1.1d volumes out of %1.1d "\
+"tried")
+QMSG(227,"Volume is not absent: %6.6s")
+ 
+/*************************************************************/
+/*  Msgs for the DEVTYPE and QUERY DEVTYPES commands         */
+/*************************************************************/
+QMSG(230,"Unknown devtype: Model %-6.6s Max_den %d "\
+"Length %d")
+QMSG(231,"Duplicate devtype: Model %-6.6s Max_den %d "\
+"Length %d")
+QMSG(232,"Devtype in use: Model %-6.6s Max_den %d "\
+"Length %d")
+ 
+QMSG(233,"Model   Max_den   Length     Code Sort Group    "\
+"P Max_strp Strp_siz")
+QMSG(234,"------ -------- -------- -------- ---- -------- "\
+"- -------- --------")
+QMSG(235,"%6.6s %8.8s %8.1d %8.1d %4.4s %8.8s %c %8.1d %8.1d")
+QMSG(236,"%.*s : %.6s %8.8s %d")
+ 
+/*************************************************************/
+/*  Msgs for the SUPPLY  and QUERY SUPPLY   commands         */
+/*************************************************************/
+QMSG(240,"Supply order requested not found")
+QMSG(241,"Only %d volumes are still outstanding for this "\
+"supply order")
+QMSG(242,"Supply order already exists")
+ 
+QMSG(243,"Reqnum   Batchnum Model    Maxden   Length S "\
+"   Total     Left  Broken  Date")
+QMSG(244,"-------- -------- ------ -------- -------- - "\
+"-------- -------- -------- --------")
+QMSG(245,"%-8.8s %8.1d %-6.6s %8.8s %8.1d %c %8.1d %8.1d "\
+"%8.1d %8.8d")
+ 
+QMSG(246,"%.*s %d")
+QMSG(247,"%.*s %d %d")
+ 
+QMSG(248,"Reqnum   Batchnum Model    Maxden   Length S "\
+"   Total     Cost Userid   Manufact")
+QMSG(249,"%-8.8s %8.1d %-6.6s %8.8s %8.1d %c %8.1d %8.1d "\
+"%-8.8s %-8.*s")
+ 
+QMSG(250,"Supply batch %d not found")
+QMSG(251,"Batch %d is not in supply")
+QMSG(252,"Batch %d is not HELD")
+QMSG(253,"Supply batch only has %d volumes left")
+QMSG(254,"Supply batch only has %d broken volumes")
+QMSG(255,"Batch %d is in use")
+ 
+QMSG(258,"Density value must not be greater than MaxDensity")
+ 
+ 
+QMSG(260,"Volume %-6.6s not Free or Held")
+QMSG(261," Volume %-6.6s")
+QMSG(262,"Transfer from %-8.8s to %-8.8s and account "\
+"unchanged")
+QMSG(263,"Non existant new group: %-8.8s Account %-8.8s "\
+"Volume %-6.6s")
+QMSG(264,"No matching volumes found belonging to %-8.8s")
+QMSG(265,"Permission Denied: Operand %.*s")
+ 
+/*************************************************************/
+/*  Msgs for the QUERY CONTENTS command.                     */
+/*************************************************************/
+QMSG(270,"Empty library: %-8.8s")
+QMSG(271,"Library      Slot Type VID    Model  Owner    "\
+"Account  S")
+QMSG(272,"-------- -------- ---- ------ ------ -------- "\
+"-------- -")
+QMSG(273,"%-8.8s %8.1d Home %-6.6s %-6.6s %-8.8s %-8.8s %c")
+QMSG(274,"%-8.8s %8.1d Move %-6.6s %-6.6s %-8.8s %-8.8s %c")
+QMSG(275,"%.*s %-6.6s %8.1d")
+QMSG(276,"No volumes found in given slot range")
+QMSG(277,"Slots for library %-8.8s between %8.1d and %8.1d")
+ 
+/*************************************************************/
+/*  Msgs for the OPSYSTEM and QUERY OPSYSTEM commands        */
+/*************************************************************/
+QMSG(280,"Unknown Operating system: %-8.8s")
+QMSG(281,"Duplicate Operating system: %-8.8s")
+QMSG(282,"System   Generic  Userid   SysType  Enq Scr "\
+"Location")
+QMSG(283,"-------- -------- -------- -------- --- --- "\
+"------------------------------")
+QMSG(284,"%-8.8s %-8.8s %-8.8s %-8.8s  %c   %c  %.*s")
+QMSG(285,"%.*s %.8s %.8s")
+QMSG(286,"Requests outstanding from system %-8.8s")
+QMSG(287,"Require location identifier")
+ 
+/*************************************************************/
+/*  Messages for the LOGICAL family of commands              */
+/*************************************************************/
+QMSG(290,"Library not logical: %-8.8s")
+QMSG(291,"Duplicate cartridge: %-8.8s")
+QMSG(292,"Unknown cartridge: %-8.8s")
+QMSG(293,"Stripe range invalid: %1.1d-%1.1d")
+QMSG(294,"Stripe(s) in use: %-8.8s %1.1d-%1.1d")
+ 
+QMSG(295,"Cart     VID    Stripe_1 Stripe_2 Last_written    "\
+"S Userid   Account  Library")
+QMSG(296,"-------- ------ -------- -------- --------------- "\
+"- -------- -------- --------")
+QMSG(297,"%-8.8s %-6.6s %8.1d %8.1d %15.6f "\
+"%c %-8.8s %-8.8s %-8.8s")
+QMSG(298,"%.*s %-6.6s")
+ 
+QMSG(299,"Cart     Model  Volumes  Userid   Account  "\
+"Library      Slot Group")
+QMSG(300,"-------- ------ -------- -------- -------- "\
+"-------- -------- --------")
+QMSG(301,"%-8.8s %-6.6s %8.1d %-8.8s %-8.8s "\
+"%-8.8s %8.1d %-8.8s")
+QMSG(302,"%.*s %-8.8s %-8.8s")
+ 
+/*************************************************************/
+/* For the QVOL command                                     */
+/*************************************************************/
+QMSG(310,"%-6.6s Volume Not Known. %25.1c")
+QMSG(311,"%-6.6s %-8.8s %8.8ld %-6.6s %8.8s %1.1c %1.1c "\
+"%1.1c %1.1c %1.1c %1.1c %8.8s %5.5ld %5.5ld %-3.3s")
+QMSG(313,"Unknown Generic Operating System: %-8.8s")
+QMSG(314,"Unknown Operating System: %-8.8s")
+QMSG(315,"Volume unmountable")
+QMSG(316,"Ignoring option: %-8.8s")
+ 
+/*************************************************************/
+/* For the ALLOCATE command                                 */
+/*************************************************************/
+QMSG(320,"Can not allocate zero tapes.")
+QMSG(321,"Allocated %d tape%sof device code %d")
+QMSG(322,"Allocated %d tape%sfrom batch %d.")
+ 
+/*************************************************************/
+/* For the Transparent Tape Staging Interface.              */
+/*************************************************************/
+QMSG(330,"rc = %d  from TMSPURGE of vid: %6.6s")
+QMSG(331,"Error flushing tape in Transparent Tape Stager. "\
+"Probable stage out pending.")
+QMSG(400,"Exchange initiated for vid: %6.6s")
+ 
+/*************************************************************/
+/*  Msgs for the CZAR/MANAGER command                        */
+/*************************************************************/
+QMSG(1076,"Czar/Account/Node not found")
+QMSG(1077,"Czar/Account/Node already exists")
+QMSG(1078,"%-9.8s")        /* Not used */
+QMSG(1079,"%.*s %-8.8s %-8.8s %-8.8s")
+QMSG(1080,"%.*s %-8.8s %-8.8s")
+QMSG(1081,"%.*s %-8.8s")
+QMSG(1121,"Unknown Czar   : %-.8s")
+QMSG(1122,"Unknown Account: %-.8s")
+QMSG(1125,"Manager  Account  Node     Set")
+QMSG(1126,"-------- -------- -------- ---")
+QMSG(1127,"%-8.8s %-8.8s %-8.8s  %c")
+QMSG(1128,"%.*s")
+QMSG(1129,"%.*s %-8.8s %-8.8s")
+QMSG(1130,"TMS authorization granted to %-8.8s for "\
+"account %-8.8s node %-8.8s")
+QMSG(1131,"TMS authorization revoked from %-8.8s for "\
+"account %-8.8s node %-8.8s")
+QMSG(1140,"Permission Denied: Account %-8.8s Node %-8.8s")
+ 
+/*************************************************************/
+/*  Msgs for the Frequently Used Commands algorithm          */
+/*************************************************************/
+QMSG(1200,"**** Vector initialisation failure")
+QMSG(1205,"Command    Location    Count MilliSec   "\
+"    Next Previous   Syntax")
+QMSG(1206,"--------   -------- -------- --------   "\
+"-------- -------- --------")
+QMSG(1207,"%-8.8s   %8x %8lu %8lu   %8x %8x %8x")
+QMSG(1208,"%-8.8s %6lu")
+QMSG(1210,"%.*s %-8.8s")
+ 
+/*************************************************************/
+/*  Message for the QUERY FREE1ST SUBCOMMAND                 */
+/*************************************************************/
+QMSG(2001,"First free slot: %d")
+ 
+/*************************************************************/
+/*  Msgs for the FLUSH SYSTEM command                        */
+/*************************************************************/
+QMSG(2010,"All MOUNT requests flushed")
+QMSG(2011,"No MOUNT requests found")
+ 
+/*************************************************************/
+/*  Msgs for the extended AUTHUSER command                   */
+/*************************************************************/
+QMSG(2076,"%-8.8s")
+QMSG(2077,"%-8.8s by %-8.8s")
+QMSG(2078,"%-8.8s AT %-8.8s")
+QMSG(2079,"%.*s %-8.8s %-8.8s")
+QMSG(2080,"%.*s FROM %-8.8s")
+ 
+/*************************************************************/
+/*  Msgs for the extended QUERY COMMAND command              */
+/*************************************************************/
+QMSG(2090,"General commands for %-8.8s at %-8.8s")
+QMSG(2091,"All possible commands for %-8.8s at %-8.8s")
+QMSG(2092,"Authorised commands for %-8.8s at %-8.8s")
+QMSG(2095,"------- -------- --- -------- -- --------")
+QMSG(2096,"--- -------- -------- --- -------- -- --------")
+QMSG(2097,"---------- -------- --- -------- -- --------")
+QMSG(2100,"General command %-8.8s not found")
+QMSG(2101,"Command %-8.8s not found")
+QMSG(2102,"Authorised command %-8.8s not found")
+ 
+/*************************************************************/
+/*  Msgs for the extended QUERY LIBRARY command              */
+/*************************************************************/
+QMSG(2125,"Library  Czar     Group    Slots    Spare    "\
+"Location")
+QMSG(2126,"-------- -------- -------- -------- -------- "\
+"------------------------------")
+QMSG(2127,"%-8.8s %-8.8s %-8.8s %8.1ld %8.1ld %.*s")
+QMSG(2129,"%.*s %-8.8s %-8.8s ( LOCID")
+ 
+/*************************************************************/
+/*  Msgs for the extended unit address field in MOUNT        */
+/*************************************************************/
+QMSG(2175,"%c %c %-8.8s %8.8s %-8.8s %-8.8s %-8.8s "\
+"%15.6f %-8.8s")
+QMSG(2178,"%-6.6s %-8.8s %8.1d %c %-8.8s %8.8s "\
+"%-8.8s %15.6f %-8.8s")
+ 
+/*************************************************************/
+/*  Msgs for the extended checking in the MOUNT command      */
+/*************************************************************/
+QMSG(2190," Volume in use on this system: %6.6s")
+QMSG(2193," Request for volume %6.6s creates deadlock")
+ 
+/*************************************************************/
+/*  Msgs for the GENERIC and QUERY GENERIC commands          */
+/*************************************************************/
+QMSG(2200,"No Generic type for model %-6.6s library %-8.8s "\
+"density %d system %-8.8s")
+QMSG(2201,"Generic type for model %-6.6s library %-8.8s "\
+"density %d system %-8.8s already exists")
+QMSG(2202,"Model  Library  Density  SysType  Name  ")
+QMSG(2203,"------ -------- -------- -------- ------")
+QMSG(2204,"%-6.6s %-8.8s %8.8s %-8.8s %-6.6s")
+QMSG(2205,"%.*s %-6.6s %-8.8s %8.8s %-8.8s")
+ 
+/*************************************************************/
+/*  Msgs for the FINDVIDS command                            */
+/*************************************************************/
+QMSG(2210,"FINDVIDS USERID %-8.8s VID %-6.6s TEXT   "\
+"LIKE %.*s")
+QMSG(2211,"FINDVIDS USERID %-8.8s VID %-6.6s BINARY "\
+"LIKE %.*s")
+QMSG(2212,"FINDVIDS USERID %-8.8s VID %-6.6s VOLINFO "\
+"LIKE %.*s")
+QMSG(2213,"FINDVIDS LIBRARY %-8.8s VID %-6.6s TEXT   "\
+"LIKE %.*s")
+QMSG(2214,"FINDVIDS LIBRARY %-8.8s VID %-6.6s BINARY "\
+"LIKE %.*s")
+QMSG(2215,"FINDVIDS LIBRARY %-8.8s VID %-6.6s VOLINFO "\
+"LIKE %.*s")
+QMSG(2216,"%-6.6s %.*s")
+ 
+/*************************************************************/
+/*  Msgs for the UPDATE command                              */
+/*************************************************************/
+QMSG(2400,"No new label information given")
+QMSG(2401,"Label for VID %-6.6s: Type=%-3.3s;  VSN=%-6.6s;  "\
+"Density=%8.8s")
+ 
+/*************************************************************/
+/*  Msgs for the DENSITY mapping command                     */
+/*************************************************************/
+QMSG(2500,"Model  Density  Code     P")
+QMSG(2501,"------ -------- -------- -")
+QMSG(2502,"%-6.6s %-8.8s %8.d %c")
+QMSG(2503,"%.*s %-6.6s %-8.8s %8.d")
+QMSG(2504,"Cannot update Primary Key Field")
+QMSG(2505,"Mapping already exists")
+QMSG(2506,"Mapping does not exist")
+QMSG(2507,"Density %8.8s invalid for model %6.6s")
+QMSG(2510,"Cannot delete Primary Entry")
+QMSG(2511,"Cannot update code for Primary Entry")
+ 
+/*************************************************************/
+/*  Msgs for the LOCATION mapping command                    */
+/*                                                           */
+/*  Warning --> Location command relies on 2505 & 2506 above */
+/*************************************************************/
+QMSG(2520,"Code   Location Description")
+QMSG(2521,"------ ------------------------------")
+QMSG(2522,"%-6.d %.*s")
+QMSG(2523,"%.*s %-6.d")
+ 
+/*************************************************************/
+/*  Msgs for the extended FEATURE QUERY ALERTEE command      */
+/*************************************************************/
+QMSG(9068,"%-8.8s at %-8.8s")
+QMSG(9069,"%.*s %-8.8s AT %-8.8s")
+ 
+/*************************************************************/
+/*  Msgs for general Code debugging facilities               */
+/*************************************************************/
+QMSG(9900,"SQL Debug: %-8.8s  ->  %8.8x.%8.8x")
+QMSG(9910,"PDate: %8.8d")
+QMSG(9911,"PTime: %8.8d")
+QMSG(9912,"DateTime: %f")
+QMSG(9920,"Sqlcode: %d")
+QMSG(9921,"__%s.%d")
+QMSG(9922,"R%d code %d")
+ 
+#endif
+ 
+/* UPDATES APPLIED AT 09:36:29 ON 12 AUG 1993
+UNITADDR * T. Cass      22 Mar 91 * Store MOUNT unit addr as char strin
+*         APPLMESG UNITADDR D1 REL191  06/07/93   14:20:05
+VOLINFO  * M. Ellerker   7 Jul 93 * Find Volinfo for user/lib
+*         APPLMESG VOLINFO  D1 REL191  07/07/93   14:18:15
+REORG10  * M. Ellerker  23 Jul 93 * Only allow GENERIC OR SYSTEM
+*         APPLMESG REORG10  D1 REL191  08/06/93   14:30:20
+DENMAP   * M. Ellerker   6 Aug 93 * Forgot this one !
+*         APPLMESG DENMAP   D1 REL191  08/06/93   17:28:17
+*/
+\end{verbatim}
+
+\Filename{H1fatmenappendix-summary-fatmen-system}
+\chapter{Summary of the FATMEN system}
+
+\begin{Tabhere}
+\caption{FATMEN command line interface}
+\begin{center}
+\begin{tabular}{|>{\tt}p{5cm}r|>{\tt}p{5cm}r|}
+\hline
+\rm\bf Command           & \bf page                &
+\rm\bf Command           & \bf page                \\
+\hline
+ALLOCATE                 & \pageref{ALLOCATE}      &
+ADDDISK                  & \pageref{ADDDISK}       \\
+ADDTAPE                  & \pageref{ADDTAPE}       &
+CD                       & \pageref{CD}            \\
+CLR                      & \pageref{CLR}           &
+CP                       & \pageref{CP}            \\
+COPY                     & \pageref{COPY}          &
+DIR                      & \pageref{DIR}           \\
+DUMP                     & \pageref{DUMP}          &
+END                      & \pageref{END}           \\
+EXIT                     & \pageref{EXIT}          &
+EXTRACT                  & \pageref{EXTRACT}       \\
+FC                       & \pageref{FC}            &
+FIND                     & \pageref{FIND}          \\
+GIME                     & \pageref{GIME}          &
+INIT                     & \pageref{INIT}          \\
+LD                       & \pageref{LD}            &
+LOCK                     & \pageref{LOCK}          \\
+LOGLEVEL                 & \pageref{LOGLEVEL}      &
+LS                       & \pageref{LS}            \\
+MAKE                     & \pageref{MAKE}          &
+MEDIA                    & \pageref{MEDIA}         \\
+MKDIR                    & \pageref{MKDIR}         &
+MODIFY                   & \pageref{MODIFY}        \\
+                         &                         &
+MV                       & \pageref{MV}            \\
+PWD                      & \pageref{PWD}           &
+QUIT                     & \pageref{QUIT}          \\
+RM                       & \pageref{RM}            &
+RMDIR                    & \pageref{RMDIR}         \\
+RMTREE                   & \pageref{RMTREE}        &
+SEARCH                   & \pageref{SEARCH}        \\
+TAG                      & \pageref{TAG}           &
+TOUCH                    & \pageref{TOUCH}         \\
+TREE                     & \pageref{TREE}          &
+UNLOCK                   & \pageref{UNLOCK}        \\
+UPDATE                   & \pageref{UPDATE}        &
+VERSION                  & \pageref{VERSION}       \\
+VIEW                     & \pageref{VIEW}          &
+ZOOM                     & \pageref{ZOOM}          \\
+SET/COPYLEVEL            & \pageref{SETCOPYLEVEL}  &
+SET/MEDIATYPE            & \pageref{SETMEDIATYPE}  \\
+SET/LOCATION             & \pageref{SETLOCATION}   &
+SET/USERWORDS            & \pageref{SETUSERWORDS}  \\
+SET/DATAREP              & \pageref{SETDATAREP}    &
+SET/SOURCE               & \pageref{SETSOURCE}     \\
+SET/DESTINATION          & \pageref{SETDESTINATION}& 
+SHOW/SOURCE              & \pageref{SHOWSOURCE}    \\
+SHOW/DESTINATION         & \pageref{SHOWDESTINATION}& 
+SHOW/DATAREP             & \pageref{SHOWDATAREP}   \\
+SHOW/COPYLEVEL           & \pageref{SHOWCOPYLEVEL} &
+SHOW/LOCATION            & \pageref{SHOWLOCATION}  \\
+SHOW/MEDIATYPE           & \pageref{SHOWMEDIATYPE} &
+SHOW/USERWORDS           & \pageref{SHOWUSERWORDS} \\
+\hline
+\end{tabular}
+\end{center}
+\end{Tabhere}
+\clearpage
+
+\extrarowheight0pt
+\begin{longtable}{|p{.9\linewidth}r|} 
+\caption{FATMEN Routine calling sequences}                 \\
+\hline
+ \bf Function                           &                  \\
+ \quad\bf Description                   & \bf page         \\
+\hline
+\endfirsthead
+\caption[]{FATMEN Routine calling sequences (cont.)}       \\
+\hline
+ \bf Function                           &                  \\
+ \quad\bf Description                   & \bf page         \\
+\hline
+\endhead
+\hline
+\endfoot
+Initialise FATMEN system & \\
+  \quad\small\tt CALL FMSTRT(LUNRZ,LUNFZ,CHFAT,IRC*) & \pageref{FMSTRT} \\
+Access a dataset & \\
+  \quad\small\tt CALL FMFILE(LUN,GENAM,CHOPT,IRC*) & \pageref{FMFILE} \\
+Deaccess a dataset & \\
+  \quad\small\tt CALL FMFEND(LUN,GENAM,CHOPT,IRC*) & \pageref{FMFEND} \\
+Add a tape file & \\
+  \quad\small\tt CALL FMADDT(argument-list) & \pageref{FMADDT} \\
+Add a disk file & \\
+  \quad\small\tt CALL FMADDD(argument-list) & \pageref{FMADDD} \\
+Return information on FATMEN entry & \\
+  \quad\small\tt CALL FMPEEK(GENAM,IVECT,CHOPT,IRC*) & \pageref{FMPEEK} \\
+Add entry to catalogue & \\
+  \quad\small\tt CALL FMPOKE(GENAM,IVECT,CHOPT,IRC*) & \pageref{FMPOKE} \\
+Initialise FATMEN system & \\
+  \quad\small\tt CALL FMINIT(IXSTOR*,LUNRZ,LUNFZ,DBNAME,IRC*) & \pageref{FMINIT} \\
+Terminate FATMEN package & \\
+  \quad\small\tt CALL FMEND(IRC*) & \pageref{FMEND} \\
+Set logging level of FATMEN package & \\
+  \quad\small\tt CALL FMLOGL(LEVEL) & \pageref{FMLOGL} \\
+Control updating mode & \\
+  \quad\small\tt CALL FMUPDT(MAX,NGROUP,IFLAG,IRC*) & \pageref{FMUPDT} \\
+Purge old entries from catalogue & \\
+  \quad\small\tt CALL FMPURG(PATH,KEYSEL,MAXSIZ,MINACC,MAXDAYS,MINCPS,LUNPUR,CHOPT,IRC*) & \pageref{FMPURG} \\
+Get information on named file & \\
+  \quad\small\tt CALL FMGET(GENAM,LBANK*,KEYS*,IRC*) & \pageref{FMGET} \\
+Get information on named file with key selection & \\
+  \quad\small\tt CALL FMGETK(GENAM,LBANK*,*KEYS*,IRC*) & \pageref{FMGETK} \\
+Add entry to FATMEN catalogue & \\
+  \quad\small\tt CALL FMPUT(GENAM,LBANK,IRC*) & \pageref{FMPUT} \\
+Modify existing entry & \\
+  \quad\small\tt CALL FMMOD(GENAM,LBANK,IFLAG,IRC*) & \pageref{FMMOD} \\
+Create a new FATMEN bank & \\
+  \quad\small\tt CALL FMBOOK(GENAM,KEYS*,LADDR*,*LSUP*,JBIAS,IRC*) & \pageref{FMBOOK} \\
+Remove entry from FATMEN catalogue & \\
+  \quad\small\tt CALL FMRM(GENAM,LBANK*,KEYS,IRC*) & \pageref{FMRM} \\
+Make directory & \\
+  \quad\small\tt CALL FMKDIR(CHDIR,IRC*) & \pageref{FMKDIR} \\
+Set contents of FATMEN bank & \\
+  \quad\small\tt CALL FMFILL(GENAM,*LBANK*,*KEYS*,CHOPT,IRC*) & \pageref{FMFILL} \\
+Insert character data into FATMEN bank & \\
+  \quad\small\tt CALL FMPUTC(LBANK,STRING,ISTART,NCH,IRC*) & \pageref{FMPUTC} \\
+Read character data from FATMEN bank & \\
+  \quad\small\tt CALL FMGETC(LBANK,STRING*,ISTART,NCH,IRC*) & \pageref{FMGETC} \\
+Insert integer vector into FATMEN bank & \\
+  \quad\small\tt CALL FMPUTV(LBANK,IVECT,ISTART,NWORDS,IRC*) & \pageref{FMPUTV} \\
+Read integer vector from FATMEN bank & \\
+  \quad\small\tt CALL FMGETV(LBANK,IVECT*,ISTART,NWORDS,IRC*) & \pageref{FMGETV} \\
+Insert integer value into FATMEN bank & \\
+  \quad\small\tt CALL FMPUTI(LBANK,IVAL,IOFF,IRC*) & \pageref{FMPUTI} \\
+Read integer value from FATMEN bank & \\
+  \quad\small\tt CALL FMGETI(LBANK,IVAL*,IOFF,IRC*) & \pageref{FMGETI} \\
+Find existing dataset and associate with logical unit & \\
+  \quad\small\tt CALL FMFIND(GENAM,DDNAME,*LBANK*,IRC*) & \pageref{FMFIND} \\
+Create new dataset & \\
+  \quad\small\tt CALL FMMAKE(GENAM,DDNAME,*LBANK*,IRC*) & \pageref{FMMAKE} \\
+Open a dataset for read or write & \\
+  \quad\small\tt CALL FMOPEN(GENAM,DDNAME,*LBANK*,CHOPT,IRC*) & \pageref{FMOPEN} \\
+Close file opened via FATMEN & \\
+  \quad\small\tt CALL FMCLOS(GENAM,DDNAME,LBANK,CHOPT,IRC*) & \pageref{FMCLOS} \\
+Copy a dataset and update the FATMEN catalogue & \\
+  \quad\small\tt CALL FMCOPY(GN1,*LBANK1*,*KEYS1*,GN2,*LBANK2*,*KEYS2*,CHOPT,IRC*) & \pageref{FMCOPY} \\
+Check whether generic name already exists & \\
+  \quad\small\tt CALL FMEXST(GENAM,IRC*) & \pageref{FMEXST} \\
+List files in specified directory & \\
+  \quad\small\tt CALL FMLS(GENAM,CHOPT,IRC*) & \pageref{FMLS} \\
+Display contents of FATMEN bank & \\
+  \quad\small\tt CALL FMSHOW(GENAM,*LBANK*,*KEYS*,CHOPT,IRC*) & \pageref{FMSHOW} \\
+Count file names & \\
+  \quad\small\tt CALL FMFILC(GENAM,NFILES*,IRC*) & \pageref{FMFILC} \\
+Scan FATMEN directory structure & \\
+  \quad\small\tt CALL FMSCAN(PATH,NLEVEL,UROUT,IRC*) & \pageref{FMSCAN} \\
+Loop through FATMEN file names & \\
+  \quad\small\tt CALL FMLOOP(GENAM,UROUT,IRC*) & \pageref{FMLOOP} \\
+Return directory names in directory structure & \\
+  \quad\small\tt CALL FMLDIR(PATH,DIRS*,NFOUND,MAXDIR,*ICONT*,IRC*) & \pageref{FMLDIR} \\
+Return file names in directory structure & \\
+  \quad\small\tt CALL FMLFIL(GENAM,FILES*,KEYS*,NFOUND,MAXFIL,JCONT,IRC*) & \pageref{FMLFIL} \\
+Sort file names and keys & \\
+  \quad\small\tt CALL FMSORT(FILES,KEYS,NFILES,JSORT*,IRC*) & \pageref{FMSORT} \\
+Match file name against pattern & \\
+  \quad\small\tt CALL FMATCH(CHFILE,MATCH,IRC*) & \pageref{FMATCH} \\
+Match multiple names against pattern & \\
+  \quad\small\tt CALL FMMANY(MATCH,FILES,NFILES,NMATCH*,IRC*) & \pageref{FMMANY} \\
+Print contents of FATMEN keys vector & \\
+  \quad\small\tt CALL FMPKEY(KEYS,NKEYS) & \pageref{FMPKEY} \\
+Select files using the FATMEN keys & \\
+  \quad\small\tt CALL FMSELK(GENAM,INKEYS,OUKEYS*,NKEYS*,MAXKEY,IRC*) & \pageref{FMSELK} \\
+Select files using the FATMEN bank information & \\
+  \quad\small\tt CALL FMSELB(GENAM,INKEYS,NKEYS,UEXIT,ISEL*,IRC*) & \pageref{FMSELB} \\
+Select files using keys matrix & \\
+  \quad\small\tt CALL FMSELM(GENAM,LBANK*,KEYS*,KEYM,NKEY,CHOPT,IRC*) & \pageref{FMSELM} \\
+Compare FATMEN entries & \\
+  \quad\small\tt CALL FMCOMP(GENAM1,*LBANK1*,*KEYS1*,GENAM2,*LBANK2*,*KEYS2*,IRC*) & \pageref{FMCOMP} \\
+Print user words and comment & \\
+  \quad\small\tt CALL FMUPRT(GENAM,LBANK,KEYS,IUSER,COMM,IRC*) & \pageref{FMUPRT} \\
+User selection & \\
+  \quad\small\tt CALL FMUSEL(GENAM,LBANK,KEYS,IRC*) & \pageref{FMUSEL} \\
+Allocate new piece of media & \\
+  \quad\small\tt CALL FMALLO(MEDIA,DENS,COMPACT,LIB,POOL,LBANK,CHOPT,VSN*,VID*,IRC*) & \pageref{FMALLO} \\
+Move volumes between TMS pools & \\
+  \quad\small\tt CALL FMPOOL(GENAM,LBANK,KEYS,CHPOOL,CHOPT,IRC) & \pageref{FMPOOL} \\
+Obtain volume characteristics & \\
+  \quad\small\tt CALL FMQVOL(GENAM,LBANK,KEYS,LIB*,MODEL*,DENS*,MNTTYP*,LABTYP*,IRC*) & \pageref{FMQVOL} \\
+Obtain media information & \\
+  \quad\small\tt CALL FMQMED(GENAM,*LBANK*,*KEYS*,IMEDIA*,IROBOT*,IRC*) & \pageref{FMQMED} \\
+Set default media information & \\
+  \quad\small\tt CALL FMEDIA(MFMMED,MFMTYP,MFMGEN,MFMSIZ,MFMDEN,MFMMNT,MFMLAB,NMEDIA,IRC*) & \pageref{FMEDIA} \\
+Get, Set or Delete TMS Tags & \\
+  \quad\small\tt CALL FMTAGS(GENAM,*LBANK*,*KEYS*,*CHTAG*,CHOPT,IRC*) & \pageref{FMTAGS} \\
+Declare location codes to FATMEN & \\
+  \quad\small\tt CALL FMSETL(LOC,NLOC,IRC*) & \pageref{FMSETL} \\
+Declare media types to FATMEN & \\
+  \quad\small\tt CALL FMSETM(MTP,NMTP,IRC*) & \pageref{FMSETM} \\
+Declare copy levels to FATMEN & \\
+  \quad\small\tt CALL FMSETC(CPL,NCPL,IRC*) & \pageref{FMSETC} \\
+Declare selection matrix and options to FATMEN & \\
+  \quad\small\tt CALL FMSETK(KEYM,NK,CHOPT,IRC*) & \pageref{FMSETK} \\
+Modify user words & \\
+  \quad\small\tt CALL FMMODU(PATH,UFORM,UVECT,UCOMM,CHOPT,IRC*) & \pageref{FMMODU} \\
+Declare logical units to FATMEN & \\
+  \quad\small\tt CALL FMSETU(LUN,NLUN,IRC*) & \pageref{FMSETU} \\
+Get a free logical unit & \\
+  \quad\small\tt CALL FMGLUN(LUN*,IRC*) & \pageref{FMGLUN} \\
+Free a logical unit & \\
+  \quad\small\tt CALL FMFLUN(LUN*,IRC*) & \pageref{FMFLUN} \\
+Verify bank contents & \\
+  \quad\small\tt CALL FMVERI(GENAM,LBANK,KEYS,CHOPT,IRC*) & \pageref{FMVERI} \\
+Pack date and time. & \\
+  \quad\small\tt CALL FMPKTM(IDATE,ITIME,IPACK*,IRC*) & \pageref{FMPKTM} \\
+Unpack date and time. & \\
+  \quad\small\tt CALL FMUPTM(IDATE*,ITIME*,IPACK,IRC*) & \pageref{FMUPTM} \\
+Pack date and time for VAX format. & \\
+  \quad\small\tt CALL FMPKVX(CHDATE,IDATE,ITIME,IPACK*,IRC*) & \pageref{FMPKVX} \\
+Unpack date and time for VAX format. & \\
+  \quad\small\tt CALL FMUPVX(CHDATE*,IDATE*,ITIME*,IPACK,IRC*) & \pageref{FMUPVX} \\
+Return file names in specified directory & \\
+  \quad\small\tt CALL FMFNMS(PATH,FILES*,KEYS*,NKEYS*,MAXKEY,IRC*) & \pageref{FMFNMS} \\
+Return file names in directory structure & \\
+  \quad\small\tt CALL FMLIST(PATH,FILES*,KEYS*,NFOUND,MAXFIL,IRC*) & \pageref{FMLIST} \\
+Obtain names of subdirectories in specified tree & \\
+  \quad\small\tt CALL FMTREE(PATH,SUBDIR*,NLEVEL,NFOUND*,MAXDIR,IRC*) & \pageref{FMTREE} \\
+User routine to allocate new piece of media & \\
+  \quad\small\tt CALL FUALLO(MEDIA,VSN*,VID*,IRC*) & \pageref{FUALLO} \\
+Create a new FATMEN bank & \\
+  \quad\small\tt CALL FMLIFT(GENAM,KEYS*,MEDIA,CHOPT,IRC*) & \pageref{FMLIFT} \\
+Get the address of a FATMEN bank & \\
+  \quad\small\tt CALL FMLINK(GENAM,LBANK*,CHOPT,IRC*) & \pageref{FMLINK} \\
+Obtain volume characteristics & \\
+  \quad\small\tt CALL FMQTMS(VID,LIB*,MODEL*,DENS*,MNTTYP*,LABTYP*,IRC*) & \pageref{FMQTMS} \\
+\end{longtable}
+ 
+\clearpage
+
+\label{BANK-OFFSETS}
+\extrarowheight2pt
+%\arraycolsep3pt
+\newlength{\Tonecol}
+\setlength{\Tonecol}{\linewidth}
+\addtolength{\Tonecol}{-\arraycolsep}
+\addtolength{\Tonecol}{-\arrayrulewidth}
+\newlength{\myla}\settowidth{\myla}{\bf Date and timexx}
+\newlength{\mylb}\setlength{\mylb}{\linewidth}
+\addtolength{\mylb}{-\myla}
+\addtolength{\mylb}{-.21\linewidth}
+\addtolength{\mylb}{-6\arraycolsep}
+\addtolength{\mylb}{-4\arrayrulewidth}
+\begin{longtable}{|p{\myla}|>{\tt}p{.21\linewidth}|p{\mylb}|}
+\caption{Bank offsets and datatypes}                                     \\ 
+\hline
+\multicolumn{1}{|c}{\bf Function}    &
+\multicolumn{1}{c}{\bf Data type}   &
+\multicolumn{1}{c|}{\bf Description}                                     \\
+\hline
+\endfirsthead
+\caption[]{Bank offsets and datatypes (cont.)}                           \\
+\hline
+\multicolumn{1}{|c}{\bf Function}    &
+\multicolumn{1}{c}{\bf Data type}   &
+\multicolumn{1}{c|}{\bf Description}                                     \\
+\hline
+\endhead
+\hline
+\endfoot
+\bf Key Definitions               &
+\tt MKSRFA (I*4)                  &
+An integer assigned by the FATMEN system to permit differentiation between
+entries with the same generic name.
+It is not normally specified by the user, unless a particular entry is
+required, e.g. in an {\tt RM} command.                                    \\
+\cline{2-3}
+& \tt MKFNFA (H*20)              &
+The part of the generic name following the last slash, such as
+{\tt RUN123} in the name {\tt //CERN/DELPHI/TEST/RUN123}                  \\
+\cline{2-3}
+& \tt MKCLFA (I*4)               &
+The 'copy level', where 0=original, 1=copy, 2=copy of a copy etc.
+Some experiments prefer to use the copy level to indicate the data
+representation of the data pointed to by that entry, where {\tt 1=IEEE},
+{\tt 2=IBM}, {\tt 3=VAX}, {\tt 4=byte-swapped IEEE} (e.g. DECstation),
+{\tt 5=CRAY} \\
+\cline{2-3}
+& \tt MKLCFA (I*4)               &
+The location code, which is used to find the nearest or most
+suitable copy of a dataset. The location code corresponds to a site or LAN,
+because it is only at this level that a meaningful choice can be made.
+Thus it is only a first level selection, to filter out all
+opies at a given location, such as CERN, RAL etc.                         \\
+\cline{2-3}
+& \tt MKMTFA (I*4)               &
+The type of medium on which the dataset resides. \newline
+{\tt 1=DISK, 2=3480, 3=3420, 4=8200 (Exabyte)}.                           \\
+\hline
+\bf Generic file description    &
+\tt MFQNFA (H*256)$^{*+}$         &
+This points to the fully qualified dataset name that the file has on
+disk or tape. For VM files, the file name should be encoded in the
+form {\tt <user.addr>fn.ft} where {\tt addr}, if omitted, defaults to 191.\\
+\cline{2-3}
+& \tt MHSNFA (H*8)$^{*+}$        &
+The host on which the file resides, or through which it is accessed,
+in the case of a tape file.                                               \\
+\cline{2-3}
+& \tt MCPLFA (I*4)$^{*+}$        &
+The 'copy level', where 0=original, 1=copy, 2=copy of a copy etc.         \\
+\cline{2-3}
+& \tt MLOCFA (I*4)$^{*+}$        &
+The location code, which is used to find the nearest or most
+suitable copy of a dataset.The location code corresponds to a site or LAN,
+because it is only at this level that a meaningful choice can be made.
+Thus it is only a first level selection, to filter out all
+copies at a given location, such as CERN, RAL etc.                        \\
+\cline{2-3}
+& \tt MMTPFA (I*4)$^{*+}$        &
+The type of medium on which the dataset resides. \newline
+{\tt 1=DISK, 2=3480, 3=3420, 4=8200 (Exabyte)}.                           \\
+\hline
+\bf Disk description             &
+\tt MHSTFA (H*16)$^+$            &
+The host type, e.g. IBM 3090.
+This field is filled in by the FATMEN system.                             \\
+\cline{2-3}
+& \tt MHOSFA (H*12)$^+$          &
+The host operating system, such as {\tt VM/XA CMS 5.5.}
+This field is filled in by the FATMEN system.                             \\
+\hline
+\bf Tape description             &
+\tt MVSNFA (H*8)$^*$             &
+The {\bf volume serial number} or magnetically recorded label on the tape.\\
+%\cline{2-3}
+& \tt MVIDFA (H*8)$^*$           &
+The {\bf visual identifier} or contents of the sticky label on the tape.  \\
+\cline{2-3}
+& \tt MVIPFA (I*4)               &
+The VID prefix - internal representation.                                 \\
+\cline{2-3}
+& \tt MDENFA (I*4)$^+$           &
+The density of the medium, such as 6250, 38000.
+Normally, such details are retained by the Tape Management System.        \\
+\cline{2-3}
+& \tt MVSQFA (I*4)$^+$           &
+The volume sequence number, only used for multi-volume files.
+(Not yet supported).                                                      \\
+\cline{2-3}
+& \tt MFSQFA (I*4)$^*$           &
+The file sequence number, for multi-file tapes.                           \\
+\hline
+\bf File description\footnotemark[1]
+                                 &
+\tt MSRDFA (I*4)                 & The start record in the file.          \\
+\cline{2-3}
+& \tt MERDFA (I*4)               & The end record in the file.            \\
+\cline{2-3}
+& \tt MSBLFA (I*4)               & The start block in the file.           \\
+\cline{2-3}
+& \tt MEBLFA (I*4)               & The end block in the file.             \\
+\hline
+\bf Logical description           &
+\tt MFLFFA (H*4)$^{*+}$          &
+The FATMEN defined file format.
+The following definitions are recognised by the FATMEN system:
+\begin{DLtt}{MMMM}
+\item[FA]ZEBRA ASCII
+\item[FZ]ZEBRA native
+\item[FXN]ZEBRA native, exchange file format
+\item[FX]ZEBRA exchange
+\item[FFX]ZEBRA exchange, FORTRAN I/O
+\item[RZ]ZEBRA RZ
+\item[RX]ZEBRA RZ, exchange format
+\item[EP]EPIO
+\item[AS]normal ASCII
+\item[DA]FORTRAN direct access dataset
+\item[UN]unknown
+\item[FPT]FPACK text
+\item[FPS]FPACK sequential-access
+\item[FPD]FPACK direct-access
+\item[FPK]FPACK keyed-access
+\item[FPO]FPACK ordered
+\item[YBB]YBOS binary
+\item[YBD]YBOS direct-access
+\end{DLtt}
+\vspace*{-\baselineskip}                                                   \\
+\cline{2-3}
+& \tt MFUTFA (H*4)               & The user defined file type.            \\
+\hline
+\bf Physical description         &
+\tt MRFMFA (H*4)                 &
+The record format, e.g. {\tt VBS, FB} etc.                                \\
+\cline{2-3}
+& \tt MRLNFA (I*4)               & The record length, in 4-byte words.    \\
+\cline{2-3}
+& \tt MBLNFA (I*4)               & The block length, in 4-byte words.     \\
+%\cline{2-3}
+& \tt MFSZFA (I*4)               &
+The file size in Megabytes, rounded up to the next integer.
+A Megabyte is defined as {\tt (1,024)**2} bytes.                          \\
+\cline{2-3}
+& \tt MUSCFA (I*4)               &
+The number of times that the file has been accessed (use count).
+A call to FMOPEN with the option W, or to FMMAKE sets the use count to 1.
+A call to FMOPEN with the option R, or to FMFIND increments the count.    \\
+\hline
+\bf Date and time\footnotemark[2] &
+  \tt MCRTFA (I*4)$^+$           & Creation date and time.                \\
+\cline{2-3}
+& \tt MCTTFA (I*4)$^+$           & Date and time of cataloging.           \\
+\cline{2-3}
+& \tt MLATFA (I*4)               &
+Date and time of last access (when available).                            \\
+\hline
+\bf Creator information           &
+ \tt MCURFA (H*8)$^+$            & The user name of the creator.          \\
+\cline{2-3}
+& \tt MCIDFA (H*8)$^+$           & The account
+({\tt UUUGG} or {\tt UUU\$GG}) of the creator (CERNVM or VAX/VMS).
+For Unix systems, the NFSID is used.                                      \\
+\cline{2-3}
+& \tt MCNIFA (H*8)$^+$           & The node on which the file was created.
+This is not necessarily the node from which it was catalogued.            \\
+\cline{2-3}
+& \tt MCJIFA (H*8)$^+$           &
+The job or process name which created the file.                           \\
+\hline
+\bf File protection               & \tt MFPRFA (I*4)                &
+The file protection flag, currently unused.                               \\
+\hline
+\bf System area                   & \tt MSYWFA(10) (I*4)            &
+Pointer to the first of ten system defined words
+(reserved for future use).                                                \\
+\hline
+\bf User area                    & \tt MUSWFA(10) (I*4)            &
+Pointer to the first of ten user defined words.                           \\
+\cline{2-3}
+& \tt MUCMFA (H*80)$^+$          & A user-defined comment.                \\
+\hline
+\multicolumn{3}{|p{\the\Tonecol}|}{
+\small
+\begin{flushleft}
+\quad $^+$\ Items filled
+in automatically by the routine \Rind{FMBOOK} or \Rind{FMLIFT} (See
+pages~\pageref{FMBOOK} and \pageref{FMLIFT}).\\
+\quad $^*$\ Mandatory items (defined as \Lit{NOT NULL} 
+in the ORACLE/SQL tables).\\
+All fields may be overwritten
+by the user, but care must be exercised to ensure that the new
+values are coded in the correct format.
+In particular, for hollerith
+values, the entire field must first be set to blanks to avoid problems
+if the new value is shorter than the default setting.
+The routines \Rind{FMPUTC} and \Rind{FMPUTI} (see on Page~\pageref{FMPUTC} and
+on Page~\pageref{FMPUTI}) may be used to simplify bank modification.
+See the routine on Page~\pageref{FMVERI} for information on how
+to check the contents of a bank.\\[5mm]
+{\bf Notes}\\
+\quad\footnotesize$^1$\ The file description information will
+normally be left as zero, or set to the first and last record and block
+numbers. They could also be used to indicate a subset of a file.\\
+\quad$^2$\ The date  and time fields are stored
+packed, using routine \Rind{FMPKTM}. 
+They can be unpacked using routine \Rind{FMUPTM}.
+\end{flushleft}}
+\end{longtable}
+\footnotetext[1]{The file description information will
+normally be left as zero, or set to the first and last record and block
+numbers. They could also be used to indicate a subset of a file.}
+\footnotetext[2]{The date  and time fields are stored
+packed, using routine \Rind{FMPKTM}. 
+They can be unpacked using routine \Rind{FMUPTM}.}
+
+\clearpage
+
+\subsection{Disk file name}
+\index{disk filename}
+\par
+The disk file name should be entered in the format of the host
+operating system. For VM/CMS systems, the convention
+{\tt <user.address> filename.filetype} is used.
+If {\tt address} is omitted, {\tt user} may then be any
+valid entry in a {\tt GIMEUSER}, {\tt GIMEGRP} or {\tt GIMESYS} names file.
+If not found in a GIME names file, the default address 191 will be used.
+\par
+An extract from a GIME names file is given below:
+\begin{XMP}
+:NICK.L3DSTS  :USERID.L3MAXI
+              :ADDR.222
+              :LINKMODE.RR
+              :FILEMODE.E
+\end{XMP}
+Using this example, files such as {\tt<L3DSTS>RUN1.DST} would be assumed
+to be on the 222 disk of user L3MAXI.
+\par
+For VAX/VMS systems, the full file name, including disk and directory
+names should be entered.
+\subsection{Disk files and VAXclusters}
+\index{VAXcluster}
+\index{cluster}
+\index{cluster alias}
+\index{DECnet cluster alias}
+\par
+If the FATMEN software finds that the current node is in the
+same cluster as the node specified in the FATMEN catalogue
+and the disk specified is available, it will treat the entry
+as if the file were on the current node.
+\begin{XMPt}{Example of valid disk file names for the cluster VXCERN}
+*     Create a valid entry in an existing FATMEN bank
+      CALL UCTOH('VXCRNA',IQ(LFAT+MHSNFA),4,6)
+*     or we could use the VAXcluster alias rather than current node name
+      CALL UCTOH('VXCERN',IQ(LFAT+MHSNFA),4,6)
+*     Create a valid disk file name
+*     Note that logical name for disk is unique and consistant HEP-wide!
+      CALL UCTOH('DELPHI$DK123:<DELPROD.MCDSTS>RUN567',
+     +            IQ(LFAT+MFQNFA,4,35)
+\end{XMPt}
+
+\newpage
+
+\subsection{Disk files and DFS or NFS}
+\index{DFS}
+\index{NFS}
+
+The FATMEN system can use DFS\cite{bib-DFS} or
+NFS\cite{bib-NFS} to access a remote disk file,
+if the disk or file system on which it resides is mounted locally.
+Users are strongly recommended to adopt a convention for DFS and NFS
+names, so that the same name is used throughout a LAN. For DFS it is
+recommended that the disk in question have the same logical name
+on the system to which it is directly attached as on those
+where it is mounted via DFS. Thus, a disk on the central cluster
+with logical name VXCERN\$DISK999 should be mounted remotely via
+DFS with the same logical name. If the FATMEN system finds a DFS
+device of the corresponding name on the local system, it will
+assume that the physical device to which it points is indeed the correct
+one. {\bf N.B. the FATMEN software currently considers only the
+'system' logical name table ({\tt LNM\$SYSTEM\_TABLE}).}
+\begin{XMPt}{Example of mounting a remote disk via DFS}
+$!Mount the VXCERN disk DELPHI$DK123
+$!The 'access-point' is defined on VXCERN and points
+$!to the disk in the previous example. This will allow
+$!users on the current node to access data on this disk
+$!that is catalogued in FATMEN transparently.
+$RUN SYS$SYSTEM:DFS$CONTROL
+DFS>mount access-point DELPHI$DK123 /SYSTEM
+DFS>exit
+\end{XMPt}
+\par
+If the dataset name in the FATMEN entry (MFQNFA) starts with a \$,
+then on Unix systems FATMEN will assume that the text that follows
+up to the first slash character is an environmental variable and 
+attempt to translate it. An example is given below.
+\begin{XMP}
+ FM> ls C01 -gn # List full generic name and corresponding dataset name
+ 
+ //CERN/OPAL/DDST/PASS4/FYZ1/P19R1973/C01
+ Fileid:      $OPALDATA/fyz1/p19r1973.c01
+ 
+ Files:    1
+ FM>quit
+
+[zfatal] > echo $OPALDATA                      
+/u/ws/ddst
+[zfatal] >
+[zfatal] >
+[zfatal] > telnet shift1
+
+...
+
+shift1 [2] printenv OPALDATA
+/user/ws/data
+shift1 [3]
+\end{XMP}
+\subsection{Location code}
+\index{location code}
+\par
+This is an integer code indicating the LAN or site where the
+data resides. Currently, the only supported LAN is CERN, for which
+the location code is defined as 1. This code is used by the FATMEN
+system for a first pass selection of the best copy of a data set.
+The correspondance between the location code and the LAN will be
+stored in the FATMEN database itself.
+\subsection{Username (MCURFA)}
+\index{username (MCURFA)}
+\par
+This is obtained through QUERY USERID on VM/CMS systems, the
+\$GETJPI system service on VAX/VMS and the getpwuid function on Unix.
+\subsection{Jobname (MCJIFA)}
+\index{jobname (MCJIFA)}
+\par
+This is obtained through JOBNAM (CERN Program Library Entry Z100)
+on VM/CMS systems, the \$GETQUI system service on VAX/VMS and the
+getpwuid function on Unix.
+\subsection{Account (MCIDFA)}
+\index{account (MCIDFA)}
+\par
+This is obtained through the QUERY ACCOUNT command on VM/CMS, the \$GETUAI
+system service on VAX/VMS or the getuid function on Unix.
+\subsection{Host name (MHSTFA, MCNIFA)}
+\index{host name (MHSTFA, MCNIFA)}
+\par
+This is obtained through the QUERY USERID command on VM/CMS and the
+\$GETSYI system service on VAX/VMS.
+\subsection{Host type (MHSTFA)}
+\index{host type (MHSTFA)}
+\par
+This is obtained through the QUERY CMSLEVEL command on VM/CMS and
+the \$GETSYI system service on VAX.
+\subsection{Host Operating System (MHOSFA)}
+\index{host operating system (MHOSFA)}
+\par
+This is obtained using the CP QUERY USERID command on VM/CMS
+systems and the \$GETSYI system service on VAX/VMS machines.
+

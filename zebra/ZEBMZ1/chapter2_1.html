@@ -1,0 +1,1959 @@
+<HEAD>
+<TITLE> Memory management</TITLE>
+</HEAD>
+<BODY><P>
+ <HR> <A NAME=tex2html19 HREF=tex2htmlindex2_2.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/next_motif.gif"></A> <A NAME=tex2html17 HREF=ZEBMZ1.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/up_motif.gif"></A> <A NAME=tex2html11 HREF=ZEBMZ1.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/previous_motif.gif"></A>  <A NAME=tex2html21 HREF=tex2htmlindex2_2.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/index_motif.gif"></A><BR>
+<B> Next:</B> <A NAME=tex2html20 HREF=tex2htmlindex2_2.html>Index</A>
+<B>Up:</B> <A NAME=tex2html18 HREF=ZEBMZ1.html>No Title</A>
+<B> Previous:</B> <A NAME=tex2html12 HREF=ZEBMZ1.html>No Title</A>
+<HR> <P>
+<H1><A NAME=SECTION0010000000000000000> Memory management</A></H1>
+<P>
+<A NAME=secH1MZmemorymanagement><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<P>
+The memory management package MZ of ZEBRA is fundamental
+to all other ZEBRA packages.
+<P>
+The ZEBRA package MZ derives from its predecessors:
+<P>
+<UL><LI> the ZEBRA data structure derives from the HYDRA data structure <A HREF=../../general/biblio/bibliography.html#bibHYDRAMZ>[]</A>;
+<LI> the multi-store strategy derives from ZBOOK <A HREF=../../general/biblio/bibliography.html#bibZBOOK>[14]</A>
+</UL>
+<H1><A NAME=SECTION0011000000000000000> ZEBRA bank format</A></H1>
+<P>
+<PRE><TT>LQ(L-NL-NIO-1) IOcb/NOFF    IOcb: I/O control byte (16 bits)
+                                NOFF = NIO + NL + 12 (16 bits)
+
+    LQ(L-NL-NIO)   IOW (1)      first extra I/O descriptor word (if any)
+                   ...
+    LQ(L-NL-1)     IOW (NIO)    last  extra I/O descriptor word
+
+    LQ(L-NL)       link NL      last reference link
+                   ...
+    LQ(L-NS-1)     link NS+1    first reference link
+    LQ(L-NS)       link NS      last structural link
+                   ...
+    LQ(L-1)        link 1       first structural link
+
+    LQ(L)          next         adr of the next bank in the linear str.
+    LQ(L+1)        up           adr of the supporting bank
+    LQ(L+2)        origin       adr of the supporting link
+
+    IQ(L-5)        IDN          numeric   bank ID
+    IQ(L-4)        IDH          Hollerith bank ID  (4 characters)
+    IQ(L-3)        NL           number of links
+    IQ(L-2)        NS           number of structural links
+    IQ(L-1)        ND           number of data words
+
+    IQ(L)          status       bits  1-18 user
+                                     19-32 system   25: drop bit
+                                     19-22 NIO      26: mark bit
+    IQ(L+1)        first data word
+                   ...
+    IQ(L+ND)       last  data word
+
+            This layout requires:
+
+                  DIMENSION    LQ(999), IQ(999), Q(999)
+                  EQUIVALENCE (LQ(9),IQ(1),Q(1))
+
+
+ ---- Format of a short dead region ----
+
+    word 1:  bits  1-16: NW, # of words, with  0 &lt; NW &lt; 12
+                   17-24: NW again for redundancy
+                      25: drop-bit set
+                  26-end: zero
+     2-&gt;NW:  dead words, content irrelevant</TT></PRE>
+<P>
+<H1><A NAME=SECTION0012000000000000000> MZEBRA - initialize the ZEBRA system</A></H1>
+<P>
+To initialize the ZEBRA system Common blocks the user must call
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZEBRA>MZEBRA</A>, before any other request to ZEBRA.
+<P>
+In particular, the following COMMON variables of interest to
+the user are initialized:
+<P>
+<PRE><TT>logical unit numbers:
+      COMMON /ZUNIT/ IQREAD,IQPRNT,IQPR2,IQLOG,IQPNCH,IQTTIN,IQTYPE
+
+default logging level:
+      NQLOGD in /ZSTATE/
+
+where
+      IQREAD   lun for standard system input ('card reader')
+
+      IQPRNT   lun for standard  user print output
+      IQPR2    lun for secondary user print output
+               initialization: IQPRNT=IQPR2=IQLOG
+
+      IQLOG    lun for standard system output ('line printer')
+               this is used for all ZEBRA system printing
+
+      IQPNCH   standard system coded output to be read back by
+               program ('card punch')
+
+      IQTTIN   standard on-line terminal input  (zero if none)
+      IQTYPE   standard on-line terminal output (zero if none)
+
+      NQLOGD   system-wide default logging level, see next para.
+               standard default initialization to zero</TT></PRE>
+<P>
+On any particular machine ZEBRA knows the correct values for
+the logical unit numbers, for example it knows that 6 and 7
+are the right values for <tt>IQREAD</tt> and <tt>IQLOG</tt> on the IBM,
+similarly  <tt>L&quot;INPUT&quot;</tt> and <tt>L&quot;OUTPUT&quot;</tt>  on the CDC Cybers.
+It is of advantage to the user to direct all his print output
+through the unit numbers provided by ZEBRA in <A HREF=#ZUNIT>ZUNIT</A>.
+After the call to <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZEBRA>MZEBRA</A> he is free to change any particular
+value in <A HREF=#ZUNIT>ZUNIT</A>, and with the call to <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZEBRA>MZEBRA</A> he may also
+modify the initialization, in particular he may re-direct
+the standard print output to the on-line terminal.
+<P>
+The parameter in the call to <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZEBRA>MZEBRA</A> may select initialization
+options either with an integer constant or with a list:
+<P>
+<P><A NAME=MZEBRA>CALL MZEBRA (LIST)</A><P>
+<P>
+<PRE><TT>--- short form of options:
+
+   with  LIST = 0:  standard defaults
+               -1:  preset IQLOG = IQTYPE, ie. output to terminal
+               -2:  preset NQLOGD= -2,     ie. only error messages
+               -3:  preset NQLOGD= -2 and IQLOG=IQTYPE</TT></PRE>
+<P>
+<PRE><TT>--- options specified by a list:
+
+   with  LIST(1)   N elements in the list to follow (excluding itself)
+                   if zero or -ve: standard options
+
+             (2)   -&gt; NQLOGD, the system-wide default log level
+                              (see MZLOGL on the next page)
+
+                   for example: LIST(2)= -3: suppress all messages
+                   standard default: NQLOGD = 0
+
+             (3)   -&gt; IQLOG,  lun for standard log printing
+                              unless absent or zero
+                              if = -1: set IQLOG = IQTYPE
+
+             (4)   -&gt; IQPRNT, lun for standard output printing
+                              if absent/zero: set IQPRNT = IQLOG
+                              if = -1:        set IQPRNT = IQTYPE</TT></PRE>
+<P>
+<P><A NAME=MZVERS>CALL MZVERS </A><P>
+<P>
+ prints at logging level -1 or above an initialisation message
+on unit <tt>IQLOG</tt>, showing amongst other things,
+the version number of the current ZEBRA system.
+In <tt><tt>IQUEST</tt><A NAME=437><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=438><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=439><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A><A NAME=440><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>(1)</tt> it returns as an integer
+the Zebra MZ version number multiplied by 10000;
+thus version 3.66 /7 would give 36607.
+<P>
+<P><B>Examples:</B><P><PRE><TT>set normal logging, set printer output to terminal:
+
+      CALL MZEBRA (-1)
+      CALL MZVERS
+
+   set monitor logging, set unit 4 as print file:
+
+      DIMENSION    LIST(3)
+      DATA  LIST   / 2,  2, 4 /
+      CALL MZEBRA (LIST)
+      CALL MZVERS</TT></PRE>
+<P>
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZEBRA>MZEBRA</A> only initializes the general ZEBRA system commons,
+it does not initialize the dynamic store.
+Before any request to the ZEBRA system involving the store,
+the user must initialize it by calling <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZSTOR>MZSTOR</A>.
+<P>
+<P><A NAME=MZEND>CALL MZEND </A><P>
+<P>
+Should be called at the end of execution by the user
+to obtain the statistics of usage of the dynamic store.
+<P>
+<H1><A NAME=SECTION0013000000000000000> MZLOGL - change the MZ logging level</A></H1>
+<P>
+Various parts of the ZEBRA system write log messages
+to the standard system output,
+and occasionally also to the on-line terminal, if any.
+Examples of messages provided for are:
+<P>
+<PRE><TT>a) messages for recoverable errors:
+      read errors, data errors
+
+   b) intialization messages for:
+      stores, divisions, link areas, files
+
+   c) termination messages giving statistics of usage of
+      various facilities like memory, files
+
+   d) operation messages:
+      change in program phase, end-of-file
+
+   e) watch messages for hopefully rare, expensive events:
+      garbage collection, MZPUSH with relocation
+
+   f) monitor messages to help the user debug his program</TT></PRE>
+<P>
+To control the amount of information thus provided to the user,
+a log level is defined and can be set and reset by the user
+at execution time.
+The default log level zero enables the messages which one would
+usually like to see for record in a production run.
+The user may reduce the log level to cut out most or all messages;
+he may increase the level to watch the running of his program,
+or even to debug his data or his input files.
+<P>
+Separate ZEBRA entities, such as dynamic stores or files,
+each have their own attached log level,
+which may be changed by the user at any time.
+By default they inherit the global system-wide default log-level
+set by <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZEBRA>MZEBRA</A>, whose own default is zero.
+<P>
+A somewhat similar system has been used
+for the debugging of the ZEBRA system itself;
+the corresponding WRITE statements are still present in the code
+on the PAM files, although not on the object libraries,
+and could be activated after re-compilation
+by setting a special log level.
+<P>
+(The code for generating the logging messages is conditional and can
+be de-selected at generation time of the ZEBRA binary library.
+This is controlled by PATCHY conditionals:
+<PRE><TT>+USE, QPRINT, T=INH.  deselects all messages
+   +USE, QDEBUG, T=INH.  deselects all messages at or above level 2
+   +USE, QDEVZE.         selects the messages for debugging Zebra. )</TT></PRE>
+<P>
+The log level attached to a particular dynamic store is initialized
+by <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZSTOR>MZSTOR</A>, normally to the global default log level.
+The user may change and re-change it at any time with:
+<P>
+<P><A NAME=MZLOGL>CALL MZLOGL (IXSTOR,LOGL)</A><P>
+<P>
+with
+<PRE><TT>IXSTOR  index of the store,
+              zero for the primary store
+
+        LOGL  the desired log level, as shown in the following
+              table, which also shows which MZ routines print
+              at this (or higher level):
+
+     level  -3:  no log messages at all
+
+            -2:  error messages        ZFATAL, ZPHASE
+
+            -1:  terse logging         MZEBRA, MZSTOR, ZPHASE
+
+             0:  normal logging        MZDIV, MZLINK
+
+            +1:  log to watch          MZLINT, MZGARB, MZPUSH
+
+            +2:  log to monitor calls to ZEBRA
+                  MZLINT, MZWORK, MZBOOK, MZLIFT, MZDROP,
+                  MZPUSH, MZREPL, MZGARB, MZLOGL
+
+   ( Messages to debug the ZEBRA system itself:
+
+      giving  LOGL = 100+n  sets the log-level to MIN(n,2)
+                            and the debug print level to &quot;n&quot;
+
+                   this is not normally available !          )</TT></PRE>
+<P>
+<H1><A NAME=SECTION0014000000000000000> MZSTOR - initialize a dynamic store</A></H1>
+<P>
+A call to <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZSTOR>MZSTOR</A> is required to initialize the dynamic store before any
+operation using this store.
+<P>
+ZEBRA can handle up to 16 different dynamic stores. Each such store
+must reside in a Common block, not in a local vector.
+Each store must be intialized by calling <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZSTOR>MZSTOR</A> once,
+and once only for this store.
+The first store initialized is the primary store,
+its store-index <tt>IXSTOR</tt> will be zero.
+Further secondary stores may be initialized,
+their <tt>IXSTOR</tt> will be allocated non-zero values by <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZSTOR>MZSTOR</A>.
+<P>
+In the call to <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZSTOR>MZSTOR</A> the user specifies the first and the last
+word of his dynamic store, he indicates the number and kinds
+of permanent links contained at the beginning of the store,
+and he communicates the Fortran name of the common block he
+is using for this store for printing purposes.
+A &quot;fence&quot; region of at least one word must be reserved preceding
+the store to allow catching errors due to using L=0.
+<P>
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZSTOR>MZSTOR</A> initializes the store with 3 divisions:
+the forward &quot;working space&quot; division 1
+followed by the reverse division 2, which is the default division
+in many instances, and the reverse &quot;system&quot; division
+at the end of the store.
+<P>
+For each secondary store, the system needs an area of
+about 400 words to hold the system tables for this store.
+This area is allocated by <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZSTOR>MZSTOR</A> on the last words
+of the dynamic store itself.
+<P>
+The use of several dynamic stores introduces an execution time
+overhead proportional to the number of times that ZEBRA has to
+operate in a store other than the &quot;current&quot; one.
+All ZEBRA routines check on the current store being the right one;
+if not, a call to <A HREF=#MZSDIV>MZSDIV</A> changes the &quot;environment&quot;.
+A normal application uses only one store, the primary store.
+Apart from allowing to point from any data to any other,
+this also saves having to carry the store index,
+which is simply zero.
+<P>
+A given dynamic store is initialized by
+<P>
+<P><A NAME=MZSTOR>CALL MZSTOR (IXSTOR*, chNAME, chOPT, FENCE, LQ(1), LQ(LR), LQ(LW), LQ(LIM2), LQ(LAST))</A><P>
+<P>
+with
+<PRE><TT>IXSTOR* returns the index of the store, to be used when specifying this store in
+subsequent calls to the ZEBRA system.  The indices for the divisions 1 + 2
+created by MZSTOR are: for division 1: IXDIV = IXSTOR + 1 2: IXDIV = IXSTOR + 2
+
+              IXSTOR will be set to zero for the primary store.
+
+      chNAME  name of the store for printing purposes,
+              8 characters maximum
+
+      chOPT  character string of options:
+
+            log:      set log level to the default set up by MZEBRA
+                   Q  quiet, set log level to -2
+
+       FENCE  safety area immediately in front of the store to
+              protect against illegal use of LQ(0), LQ(-1), etc.
+              The fence extends from FENCE(1) to LQ(0).
+
+       LQ(1)  first word of the dynamic store
+
+      LQ(LR)  first permanent reference link, if any
+
+      LQ(LW)  first word in the store after the permanent links,
+              this is the first word available to the working space,
+              or to division 1. The following words are allocated
+              as permanent user links, if any:
+
+                LQ(1)  to LQ(LR-1)  structural links, if any
+                LQ(LR) to LQ(LW-1)   reference links, if any
+
+    LQ(LIM2)  lowest position of the end of division 2,
+              to protect divisions 1 and 2 from being squeezed out
+              of existence by other divisions created later.
+
+    LQ(LAST)  last word of the dynamic store.
+
+Required:
+
+  -  the fence must have one word at least, but at most 1000 words.
+  -  the data region of the store (ie. the total store minus
+     the permanent links) must not be less than 2000 words.</TT></PRE>
+<P>
+The store is allocated by <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZSTOR>MZSTOR</A> as follows:
+<P>
+<PRE><TT>_________________________________________________________________ _ _ _ _ 
+|       |        permanent       | div |         | div | division |
+| fence | structural | reference | 1   | reserve | 2   |  system  | 
+|       |          links         | --&gt; | area    | &lt;-- |    &lt;---- | [table]
+|_______|____________|___________|_____|_________|_____|__________|_ _ _ _ 
+|       |(1)         |(LR)       |(LW) |         |     |    (LAST)| 
+ FENCE   LQ                                                       [or LAST]</TT></PRE>
+<P>
+The fence region is preset to contain IQNIL in every word, this must never be
+changed; the debug aids will check for over-writing.  The permanent links are
+cleared to zero; the rest of the store is not touched.
+<P>
+The use of division 1 is somewhat special as explained
+in section <A HREF=chapter2_1.html#secMZWORK>2.7</A> for <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZWORK>MZWORK</A>.
+<P>
+<P><B>Examples:</B><P><PRE><TT>for a normal primary store:
+
+      PARAMETER   (LIM2Q=40000)
+      PARAMETER   (NNQ=120000)
+      DIMENSION    LQ(NNQ), IQ(NNQ), Q(NNQ)
+      EQUIVALENCE (LSAFE,LQ(1)), (Q(1),IQ(1),LQ(9))
+
+      COMMON //    IXDIV1, ...            division indices
+     +,            FENCE(16),LSAFE(10)    ten unused links for safety
+     +,            LMAIN, ...             more structural links
+     +,            L1, ...                more reference  links
+     +,            DIV12(99)
+
+      CALL MZSTOR (0,'//','.',FENCE,LQ,L1,DIV12,Q(LIM2Q),Q(NNQ))
+
+for a secondary store without permanent links:
+
+      DIMENSION    LZ(40000), IZ(40000), Z(40000)
+      EQUIVALENCE (Z(1),IZ(1),LZ(9))
+
+      COMMON /ZDYN/IXSTZ,IXDV1,IXDV2,IXHIT
+     +,            FENDZ(16),LZ,LASTZ
+
+      CALL MZSTOR (IXSTZ,'/ZDYN/','.',FENDZ,LZ,LZ,LZ,LZ(30000),LASTZ)
+      IXDV1 = IXSTZ + 1
+      IXDV2 = IXSTZ + 2</TT></PRE>
+<P>
+<H3><A NAME=SECTION0014010000000000000> Note:</A></H3>
+<P>
+To ease the use of double-precision variables in the working space,
+the number of words in the fence, more generally: the number of words in the
+Common block preceding the dynamic store, as well as the number of permanent
+links, should be <i>even</i>.
+<P>
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZSTOR>MZSTOR</A> prints at log level -1 or above
+an initialization message on unit <tt>IQLOG</tt>,
+showing the whereabouts and the sizes of the store.
+<P>
+<H1><A NAME=SECTION0015000000000000000> MZDIV  - create a new division</A></H1>
+<P>
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZDIV>MZDIV</A> may trigger relocation.
+<P>
+A dynamic store is physically subdivided into 'divisions'.
+Up to 20 divisions are allowed, which permits 17 divisions
+created by the user with <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZDIV>MZDIV</A>, beyond the 3 divisions
+created initially by <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZSTOR>MZSTOR</A>.
+<P>
+Dividing the store into divisions is a device for keeping
+different data-structures in physically separate parts
+of the dynamic store.
+In principle the user does not need to care where and in what
+order his banks are kept physically in the store,
+since all logical relations are described by links,
+not by arrangement.
+The reason for using divisions in spite of this general principle
+is exclusively the possible gain in efficiency,
+when deleting a whole data-structure, for example,
+or with the output of a data-structure to tape or disk.
+This may be seen by comparing the operations necessary to output
+either a data-structure whose banks co-exist intermixed with
+the banks of other structures, or a data-structure which has
+the exclusive use of a division:
+the first case requires a logical walk through the data-structure
+to identify all the banks which belong to it,
+plus the construction of a table to indicate their where-abouts,
+and the write-out of the memory according to that table;
+in the second case a contiguous chunk of memory
+can be written out directly.
+<P>
+Mode of a division:  depending on whether a division grows
+at its higher or at its lower end,
+a division is said to be of mode 'forward' or 'reverse'
+(<tt>MODE = 0</tt> or <tt>1</tt>).
+Reverse mode is selected by the <tt>R</tt> option in the call to <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZDIV>MZDIV</A>,
+else forward mode is assumed.
+By arranging a forward division to be followed by a reverse
+division (of the same kind),
+the 'reserve areas', ie. the reserved space for these divisions
+not currently allocated to banks,
+of the two divisions is contiguous and is hence available
+to either division,
+thereby reducing the total memory requirement in general.
+<P>
+Kind of a division:  Depending on its usage,
+we distinguish three kinds of divisions (apart from the
+system division, which is used by the ZEBRA system itself):
+<P>
+<UL><LI> a 'user short-range' division is a division which is
+      wiped clean after every event;
+<LI> a 'user long-range' division is a division which carries
+      data living beyond several events,
+      or many events, or until the termination phase;
+<LI> a 'package' division is a division used by some service
+      packages,
+      and whose contents are not normally of any concern to the user.
+</UL>Links, including structural links,
+may in general point from one division to any other division
+of the same store,
+except that the link 'next-of-same' may not,
+ie. a linear stucture must be contained within one division.
+To reduce the load on relocation,
+the user has the possibility to indicate which division points
+to which other divisions,
+as explained in section <A HREF=chapter2_1.html#secMZXREF>2.14</A> for <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZXREF>MZXREF</A>.
+By default ZEBRA assumes that all user divisions may point
+to all other user divisions.
+<P>
+User short-range divisions are allocated one after the other
+from left to right, starting with division 1;
+long-range and package divisions
+are allocated one before the other from right to left,
+starting with division 20, pushing the system division downwards.
+<P>
+A given division in a particular store is identified by its 'index';
+thus if a bank is to be created in this division,
+its index has to be specified to <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZLIFT>MZLIFT</A>.
+The division index carries the store-number and the division-number
+encoded onto a word of 32 bits;
+when a new division is created by a call to <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZDIV>MZDIV</A> the next free
+division-number is allocated to it,
+and the encoded division index is returned to the user as
+an output parameter.
+The store index, constructed by <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZSTOR>MZSTOR</A>, is formally a division index
+for the (non-existing) division zero.
+The format of the division index permits the simultaneous selection
+of several divisions by a 'compound index',
+see section <A HREF=chapter2_1.html#secMZIXCO>2.15</A> for the specifications.
+<P>
+A division is created with:
+<P>
+<P><A NAME=MZDIV>CALL MZDIV (IXSTOR,IXDIV*,chNAME,NW,NWMAX,chOPT)</A><P>
+<P>
+with
+<PRE><TT>IXSTOR  index of the store for creation,
+              zero for the primary store
+
+      IXDIV*  returns the index of the division created,
+              to be used when specifying this division
+              in subsequent calls to the ZEBRA system.
+
+      chNAME  name of the division for printing purposes,
+              8 characters maximum
+
+          NW  number of words to be allocated to the division initially,
+              during execution later the division may grow, but not beyond
+       NWMAX  maximum size of the division
+
+       chOPT  character string of options:
+
+             mode:      forward mode is default    (gives MODE = 0
+                     R  reverse division                  MODE = 1
+                     M  match the neighbour division      MODE = 0 or 1
+
+             kind:      user short-range is default       KIND = 1
+                     L  user long-range division          KIND = 2
+                     P  package division                  KIND = 3 )
+                        (P implies C, over-rules L)
+
+             xref:      by default all user divisions point to all other
+                                   user divisions (see section~\ref{sec:MZXREF})
+                     C  division contained, ie. no links point outside
+
+Required:     NW at least 100 words,  NWMAX at least NW words</TT></PRE>
+<P>
+<P><B>Examples:</B><P><PRE><TT>CALL MZDIV (0,IXHITS,'HITS',10000,20000,'.')
+
+           creates a user short-range division HITS in forward mode.
+
+      CALL MZDIV (0,IXCALI,'CALIB',8000,8000,'RL')
+
+           creates a user long-range division CALIB in reverse mode.</TT></PRE>
+<P>
+If the user creates several divisions it is economic to create
+pairs of forward/reverse divisions.
+With Zebra version 3.67 the mode option M has been introduced
+to request automatic pairing with the divisions already existing.
+<P>
+<P><B>Example</B><P><PRE><TT>CALL MZSTOR (0, '//', ...
+      CALL MZDIV  (0, IXABC, 'ABC', NW3,  NWMAX3, 'M')
+      CALL MZDIV  (0, IXDEF, 'DEF', NW4,  NWMAX4, 'M')
+      CALL MZDIV  (0, IXXYZ, 'XYZ', NW20, NWMX20, 'LM')
+      CALL MZDIV  (0, IXUVW, 'UVW', NW19, NWMX19, 'LM')</TT></PRE>
+<P>
+This will give a primary store with this lay-out:
+<P>
+<PRE><TT>| div 1      div 2 | div 3      div 4 |   div    | div 19      div 20 |
+   |                  |                  |  system  |                    |
+|  | -----&gt;    &lt;----- | -----&gt;    &lt;----- |     &lt;--  | ------&gt;    &lt;------ |
+|__|__________________|__________________|__________|____________________|</TT></PRE>
+<P>
+The forward divisions 3 and 19 are followed by the reverse
+divisions 4 and 20.
+The divisions of each pair share the same memory region,
+originally of NW3+NW4 and NW19+NW20 words.
+Thus the occupied space of one division can be large
+(even larger than its own declared maximum) at a particular
+moment during execution,
+if the space occupied by the other division of the pair is small
+enough to keep the sum below the maximum.
+<P>
+<H3><A NAME=SECTION0015010000000000000> Remember:</A></H3>
+<P>
+the higher logical entity above the bank
+is the 'data-structure' and <i>not</i> the division;
+the division is a physical concept entirely different
+from the logical concept of the data-structure,
+and the two must not be confused.
+<P>
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZDIV>MZDIV</A> prints at log level 0 or above
+an initialization message on unit <tt>IQLOG</tt>.
+<P>
+<H1><A NAME=SECTION0016000000000000000> MZLINK / MZLINT - initialize a link area</A></H1>
+<P>
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZLINK>MZLINK</A> and <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZLINT>MZLINT</A> may trigger garbage collection.
+<P>
+A link area is a vector of links outside any dynamic store,
+with all its links pointing to one particular store,
+consisting of <tt>NS</tt> structural links followed by 
+<tt>NR</tt> reference links.
+Either <tt>NS</tt> or <tt>NR</tt> may be zero.
+<P>
+We distinguish two kinds of link areas:
+<P>
+<H2><A NAME=SECTION0016100000000000000> Permanent link area</A></H2>
+<P>
+A permanent link area is initialized once at the steering level
+and stays alive for the whole program;
+it consists of just the vector of links.
+<P>
+<H2><A NAME=SECTION0016200000000000000> Temporary link area</A></H2>
+<P>
+A temporary link area is requested and de-activated
+by lower-level code any number of times.
+Each such area has two words pre-fixed to the link-vector
+for efficiency:
+<P>
+<DL COMPACT>
+<DT>word 1
+<DD> is a flag indicating whether the area is active or not;
+              if this word is zero, the contents of the area will
+              not be updated in case of a memory move.
+              The user may reset this word to zero to de-activate the area.
+<DT>word 2
+<DD> is a key allowing the system to easily find the
+              where-abouts of this area in the system tables without searching.
+              This word must never be touched by the user.
+</DL>A link area must be in COMMON storage;
+if it is in local storage there is a danger that Fortran
+optimization causes a register to preserve the old value of a link
+across a relocation operation,
+for garbage collection,
+but also for simple updating with <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZDROP>MZDROP</A>, <A HREF=../../zebra/ZEBMZ2/chapter2_1.html#ZSHUNT>ZSHUNT</A>, etc.
+<P>
+As for links in banks, a structural link may only contain zero or the
+valid address of a bank; it must never contain garbage.
+<P>
+To initialize a permanent link area, one calls once,
+and once only for this area:
+<P>
+<P><A NAME=MZLINK>CALL MZLINK (IXSTOR,chNAME,!LAREA,!LREF,!LREFL)</A><P>
+<P>
+with
+<PRE><TT>IXSTOR  index of the store into which the links will point,
+              (IXDIV of any division in this store allowed)
+              zero for the primary store
+
+      chNAME  name of the Fortran Common in which the link area resides,
+              for printing purposes, 8 characters maximum
+
+      !LAREA  first word of the link area,
+              being also the first link of this area
+
+       !LREF  first reference link, if any;
+              last structural link, if no reference links
+
+      !LREFL  last reference link, if any,
+              if none: give LAREA in this parameter position</TT></PRE>
+<P>
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZLINK>MZLINK</A> will clear the links to zero.
+<P>
+<P><B>Examples:</B><P><PRE><TT>mixed link area:
+
+      COMMON /LAMIX/ LS1,...,LSN, LR1,...,LRN
+
+      CALL MZLINK (0,'/LAMIX/',LS1,LR1,LRN)
+
+structural link area:
+
+      COMMON /LASTR/ LS1, ..., LSN
+
+      CALL MZLINK (0,'/LASTR/',LS1,LSN,LS1)
+
+reference link area:
+
+      COMMON /LAREF/ LR1, ..., LRN
+
+      CALL MZLINK (0,'/LAREF/',LR1,LR1,LRN)</TT></PRE>
+<P>
+Note that in a permanent link area with exactly one link
+this link cannot be a reference link.
+<P>
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZLINK>MZLINK</A> prints at log level zero (or above) an initialization
+message on unit <tt>IQLOG</tt>.
+<P>
+To activate a temporary link area, one calls with:
+<P>
+<P><A NAME=MZLINT>CALL MZLINT (IXSTOR,chNAME,LAREA,!LREF,!LREFL)</A><P>
+<P>
+with
+<PRE><TT>IXSTOR  index of the store, as for MZLINK
+
+      chNAME  name of the link area, as for MZLINK
+
+       LAREA  first word of the link area,
+              with: LAREA(1) the user flag word
+                     LAREA(2) system word
+                     LAREA(3) the first link of the area
+
+       !LREF  first reference link, if any, as for MZLINK
+
+      !LREFL  last reference link, if any, as for MZLINK</TT></PRE>
+<P>
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZLINT>MZLINT</A> will clear the links to zero,
+set the flag-word <tt>LAREA(1)</tt> to be non-zero,
+and set the system-word <tt>LAREA(2)</tt> on first contact.
+<P>
+To de-activate a temporary link-area the user sets <tt>LAREA(1)=0</tt>.
+From then on the links in this area are no longer relocated,
+and hence will be meaningless.
+To re-activate the area the user could set <tt>LAREA(1)=1</tt>,
+but he must then clear the contents of the links himself;
+it is safer to call <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZLINT>MZLINT</A>, which will do the necessary.
+<P>
+<P><B>Examples:</B><P><PRE><TT>mixed link area:
+
+      COMMON /LAMIX/ LAMIX(2), LS1,...,LSN, LR1,...,LRN
+
+      CALL MZLINT (0,'/LAMIX/',LAMIX,LR1,LRN)
+
+structural link area:
+
+      COMMON /LASTR/ LASTR(2), LS1, ..., LSN
+
+      CALL MZLINT (0,'/LASTR/',LASTR,LSN,LASTR)
+
+reference link area:
+
+      COMMON /LAREF/ LAREF(2), LR1, ..., LRN
+
+      CALL MZLINT (0,'/LAREF/',LAREF,LR1,LRN)</TT></PRE>
+<P>
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZLINT>MZLINT</A> prints a log message at level 1 for initialization
+and at level 2 for re-initialization.
+<P>
+<H1><A NAME=SECTION0017000000000000000> MZWORK - allocate working space</A></H1>
+<P>
+<A NAME=secMZWORK><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<P>
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZWORK>MZWORK</A> may wipe division 1 and it may trigger garbage collection.
+<P>
+The region at the beginning of the dynamic store just after
+the permanent links may be used as working space,
+consisting of a set of reference links followed by
+a set of data words.
+<P>
+The user requests reservation of the working space with
+<P>
+<P><A NAME=MZWORK>CALL MZWORK (IXSTOR,DFIRST,DLAST,IFLAG)</A><P>
+<P>
+<PRE><TT>with  IXSTOR  index of the store or of any of its divisions,
+              zero for the primary store
+
+      DFIRST  first data word of the working space,
+              the preceding words are taken as reference links;
+              this parameter is ignored if IFLAG is =2 or =-1
+
+       DLAST  last data word,
+              this parameter is ignored if IFLAG is =-1 or =3 or =4
+
+       IFLAG  = 0  define a new working space,
+                   previous contents are not to be retained
+
+              = 1  vary the limits of the working space,
+                   keeping intact the links which are common to
+                   both the old and the new working space.
+
+              = 2  vary only the DLAST limit of the working space,
+                   keeping alive all links and the data words
+                   which are common to the old and the new working space.
+
+              = 3  keep the DLAST limit unchanged, keep division 1,
+                   re-define the DFIRST limit for new links,    
+                   ie. clear the links to zero.             
+
+              = 4  keep the DLAST limit unchanged, keep division 1,
+                   re-define the DFIRST limit keeping intact the links
+                   which are common to the old and the new working space.
+
+              =-1  reset the working space to null,
+                   ie. to zero links, zero data words</TT></PRE> 
+Staring with Zebra version 3.67, the links of the working space
+are cleared to zero by <BR><A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZWORK>MZWORK</A>; if <tt>IFLAG = 1</tt> or 4 only the new links are cleared.
+<P>
+A call to <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZWORK>MZWORK</A> with <tt>IFLAG &lt; 3</tt> destroys division 1 of the store
+<i>without</i> a relocation pass to reset links pointing into division 1.
+This is done in this way for efficiency,
+hence normally only very temporary data should be kept in division 1,
+and only working space links should point to them.
+To say it differently: division 1 is logically part of the
+working space,
+its time of existence is the same as that of the working space,
+and it is good practice to maintain links into division 1
+only in the working space.
+If however it is necessary to hold such links elsewhere,
+one should either reset them explicitly or wipe the division with
+<tt>CALL <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZWIPE>MZWIPE</A>(1)</tt> before calling <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZWORK>MZWORK</A>
+[ or with <tt>CALL <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZWIPE>MZWIPE</A>(IXSTOR+1)</tt> for a secondary store ].
+<P>
+<P><B>Example</B><P><PRE><TT>+CDE, Q.
+     +,         LR1, ...     working space reference links
+     +,         DFIRST, ...  working space data words
+     +,         DLAST
+
+      CALL MZWORK (0,DFIRST,DLAST,0)</TT></PRE>
+<P>
+will give this layout of the store:
+<P>
+<PRE><TT>_____________________________________________________________
+   |           |       |             |               |           |
+   | permanent |  wsp  |   w. space  | div 1   div 2 | other     |
+   |   links   | links |     data    | ---&gt;     &lt;--- | divisions |
+   |___________|_______|_____________|_______________|___________|
+   |LQ         |LR1    |DFIRST  DLAST|                           |</TT></PRE>
+<P>
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZWORK>MZWORK</A> prints a monitor log message at level 2.
+<P>
+<H1><A NAME=SECTION0018000000000000000> MZLIFT / MZBOOK - bank creation</A></H1>
+<P>
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZBOOK>MZBOOK</A> and <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZLIFT>MZLIFT</A> may cause garbage collection.
+<P>
+A bank may be lifted with either
+<P>
+<P><A NAME=MZBOOK>CALL MZBOOK (IXDIV,!L*,!LSUP,JB, chID,NL,NS,ND,IOD,NZERO)</A><P>
+<P>
+or
+<P>
+<P><A NAME=MZLIFT>CALL MZLIFT (IXDIV,!L*,!LSUP,JB, NAME, NZERO)</A><P>
+<P>
+with
+<PRE><TT>IXDIV   index of the division in which the bank is to be lifted
+                 = 0       use default in   primary store
+                [= IXSTOR  use default in secondary store ]
+                see below for details
+
+          !L*   returns the address of the bank created
+
+        !LSUP   if JB &lt; 0:  address of the supporting up bank
+                if JB = 0:  address of the supporting previous bank
+                if JB = 1:  supporting link*
+                if JB = 2:  LSUP not used
+
+           JB   if JB &lt; 1:  link bias in the supporting bank
+                             (must be a structural link)
+                if JB = 1:  create top-level bank
+                if JB = 2:  create stand-alone bank
+
+         NAME   specifies the properties of the bank:
+
+ NAME(1) = ID:  4-character bank identifier, alphanumeric,
+                  MZBOOK: variable of type CHARACTER
+                  MZLIFT: Hollerith string of the form 4Hxxxx
+     (2) = NL:  total number of links, NL &lt; 64k
+     (3) = NS:  number of structural links, NS &lt;= NL
+                  (not counting the 3 links next, up, origin)
+     (4) = ND:  number of data words, ND &lt; 1 Mwords
+
+     (5) = IOD:  I/O descriptor for the data words, which may be:
+                 - result from MZFORM, 1 word, I/O index
+                 - result from MZIOBK, 1 or more words, I/O characteristic
+                 - immediate, the whole bank is of the same type:
+                    IOD = 0  undefined, bank cannot be transported
+                          1  32-bit unsigned integer
+                          2  signed integer
+                          3  floating         4  double-precision
+                          5  Hollerith        7  self-descriptive
+                 - requests:
+                    IOD = 9  retrieve I/O characteristic by IDH,
+                             stored in the system by MZFORM
+                         11  take the I/O characteristic from any
+                             bank in the target linear structure,
+                             if this is empty act as for 9</TT></PRE>
+<P>
+<PRE><TT>NZERO   controls whether and how much of the data-part
+                of the bank is preset to zero:
+                   N = -1:  no presetting
+                   N = 0:  the whole bank is cleared
+                   N &gt; 0:  the first N words are cleared
+                The links of the bank are always cleared to zero.</TT></PRE> 
+In what follows we will need the parameter <tt>LNEXT</tt>,
+which is the address of the successor bank to the bank to be lifted;
+its address will be stored into link 0 of the new bank,
+ie. into its 'next' link.
+<tt>LNEXT</tt> is obtained as follows:
+<PRE><TT>if  JB &lt; 1:   LNEXT = LQ(LSUP+JB)
+            JB = 1:   LNEXT = LSUP
+            JB = 2:   LNEXT = 0</TT></PRE> 
+The <i>division</i> [ and the store ] into which the bank
+is to be lifted is selected by the parameter <tt>IXDIV</tt>.
+If a definite division is specified, this is used,
+but it must be compatible with <tt>LNEXT</tt>;
+a linear structure must be contained within one and the same
+division !
+<P>
+If 'default division' is specified,
+by giving zero [ or <tt>IXSTOR</tt> ] for <tt>IXDIV</tt>,
+the bank will be created in the division holding the logically
+nearest bank of the data structure into which the new bank
+will be inserted, in this order of priority:
+<P>
+<UL><LI> if the bank is added to an existing, non-empty, linear structure,
+      i.e. if <tt>LNEXT</tt> is non-zero, or if <tt>JB=0</tt>,
+      use the division holding this linear structure;
+<LI> if <tt>JB &lt; 0</tt> use the division holding the supporting up bank at <tt>LSUP</tt>;
+<LI> use division 2.
+</UL>The <i>numeric bank identifier</i> <tt>IDN</tt> serves to readily identify
+a particular bank within a linear structure for interactive work.
+Normally the Hollerith identifiers <tt>IDH</tt> in a linear structure are
+all identical;
+it is desirable that the <tt>IDN</tt>'s are all different.
+In principle the user can set any positive integer into <tt>IQ(L-5)</tt> after
+the bank has been created, but <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZLIFT>MZLIFT</A>/<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZBOOK>MZBOOK</A> will store a default
+value in this order of priority:
+<P>
+<PRE><TT>-  if LNEXT is non-zero: use IDN+1 of the bank at LNEXT;
+
+  -  if JB = 0: use IDN+1 of the bank at LSUP;
+
+  -  if JB &lt; 0: use the value IDN = -JB;
+
+  -  IDN = 1 will be set.</TT></PRE>
+<P>
+The bank being lifted is <i>inserted</i>
+into an existing data-structure according to <tt>LSUP</tt>
+under control of the parameter <tt>JB</tt>:
+<P>
+<PRE><TT>--- case 1: JB &lt; 0       insert as dependent of the bank at LSUP
+                          ex.:  CALL MZLIFT (0,L,LSUP,-4,NAME,0)
+            _______
+           |       |
+         __|  SUP  |  &lt;-------------------------.------ ...
+        |  |       |  &lt;---------.               |
+  link  |  |_______|            |               |
+JB= -4  |                       |               |
+        |                       |               |
+        |                    up |            up |
+        |                  ________        ________
+        |                 |        |      |        |
+        `---------------&gt; |  lift  | ---&gt; |  NEXT  | ---&gt;  ...
+                          |________|      |________|
+
+  SUP   is the supporting bank whose address is LSUP
+  lift  is the new bank being lifted
+  NEXT  is the first bank of the linear structure in front of which
+        the bank 'lift' is inserted, ie. the initial content of
+        link JB in bank SUP was LNEXT = LQ(LSUP+JB).
+
+The up-link and the origin-link in the bank lifted are set as
+
+                  up-link  &lt;--  LSUP
+              origin-link  &lt;--  LSUP+JB
+
+
+--- case 2: JB = 0       insert inside a linear structure
+                          ex.:  CALL MZLIFT (0,L,LSUP,0,NAME,0)
+     ______
+    |      |
+  __|  UP  |  &lt;------------------------------------------.---- ...
+ |  |      |  &lt;------------.                             |
+ |  |______|               |                             |
+ |                         |&lt;-------------.              |
+ |                         |              |              |
+ |                      up |           up |           up |
+ |      ____          ________       ________       ________
+ |     |    |        |        |     |        |     |        |
+ `---&gt; |    | -...-&gt; |  SUP   | --&gt; |  lift  | --&gt; |  NEXT  | --&gt; ...
+       |____|        |________|     |________|     |________|
+
+
+The up-link and the origin-link in the bank lifted are set as
+
+                  up-link  &lt;--  copy of the up-link in bank SUP
+              origin-link  &lt;--  LSUP</TT></PRE> 
+<tt>SUP</tt>, <tt>lift</tt>, <tt>NEXT</tt> have the same significance as in case 1.
+<tt>UP</tt> is the bank pointed to by the up-link in bank <tt>SUP</tt>,
+which link might be zero.
+If bank <tt>NEXT</tt> does not exist, ie. if <tt>LNEXT = LQ(LSUP)</tt> is zero,
+the bank <tt>'lift'</tt> is added at the end of the linear structure.
+<P>
+<PRE><TT>--- case 3: JB = +1      create new top-level bank
+                          ex.:  CALL MZLIFT (0,L,LSUP,1,NAME,0)
+
+              usually: zero  &lt;------------------.
+                                                 |
+                                                 |
+                                  --------------&gt;|
+                                 |               |
+                              up |            up |
+                            ________        ________
+                           |        |      |        |
+ result  LSUP and L  ----&gt; |  lift  | ---&gt; |  NEXT  | ---&gt; ...
+                           |________| .--&gt; |________|
+                                      |
+  input  LSUP  -----------------------^</TT></PRE> 
+For  <tt>JB=+1</tt>  the origin-link and the up-link are taken from
+the bank <tt>NEXT</tt> pointed to by <tt>LSUP</tt> on input;
+the first time round, when <tt>NEXT</tt> does not exist,
+ie. when <tt>LSUP=0</tt>,
+the up-link is set to zero and the origin-link is made to point
+to the location containing <tt>LSUP</tt>.
+<P>
+The location pointed to by the origin-link is filled with the address
+of the bank created, unless the origin-link is zero.
+<PRE><TT>--- case 4: JB = +2      no inserting at all
+                          ex.:  CALL MZLIFT (0,L,0,2,NAME,0)</TT></PRE> 
+For  <tt>JB=2</tt>  the bank is lifted without being linked into a structure;
+both the origin-link and the up-link in the bank are set to zero.
+<P>
+<H3><A NAME=SECTION0018010000000000000> Note:</A></H3>
+<P>
+because structural links are used to connect banks as
+illustrated by these examples, and are hence manipulated by the system,
+they must never contain anything but valid bank addresses, or zero.
+<P>
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZLIFT>MZLIFT</A> and <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZBOOK>MZBOOK</A> print a monitor log message at level 2.
+<P>
+<H1><A NAME=SECTION0019000000000000000> MZPUSH - alter the size of a bank</A></H1>
+<P>
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZPUSH>MZPUSH</A> (increasing) may cause garbage collection.
+<P>
+To increase or decrease the size of a bank, one may
+<P>
+<P><A NAME=MZPUSH>CALL MZPUSH (IXDIV,*!L*,INCNL,INCND,chOPT)</A><P>
+<P>
+with
+<PRE><TT>IXDIV  index of the division; zero [or IXSTOR] allowed,
+              in which case MZPUSH will find the division
+
+        *!L*  address of the bank to be pushed,
+              on return L contains the new address of the bank
+              (cannot be a link in a bank !)
+
+       INCNL  number of additional links,
+              zero for no change, negative for decrease.
+              Additional links will be given type 'reference',
+              unless the original bank has only structural links.
+
+       INCND  number of additional data words,
+              zero for no change, negative for decrease.
+
+       chOPT  character string of options:
+
+                 default: any link may point to the bank at L,
+
+              R  but not into the abandoned bank region
+                        (in case of bank reduction)
+
+              I  isolated: only the inherent structural links
+                           point to this bank</TT></PRE> 
+For 'isolated' the user is sure that no link other than the
+supporting structural link, and the link passed in the parameter <tt>L</tt>,
+and the reverse links in the first level dependents,
+point to this bank.
+<P>
+The I/O descriptor of the old bank must also be valid for the
+new bank; if this would not be the case one should use 
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZREPL>MZREPL</A> instead of <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZPUSH>MZPUSH</A>.
+<P>
+New link words and new data words acquired by the bank
+are cleared to zero.
+<P>
+Except for special cases,
+increasing the size of a bank is an expensive operation,
+and should be avoided.
+The correct solutions to the problems of indefinite number of objects
+or of indefinite size are either the use of a linear structure
+or the lifting of a bank of maximum size,
+which is reduced to the final size once the contents are complete.
+<P>
+The increase of a bank is handled in general as follows:
+a new bank is lifted with the new dimensions,
+the contents of the original bank are copied over,
+and the old bank is marked as dropped.
+Any link pointing to the original bank must be re-routed
+to the replacement bank by <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZPUSH>MZPUSH</A>.
+In full generality this can only be done by a relocation pass
+over all memory (ie. all link areas and all divisions pointing
+to the division in which the bank resides.)
+<P>
+The expensive part in this operation is the relocation pass,
+and this can be saved under special circumstances:
+<P>
+ a) Increasing the data part of the last bank in a forward division,
+or the link part in a reverse division,
+can be done in situ without the lifting of a new bank.
+Hence any link pointing to the bank remains valid.
+(However note: this is not a good reason for creating an extra
+division, because the lifting of a maximum size bank is
+a better solution.)
+<P>
+ b) If there are no links pointing to the bank (except the
+standard structural support links)
+there is no point to scan all links,
+because the relocation pass would have no effect.
+However, ZEBRA could not detect this situation without actually
+performing the relocation pass,
+but the user may know the situation a priori,
+in which case he can signal it to <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZPUSH>MZPUSH</A> with the <tt>I</tt> option.
+<P>
+Reducing the size of a bank is less onerous (if
+the <tt>R</tt> option is given).
+The parameters of the original bank are adjusted to the
+new dimension in situ and the abandoned memory is marked as dead.
+Links which point into the abandoned region, if any,
+can only be reference links and must be reset to zero.
+To have links pointing into a bank, rather than to the status-word,
+is relatively rare.
+Again, the relocation pass can be saved,
+and for reducing a bank this is the normal situation,
+if the user knows the situation a priori and signals it to
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZPUSH>MZPUSH</A> with the <tt>R</tt> option (or <tt>I</tt> which is stronger).
+<P>
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZPUSH>MZPUSH</A> prints a monitor log message at level 2,
+but if the operation involves a relocation pass a log message
+will be given at level 1.
+<P>
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZPUSH>MZPUSH</A> accumulates statistics of the number of times that an
+expensive operation was performed;
+this is printed by <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZEND>MZEND</A>.
+<P>
+<H1><A NAME=SECTION00110000000000000000> MZREPL - connect replacement banks</A></H1>
+<P>
+If one wants to replace a given 'old' bank in a data-structure
+by a 'new' bank,
+and if there are links elsewhere in the data-structure(s)
+or in link-areas pointing to the old bank,
+this is a non-trivial operation because these links
+have to be relocated to point to the new bank.
+Normally this can be done with <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZPUSH>MZPUSH</A>,
+but not if the I/O descriptor has to change.
+For these cases <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZREPL>MZREPL</A> is provided.
+<P>
+The user is supposed to lift and fill the 'new' bank and also a
+tiny 'index' bank with 2 (structural) links and 1 data word,
+recording the address of the old bank in link 1 and the address
+of the new bank in link 2.
+This index bank is handed to <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZREPL>MZREPL</A> which will then execute
+the necessary relocation, using the data word as working storage.
+<P>
+If several such operations are needed one should not loop
+over calls to <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZREPL>MZREPL</A>, but construct a linear structure of
+index banks for <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZREPL>MZREPL</A>, which will then do all the replacements
+with one single relocation pass.
+Because of this feature <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZREPL>MZREPL</A> can be more economical than
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZPUSH>MZPUSH</A> for multiple replacements.
+<P>
+Both the old and the new banks are required to be in one single
+division, but the index banks may be in a different division.
+<P>
+<P><A NAME=MZREPL>CALL MZREPL (IXDIV, *!LIX*, chOPT)</A><P>
+<P>
+with
+<PRE><TT>IXDIV  index of the division; zero [or IXSTOR] allowed,
+              in which case MZREPL will find the division
+
+      *!LIX*  the address of the linear structure of the index banks.
+
+       chOPT  character string of options:
+
+                 default: drop the old and the index banks
+
+              K  keep the old and the index banks
+
+              I  isolated, as for MZPUSH</TT></PRE>
+<P>
+If one needs to keep the old banks beyond the call to <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZREPL>MZREPL</A>,
+note this: really all links pointing to the 'old' banks are
+relocated, and therefore one would loose access to the old banks.
+To overcome this the K option selects a special processing:
+before going into the relocation the link pointing to the
+old bank is saved into the data-word of the index bank
+(this works because there is no garbage collection involved);
+just before returning to the user all index banks are changed
+to have only 1 structural link restored to support the old bank,
+and link 2 continues to point to the corresponding new bank,
+but now as a reference link.
+<P>
+Each old bank is changed to have zero structural links,
+the 'next' link is reset to zero, and the bank is made to
+depend from its index bank.
+<P>
+When one has finished with the old banks one can drop the
+structure of index banks, thereby also dropping the old banks.
+<P>
+The linear structure of index banks is re-ordered by <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZREPL>MZREPL</A> for
+increasing address of the old banks;
+<tt>LIX</tt> returns the address of the new first bank.
+<P>
+<P><B>Example</B><P><PRE><TT>Replace all the banks of a linear structure.
+
+   LIX, LOLD, LNEW  are temporary links,
+   either in the working space or in a link area.
+
+   IXDIVA is the division index of the banks;
+   IXDIVX is the index of some short range division to hold the
+          index banks, division 1 by preference.
+
+      LIX = 0    clear LIX to start (reference link allowed)
+
+      LOLD = get the adr of the first old bank
+
+   24 CALL MZBOOK (IXDIVX, L, LIX,1, 'IXIX',2,2,1,0, -1)
+      LQ(LIX-1) = LOLD
+
+      CALL MZLIFT (IXDIVA, LNEW, LIX,-2, ...
+
+          fill the new bank at LNEW
+               ie. links LQ(LNEW-NL) to LQ(LNEW-1)
+                    data IQ(LNEW+1)  to IQ(LNEW+ND)
+               but not 'next', 'up', 'origin'
+
+      LOLD = LQ(LOLD)
+      IF (LOLD.NE.0)         GO TO 24
+
+      CALL MZREPL (IXDIVA, LIX, '.')</TT></PRE>
+<P>
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZREPL>MZREPL</A> prints a monitor log message at level 2.
+<P>
+<H1><A NAME=SECTION00111000000000000000> MZDROP - drop a bank and its dependents</A></H1>
+<P>
+With <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZDROP>MZDROP</A> one may either drop the bank at <tt>L</tt> or,
+if the <tt>L</tt> option is given, the linear structure at <tt>L</tt>.
+Dropping a bank implies dropping also the whole partial
+data-structure which depends on this bank downwards.
+<P>
+Dropped banks stay in memory with the <tt>IQDROP</tt> status-bit set,
+links pointing to them continue to do so,
+except for the immediate structural link indicated via the
+origin-link of the bank at <tt>L</tt>, which is bridged or reset to zero,
+whichever is appropriate.
+<P>
+To drop one gives
+<P>
+<P><A NAME=MZDROP>CALL MZDROP (IXSTOR, !L, chOPT)</A><P>
+<P>
+with
+<PRE><TT>IXSTOR  index of the store or of any division in this store,
+              zero for the primary store
+
+          !L  the address of the bank or linear structure to be dropped
+
+       chOPT  character string of options:
+
+                  default: drop the bank at L only,
+                  ie. the 'next' link of this bank is not followed
+
+               L  drop the linear structure pointed to by L
+                  ie. the 'next' link of the bank at L is followed
+
+               V  drop only the partial data-structure
+                  dependent vertically downwards from the bank at L,
+                  but not the bank itself.</TT></PRE>
+<P>
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZDROP>MZDROP</A> prints a monitor log message at level 2.
+<P>
+The parameter <tt>L</tt> in the call to <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZDROP>MZDROP</A> is not as such changed
+on return,
+but if it is the structural link supporting the d/s it will
+in fact be up-dated for the removal of the first bank
+in this structure.
+<P>
+Suppose this artifical sequence of operations (with <tt>LS=0</tt> initially):
+<PRE><TT>CALL MZLIFT (0,L,LS,1,...)          create bank '3'
+      CALL MZLIFT (0,L,LS,1,...)          create bank '2'
+                                  LS now points to bank 2
+
+      CALL MZLIFT (0,L,LS,1,...)          create bank '1'
+                                  LS now points to bank 1
+
+      CALL MZDROP (0,LS,'.')              drop bank 1
+                                  LS now points again to bank 2
+
+if however the dropping is done with
+
+      CALL MZDROP (0,L,'.')               drop bank 1
+
+         then LS will be made to point to bank 2,
+         but L will continue to point to the (dead) bank 1.</TT></PRE>
+Since the parameter <tt>L</tt> in the call to <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZDROP>MZDROP</A> is not changed,
+selective dropping of banks in a linear structure can be done
+with a loop like this:
+<PRE><TT>L = start adr of the linear structure
+   12 IF (L.NE.0)  THEN
+          IF (bank not wanted)  CALL MZDROP (0,L,'.')
+          L = LQ(L)
+          GO TO 12
+        ENDIF</TT></PRE>
+<P>
+<H1><A NAME=SECTION00112000000000000000> MZWIPE - reset complete divisions to empty</A></H1>
+<P>
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZWIPE>MZWIPE</A> causes relocation normally.
+<P>
+By calling <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZWIPE>MZWIPE</A> the user can delete the contents of
+whole divisions:
+<P>
+<P><A NAME=MZWIPE>CALL MZWIPE (IXWIPE)</A><P>
+<P>
+with the parameter <tt>IXWIPE</tt> indicating the divisions
+of a particular store to be wiped out.
+<tt>IXWIPE</tt> may be any of the three possible forms of a division index:
+<P>
+<PRE><TT>a) specific division index, as returned by MZDIV
+
+  b) generic division index, [ IXSTOR + ] n, where
+
+        n = 21:  all user short range divisions
+            22:  all user long  range divisions
+            23:  all package divisions
+
+  c) compound division index, as created by MZIXCO, see there for details.</TT></PRE>
+<P>
+<tt>IXWIPE = 0</tt>  is taken to mean <tt>IXWIPE = 21</tt>,
+ie. all short range divisions in the primary store;
+similarily <tt>IXSTOR+21</tt> can be used.
+<P>
+Wiping divisions resets the divisions to be empty,
+but without reducing the space reserved for them,
+followed by a relocation pass to reset to zero all links
+pointing into the wiped divisions.
+Included into this pass are the links of all link areas,
+of the working space and of all divisions which are declared
+to point to the divisions in question
+(all of this for one particular store only, of course).
+<P>
+If several divisions are to be wiped out,
+this must be done by <i>one</i> call to <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZWIPE>MZWIPE</A>,
+and not by several calls in succession,
+to save the time of multiple relocation passes,
+each of which would take longer than the single pass.
+<P>
+<P><B>Examples:</B><P>for the primary store one has:
+<P>
+<PRE><TT>1) Wipe the last 'event':      CALL MZWIPE (0)
+
+  2) Wipe division 1:            CALL MZWIPE (1)
+
+  3) Wipe all user's divisions:  IX = MZIXCO (21,22,0,0)
+                                  CALL MZWIPE (IX)
+
+  4) Wipe divisions IX1, IX2, IX3, IX4, and IX5:
+
+                   IX = MZIXCO (IX1,IX2,IX3,IX4)
+                   IX = MZIXCO (IX,IX5,0,0)
+                   CALL MZWIPE (IX)</TT></PRE>
+<P>
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZWIPE>MZWIPE</A> operates by calling <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZGARB>MZGARB</A>, which will print a monitor
+log message at level 2.
+<P>
+<H1><A NAME=SECTION00113000000000000000> MZGARB - garbage collection requested by the user</A></H1>
+<P>
+Garbage collection is triggered by the system if there is not
+enough space to satisfy an <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZWORK>MZWORK</A> or <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZLIFT>MZLIFT</A> request
+(hopefully this does not normally occur).
+Thus the user does not have to worry about initiating
+garbage collection to win space in the dynamic store.
+To remove the last event from the store,
+the user calls <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZWIPE>MZWIPE</A> which is much more efficient
+than dropping the banks of the event followed by garbage collection.
+<P>
+He may however occasionally want to force a garbage collection
+to tidy up his data,
+particularly during the initialization phase of his program.
+Again, as in <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZWIPE>MZWIPE</A>, if there are several divisions to be tidied up,
+this must be done by <i>one</i> call to <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZGARB>MZGARB</A>.
+Also,
+if one or several divisions are to be wiped out at the same moment,
+this should be included into the call to <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZGARB>MZGARB</A>;
+one and the same relocation pass can handle wiping
+and garbage collection simultaneously.
+<P>
+The calling sequence is:
+<P>
+<P><A NAME=MZGARB>CALL MZGARB (IXGARB,IXWIPE)</A><P>
+<P>
+with
+<PRE><TT>IXGARB  index of the divisions where garbage
+              is to be collected (none if =0)
+
+      IXWIPE  index of the divisions to be wiped out
+              = 0:  no divisions to be wiped</TT></PRE>
+<P>
+Both <tt>IXGARB</tt> or <tt>IXWIPE</tt> may be any of the three possible forms
+of a division index:
+<PRE><TT>a) specific division index, as returned by MZDIV
+
+  b) generic division index, [ IXSTOR + ] n, where
+
+        n = 21:  all user short range divisions
+            22:  all user long  range divisions
+            23:  all package divisions
+
+  c) compound division index, as created by MZIXCO, see there for details.</TT></PRE>
+<P>
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZGARB>MZGARB</A> prints a monitor log message at level 2,
+but if the operation involves a garbage collection
+a message is given at level 1.
+<P>
+<H1><A NAME=SECTION00114000000000000000> MZXREF - set cross-reference between divisions</A></H1>
+<P>
+<A NAME=secMZXREF><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<P>
+To save time when wiping a given division (or divisions),
+and also on garbage collection,
+ZEBRA will relocate the links of only those divisions
+which reference the division(s) being changed.
+To know which division may have links pointing
+to which other division,
+ZEBRA keeps internally a cross-reference matrix;
+the entry for a given division is intialized by <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZDIV>MZDIV</A>
+and this may be modified by the user calling <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZXREF>MZXREF</A>:
+<P>
+<P><A NAME=MZXREF>CALL MZXREF (IXFROM,IXTO,chOPT)</A><P>
+<P>
+with
+<PRE><TT>IXFROM  index of the division which contains links pointing
+              to the divisions indicated by IXTO;
+              this must be the index of one particular division.
+
+        IXTO  index of the division(s) which are referenced
+
+       chOPT  character string of options:
+
+            none  set reference(s), ie. overwrite the previous
+                  content of the matrix entry
+               A  add reference(s), ie. add to the matrix entry,
+                  keeping what was there before
+               R  remove reference(s), ie. take the references
+                  out from the matrix entry, but keep the others
+                  (R over-rules A)
+               C  contained division, ie. clear the matrix entry
+                  (C over-rules A and R)
+
+      IXTO may be any of the three possible forms of a division index:
+
+        a) specific division index, as returned by MZDIV
+
+        b) generic division index, [ IXSTOR + ] n, where
+
+              n = 21:  all user short range divisions
+                  22:  all user long  range divisions
+                  23:  all package divisions
+                  24:  the system division
+
+        c) compound division index as created by MZIXCO.</TT></PRE>
+<P>
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZDIV>MZDIV</A> creates a division with its matrix row initialized
+(unless <tt>C</tt> option) as follows:
+<PRE><TT>user division:  references all other user divisions
+      package div.:  no references at all</TT></PRE>
+<P>
+Note: if division <tt>FR</tt> contains a bank which supports structurally
+banks in division <tt>TO</tt>,
+then the forward links point from division <tt>FR</tt> to division <tt>TO</tt>,
+but there are also the reverse links in the supported banks
+which point from division <tt>TO</tt> to division <tt>FR</tt>.
+As a result one would need both
+<PRE><TT>CALL MZXREF (IXFR,IXTO,'A')
+     and  CALL MZXREF (IXTO,IXFR,'A')</TT></PRE>
+<P>
+<P><B>Examples:</B><P>for the primary store one has:
+<P>
+<PRE><TT>1) User's division IXTHIS may reference all other user divisions:
+
+         nothing needs to be done, this is the default assumption
+
+  2) Division IXTHIS references only banks in division 2:
+
+                   CALL MZXREF (IXTHIS, 2, '.')
+
+  3) Division IXTHIS references only, but maybe all,
+     the short-range divisions:
+
+                   CALL MZXREF (IXTHIS, 21, '.')
+
+  4) Division IXTHIS references all short-range divisions
+     and also the long-range division IXLONG:
+
+                   CALL MZXREF (IXTHIS, 21, '.')
+                   CALL MZXREF (IXTHIS, IXLONG, 'A')
+
+  5) Division IXTHIS to reference all short-range divisions
+     except the division IXSH:
+
+                   CALL MZXREF (IXTHIS, 21, '.')
+                   CALL MZXREF (IXTHIS, IXSH, 'R')</TT></PRE>
+<P>
+To print the matrix entry for one particular division,
+or the complete cross-reference matrix of a store, one may
+<P>
+<P><A NAME=MZXRPR>CALL MZXRPR (IXDIV)</A><P>
+<P>
+with
+<PRE><TT>IXDIV  1) index of the division to be shown
+              2) = IXSTOR, index of the store to be shown</TT></PRE>
+<P>
+<H1><A NAME=SECTION00115000000000000000> MZIXCO - create compound division index</A></H1>
+<P>
+<A NAME=secMZIXCO><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/invis_anchor.xbm"></A>
+<P>
+A compound division index permits to indicate several divisions
+of the same store in one single word,
+as used with <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZWIPE>MZWIPE</A> for example.
+<P>
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZIXCO>MZIXCO</A> joins up to four division indices into a compound:
+<P>
+<P><A NAME=MZIXCO>IXCO = MZIXCO (IX1,IX2,IX3,IX4)</A><P>
+<P>
+If less than 4 indices are to be joined trailing zeros
+should be given.
+If more than 4 indices are to be joined this is done by
+repeated calls.
+<P>
+Any input parameter <tt>IXn</tt> may take any one of the three possible
+forms of a division index:
+<PRE><TT>a) specific division index, as returned by MZDIV
+
+  b) generic division index, [ IXSTOR + ] n, where
+
+        n = 21:  all user short range divisions
+            22:  all user long  range divisions
+            23:  all package divisions
+            24:  the system division
+
+  c) compound division index, created by a previous call to MZIXCO.</TT></PRE>
+<P>
+<P><B>Examples:</B><P>for the primary store one has:
+<P>
+<PRE><TT>1) Compound to give divisions 1 and 2:
+
+                   IXCO = MZIXCO (1,2,0,0)
+
+  2) Compound to give divisions 1, 2, and IXHITS:
+
+                   IXCO = MZIXCO (1,2,IXHITS,0)
+
+  3) Compound to give all short-range divisions and IXCUMU:
+
+                   IXCO = MZIXCO (21,IXCUMU,0,0)
+
+[ 4) Compound to give all user divisions of the store
+     whose index is IXSTOR:
+
+                   IXCO = MZIXCO (IXSTOR+21,IXSTOR+22,0,0) ]</TT></PRE>
+<P>
+<H2><A NAME=SECTION00115100000000000000> Format of the division index</A></H2>
+<P>
+<PRE><TT>bits 25, 26, 32    non-zero is illegal
+
+      bit 31  zero:     simple index
+              one:     compound index
+
+      bits 27-30 :     the number of the store,
+                         zero for the primary store
+
+Division JDIV is selected if
+
+     simple index:      the value of bits 1-24 is JDIV
+   compound index:      bit JDIV is present
+
+JDIV may be 1 to 20 for that particular division,
+         or it may be generic with:
+
+          JDIV = 21:  user's short range divisions
+                 22:  user's  long range divisions
+                 23:  package divisions
+                 24:  system division</TT></PRE>
+<P>
+<H1><A NAME=SECTION00116000000000000000> MZFORM <i>et al.</i> - handle the I/O characteristic</A></H1>
+<P>
+<A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZFORM>MZFORM</A> may cause garbage collection.
+<P>
+The nature of the contents of any bank which is to be transported
+from one computer to another one has to be indicated to ZEBRA,
+such that it can do the necessary tranformations.
+In the simplest case that all the data words of a bank are
+of the same type, this is easily indicated in the parameters
+to <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZLIFT>MZLIFT</A> or <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZBOOK>MZBOOK</A>.
+For anything more complicated the user specifies the &quot;format&quot;
+of the bank by calling <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZIOBK>MZIOBK</A> or <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZFORM>MZFORM</A> which encode the format
+into a variable number of words to be included into each bank
+in the system part as the &quot;I/O characteristic&quot;.
+<P>
+Thus the content description is carried by each bank;
+this avoids complicated logistics of finding bank descriptors
+elsewhere than in the bank itself.
+Complex bank contents require a relatively large number
+of extra system words.
+This could represent a substantial overhead on memory
+or file space occupation,
+which the user can avoid in the design of his bank contents.
+Anyway, the number of these extra descriptor words is limited to 16,
+and any descriptor which would need more is refused.
+Thus ZEBRA will not handle any arbitrary bank contents
+via this basic procedure,
+but by using the concept of the &quot;self-describing&quot; sector (see below)
+the user can indeed store any kind of information mix,
+decided at execution time, into a bank and have it travel
+from one computer to another one.
+<P>
+<H2><A NAME=SECTION00116100000000000000> Sectors</A></H2>
+<P>
+The basic element for setting up an I/O characteristic is the sector,
+which is a number of words consecutive in the bank which are
+all of the same type.
+A sector is described in the <tt>format</tt> parameter to <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZFORM>MZFORM</A> <i>et al.</i>
+as a combination of its word-count <tt>&quot;c&quot;</tt> and 
+its type <tt>&quot;t&quot;</tt> as  <tt>&quot;ct&quot;</tt>.
+For example, <tt>24F</tt> is a sector of 24 single-precision floating-point numbers,
+<tt>24D</tt> is a sector of 24 words holding 12 double-precision numbers,
+and  <tt>1I</tt> is a sector of one integer word.
+<P>
+The possible values for <tt>&quot;t&quot;</tt> are:
+<PRE><TT>t =  B   bit string of 32 bits, right justified
+           I   integer
+           F   floating-point
+           D   double precision
+           H   4-character Hollerith
+           S   self-describing sector (see below)</TT></PRE> 
+A ``static'' sector is a sector of a fixed number of words,
+such as the <tt>24F</tt> of the example above.
+<P>
+An ``indefinite-length'' sector is a sector whose end is defined
+by the end of the bank.
+This is written as  <tt>-t</tt>, for example  <tt>-F</tt>  signals that the rest
+of the bank is all floating-point words.
+<P>
+A ``dynamic'' sector is a sector which is preceded in the bank
+by a single positive integer word indicating the sector length;
+if this number is zero this means that the rest of
+the bank is currently unused.
+This is written as  <tt>*t</tt>, for example  <tt>*F</tt>  indicates
+a dynamic sector of type floating.
+<P>
+Thus the word-count <tt>&quot;c&quot;</tt> in the sector specification is written as:
+<PRE><TT>c =  n   numeric, n words:       static length sector
+           -   all remaining words:    indefinite length sector
+           *   dynamic length sector</TT></PRE> 
+A ``self-describing'' sector is a dynamic sector whose type
+is also encoded into the one word preceding the sector as
+<PRE><TT>word 0  =  16*NW + IT
+
+      with  NW = length of the sector
+            IT = numeric representation of the type
+                 =  1  B bit string    2  I integer
+                    3  F floating      4  D double precision
+                    5  H Hollerith
+                    6  (reserve)       7  (special)</TT></PRE> 
+The form <tt>&quot;nS&quot;</tt> is meaningless;
+the form <tt>&quot;*S&quot;</tt> indicates one particular sector;
+the form <tt>&quot;-S&quot;</tt> is <i>special</i> in that it indicates
+that the rest of the bank is filled by self-describing sectors,
+as many as there may be.
+(Thus the forms, for example, <tt>'4I 5F / *S'</tt> and <tt>'4I 5F -S'</tt> are
+equivalent, but the second form is more economic;
+the user may give either, the internal result will be the
+second form.)
+<P>
+<H2><A NAME=SECTION00116200000000000000> Complete Characteristics</A></H2>
+<P>
+Looking now at the bank as a whole,
+we divide it into a &quot;leading part&quot; and a &quot;trailing part&quot;,
+either of which may be empty.
+<P>
+The leading part consists of one region of maybe several sectors,
+occurring once at the beginning of the bank.
+This leading region may end with an indefinite-length sector,
+in which case the trailing part is empty.
+<P>
+The trailing part of the bank may be empty or it may consist
+of an indefinite number of regions which
+<i>all have the same structure</i>,
+such that the same format description is valid for all of them.
+<P>
+The symbol <tt>&quot;/&quot;</tt> marks the break between the leading region
+and the trailing regions in the format parameter to <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZFORM>MZFORM</A> <i>et al.</i>
+<P>
+<P><B>Examples:</B><P><PRE><TT>trailing part empty:
+
+      '-F'         the whole bank is floating
+      '3I -F'      the first 3 words are integer, the rest is F
+      '*I -F'      the first word n=IQ(L+1) is a positive integer,
+                   words 2 to n+1 are integers, the rest is F
+      '3B *I -F'   the first sector consists of 3 words bit-string,
+                   the second sector is dynamic of type integer,
+                   the rest of the bank is floating
+      '3I *F'      the first 3 words are integer, followed by a
+                   dynamic sector of type F, the rest (if any) of
+                   the bank is currently unused</TT></PRE>
+<P>
+<PRE><TT>both parts present
+
+      '3B 7I / 2I 4F 16D'  the leading region has 3 B and 7 I words,
+                           each trailing region consists of 2 integer
+                           words, followed by 4 F words, followed
+                           by 16 D words, ie. 8 double-precision numbers
+      '4I / *H'    the bank starts with 4 integer words,
+                   the rest is filled with dynamic Hollerith sectors
+      '*I / 2I *F' the leading region is one dynamic I sector,
+                   each trailing region consists of 2 integers
+                   followed by a dynamic F sector
+                   (ie. 3 integers plus a number of floating words
+                    this number being indicated by the 3rd integer)
+
+leading part empty
+
+      '/ *H'       the bank is filled with dynamic Hollerith sectors
+      '/ 4I 29F'   4 integers and 29 floating numbers alternate</TT></PRE>
+<P>
+<H2><A NAME=SECTION00116300000000000000> Economic formats</A></H2>
+<P>
+It is in the interest of the user to design his bank contents
+such that the I/O characteristic is as simple as possible,
+because the number of system words in any bank increases
+with the complexity of the lay-out.
+&quot;Simple&quot; means: as few sectors to be described as possible.
+<PRE><TT>For example:  '2B 2I 2B 2I 2B 2I -F' is much less simple then
+               '6B 6I -F'.</TT></PRE> 
+Moreover, if the integers described by this format are sure to
+be positive integers, then one can use the even simpler form
+<tt>'12B -F'</tt>.
+<P>
+In the following we give an exhaustive list of the most
+economic bank formats, those requiring zero or one extra system
+word in the banks.
+<P>
+<H2><A NAME=SECTION00116400000000000000> Zero extra I/O words</A></H2>
+<P>
+These bank formats can be described by the 16 bits of the
+I/O control-byte alone:
+<PRE><TT>(0)  '-t' or '*t'
+        'ct -t'           if c &lt; 64   (c=* is represented as c=0,
+          or 'ct *t'                   hence  '*t -t'  is a sub-case)
+   (1)  '*t *t -t'
+   (2)  '*t *t *t'
+   (3)  'ct / *t'         if c &lt; 64
+        '/ ct *t'         if c &lt; 64
+        '/ ct'            this is useful only if c=*
+                          else the form '-t' is used
+   (4)  '*t / *t *t'
+        '*t *t / *t'
+   (5)  '/ *t *t *t'</TT></PRE> 
+<H2><A NAME=SECTION00116500000000000000> One extra I/O word</A></H2>
+<P>
+These bank formats can be described by the 16 bits of the
+I/O control-byte plus the 32 bits of one extra I/O word:
+<PRE><TT>(1)  'ct -t'
+        'ct ct -t'        if c &lt; 65536
+        'ct ct ct -t'     if c &lt; 1024
+   (2)  'ct *t'
+        'ct ct *t'        if c &lt; 65536
+        'ct ct ct *t'     if c &lt; 1024
+   (4)  'ct / ct'         if c &lt; 65536
+        'ct / ct ct'      if c &lt; 1024
+        'ct / ct ct ct'   if c &lt; 256
+        'ct ct / ct'      if c &lt; 1024
+        'ct ct / ct ct'   if c &lt; 256
+   (5)  '/ ct ct'         if c &lt; 65536
+        '/ ct ct ct'      if c &lt; 1024        (remember:
+        '/ ct ct ct ct'   if c &lt; 256          c=0 means c=*)</TT></PRE>
+<P>
+Three routines are provided to mediate between the user
+specifying the bank format in a readable form
+and the highly encoded I/O characteristic
+to be included into any bank at creation time.
+<P>
+<H2><A NAME=SECTION00116600000000000000> <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZIOCH>MZIOCH</A></A></H2>
+<P>
+analyses the format <tt>chFORM</tt> to convert and pack it into
+the output vector <tt>IOWDS</tt>.
+This is the basic routine,
+but it is usually called by the user only to specify formats
+of objects other than banks, like the user header vector for <A HREF=../../zebra/ZEBFZ2/chapter2_1.html#FZOUT>FZOUT</A>.
+<P>
+To specify bank formats the following two routines serve more
+conveniently:
+<P>
+<H2><A NAME=SECTION00116700000000000000> <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZIOBK>MZIOBK</A></A></H2>
+<P>
+is provided for the context of <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZLIFT>MZLIFT</A>;
+like <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZIOCH>MZIOCH</A> it analyses the format <tt>chFORM</tt>,
+but it stores the result as part of the bank-description vector
+<tt>NAME</tt> for <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZLIFT>MZLIFT</A>.
+<P>
+<H2><A NAME=SECTION00116800000000000000> <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZFORM>MZFORM</A></A></H2>
+<P>
+again analyses the format <tt>chFORM</tt>,
+but it does not return the result to the user.
+Instead,
+it remembers the I/O characteristic in a system data-structure,
+returning to the user only the index to the characteristic
+in the system.
+The user may then either pass this index to <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZBOOK>MZBOOK</A> (or <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZLIFT>MZLIFT</A>)
+at bank creation time,
+or alternatively he may request <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZBOOK>MZBOOK</A> (or <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZLIFT>MZLIFT</A>) to search
+the system data-structure for the I/O characteristic
+associated to the Hollerith identifier <tt>IDH</tt> of the bank to be
+created.
+<P>
+The first word of the I/O characteristic delivered by <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZIOCH>MZIOCH</A> 
+or <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZIOBK>MZIOBK</A> has the following redundant format:
+<PRE><TT>|       16       |    5    |     5     | 6 bits|
+          |----------------------------------------------|
+          |  control-byte  |  NWXIO  |  NWXIO+1  |     1 |
+          |----------------|---------|-----------|-------|</TT></PRE>
+The I/O index delivered by <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZFORM>MZFORM</A> has the following format:
+<PRE><TT>|       16       |    5    |     5     | 6 bits|
+          |----------------------------------------------|
+          |      index     |    0    |  NWXIO+1  |     2 |
+          |----------------|---------|-----------|-------|</TT></PRE> 
+where NWXIO is the number of extra I/O words,
+ie. the total length of the characteristic is NWXIO+1.
+<P>
+<H2><A NAME=SECTION00116900000000000000> Typing rules for chFORM</A></H2>
+<P>
+The format should be typed giving the &quot;ct&quot; for each sector,
+in the order in which they occur in the bank, as shown in the
+examples.
+Leading, interspersed, and trailing blanks (also comma or dot)
+for aeration are allowed and ignored.
+<P>
+Single-word sectors must be typed as '1t', 't' alone is illegal.
+<P>
+The c for double-precision sectors gives the number of words,
+thus 14D specifies 7 double-precision numbers; 7D is illegal.
+<P>
+<P><A NAME=MZIOCH>CALL MZIOCH (IOWDS*,NWIO,chFORM)</A><P>
+<P>
+with
+<PRE><TT>IOWDS*  the I/O words to receive the result,
+                   a vector dimensioned to NWIO
+
+             NWIO  the maximum size of IOWDS, &lt; 17
+
+           chFORM  the format as a CHARACTER string</TT></PRE>
+<P>
+<P><A NAME=MZIOBK>CALL MZIOBK (NAME*,NWMM,chFORM)</A><P>
+<P>
+with
+<PRE><TT>NAME*  the bank description vector for MZLIFT,
+                   the resulting characteristic will be stored
+                   into the I/O words starting at NAME(5),
+                   the IDH contained in NAME(1) will be used
+                   if diagnostics are necessary,
+                   a vector dimensioned to NWMM
+
+             NWMM  the maximum size of NAME, &lt; 21
+
+           chFORM  the format as a CHARACTER string</TT></PRE> 
+<P><A NAME=MZFORM>CALL MZFORM (chIDH,chFORM,IXIO*)</A><P>
+<P>
+with
+<PRE><TT>chIDH  the Hollerith IDH of the bank, type CHARACTER
+
+           chFORM  the format as a CHARACTER string
+
+            IXIO*  returns the index to the characteristic stored
+                   in a system data-structure,
+                   this can be passed to MZBOOK/MZLIFT,
+                   in which case it must not be modified</TT></PRE>
+<P>
+<P><B>Examples:</B><P><PRE><TT>DIMENSION    IOHEAD(4), MMLIFT(8)
+
+      CALL MZIOCH (IOHEAD,4, '8I -F')             for an FZIN user header
+      CALL MZIOBK (MMLIFT,8, '2I / 2I 8F')        for MZLIFT
+      CALL MZFORM ('RCBC', '2I/2I 8F'), IORCBC)   for reference by index</TT></PRE>
+<P>
+People creating data outside Zebra,
+but destined to be read by FZ of Zebra,
+will have to know the representation of the I/O characteristic
+stored into any bank:
+<P>
+The physically first word of any bank contains:
+<P>
+<PRE><TT>right half:  NOFF = NIO + NL + 12
+   (bits 1-16)   where  NIO: the number of extra
+                              I/O descriptor words for the bank
+                        NL: the number of links in the bank
+
+
+   left half:   the I/O control byte, which controls the
+   (bits 17-32)  interpretation of the I/O characteristic</TT></PRE>
+<P>
+In the simplest cases the I/O control byte alone specifies
+the nature of the data in the bank, without needing extra
+descriptor words (in which case NIO is zero).
+We give here the translation of some of these cases:
+<P>
+<PRE><TT>-B:  0001             *B:  0009
+       -I:  0002             *I:  000A
+       -F:  0003             *F:  000B
+       -D:  0004             *D:  000C
+       -S:  0007</TT></PRE>
+<P>
+For example: suppose one were to prepare a bank with
+two links and 4000 data words which are all un-signed
+32-bit integer (type B), a bank which is to travel
+in link-less mode such that all standard links are zero:
+<P>
+<PRE><TT>word 1   0001 000E     -B | NOFF = 14
+        2   zero          link 2
+        3   zero               1
+        4   zero          link next
+        5   zero               up
+        6   zero               origin
+        7   IDN           numeric ID
+        8   IDH           Hollerith ID
+        9   2             number of links
+       10   1, say        number of structural links
+       11   4000          number of data words
+       12   zero          status word
+                          bits 19-22 give NIO, here zero
+       13   data word 1
+            ...
+     4012   data word 4000</TT></PRE>
+<P>
+Note that the status word contains NIO on bits 19-22
+to allow Zebra to reach the start-of-bank.
+<P>
+It is impraticable to tabulate the translation of more
+complicated formats. There is a little program <tt>DIOCHAR</tt>
+to interactively take a format <tt>chFORM</tt>, translate it
+and display the result in hexadecimal.
+This is not yet properly installed on the CERN machines,
+but on the Apollo people at CERN can run it by giving
+the command <kbd>/user/zoll/uty/diochar</kbd>
+<P>
+The subroutine <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZIOTC>MZIOTC</A> is provided to convert an encoded
+IO characteristic back into printable form.
+One may hand to this routine the address of a bank and
+receive its IO characteristic in a <tt>CHARACTER</tt> variable.
+Alternatively one may pass to it an integer array as delivered
+by <A HREF=../../zebra/ZEBMZ1/chapter2_1.html#MZIOCH>MZIOCH</A> for back-conversion to <tt>CHARACTER</tt>,
+for example the IO characteristic of a user-header vector
+read with <A HREF=../../zebra/ZEBFZ2/chapter2_1.html#FZIN>FZIN</A>.
+<P>
+<P><A NAME=MZIOTC>CALL MZIOTC (IXST, !L, NCHTR*, chIOTR*)</A><P>
+<P>
+or
+<P>
+<P> CALL MZIOTC (IOWDS, 0, NCHTR*, chIOTR*)<P>
+<P>
+with
+<PRE><TT>IXST  the index of the store holding the bank,
+                          or of any of its divisions
+               !L  the address of the bank
+
+            IOWDS  the integer array with the encoded characteristic
+                   (L must be zero in this case)
+
+           NCHTR*  number of useful characters stored into chIOTR
+                   = 0 if trouble
+
+          chIOTR*  the CHARACTER variable to receive the characteristic</TT></PRE>
+<P>
+The routine returns zero in <tt>NCHTR</tt> if L is non-zero and not
+a valid bank address,
+or if <tt>chIOTR</tt> is not long enough.
+<P>
+ <H2>References</H2>
+<P><A NAME=BIBLIO HREF=../../general/biblio/bibliography.html>Global CERN library references</A><P>/user/goossens/cnasall/cnasbibl,/user/goossens/cnasall/textproc}    
+<HR> <A NAME=tex2html19 HREF=tex2htmlindex2_2.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/next_motif.gif"></A> <A NAME=tex2html17 HREF=ZEBMZ1.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/up_motif.gif"></A> <A NAME=tex2html11 HREF=ZEBMZ1.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/previous_motif.gif"></A>  <A NAME=tex2html21 HREF=tex2htmlindex2_2.html><IMG ALIGN=MIDDLE SRC="http://asis01.cern.ch/CN/CERNTEX/icons/index_motif.gif"></A><BR>
+<B> Next:</B> <A NAME=tex2html20 HREF=tex2htmlindex2_2.html>Index</A>
+<B>Up:</B> <A NAME=tex2html18 HREF=ZEBMZ1.html>No Title</A>
+<B> Previous:</B> <A NAME=tex2html12 HREF=ZEBMZ1.html>No Title</A>
+<HR> <P>
+<HR>
+
+</BODY>
+<P><ADDRESS>
+goossens@cern.ch
+</ADDRESS>

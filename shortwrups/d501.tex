@@ -1,0 +1,326 @@
+\Version {LEAMAX}                                \Routid{D501}
+\Keywords{CONSTRAIN, NON, LINEAR, LEAST, SQUARES, MAXIMUM, LIKELIHOOD,
+DATA, FIT, FITTING, ESTIMATION}
+\Author{W. M\"onch, B. Schorr}                   \Library{MATHLIB}
+\Submitter{W. M\"onch}                           \Submitted{15.03.1993}
+\Language{Fortran}                              %\Revised{}
+\Cernhead {Constrained Non-Linear Least Squares and Maximum
+            Likelihood Estimation}
+{\tt LEAMAX} is a portable collection of
+subprograms for solving general non-linear least squares problems,
+non-linear data fitting problems, and maximum likelihood estimations.
+ 
+Subroutine subprograms
+{\tt RSUMSQ}, {\tt RFUNFT}, {\tt RMAXLK} and
+{\tt DSUMSQ}, {\tt DFUNFT}, {\tt DMAXLK}
+calculate an approximation to a minimum of an  objective function
+$\varphi$ , with respect to $n$ unknown parameters
+$a = (a_1,...,a_n) \mathbf{^T} \in \mathbf{R^n}$ : \\ [3mm]
+\begin{DL}{1234}
+\item[{\bf (S)}] The general non-linear least squares problem
+$$ \varphi_S(a) \ = \ \frac{1}{2}
+\sum_{i=1}^m\, [f_i(a)]^2,$$
+\item[{\bf (F)}] The least squares data fitting problem
+$$ \varphi_F(a) \ = \ \frac{1}{2} \sum_{i=1}^m\,
+\left[\frac{y_i-f(x_i,a)}{\sigma_i}\right]^2,$$
+\item[{\bf (M)}] The maximum likelihood estimation
+$$ \varphi_M(a) \ = \ -\sum_{i=1}^m\, \ln (f(x_i,a)),$$
+\end{DL}
+subject to bounds on the variables of the form
+$$ \underline{a}_j \le a_j \le \overline{a}_j
+   \mbox{\hspace{1cm}} (j=1,2,\ldots,n).$$
+The functions $f_i : \mathbf{R^n} \to \mathbf{R^1}$ $(i=1,...,m)$
+and $f : \mathbf{R^k} \times \mathbf{R^n} \to \mathbf{R^1}$ are
+arbitrary non-linear functions with respect to the argument $a$.
+In the case of the data fitting problem {\bf (F)}, a set of observation
+data $\{(x_i,y_i) | x_i \in \mathbf{R^k},
+y_i \in \mathbf{R^1},i=1,...,m \}$ with their corresponding
+weights $\sigma_i$ $(i=1,...,m)$ has to be provided,
+whereas for the maximum likelihood estimation {\bf (M)}, the set of data
+points $\{(x_i) | x_i \in \mathbf{R^k},i=1,...,m\}$ belongs to the input
+of the problem.
+ 
+These subprograms are based on the algorithm described by
+Mor\'e (Ref. 1) for finding the solution of a general non-linear least
+squares problem by using the Levenberg-Marquardt algorithm.
+The method is completed
+by an active set strategy for handling simple box constraints to the
+unknown parameters (see {\bf Long Write-up} for details).
+The necessary derivatives can either be supplied by the user
+(subprogram {\tt SUB}) or are approximated numerically.
+In the case of a non-linear data fitting problem, approximations to
+the covariance matrix and the standard deviations of the model
+parameter estimators are also provided.
+ 
+On computers other than CDC or Cray, only the double-precision versions
+{\tt DSUMSQ}, {\tt DFUNFT}, {\tt DMAXLK} are available. On CDC and
+Cray computers, only the single-precision versions
+{\tt RSUMSQ}, {\tt RFUNFT}, {\tt RMAXLK} are available.
+\newpage
+\Structure
+{\tt SUBROUTINE} subprograms\\
+User Entry Names: \Rdef{RSUMSQ}, \Rdef{RFUNFT}, \Rdef{RMAXLK},
+\Rdef{DSUMSQ}, \Rdef{DFUNFT}, \Rdef{DMAXLK} \\
+Internal Entry Names: {\tt D501L1}, {\tt D501L2}, {\tt D501SF},
+{\tt D501P1}, {\tt D501P2}, {\tt D501N1}, {\tt D501N2} \\
+External References:
+  \begin{tabular}[t]{@{}llll}
+     \Rind{RGEQPF}{F001},&\Rind{RORMQR}{F001},&
+       \Rind{RTRTRS}{F001}, &\Rind{DGEQPF}{F001},\\
+     \Rind{DORMQR}{F001},&\Rind{DTRTRS}{F001},&
+       \Rind{RVSET}{F002},  &\Rind{RVSCL}{F002}, \\
+     \Rind{RVSUB}{F002}, &\Rind{RVCPY}{F002}, &
+       \Rind{RVMPY}{F002},  &\Rind{DVSET}{F002}, \\
+     \Rind{DVSCL}{F002}, &\Rind{DVSUB}{F002}, &
+       \Rind{DVCPY}{F002},  &\Rind{DVMPY}{F002}, \\
+     \Rind{RMSET}{F003}, &\Rind{RMSCL}{F003}, &
+       \Rind{RMCPY}{F003},  &\Rind{RMMPY}{F003}, \\
+     \Rind{RMBIL}{F003}, &\Rind{DMMLT}{F003}, &
+       \Rind{DMSET}{F003},  &\Rind{DMSCL}{F003}, \\
+     \Rind{DMCPY}{F003}, &\Rind{DMMPY}{F003}, &
+       \Rind{DMBIL}{F003},                       \\
+     \Rind{RMMLT}{F004}, &\Rind{DMMLT}{F004}, &
+     \Rind{RSINV}{F012}, &\Rind{DSINV}{F012}     \\
+     \multicolumn{4}{@{}l}{User-supplied {\tt SUBROUTINE} subprogram}
+  \end{tabular}
+\Usage
+For $\mathtt{t = R}$ (type {\tt REAL}),
+$\mathtt{t = D}$ (type {\tt DOUBLE PRECISION}):
+ 
+{\bf (S) General non-linear least squares problem}
+\begin{verbatim}
+    CALL tSUMSQ(SUB,M,N,NC,A,AL,AU,MODE,EPS,MAXIT,IPRT,
+   +            MFR,IAFR,PHI,DPHI,COV,STD,W,NERROR)
+\end{verbatim}
+{\bf (F) Least squares data fitting problem}
+\begin{verbatim}
+    CALL tFUNFT(SUB,K,M,N,NX,NC,X,Y,SY,A,AL,AU,MODE,EPS,MAXIT,IPRT,
+   +            MFR,IAFR,PHI,DPHI,COV,STD,W,NERROR)
+\end{verbatim}
+{\bf (M) Maximum likelihood estimation}
+\begin{verbatim}
+    CALL tMAXLK(SUB,K,M,N,NX,X,A,AL,AU,MODE,EPS,MAXIT,IPRT,
+   +            MFR,IAFR,PHI,DPHI,W,NERROR)
+\end{verbatim}
+\begin{DLtt}{123456}
+\item[SUB] Name of user-supplied {\tt SUBROUTINE} subprogram,
+declared {\tt EXTERNAL} in the calling program.
+This subprogram must provide the values of the functions
+$f_i(a) \; (i=1, \ldots , m)$,  $f( \cdot , a)$,
+and, if $\mathtt{MODE = 1}$, the values of the derivatives
+$\partial f_i(a) / \partial a_j  \; $ and
+$\partial f(\cdot , a) / \partial a_j  \; $
+$(i=1, \ldots , m ; j=1, \ldots ,n)$  (see {\bf Examples}).
+\item[K] ({\tt INTEGER}) Cases {\bf (F)} and {\bf (M)}: dimension $k$
+of a data point (observation) $x_i \in \mathbf{R^k}$.
+\item[M] ({\tt INTEGER}) Case {\bf (S)}:
+number of non-linear functions $f_i$;
+cases {\bf (F)} and {\bf (M)}: number of data points (observations).
+\item[N] ({\tt INTEGER}) Number of unknown parameters $a$.
+\item[NX] ({\tt INTEGER}) Cases {\bf (F)} and {\bf (M)}: declared first
+dimension of array {\tt X} in the calling program, $\mathtt{NX \ge K}$.
+\item[NC] ({\tt INTEGER}) Cases {\bf (S)} and {\bf (F)}: declared
+first dimension of array {\tt COV} in the calling program,
+$\mathtt{ NC \ge N}$.
+\item[X] (Type according to {\tt t}) Cases {\bf (F)} and {\bf (M)}:
+two-dimensional array of dimension $\mathtt{(NX , \ge M)}$.
+On entry, {\tt X} must contain the data set \{ $x_i$ \} (the $i$-th
+column of {\tt X} belongs to the data point $x_i \in \mathbf{R^k}$ ,
+    $i=1,...,m$).
+\item[Y] (type according to {\tt t}) Case {\bf (F)}: one-dimensional
+array of length $\mathtt{ \ge M}$, contains, on entry, the data set
+ \{ $y_i$ \}.
+\item[SY] (type according to {\tt t}) Case {\bf (F)}: one-dimensional
+array of length $\mathtt{ \ge M}$, contains, on entry, the weights
+\{ $\sigma_i$ \} of the data points.
+\item[A] (Type according to {\tt t}) One-dimensional array of length
+$\mathtt{\ge N}$. On entry, {\tt A(J)} must contain the starting
+value of $a_j$ for the Levenberg-Marquardt algorithm.
+On exit, {\tt A(J)} contains an approximation to $a_j$ of a minimum
+point (if the algorithm was successful).
+\item[AL] (Type according to {\tt t}) One-dimensional array of length
+$\mathtt{\ge N}$. On entry, {\tt AL(J)} must contain the lower bound
+$\underline{a}_j$   of $a_j$  .
+\item[AU] (Type according to {\tt t}) One-dimensional array of length
+$\mathtt{\ge N}$. On entry, {\tt AU(J)} must contain the upper
+bound $\overline{a}_j$ of $a_j$  .
+\item[MODE] ({\tt INTEGER})
+\item[] $\mathtt{ = 0:}$ The derivatives are approximated by divided
+                         differences.
+\item[] $\mathtt{ = 1:}$ The derivatives are to be supplied by subprogram
+                         {\tt SUB}.
+\item[] Other values for {\tt MODE} are treated as {\tt MODE = 0}.
+\item[EPS] (Type according to {\tt t}) User-supplied tolerance used to
+control the termination criterion. {\tt EPS} should be chosen according
+to the accuracy required by the problem and the machine
+accuracy {\tt t} (recommended value on entry: between
+$\mathtt{10^{-6}}$ for {\tt t = R} , and $\mathtt{ 10^{-12}}$ for
+{\tt t = D}, respectively).
+\item[MAXIT] ({\tt INTEGER}) Maximum permitted number of iterations.
+\item[IPRT] ({\tt INTEGER}) Printing control.
+\item[] $\mathtt{ = 0:}$ no printing of intermediate results,
+\item[] $\mathtt{ = \pm L:}$ \parbox[t]{136mm}{
+printing of intermediate results at
+every $\mathtt{|L|}$-th iteration; if $\mathtt{IPRT < 0}$, printing of
+all input parameters of {\tt tSUMSQ}, {\tt tFUNFT}, {\tt tMAXLK},
+respectively, in addition.}
+\item[MFR] ({\tt INTEGER}) On exit, {\tt MFR} contains the number of
+free variables at the solution point.
+\item[IAFR] ({\tt INTEGER}) One-dimensional array
+of length $\mathtt{\ge 2*N}$ for cases {\bf (S)} and {\bf (F)}, and of
+length $\mathtt{\ge N}$ for case {\bf (M)}, used as working space.
+On exit, the first {\tt MFR} elements of {\tt IAFR} contain the
+indices of the free variables at the solution point.
+\item[PHI]  (Type according to {\tt t}) On exit, {\tt PHI} contains the
+value of the objective function $\varphi$ at the solution point.
+\item[DPHI] (Type according to {\tt t}) One-dimensional array of length
+$\mathtt{\ge N}$.
+On exit, {\tt DPHI(J)} contains the derivative
+$\partial \varphi / \partial a_j$  of $\varphi$ with
+respect to $a_j$ (j-th component of the gradient of $\varphi$)
+at the solution point.
+\item[COV] (Type according to {\tt t}) Cases {\bf (S)} and {\bf (F)}:
+two-dimensional array of dimension $\mathtt{(NC , \ge N)}$. On exit,
+{\tt COV} contains an approximation to the covariance matrix.
+\item[STD] (Type according to {\tt t}) Cases {\bf (S)} and {\bf (F)}:
+one-dimensional array of length $\mathtt{\ge N}$. On exit, {\tt STD(J)}
+contains an approximation to the standard deviation of the estimator
+of the model parameter $a_j$.
+\item[W] (Type according to {\tt t}) One-dimensional array of length
+$\mathtt{\ge 9*N+4*M+2*M*N+3*N*N}$ for cases {\bf (S)} and {\bf (F)},
+and of length $\mathtt{\ge 7*N+2*N*N}$ for case {\bf (M)}, used as
+working space.
+\item[NERROR] ({\tt INTEGER}) Error indicator. On exit:
+\item[]$\mathtt{ = 0:}$ No error or warning detected.
+\item[]$\mathtt{ = 1:}$ \parbox[t]{139mm}{
+At least one of the constants {\tt K}, {\tt M}, {\tt N}, {\tt NX},
+{\tt NC}, {\tt MAXIT} is illegal or at least for one $j$ the relation
+$ \underline{a}_j \leq \overline{a}_j$ is not true.}
+\item[]$\mathtt{ = 2:}$
+The maximum number {\tt MAXIT} of iterations has been reached.
+\item[]$\mathtt{ = 3:}$ \parbox[t]{139mm}{
+The objective function $\varphi$ or its derivative is not defined for
+the current values of the parameter vector $a$.}
+\item[]$\mathtt{ = 4:}$ \parbox[t]{139mm}{
+Cases {\bf (S)} and {\bf (F)}:
+The routines {\tt tGEQPF}, {\tt tORMQR}, {\tt tTRTRS} in the Linear
+Algebra package {\tt LAPACK} (F001) were unable to solve the linear
+least squares problem or the subprogram {\tt tSINV} (F012) was unable
+to compute the covariance matrix. \\
+Case {\bf (M)}: the routine {\tt tSINV} (F012) was unable to solve
+the normal equations.}
+\end{DLtt}
+ 
+\newpage
+\Examples
+For the user-supplied {\tt SUBROUTINE} subprogram {\tt SUB} write for
+instance in the case $\mathtt{t = D}$: \\
+ 
+{\bf (S)} Objective function (Brown badly-scaled function, $n=2,\,m=3$):
+$$ \varphi_S(a) \ = \ \frac{1}{2} \:
+\left[(a_1-10^6)^2+(a_2-2\cdot 10^{-6})^2+(a_1a_2-2)^2 \right] $$ .
+\begin{verbatim}
+      SUBROUTINE SUB(N,A,M,F,DF,MODE,NERROR)
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      PARAMETER (Z0 = 0)
+      DIMENSION A(*),F(*),DF(M,*)
+      NERROR=0
+      F(1)=A(1)-1D6
+      F(2)=A(2)-2D-6
+      F(3)=A(1)*A(2)-2
+      IF(MODE .NE. 1) RETURN
+      CALL DMSET(M,N,Z0,DF(1,1),DF(1,2),DF(2,1))
+      DF(1,1)=1
+      DF(2,2)=1
+      DF(3,1)=A(2)
+      DF(3,2)=A(1)
+      RETURN
+      END
+\end{verbatim}
+ 
+{\bf (F)} Objective function (Bard function, $n=3,\,m=15,\,k=3$):
+$$ \varphi_F(a) \ = \ \frac{1}{2} \, \sum_{i=1}^m \:
+\left[y_i - \left(a_1+ \frac{x_{1,i}}{x_{2,i}\,a_2+x_{3,i}\,a_3}\right)
+\right]^2 $$ .
+\begin{verbatim}
+      SUBROUTINE SUB(K,X,N,A,F,DF,MODE,NERROR)
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DIMENSION A(*),X(*),DF(*)
+      T=X(2)*A(2)+X(3)*A(3)
+      IF (T .EQ. 0) THEN
+       NERROR=3
+      ELSE
+       NERROR=0
+       F=A(1)+X(1)/T
+       IF(MODE .NE. 1) RETURN
+       DF(1)=1
+       DF(2)=-X(1)*X(2)/T**2
+       DF(3)=-X(1)*X(3)/T**2
+      ENDIF
+      RETURN
+      END
+\end{verbatim}
+ 
+\newpage
+{\bf (M)} Objective function ($n=1,\,m=100,\,k=1$):
+$$ \varphi_M(a) \ = \ -\:\sum_{i=1}^m\, \ln \: \left\{
+\frac{1}{a_1\sqrt{\pi}} \, \exp \left[- \,\frac{1}{2} \,
+\left(\frac{x_{1,i}-1}{a_1} \right)^2 \right] \right\} $$ .
+\begin{verbatim}
+      SUBROUTINE SUB(K,X,N,A,F,DF,MODE,NERROR)
+      IMPLICIT DOUBLE PRECISION (A-H,O-Z)
+      DIMENSION A(*),X(*),DF(*)
+      PARAMETER (PIR = 0.56418 95835 47756 287D0)
+      NERROR=3
+      IF(A(1) .LE. 0) RETURN
+      T=0.5D0*((X(1)-1)/A(1))**2
+      F=PIR*EXP(-T)/A(1)
+      NERROR=0
+      IF(MODE .EQ. 1) DF(1)=-F*(1-2*T)/A(1)**2
+      RETURN
+      END
+\end{verbatim}
+ 
+In all three cases the parameters {\tt K} , {\tt N} ,
+{\tt A} , {\tt M} , {\tt MODE} , {\tt NERROR} are as declared
+above. The other parameters are the following:
+ 
+\begin{DLtt}{1234}
+\item[F] (Type according to {\tt t})
+Case {\bf (S)}: one-dimensional array of length $\mathtt{\ge M}$.
+  {\tt F(I)} must contain the function value
+  $f_i(a)$ at $a$ $(i=1, \ldots ,m)$, on exit. \\
+Cases {\bf (F)} and {\bf (M)}:  {\tt F} must contain the function value
+$f(x,a)$ at $(x,a)$, on exit.
+\item[DF] (Type according to {\tt t}) If {\tt MODE = 1}     values of
+{\tt DF} are supplied by {\tt SUB}. For other values of {\tt MODE} the
+parameter {\tt DF} is not referenced. \\
+Case {\bf (S)}: two-dimensional array of dimension $\mathtt{(M, \ge N)}$.
+{\tt DF(I,J)} must contain the value of the partial derivative
+  $\partial f_i(a) / \partial a_j $ at $a$,
+  $(i=1, \ldots , m ; j=1, \ldots ,n)$, on exit. \\
+Cases {\bf (F)} and {\bf (M)}: one-dimensional array of length
+$\mathtt{ \ge N}$.
+{\tt DF(J)} must contain the value of the partial   derivative
+  $\partial f(x, a) / \partial a_j$, $(j=1, \ldots ,n)$,
+  on exit.
+\item[X] (Type according to {\tt t}) Cases {\bf (F)} and {\bf (M)}:
+one-dimensional array of length $\mathtt{\ge K}$ for {\bf one}
+data point $x_i \in \mathbf{R^k}$ (in contrast to above declaration).
+\end{DLtt}
+ 
+\Refer
+\begin{enumerate}
+\item J.J. Mor\'e, The Levenberg-Marquardt algorithm: Implementation
+ and theory, In: Numerical Analysis, G.A. Watson (Ed.), Lecture Notes
+ in Mathematics 630, Springer-Verlag, New York (1977) 105-116.
+\item {\AA}.Bj\"orck: Solution of Equations in $\mathbf{R^n}$
+(Part 1: Least Squares Methods).
+      In: Handbook of Numerical Analysis,
+      P.G.Ciarlet, J.L.Lions (Eds.),
+      North-Holland, Amsterdam, New York, Oxford,
+      Tokyo, 1990, 467-636.
+\item R.Fletcher: Practical Methods of Optimization.
+      John Wiley and Sons, Chichester, 2nd Edition, 1987.
+\end{enumerate}
+$\bullet$

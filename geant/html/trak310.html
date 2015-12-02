@@ -1,0 +1,87 @@
+<PRE>
+
+
+
+
+<H2>Geant  3.16  Routine  TRAK310</H2>
+
+
+<PRE>
+
+
+Origin:  F.Carminati                            Submitted:  14.12.93
+Revision:                                                            Revised:  14.12.93
+Documentation:
+
+
+</PRE>  <HR>  <H2>Altering  the  order  of  tracking
+secondary  particles</H2>
+
+
+<PRE>
+
+
+When  secondary  particles  are  produced  during
+particle  transport,  if  the  user  wants  to
+transport  them  in  turn,  they  must  be  stored  by  a
+call  to  GSKING  or  GSKPHO  onto  the  temporary  stack
+JSTAK.  As  explained  in  [TRAK310],  this  is  a  LIFO
+structure,  where  the  last  particle  introduced  is
+the  first  to  be  extracted  to  be  transported.  It
+may  be  sometimes  interesting  to  alter  the  order
+of  tracking,  for  instance  to  decide  whether  the
+current  event  is  worth  completing  or  whether  it
+should  be  skipped  to  go  to  next  one.
+
+
+It  is  possible  in  GEANT  to  alter  the  behaviour  of
+the  JSTAK  structure  using  one  of  the  words  of  the
+stack,  normally  reserved  for  the  user.  Stack
+ordering  is  activated  via  the  data  record  SORD  1.
+This  will  set  to  1  the  variable  ISTORD  in  common
+/GCSTAK/,  which  is  by  default  initialised  to  0.
+
+
+When  stack  ordering  is  activated,  the  routine
+GLTRAC,  which  fetches  the  next  particle  to  be
+tracked  from  JSTAK,  instead  of  the  last  one,  will
+select  the  one  with  the  maximum  value  of  the  user
+word.  This  user  word  must  be  set  by  the  user  in  the
+variable  UPWGHT  in  the  common  /GCTRAK/  prior  to
+the  call  to  GSKING  to  store  each  secondary.
+
+
+If,  for  instance,  all  the  protons  must  be  tracked
+first,  in  order  of  production,  and  all  the  other
+particles  after,  again  according  to  their  time  of
+production,  the  following  code  should  appear  in
+GUSTEP:
+           SUBROUTINE  GUSTEP
++SEQ,GCTRAK,GCKING
+           .
+           .
+           .
+           DO  10  IG=1,NGKINE
+*---                Younger  particles  tracked  first
+*---                Add  to  the  current  time  of  flight  the  time  delay  of
+*---                the  secondary
+                UPWGHT  =  -TOFG-TOFD(IG)
+                IPART  =  GKIN(5,IG)
+
+
+
+                IF(IPART.EQ.14)  THEN
+*---                This  is  a  proton,  add  a  100  microseconds  to  have  it
+*---                tracked  first
+                      UPWGHT  =  UPWGHT+1E-4
+                ENDIF
+*---                Now  store  the  particle  in  the  GEANT  stack
+                CALL  GSKING(IG)
+    10    CONTINUE
+
+
+Users  should  be  aware  of  the  fact  that  ordering
+the  stack  will  change  the  results,  because
+transport  depends  on  random  numbers  which  will  be
+different  for  the  same  particle  in  the  two  cases.
+</PRE>

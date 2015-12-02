@@ -1,0 +1,233 @@
+<PRE>
+
+
+
+
+<H2>Geant  3.16  Routine  CONS001</H2>
+
+
+<PRE>
+
+
+Origin:                                                            Submitted:  01.10.84
+Revision:                                                            Revised:  17.12.93
+Documentation:  F.Bruyant
+
+
+</PRE>  <HR>  <H2>Introduction  to  the  section
+CONS</H2>
+
+
+<PRE>
+
+
+</PRE>
+
+
+<H2>Introduction</H2>
+
+
+<PRE>
+
+
+The  setup  where  the  particles  are  transported  is
+represented  by  a  structure  of  geometrical
+volumes.  Each  volume  is  filled  with  matter  (which
+can  have  the  properties  of  the  vacuum  in  case  of
+it  contains  no  matter).
+
+
+The  matter  composing  the  volumes  is  described  via
+two  sets  of  attributes.  The  first  set  is  relative
+to  the  nature  of  the  material  composing  the
+volume,  and  contains  information  such  as  the
+atomic  number,  the  atomic  weight,  the  density  and
+so  on  (see  the  description  of  the  routine  GSMATE
+in  this  section  for  more  information).
+
+
+The  second  set  of  attributes  is  relevant  to  the
+process  of  particle  transport  and  they  define  a
+so-called  tracking  medium.  These  are  parameters
+such  as  the  material  composing  the  volume,  the
+magnetic  field,  the  required  tracking  precision,
+the  maximum  energy  that  can  be  lost  in  one  step
+and  so  on  (see  the  description  of  the  routine
+GSTMED  in  this  section  for  more  information).
+
+
+Each  tracking  medium  refers  to  a  material  via  a
+material  number  which  is  assigned  by  the  user.
+Different  tracking  media  can,  with  some
+limitation,  refer  to  the  same  material.
+
+
+Each  volume  is  filled  by  a  tracking  medium
+identified  by  a  medium  number.  Different  volumes
+may  have  the  same  medium  number  (see  [GEOM]).
+
+
+The  transport  of  particles  through  a  setup
+([TRAK])  requires  access  to  data  which  describe:
+
+
+   *   the  geometry  of  the  setup;
+   *   the  material  and  tracking  medium  parameters;
+
+
+
+   *   the  particle  properties.
+
+
+The  section  [CONS]  contains  the  routines  for  the
+storage  and  retrieval  of  information  related  to
+materials,  tracking  media  and  the  particles.
+
+
+Important  note:  many  entities  in  GEANT  are
+user-defined  via  a  subroutine  call.  One  of  the
+arguments  of  this  subroutine  is  a  integer  number
+which  identifies  the  entity.  Examples  are
+materials,  tracking  media,  particles  and  so  on.
+It  can  be  tempting,  for  booking  purposes,  to  use
+very  large  numbers.  For  instance,  in  a  large
+detector,  the  number  of  all  the  materials  in  the
+hadronic  calorimeter  could  be  1001< =    I< =    2000.
+Even  if  these  conventions  are  very  handy,  they
+can  introduce  a  performance  penalty.
+
+
+For  reasons  of  speed,  the  number  provided  by  the
+user  is  used  directly  as  the  number  of  the  link  in
+the  ZEBRA  data  structure  indicating  where  to
+store  the  pointer  to  the  bank  containing  the
+information  on  the  entity.  ZEBRA  pointers  are
+contiguous.  Defining  an  object  with  a  user  number
+of  1000  forces  ZEBRA  to  allow  space  for  1000
+links.  This  entails  a  loss  of  space  (999  words),
+but  much  worse  than  that,  induces  ZEBRA  to
+believe  that  there  are  in  fact  999  more  banks.  At
+every  operation  which  causes  a  relocation  of
+banks,  ZEBRA  will  check  all  the  possible  links,
+which  can  be  very  time  consuming.
+
+
+So  values  of  user-defined  entities  must  be  kept
+as  small  as  possible  and  contiguous.  In  large
+applications  one  could  write  a  routine  which
+returns  the  next  free  number  to  be  allocated,
+which  can  then  be  stored  in  a  variable  and  always
+referenced  symbolically,  freeing  the  user  from
+the  need  to  define  ranges.  As  an  example  we  give
+here  a  function  performing  this  operation  for  the
+material  number:
+           FUNCTION  NEXTMA()
++SEQ,  GCBANK
+           IF(JMATE.LE.0)  THEN
+                NEXTMA  =  1
+           ELSE
+                DO  10  IMAT  =  1,  IQ(JMATE-2)
+                      IF(LQ(JMATE-IMAT).EQ.0)  GOTO  20
+    10         CONTINUE
+    20         NEXTMA  =  IMAT
+           ENDIF
+           END
+
+
+</PRE>
+
+
+<H2>Materials</H2>
+
+
+
+<PRE>
+
+
+The  material  constants  are  stored  in  the  data
+structure  JMATE  via  the  routine  GSMATE  and  can  be
+retrieved  via  the  routine  GFMATE  and  printed  via
+the  routine  GPMATE.  The  routine  GMATE  calls
+repeatedly  the  routine  GSMATE  to  define  a
+standard  set  of  materials,  but  its  use  is  not
+mandatory.  Mixtures  of  basic  materials,
+compounds  or  molecules  with  atoms  from  different
+basic  materials,  may  also  be  defined  and  their
+characteristics  are  stored  in  the  structure
+JMATE,  through  calls  to  the  routine  GSMIXT.
+Mixtures  of  compounds  are  allowed.
+
+
+Quantities  such  as  energy  loss  and  cross-section
+tables  (see  [PHYS]),  computed  during  the
+initialisation  of  the  program  are  stored  in  the
+structure  JMATE.  These  can  be  accessed  through
+the  routine  GFTMAT  and  plotted  or  printed  through
+the  routines  GPLMAT  and  GPRMAT  respectively.
+
+
+</PRE>
+
+
+<H2>Tracking  media</H2>
+
+
+<PRE>
+
+
+The  tracking  medium  parameters  are  stored  in  the
+data  structure  JTMED  by  the  routine  GSTMED.
+Details  about  these  parameters  are  given  in
+[TRAK].  They  can  be  accessed  with  the  routine
+GFTMED  and  printed  with  the  routine  GPTMED.
+
+
+The  correctness  of  the  transport  process  and  thus
+the  reliability  of  the  results  obtained  with
+GEANT  depend  critically  on  the  values  of  the
+tracking  medium  parameters.  To  help  the  user,
+most  of  the  parameters  are  recalculated  by
+default  by  GEANT  irrespective  of  the  value
+assigned  by  the  user.  Advanced  users  can  control
+the  value  of  the  parameters  thus  bypassing  the
+automatic  computation.  See  the  description  of  the
+routine  GSTMED  for  more  information.
+
+
+The  tracking  thresholds,  and  other  parameters  and
+flags  that  control  the  physics  processes,  defined
+in  GINIT  and  possibly  modified  through  the
+relevant  data  records,  are  also  stored  in  the
+structure  JTMED.  These  parameters  can  be
+redefined  for  each  tracking  medium  via  the
+routine  GSTPAR.
+
+
+</PRE>
+
+
+<H2>Particles</H2>
+
+
+
+<PRE>
+
+
+The  parameters  of  the  particles  transported  by
+GEANT  are  stored  in  the  data  structure  JPART  via
+the  routine  GSPART.  The  decay  properties  of
+particles  are  defined  via  the  routine  GSDK.  The
+particle  constants  can  be  accessed  with  the
+routine  GFPART  and  printed  with  the  routine
+GPPART.
+
+
+The  routine  GPART  defines  the  standard  table  of
+particles,  branching  ratios  and  decay  modes.  This
+routine  needs  to  be  called  for  the  GEANT  system  to
+work  properly.  GPART  calls  the  routine  GSPART  for
+the  particle  properties  and  GSDK  for  the  decays
+for  each  particle  in  the  standard  GEANT  table.
+The  user  may  call  GSPART  and  GSDK  to  extend  or
+modify  the  table  defined  by  GPART.
+</PRE>

@@ -1,0 +1,850 @@
+head	1.2;
+access;
+symbols;
+locks
+	goossens:1.2; strict;
+
+
+1.2
+date	98.08.19.11.49.47;	author goossens;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	94.03.14.14.50.11;	author goossens;	state Exp;
+branches;
+next	;
+
+
+desc
+@ Initial checkin
+@
+
+
+1.2
+log
+@Reference version for on wwwasd/cernlib/minuit
+@
+text
+@%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%   MINUIT User Guide -- LaTeX Source                             %
+%                                                                 %
+%   Chapter 3                                                     %
+%                                                                 %
+%   The following external EPS files are referenced:              %
+%                                                                 %
+%   Editor: Michel Goossens / CN-AS                               %
+%   Last Mod.:  1 June 1992 10:10 mg                              %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ 
+\chapter{How to Use Minuit}
+
+\section{The Function FCN.}
+The user must always supply a Fortran subroutine which calculates
+the function value to be minimized or analyzed.
+\medskip
+\Shubr{FCN}{(NPAR,GRAD,FVAL,XVAL,IFLAG,FUTIL)}
+
+\begin{DLtt}{1234567}
+\item[{\rm\bf Input parameters}] \mbox{}
+\item[NPAR]  number of currently variable parameters.
+\item[XVAL]  vector of (constant and variable) parameters.
+\item[IFLAG] Indicates what is to be calculated (see example below).
+\item[FUTIL] Name of utilitary routine (if needed, it
+             must be declared \texttt{EXTERNAL} and provided by the user).
+\item[{\rm\bf Output parameters}] \mbox{}
+\item[FVAL]  The calculated function value.
+\item[GRAD]  The (optional) vector of first derivatives).
+\end{DLtt}
+
+Note that when Minuit is being used through an intermediate package such as
+HBOOK or PAW, then the \Rind{FCN} may be supplied by the this package.
+
+\begin{center}\small\textbf{Example of \texttt{FCN} routine}\end{center}
+\begin{alltt}\footnotesize
+        SUBROUTINE FCN(NPAR,GRAD,FVAL,XVAL,IFLAG,FUTIL)
+        IMPLICIT DOUBLE PRECISION (A-H,O-Z)  !  for 32-bit machines
+        DIMENSION GRAD(*),XVAL(*)
+        EXTERNAL FUTIL   !    (if needed and supplied by user)
+C-
+        IF (IFLAG .EQ. 1)  THEN
+C           read input data,
+C           calculate any necessary constants, etc.
+        ENDIF
+        IF (IFLAG .EQ. 2)  THEN
+C           calculate GRAD, the first derivatives of FVAL
+C           (this is optional)
+        ENDIF
+C             Always calculate the value of the function, FVAL,
+C             which is usually a chisquare or log likelihood.
+C                  Optionally, calculation of FVAL may involve
+        FTHEO = FUTIL(....)
+C                  It is responsability of user to pass
+C                  any parameter values needed by FUTIL,
+C                  either through arguments, or in a COMMON block
+         IF (IFLAG .EQ. 3)  THEN
+C            will come here only after the fit is finished.
+C            Perform any final calculations, output fitted data, etc.
+        ENDIF
+        RETURN
+        END
+\end{alltt}
+
+The name of the subroutine may be chosen freely (in documentation we
+give it the generic name \Rind{FCN}) and must be declared \texttt{EXTERNAL} in the
+user's program which calls Minuit (in data-driven mode) or calls
+Minuit subroutines (in Fortran-callable mode).
+The meaning of the parameters \texttt{XVAL} is of course defined by
+the user, who uses the values of those parameters to calculate his
+function value.
+The starting values must be specified by the user
+(either by supplying parameter
+definitions from a file, or typing them at the terminal,
+in data-driven mode; or
+by calling subroutine \Rind{MNPARM} in Fortran-callable mode),
+and later values are determined by Minuit as it searches for the
+minimum or performs whatever analysis is requested by the user.
+\Rind{FUTIL} represents the name of a function or subroutine which may
+be defined and supplied by the user and called from \Rind{FCN}.
+If the user does not use the \Rind{FUTIL} feature, the last argument
+may be given as zero, but if used, the name of \Rind{FUTIL} must
+be declared \texttt{EXTERNAL} and a subprogram of that name must be
+supplied at loading time.
+ 
+It is possible, by giving them different names, to analyze several
+different \Rind{FCN}s in one job.
+However, one analysis must be completed before the next is started.
+In order to avoid interference between the analyses of two different
+\Rind{FCN}s, the user should call Minuit (in data-driven mode) or \Rind{MNINIT}
+(in Fortran-callable mode) each time a new \Rind{FCN} is to be studied.
+
+\section{Running Minuit in Data-driven Mode.}
+
+Minuit can be run in two different modes:
+{\bf Data-driven mode}
+\index{data driven mode}
+\index{mode!data driven}
+means that the user drives Minuit with data, either typed
+interactively from a terminal or from a data file in batch; and
+\index{Fortran-callable mode}
+\index{mode!Fortran-callable}
+{\bf Fortran-callable mode}
+means that Minuit is driven directly from Fortran subroutine
+calls, without data.
+To some extent, the two modes may also be mixed.
+This section describes the first mode, and is valid for both
+interactive and batch running.
+The differences between interactive and batch are described in
+a separate subsection below.
+ 
+\index{data driven mode}
+\index{mode!data driven}
+In {\bf data-driven mode}, the user must supply,
+in addition to the subroutine \Rind{FCN}, a
+{\bf main program} which includes the following
+statements (the statements in upper case are required, those
+given in lower case are optional):
+
+\begin{center}\small\textbf{Example of main program when using Minuit in data
+    driven mode}
+\end{center}
+\begin{alltt}\footnotesize
+      EXTERNAL FCN
+      external futil
+      call mintio(ird,iwr,isav)
+      CALL MINUIT(FCN,futil)
+\end{alltt}
+
+The name of \Rind{FCN} may be chosen freely, and is communicated
+to Minuit as its first argument.
+\Rind{FUTIL} is the generic name of a function or subroutine which the
+user may optionally call from \Rind{FCN}, and if he does call such
+a routine, he must declare it external and communicate its
+name to Minuit as well.  If \Rind{FUTIL} is not used, then the second
+argument may be put equal to \texttt{0}, 
+and need not be declared \texttt{EXTERNAL}; if \Rind{FUTIL} is
+declared \texttt{EXTERNAL}, it must be supplied in the loading process.
+
+\newpage
+
+\Shubr{MINTIO}{(IREAD,IWRITE,ISAVE)}
+
+\medskip\Action
+The purpose of \Rind{MINTIO} is to communicate to Minuit the I/O units.
+
+\begin{DLtt}{1234567}
+\item[{\rm\bf Input parameters}] \mbox{}
+\item[IREAD]  Fortran unit number for reading (default 5).
+\item[IWRITE] Fortran unit number for writing (default 6).
+\item[Isave]  Fortran unit number for saving (default 7).
+\end{DLtt}
+
+\index{input/output units}
+
+If the default values are acceptable, then it is not necessary to
+call \Rind{MINTIO}.
+It is the user's responsibility that the I/O units are properly
+opened for the appropriate operations.
+ 
+\subsection*{Note}
+ 
+In data-driven mode, that is with \texttt{CALL}~\Rind{MINUIT}, you should
+{\bf not call \Rind{MNINIT}}, since Minuit takes care of all
+initialization. 
+To change unit numbers, call \Rind{MINTIO} 
+{\bf before calling \Rind{MINUIT}}.
+ 
+In order that control returns to the user program after
+\texttt{CALL MINUIT}, the last command in the corresponding Data Block
+should be \Cind[RETurn]{RETURN}.  
+If the last command is \Cind{EXIT} or \Cind{STOP},
+then Minuit will execute a Fortran \texttt{STOP}, and if the last
+command is \Cind{END}, Minuit will read a new Data Block from the current
+input unit.
+ 
+\subsection{Data to drive Minuit}
+ 
+In data-driven mode, either interactively or in batch,
+Minuit reads the following data provided by the user:
+
+\begin{UL}
+\item {\bf Title:} (a string of 50 characters or less)
+      which can be chosen freely by the user, to help identify the job.
+\item {\bf Parameter definitions:} for each parameter one record giving:
+      \begin{OL}
+      \item {\bf The parameter number.}
+            This is the index in the array \texttt{XVAL} by which the
+            user function \Rind{FCN} will access the value of the parameter.
+      \item {\bf The parameter name.}
+            A string of ten characters to help the user in
+            reading the Minuit output.
+      \item {\bf The starting value} of the parameter.
+      \item {\bf The starting step size,}
+             or expected uncertainty in this parameter,
+             if it is to be a variable parameter. Otherwise blank or zero if the
+             value is to be constant.
+      \item [Optional] The {\bf lower bound}
+            (limit) below which the parameter value must not vary.
+      \item [Optional] The {\bf upper bound}
+            (limit) above which the parameter value must not vary.
+      \end{OL}
+      Normally the user should {\bf not} specify limits on the parameters, that is
+      both should be left blank. If one limit is specified, then BOTH must
+      be specified. The properties of limits are explained elsewhere
+      in this document.
+ 
+      The format of the parameter definitions may be either
+      fixed-field (each item in a field of width ten columns),
+      or in free-field format.
+      In the free-field format, items are separated by blanks or one comma,
+      and the parameter name must be given between single quotes.
+      The program assumes free-field format if it finds two single
+      quotes in the line.
+      Parameter names will be blank-padded or truncated to be
+      ten characters long.
+\item {\bf A blank record:} indicates the end of parameter definitions.
+\item If the user \Rind{FCN} reads input data from the same input stream as the
+       Minuit data (the default stream is \texttt{UNIT 5}),
+       then the \texttt{FCN} data should appear here.
+\item {\bf Minuit commands:} these specify actions which should be performed by Minuit.
+       Commands must not contain leading or embedded blanks, but may be
+       truncated to three characters, and may be given in upper or lower case.
+       Some commands have numerical arguments, and these may be given in
+       free-field format, separated by blank(s) or one comma\footnote{%
+       In older versions of Minuit, there was a special format for the \Cind{MINOs}
+       command, when specifying a list of parameters; the new Minuit reads
+       the \Cind{MINOs} command with the same free-field format as the other
+       commands, so if parameter numbers are specified, they must now
+       be separated by a blank or comma.}.
+       The list of recognized commands is given and explained below.
+       The command \Cind{HELP} causes Minuit to write to the output stream a list
+       of currently recognized commands.
+       The command \Cind{HELP SHOw} lists the available \Cind{SET} 
+       and \Cind{SHOw} commands.
+\end{UL}
+
+Any or all of the above data read by Minuit
+can reside on one or more different files,
+and Minuit can be instructed
+to switch to reading a different file with the \Cind[SET INPut]{SET INPUT} command.
+Optionally, the {\bf title} record may be preceeded by a record
+beginning with the characters \Cind[SET TITle]{SET TITLE}, and the
+{\bf parameter definitions} may be preceeded by a record
+beginning with the characters \Cind[PARameters]{PARAMETERS}.
+It is in fact recommended always to include these optional
+records when preparing a data file, since the file can then be
+read at any time (not just at the beginning of a Minuit run)
+and will always be interpreted correctly by Minuit.
+ 
+\begin{center}\small\textbf{Example of a typical Minuit data set}\end{center}
+\begin{alltt}\footnotesize
+SET TITLE
+Fit to time distribution of K decays, Expt NA94
+PARAMETERS
+1 'Real(X)'  0.  .1
+2 'Imag(X)'  0.  .1
+5 'Delta M'  .535   .01
+10 'K Short LT'  .892
+11 'K Long LT'   518.3
+ 
+fix 5
+migrad
+set print 0
+minos
+restore
+migrad
+minos
+fix 5
+set param  5   0.535
+mncontour 1 2
+stop
+\end{alltt}
+
+\subsection{Batch and interactive running.}
+
+\index{batch run}
+\index{interactive session}
+In its initialization phase, Minuit attempts to determine whether
+or not it is running interactively, by calling the logical function
+\Rind{INTRAC}, a routine in the CERN Program Library which can
+be provided for all commonly used computers.
+For our purposes, we define ``running interactively'' as meaning that
+input is coming from a terminal under the control of an intelligent
+being, able to make decisions based on the output he receives at
+the terminal. It is not always easy for \Rind{INTRAC} to know whether this
+is the case, so, depending on your operating system, Minuit can be
+fooled in certain cases. When this happens, the user can always override
+the beliefs of \Rind{INTRAC} with the commands \Cind{SET BATch} and
+\Cind{SET INTeractive}. 
+The command \Cind{SHOw INTeractive} informs the user of the current mode.
+ 
+According to whether or not it believes it is running interactively,
+Minuit behaves differently in the following ways:
+
+\begin{UL}
+\item If interactive, the user is prompted before each data record is read.
+\item If interactive, Minuit recovers from many error conditions
+      and prompts the user to enter correct data or to specify
+      additional required input.
+      If the same error conditions occur in batch mode, the program either
+      exits (if no corrective action seems possible) or ignores the incorrect
+      data (for example, a command it cannot interpret) and continues.
+\item The default page size for output is a typical terminal dimension
+      (80 by 24) if interactive, and a typical printed page size (120 by 56)
+      if batch, but these can be overridden with the commands 
+      \Cind[SET WIDthpage]{SET WIDth} and \Cind[SET LINesperpage]{SET LINes}.
+\end{UL}
+
+When an interactive user requests Minuit to read
+further input from an external file (the \Cind{SET INPut} command),
+then further input is considered to be temporarily
+in batch mode, until input reverts to the primary input stream.
+
+\section{Running Minuit in Fortran-callable mode.}
+
+The following Minuit subroutines are provided in order to allow
+the user to communicate with Minuit and perform all Minuit
+functions (define parameters, execute commands, etc.) directly
+from Fortran through subroutine calls.
+In the following list of subroutines, output arguments are indicated
+by appending a star \texttt{*} to its name.
+It should also be noted that for the Double Precision version of
+Minuit (recommended for all 32-bit machines such as IBM, Vax,
+Unix workstations, etc.), all the \texttt{REAL} arguments given below must be
+declared \texttt{DOUBLE PRECISION}.
+
+\subsection{Initialize Minuit}
+ 
+\Shubr{MNINIT}{(IRD,IWR,ISAV)}
+ 
+\begin{DLtt}{123456}
+\item[{\rm\bf Input parameters:}]
+\item[IRD]  Unit number for input to Minuit.
+\item[IWR]  Unit number for output from Minuit.
+\item[ISAV] Unit number for use of the SAVE command.
+\end{DLtt}
+ 
+\subsection{Specify a title for a problem}
+ 
+\Shubr{MNSETI}{(CTITLE)}
+ 
+\begin{DLtt}{123456}
+\item[{\rm\bf Input parameter:}]
+\item[CTITLE] Character string of up to 50 characters containing
+              an identification text for the present job or fit.
+\end{DLtt}
+ 
+\subsection{Define a parameter, assigning values from variables}
+ 
+\Shubr{MNPARM}{(NUM,CHNAM,STVAL,STEP,BND1,BND2,IERFLG*)}
+ 
+\begin{DLtt}{123456}
+\item[{\rm\bf Input parameters:}]
+\item[NUM]    Parameter number as referenced by user in \Rind{FCN}.
+\item[CHNAM]  Character string of up to 10 characters containing
+              the name which the user assigned to the given parameter.
+\item[STVAL]  Starting value
+\item[STEP]   Starting step size or approximate parameter error.
+\item[BND1]   Lower bound (limit) on parameter value, if any (see below).
+\item[BND2]   Upper bound (limit) on parameter value, if any (see below).
+\item[{\rm\bf Output parameter:}]
+\item[IERFLG] Error return code: \texttt{0} if no error, \texttt{>0} if request failed.
+\end{DLtt}
+ 
+If \texttt{BND1=BND2=0.}, then the parameter is considered unbounded, which
+is recommended unless limits are needed to make things behave well.
+
+\subsection{Define a parameter, assigning values from character string}
+       Subroutine MNPARS defines a new (or redefines an old) parameter
+specifying values for its number, name, starting value, step size, and
+limits if any.  All these values are given in one character string as
+if it was being read from the input stream.  It can therefore be used
+in place of MNPARM if the character string format is more convenient
+than the calling sequence of MNPARM.
+
+Calling sequence:
+
+\Shubr{MNPARS}{(CHSTR,ICONDN*)}
+
+\begin{DLtt}{123456}
+\item[{\rm\bf Input parameter:}]
+\item[CHSTR] String specifies the parameter definition in the usual Minuit
+  format, as on a data record (See 3.2.1). The fields are in the same order
+  as the arguments to MNPARM
+\item[{\rm\bf Output parameter:}]
+\item[ICONDN] Output condition
+\end{DLtt}
+\begin{DLtt}{123456789}
+\item[{\rm\bf Possible values of output condition:}]
+\item[ICONDN=0]    all OK
+\item[ICONDN=1]    error, attempt to define parameter is ignored
+\item[ICONDN=2]    end of parameter definitions (parameter number zero)
+\end{DLtt}
+
+{\rm\bf Example:}
+\begin{verbatim}
+      CALL MNPARS(' 15  ''Lambda Mass''  1.2, 0.1' , ICONDN)
+\end{verbatim}
+
+
+\subsection{Execute a Minuit command}
+ 
+\Shubr{MNEXCM}{(FCN,CHCOM,ARGLIS,NARG,IERFLG*,FUTIL)}
+ 
+\begin{DLtt}{123456}
+\item[{\rm\bf Input parameters:}]
+\item[FCN]    Name of the function being analyzed (to be declared \texttt{EXTERNAL})
+\item[CHCOM]  Character string containing the name of the Minuit
+              command to be executed (see below).
+\item[ARGLIS] Array of dimension \texttt{MAXARG}, containing the numeric arguments 
+              to the command (if any),
+\item[NARG]   Number of arguments specified (\texttt{NARG}$\leq${MAXARG}),
+\item[FUTIL]  Name of a function called by \Rind{FCN} (or \texttt{=0} if not used).
+              If used this function must be declared \texttt{EXTERNAL}.
+\item[{\rm\bf Output parameter:}]
+\item[IERFLG] Error return code: \texttt{0} if the command was executed normally, 
+              \texttt{>0} otherwise.
+\end{DLtt}
+ 
+Executing a command by calling \Rind{MNEXCM} has exactly the same
+effect as reading the same command in data-driven mode, except that
+a few commands would make no sense and are not available in
+Fortran-callable mode (e.g. \Cind[SET INPut]{SET INPUT}).
+The other difference is that {\bf control always returns to the
+calling routine from \Rind{MNEXCM}}, even after commands \Cind{END},
+\Cind{EXIT}, and \Cind{STOP}.
+
+\subsection{Execute a Minuit command specified as a character string}
+   Subroutine MNCOMD causes the execution of the Minuit command specified
+as the second argument.  It therefore works like MNEXCM, except that it
+accepts the entire command with arguments as one character string.
+This is more convenient in many cases and avoids problems of word length
+matching (DOUBLE PRECISION constants).
+
+\Shubr{MNCOMD}{(FCN,CHSTR,ICONDN*,FUTIL)}
+
+\begin{DLtt}{123456}
+\item[{\rm\bf Input parameters:}]
+\item[FCN]    Name of the function being analyzed (to be declared \texttt{EXTERNAL})
+\item[CHSTR]  The full Minuit command with arguments (CHARACTER)
+\item[FUTIL]  Name of a function called by \Rind{FCN} (or \texttt{=0} if not used).
+              If used this function must be declared \texttt{EXTERNAL}.
+\item[{\rm\bf Output parameter:}]
+\item[ICONDN] Error return code: \texttt{0} if the command was executed normally, 
+              \texttt{>0} otherwise.
+\end{DLtt}
+ 
+\begin{DLtt}{123456789}
+\item[{\rm\bf Some abnormal conditions:}]
+\item[ICONDN=1]  command was blank, ignored
+\item[ICONDN=2]  command line was unreadable, ignored
+\item[ICONDN=3]  command was unknown, ignored
+\item[ICONDN=4]  abnormal termination (e.g., MIGRAD not converged)
+\end{DLtt}
+ 
+\subsection{Get the current value of a parameter}
+
+This routine is the inverse of \Rind{MNPARM} and
+can for instance be used after a fit.
+
+\Shubr{MNPOUT}{(NUM,CHNAM*,VAL*,ERROR*,BND1*,BND2*,IVARBL*)}
+ 
+\begin{DLtt}{123456}
+\item[{\rm\bf Input parameter:}]
+\item[NUM]    Parameter number as referenced by user in \Rind{FCN} and
+              about which information is required.
+\item[{\rm\bf Output parameters:}]
+\item[CHNAM]  Character string of up to 10 characters containing
+              the name which the user assigned to the given parameter.
+\item[VAL]    Current parameter value (fitted value if fit has converged),
+\item[ERROR]  Current estimate of parameter uncertainty (or zero if constant)
+\item[BND1]   Lower limit on parameter value, if any (otherwise zero).
+\item[BND2]   Upper limit on parameter value, if any (otherwise zero).
+\item[IVARBL] Internal parameter number if parameter is variable, or
+              zero if parameter is constant, or negative if parameter is undefined.
+\end{DLtt}
+ 
+\subsection{Get the current status of minimization}
+
+\Shubr{MNSTAT}{(FMIN*,FEDM*,ERRDEF*,NPARI*,NPARX*,ISTAT*)}
+ 
+\begin{DLtt}{123456}
+\item[{\rm\bf Output parameters:}]
+\item[FMIN]   The best function value found so far
+\item[FEDM]   The estimated vertical distance remaining to minimum
+\item[ERRDEF] The value of \texttt{UP} defining parameter uncertainties
+\item[NPARI]  The number of currently variable parameters
+\item[NPARX]  The highest (external) parameter number defined by user
+\item[ISTAT]  A status integer indicating how good is the covariance matrix:
+              \begin{DLtt}{1}
+                \item[0] Not calculated at all
+                \item[1] Diagonal approximation only, not accurate
+                \item[2] Full matrix, but forced positive-definite
+                \item[3] Full accurate covariance matrix (After \Cind[MIGrad]{MIGRAD}, 
+                         this is the indication of normal convergence.)
+              \end{DLtt}
+\end{DLtt}
+ 
+\subsection{Get the current value of the covariance matrix}
+
+\Shubr{MNEMAT}{(EMAT*,NDIM)}
+ 
+\begin{DLtt}{123456}
+\item[{\rm\bf Input parameter:}]
+\item[NDIM]   Integer variable specifying the number of rows and columns
+              the suer has reserved in \texttt{EMAT} to store the matrix elements.
+              \texttt{NDIM} should be at least as large as the number of parameters 
+              variable at the time of the call, otherwise the user will get
+              only part of the full matrix.
+\item[{\rm\bf Output parameter:}]
+\item[EMAT]   Array declared as \texttt{DIMENSION EMAT(NDIM,NDIM)} which
+              is to be filled with the (external) covariance matrix.
+\end{DLtt}
+ 
+\subsection{Access current parameter errors}
+
+\Shubr{MNERRS}{(NUM,EPLUS*,EMINUS*,EPARAB*,GLOBCC*)}
+ 
+\begin{DLtt}{123456}
+\item[{\rm\bf Input parameter:}]
+\item[NUM]    Parameter number. 
+              If \texttt{NUM>0}, this is taken to be an external parameter number; 
+              if \texttt{NUM<0}, it is the negative of an internal parameter number.
+\item[{\rm\bf Output parameters:}]
+\item[EPLUS]  The positive \Cind[MINOs]{MINOS} error of parameter \texttt{NUM}.
+\item[EMINUS] The negative \Cind[MINOs]{MINOS} error (a negative number).
+\item[EPARAB] The ``parabolic'' parameter error, from the error matrix.
+\item[GLOBCC] The global correlation coefficient for parameter \texttt{NUM}.
+              This is a number between zero and one which gives the correlation
+              between parameter \texttt{NUM} and that linear combination of all other
+              parameters which is most strongly correlated with \texttt{NUM}.
+\end{DLtt}
+ 
+Note that this call does not cause the errors to be
+calculated, it merely returns the current existing values.
+If any of the requested values has not been calculated, or has
+been destroyed (for example, by a redefinition of parameter values)
+\Rind{MNERRS} returns a value of zero for that argument.
+Thus the call to \Rind{MNERRS} will normally follow the execution of
+commands \Cind[MIGrad]{MIGRAD}, \Cind[HESse]{HESSE}, 
+\Cind{MNContour}, and/or \Rind[MINOs]{MINOS}.
+ 
+\subsection{Find a function contour with the MNContour method}
+
+\Shubr{MNCONT}{(FCN,NUM1,NUM2,NPT,XPT*,YPT*,NFOUND*,FUTIL)}
+ 
+\begin{DLtt}{123456}
+\item[{\rm\bf Input parameters:}]
+\item[FCN]    Name of the function being treated (to be declared \texttt{EXTERNAL})
+\item[NUM1/2] Parameter numbers with respect to which the contour
+              is to be determined (external).
+\item[NPT]    The number of points required on the contour (\texttt{>4}).
+\item[FUTIL]  Name of a function called by \Rind{FCN} (or =0 if not used).
+              If used this function must be declared \texttt{EXTERNAL}.
+\item[{\rm\bf Output parameters:}]
+\item[XPT]    Array of x-coordinates of contour points with 
+              values for parameter \texttt{NUM1}.
+              It must be declared with a \texttt{DIMENSION XPT(NPT)}.
+\item[YPT]    Array of y-coordinates of contour points with
+              values for parameter \texttt{NUM2}.
+              It must be declared with a \texttt{DIMENSION YPT(NPT)}.
+\item[NFOUND] The number of points actually found on the contour.
+              If all goes well, this will be equal to \texttt{NPT}, but it can be
+              negative (if the input arguments are not valid), or zero if
+              less than four points have been found, or less than \texttt{NPT} if the
+              program could not find \texttt{NPT} points.
+\end{DLtt}
+ 
+Note that alternatively \Cind{MNContour} can be calculated
+by calling \Rind{MNEXCM} to issue the \Cind{MNContour} command,
+but then the user does not have Fortran access to the actual
+point coordinates \texttt{XPT} and \texttt{YPT}.
+ 
+\subsection{Switch to command-reading mode}
+
+This facility can be useful when one wants to continue interactively.
+
+\Shubr{MNINTR}{(FCN,FUTIL)}
+ 
+\begin{DLtt}{123456}
+\item[{\rm\bf Input parameters:}]
+\item[FCN]    Name of the function being treated (to be declared \texttt{EXTERNAL})
+\item[FUTIL]  Name of a function called by \Rind{FCN} (or \texttt{=0} if not used).
+              If used this function must be declared \texttt{EXTERNAL}.
+\end{DLtt}
+ 
+The call to \Rind{MNINTR} will cause Minuit to read commands from
+the unit \texttt{IRD} (originally specified by the user in his call to \Rind{MNINIT},
+\texttt{IRD} is usually 5 by default,
+which in turn is usually the terminal by default).
+Minuit then reads and executes commands until it encounters
+a command \Cind{END}, \Cind{EXIT}, \Cind{RETurn}, or \Cind{STOP}, 
+or an end-of-file on input
+(or an unrecoverable error condition while reading
+or trying to execute a command), in which case control returns
+to the program which called \Rind{MNINTR}.
+
+\subsection{Set logical unit number for input}
+
+Sets logical unit number of input unit from which Minuit will read
+the next command.
+
+\Shubr{MNINPU}{(NUNIT, IERR*)}
+
+\begin{DLtt}{123456}
+\item[{\rm\bf Input parameters:}]
+\item[NUNIT]   The I/O unit number, which must be a valid unit, opened
+   for reading (Minuit makes no checks at this level and will not attempt
+   to open any files.)  
+\item[IERR]    returned as zero unless Minuit's internal buffer which 
+          stores unit numbers is full, which is a fatal error.  If
+          NUNIT is specified as zero, Minuit returns to reading the previous
+          unit (which is why it has to store them).
+\end{DLtt}
+ 
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d28 1
+a28 1
+             must be declared \Lit{EXTERNAL} and provided by the user).
+d37 2
+a38 1
+\begin{XMPt}{Example of \Lit{FCN} routine}
+d65 1
+a65 1
+\end{XMPt}
+d68 1
+a68 1
+give it the generic name \Rind{FCN}) and must be declared \Lit{EXTERNAL} in the
+d71 1
+a71 1
+The meaning of the parameters \Lit{XVAL} is of course defined by
+d85 1
+a85 1
+be declared \Lit{EXTERNAL} and a subprogram of that name must be
+d122 4
+a125 1
+\begin{XMPt}{Example of main program when using Minuit in data driven mode}
+d130 1
+a130 1
+\end{XMPt}
+d138 3
+a140 3
+argument may be put equal to \Lit{0}, 
+and need not be declared \Lit{EXTERNAL}; if \Rind{FUTIL} is
+declared \Lit{EXTERNAL}, it must be supplied in the loading process.
+d165 1
+a165 1
+In data-driven mode, that is with \Lit{CALL}~\Rind{MINUIT}, you should
+d172 1
+a172 1
+\Lit{CALL MINUIT}, the last command in the corresponding Data Block
+d175 1
+a175 1
+then Minuit will execute a Fortran \Lit{STOP}, and if the last
+d179 1
+a179 1
+\Subsection{10cm}{Data to drive Minuit}
+d190 1
+a190 1
+            This is the index in the array \Lit{XVAL} by which the
+d221 2
+a222 2
+       Minuit data (the default stream is \Lit{UNIT 5}),
+       then the \Lit{FCN} data should appear here.
+d253 2
+a254 1
+\begin{XMPt}{Example of a typical Minuit data set}
+d275 1
+a275 1
+\end{XMPt}
+d317 1
+a317 1
+\Section{5cm}{Running Minuit in Fortran-callable mode.}
+d324 1
+a324 1
+by appending a star \Lit{*} to its name.
+d327 2
+a328 2
+Unix workstations, etc.), all the \Lit{REAL} arguments given below must be
+declared \Lit{DOUBLE PRECISION}.
+d330 1
+a330 1
+\Subsection{4cm}{Initialize Minuit}
+d341 1
+a341 1
+\Subsection{4cm}{Specify a title for a problem}
+d351 1
+a351 1
+\Subsection{4cm}{Define a parameter, assigning values from variables}
+d365 1
+a365 1
+\item[IERFLG] Error return code: \Lit{0} if no error, \Lit{>0} if request failed.
+d368 1
+a368 1
+If \Lit{BND1=BND2=0.}, then the parameter is considered unbounded, which
+d371 1
+a371 1
+\Subsection{4cm}{Define a parameter, assigning values from character string}
+d404 1
+a404 1
+\Subsection{4cm}{Execute a Minuit command}
+d410 1
+a410 1
+\item[FCN]    Name of the function being analyzed (to be declared \Lit{EXTERNAL})
+d413 1
+a413 1
+\item[ARGLIS] Array of dimension \Lit{MAXARG}, containing the numeric arguments 
+d415 3
+a417 3
+\item[NARG]   Number of arguments specified (\Lit{NARG}$\leq${MAXARG}),
+\item[FUTIL]  Name of a function called by \Rind{FCN} (or \Lit{=0} if not used).
+              If used this function must be declared \Lit{EXTERNAL}.
+d419 2
+a420 2
+\item[IERFLG] Error return code: \Lit{0} if the command was executed normally, 
+              \Lit{>0} otherwise.
+d431 1
+a431 1
+\Subsection{4cm}{Execute a Minuit command specified as a character string}
+d442 1
+a442 1
+\item[FCN]    Name of the function being analyzed (to be declared \Lit{EXTERNAL})
+d444 2
+a445 2
+\item[FUTIL]  Name of a function called by \Rind{FCN} (or \Lit{=0} if not used).
+              If used this function must be declared \Lit{EXTERNAL}.
+d447 2
+a448 2
+\item[ICONDN] Error return code: \Lit{0} if the command was executed normally, 
+              \Lit{>0} otherwise.
+d459 1
+a459 1
+\Subsection{4cm}{Get the current value of a parameter}
+d481 1
+a481 1
+\Subsection{4cm}{Get the current status of minimization}
+d489 1
+a489 1
+\item[ERRDEF] The value of \Lit{UP} defining parameter uncertainties
+d502 1
+a502 1
+\Subsection{4cm}{Get the current value of the covariance matrix}
+d509 2
+a510 2
+              the suer has reserved in \Lit{EMAT} to store the matrix elements.
+              \Lit{NDIM} should be at least as large as the number of parameters 
+d514 1
+a514 1
+\item[EMAT]   Array declared as \Lit{DIMENSION EMAT(NDIM,NDIM)} which
+d518 1
+a518 1
+\Subsection{4cm}{Access current parameter errors}
+d525 2
+a526 2
+              If \Lit{NUM>0}, this is taken to be an external parameter number; 
+              if \Lit{NUM<0}, it is the negative of an internal parameter number.
+d528 1
+a528 1
+\item[EPLUS]  The positive \Cind[MINOs]{MINOS} error of parameter \Lit{NUM}.
+d531 1
+a531 1
+\item[GLOBCC] The global correlation coefficient for parameter \Lit{NUM}.
+d533 2
+a534 2
+              between parameter \Lit{NUM} and that linear combination of all other
+              parameters which is most strongly correlated with \Lit{NUM}.
+d546 1
+a546 1
+\Subsection{4cm}{Find a function contour with the MNContour method}
+d552 1
+a552 1
+\item[FCN]    Name of the function being treated (to be declared \Lit{EXTERNAL})
+d555 1
+a555 1
+\item[NPT]    The number of points required on the contour (\Lit{>4}).
+d557 1
+a557 1
+              If used this function must be declared \Lit{EXTERNAL}.
+d560 2
+a561 2
+              values for parameter \Lit{NUM1}.
+              It must be declared with a \Lit{DIMENSION XPT(NPT)}.
+d563 2
+a564 2
+              values for parameter \Lit{NUM2}.
+              It must be declared with a \Lit{DIMENSION YPT(NPT)}.
+d566 1
+a566 1
+              If all goes well, this will be equal to \Lit{NPT}, but it can be
+d568 2
+a569 2
+              less than four points have been found, or less than \Lit{NPT} if the
+              program could not find \Lit{NPT} points.
+d575 1
+a575 1
+point coordinates \Lit{XPT} and \Lit{YPT}.
+d577 1
+a577 1
+\Subsection{4cm}{Switch to command-reading mode}
+d585 3
+a587 3
+\item[FCN]    Name of the function being treated (to be declared \Lit{EXTERNAL})
+\item[FUTIL]  Name of a function called by \Rind{FCN} (or \Lit{=0} if not used).
+              If used this function must be declared \Lit{EXTERNAL}.
+d591 2
+a592 2
+the unit \Lit{IRD} (originally specified by the user in his call to \Rind{MNINIT},
+\Lit{IRD} is usually 5 by default,
+d601 1
+a601 1
+\Subsection{4cm}{Set logical unit number for input}
+@

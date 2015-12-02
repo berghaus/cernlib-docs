@@ -1,0 +1,256 @@
+\documentstyle[12pt]{article}
+
+\begin{document}
+\title{Requirements for a \\ HEP Database System}
+\author{S. Banerjee/L3 \and
+        L. Barone/L3   \and
+        N. Colino/L3   \and
+        R. Jones/OPAL  \and
+        R. Mount/L3    \and
+        J. Shiers/CN   \and
+        N. Watson/OPAL}
+\date{27 January 1991}
+\maketitle
+
+\Filename{H2hdbreq-Introduction}
+\section{Introduction}
+\par
+A requirement that is common to all High Energy Physics experiments
+is for a database system in which to store information such as
+detector geometry and calibration constants. Up until now, experiments
+have typically developed their own solutions to this problem, resulting
+in a number of packages with similar functionality.
+\par
+The goal of the HEPDB working group is to provide a single package
+that is sufficiently powerful to meet the major requirements of all
+experiments whilst remaining fast and simple to use. The package
+would be maintained and distributed in the CERN Program Library.
+\Filename{H2hdbreq-General-Requirements}
+\section{General Requirements}
+\par
+The following features are considered desirable:
+\begin{enumerate}
+\item
+The system must be machine independant, i.e. it must run on all
+types of computers commonly used in HEP.
+\item
+The system should be modular. This will enable parts of the system
+to be migrated as new standards or techniques emerge.
+\item
+Both interactive and callable interfaces should exist.
+\item
+The package should be both easy to use, but yet rich in facilities.
+\item
+It must be flexible enough to meet the needs of different HEP experiments.
+\item
+It should be supported and developed in conjunction with the HEP community.
+\item
+It must run in both centralised and distributed modes.
+\end{enumerate}
+\par
+It is interesting to point out that these requirements were written
+in 1982! To this list, we would add
+\begin{enumerate}
+\item
+The package should provide a superset of the functionality of existing systems.
+\item
+Existing software
+should be reused whereever possible and appropriate.
+\item
+Newly entered data must be available on all relevant on-site
+computers within 1 hour and on off-site computers within a few
+hours.
+\item
+The system for distribution of updates must work in the wide-area,
+i.e. world wide, and over a variety of networks.
+\item
+The database should be protected from system crashes etc.
+Recovery procedures making the database unavailable for a significant
+time are less desirable than mechanisms providing quick recovery.
+\item
+The need for human intervention must be minimised.
+\item
+The two extremes of bulky data (of whose internal structure the database system
+little or nothing), and lower volume data (where every word can be individually
+accessed or used as a search criterion) should be supported efficiently.
+\item
+The system must be both well supported and documented.
+\item
+The development and maintanance cost, both in financial and manpower
+terms, must be kept to a minimum.
+\end{enumerate}
+
+\Filename{H2hdbreq-Requirements-for-the-Database-Software-Package}
+\section{Requirements for the Database Software Package}
+To prevent the requirements from becoming unintelligibly abstract, it is
+assumed below that the database system is built upon the RZ package.  Only end-node
+directories of the RZ hierarchical directory structure are used to store database
+objects.  Each object in an end-node directory contains keys and data which closely
+parallel the normal and long fields in a row of a relational database table.
+
+Bulky data are stored in the data part of an RZ object, which is normally disk
+resident.  In contrast, simple tabular data are stored entirely as RZ keys which
+are normally memory-resident after the first reference to the directory.
+
+In contrast to the original RZ philosophy, the RZ keys can contain both the
+information which must be examined to identify an object and data which should
+then be returned to the application.
+
+The RZ requirement that every object in a directory have the same number of
+keys is acceptable.
+
+\subsection{Requirements: retrieval}
+\begin{enumerate}
+\item
+Retrieval of objects must be as quick and efficient as
+possible.
+\item
+Database objects should be retrieved by specifying
+\begin{itemize}
+\item
+the hierarchically structured name of an end-node directory/table,
+\end{itemize}
+and by specifying or putting restrictions on
+\begin{itemize}
+\item
+a number (which may be zero) of the user keys,
+\item
+the {\it instant} of time for which a valid object is required,
+\item
+the {\it instant} of time after which changes to the database should be ignored.
+\end{itemize}
+Retrieval operations which return more than one object (e.g. due to loose
+requirements on the user keys) should be supported.
+
+\item
+Recently accessed data should be retained in memory and the data storage in memo
+should be suitable for direct access by application code.  The application should
+not need to store its own copies of database objects.
+
+Utilities which allow the application to mark the memory resident data as
+`in use'
+and `not in use right now' are needed to allow the database package to manage
+memory efficiently.
+\end{enumerate}
+
+\subsection{Requirements: storage}
+\begin{enumerate}
+\item
+Objects should only be deleted in pathological cases.  Normally,
+ insertion of a
+new object with a validity time range having some overlap with an old one
+should logically delete the old one for the period of overlap.
+
+One might consider adopting
+the more rigorous requirement that not one bit in an existing
+object may be changed.  Thus objects initially inserted with validity `from now
+to eternity' are not changed when a new object of the same type is inserted which
+logically truncates the original infinite validity.
+
+\item
+Data compression algorithms should be supported.
+Two categories can be identified:
+\begin{itemize}
+\item
+standalone compression of single data objects
+\item
+storing only the differences between a new data object and an existing one
+\end{itemize}
+Within the second category, algorithms which can only compare data blocks of
+identical length and structure have proved adequate in the past.
+
+It should be possible to turn off data compression for reasons of speed or paranoia.
+
+\item
+The database package should be able to produce a `journal' of all activities
+modifying the database.  The journal can be used by database servers to exchange
+or broadcast updates.  The journal can also be used to restore the database to
+its up-to-date condition starting from a backup copy.
+\end{enumerate}
+
+\subsection{Requirements: usage and availability}
+\begin{enumerate}
+\item
+The package must have FORTRAN and C interfaces.
+\item
+Multi-user access must be supported.
+\item
+An interactive interface is needed (for debugging, maintenance and a few user applications).
+The interactive interface should assume that it runs on workstations supporting MOTIF.
+
+\item
+The `database' may be several independent RZ files, some of which may be private
+or test databases.  It must be possible for all needed RZ files to be simultaneously
+open and, for example, for memory-resident copies of data from several RZ files to
+be managed simultaneously by the database system.
+\end{enumerate}
+
+\subsection{Requirements: underlying package}
+
+For clarity, RZ has been assumed as the underlying random access package without
+any explicit reason why a commercial package would be unsuitable.  In the past
+(1984) L3 examined commercial packages in some detail and decided that it would
+impossible to use any of them.  Although many features of commercial products
+have now improved we believe that the situation is essentially unchanged.
+
+To provide a focus for the examination of commercial products we summarise the
+advantages and disadvantages of using Oracle, which was the strongest contender
+and is almost certainly the strongest contender now.
+
+\subsubsection{Advantages of Oracle}
+\begin{enumerate}
+\item
+The performance of Oracle was considered tolerable by L3 in 1984.  It is
+almost certainly even more tolerable now.
+\item
+Oracle provides sophisticated features to ensure data integrity which are
+probably superior to the current capabilites of RZ even when augmented by
+the journalling facilities of DBL3.
+\item
+Oracle provides a full interactive user interface.
+\item
+Oracle Corp. is interested in the HEP market.
+\end{enumerate}
+
+\subsubsection{Disadvantages of Oracle}
+\begin{enumerate}
+\item
+Oracle could replace RZ, but many/most of the features of DBL3 or OPCAL
+would still have to be added to Oracle.
+\item
+Although Oracle's interactive interface is good, its FORTRAN interface is
+very unpleasant (largely because of the mis-match between FORTRAN and
+the relational model + SQL).
+\item
+Oracle at CERN requires CERN manpower to install and apply updates to the code a
+to `administer' the databases.  It is possible to argue that using Oracle
+extensively for calibration databases would cost as much or more CERN
+manpower as developing and maintaining RZ to provide the same functions.
+
+Oracle would also require more manpower than
+RZ at any other laboratory or university at which it was installed.
+\item
+Oracle costs a significant amount of money and is not sold or maintained by
+IBM/DEC/HP etc.  The administrative effort required to get Oracle installed on most
+computers in a collaboration can be contrasted to that required to install,
+for example, FORTRAN or (to be more modern) MOTIF.
+\item
+Oracle cannot be installed in many institutes due to Cocom restrictions.
+\item
+Unlike FORTRAN or MOTIF, Oracle is not an industry standard (although
+the SQL Query language is a standard).  How can HEP guarantee Oracle
+Corp's health and interest in HEP for 20 years?
+\end{enumerate}
+
+\subsubsection{Verdict on Oracle}
+The key problem with Oracle is that for various reasons (manpower, cost,
+Cocom, administrative inertia, \ldots ) it would be impossible for most
+experiments to have Oracle available on all the computers involved
+in the analysis.
+
+\end{document}
+
+
+
+
+\end{document}

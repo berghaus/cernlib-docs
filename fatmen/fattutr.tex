@@ -1,0 +1,2087 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%   FATMEN User Guide and Reference manual                        %
+%                                                                 %
+%   Fatmen Part 2: Tutorial                                       %
+%                                                                 %
+%   This document needs the following external EPS files:         %
+%   none                                                          %
+%                                                                 %
+%   Editor: Michel Goossens / CN-AS                               %
+%   Last Mod.:  7 June 1993 11:45 mg                              %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\Filename{H1Fatmentutorial-introduction}
+\chapter{A tutorial introduction to FATMEN}
+\Filename{H2Fatmentutorial-what-is-fatmen}
+\section{What is FATMEN?}
+
+The FATMEN package is a distributed File and Tape management system.
+It provides transparent access to file catalogue
+information and to data with no source code changes required
+when moving from one host to another. This is independent 
+of the location of the data or of the host operating system.
+\par
+All data is referenced by a Unix-like name, the so-called generic-name.
+The FATMEN system is responsible for matching this name against
+a physical dataset.
+\Filename{H2Fatmentutorial-how-fatmen-helps}
+\section{How does FATMEN help?}
+\par
+FATMEN removes the necessity of having to know details such as which
+tape or disk a file is on. In addition, commands or subroutine calls to
+access data are identical on all supported systems 
+(currently VM/CMS, MVS, VAX/VMS and Unix). 
+Thus, one can take the same code from machine to machine and access
+data in a transparent manner, although the underlying mechanism
+or even the copy of the data may be completely different.
+\par
+In addition, through the FATMEN catalogue, users may list characteristic
+of a data set, such as a comment field, user words, file format etc.
+which otherwise would have to be recorded in a log book or NEWS item.
+\Filename{H2Fatmentutorial-explanation-of-terms}
+\section{Explanation of terms}
+\par
+When using the FATMEN system, all data is referenced by a name known 
+as the {\bf generic-name}. 
+The generic name has the form
+\begin{XMP}
+//catalogue/experiment/dir1/dir2/.../dirn/filename
+\end{XMP}
+where
+the slash character (/) is a directory delimiter, as for Unix file names,
+{\bf catalogue} indicates in which catalogue the file resides
+\index{catalogue}
+{\bf experiment} is the name of the experiment to which the file
+belongs
+The rest of the file name is free format, although its total length
+may not exceed 255 bytes and each component may not exceed
+20 characters. Typically, experiments will have conventions
+for the generic-name, but the sort of information that you might
+want to include in the generic-name is
+\begin{UL}
+\item
+Real data, simulated (possibly also technical run, cosmics etc.)
+\item 
+Beam particle (e.g. pi+, pi- etc.)
+\item
+Beam energy
+\item
+Target (for fixed target experiments)
+\item
+Period and run
+\item
+Magnet setting, if relevant
+\item
+Number of the pass through the reconstruction chain
+\item
+Level, i.e. DST, RAWDATA, etc.
+\end{UL}
+\par
+Examples of catalogue names are CERN, for all CERN experiments, DESY, for experiments
+based at DESY, and so on. Examples of experiment name are L3, H1, CDF.
+\par
+Note that the same generic-name can be used for more than one file. 
+In this case, the files are all assumed to contain the same data,
+but may well reside on different media or in different locations.
+The file format may differ, for example, one copy might be in
+Zebra FZ native format and another in exchange format.
+We will see later how different entries with the same generic-name
+may be selected or listed.     
+\par
+Associated with each generic-name are a catalogue entry and a key vector
+which contains important information that can be used to make a first
+pass selection. The catalogue entry is in fact a Zebra bank stored
+in a Zebra RZ file, and the keys are the normal RZ keys.
+However, for all practical purposes it is not necessary to know 
+the structure of the catalogue in such detail, particularly when using
+the FATMEN shell (interactive interface) or the so-called 'novice'
+FORTRAN callable interface, which both hide Zebra completely.
+\par
+The key vector contains the filename, i.e. the part of the generic-name
+following the last slash, and information on the mediatype on which the
+data resides, the location of the file and the so-called copy level.
+By using these keys, it is possible to make a first pass selection
+of a file, or to view only a subset of a catalogue in a very efficient
+manner. For example, when working at ones home laboratory say in the United
+States, one is probably not interested in looking at catalogue entries
+corresponding to files located several thousand kilometers away in
+CERN, still less in trying to access them over the network.
+\par
+\index{Key definitions}
+\index{KEYS}
+\index{Media type definitions}
+The meanings of the various keys are experiment defined, except for the
+media type, which is defined as follows:
+\begin{XMP}
+1: disk
+2: 3480 cartridge
+3: 3420 tape
+4: 8200 Exabyte cartridge
+\end{XMP}
+\subsection{The location code}
+\index{Location type definitions}
+\par
+The location code is one piece of information available to FATMEN
+to select the best available source of data.
+The following convention is used by OPAL:
+\index{location codes}
+\index{fatmen.loccodes}
+\begin{XMP}
+         0=Cern Vault     CERNVM VXCERN CRAY SHIFT etc      
+         1=Cern Vault                                      
+         2=Cern Vault                                     
+        11=VXOPON         OPAL Online Vax cluster        
+        12=Online         OPAL (apollo) online facilities
+        21=VXOPOF         OPAL Offline cluster           
+        31=SHIFT          SHIFT disk and archive storage
+     33101=Saclay         Active cartridges            
+     33901=Saclay         'obsolete' cartridges       
+     44501=UKACRL         Active cartridges          
+     44901=UKACRL         'obsolete' cartridges     
+\end{XMP}
+\par
+Even if the location code is not set, FATMEN will still be able to
+find 'the best' copy of a file. However, it is much more efficient
+to restrict the search by specifying one or more location codes,
+as this results in less I/O to the FATMEN catalogue and, more importantly,
+less queries to the Tape Management System (TMS).
+\subsection{The copy level}
+\index{Copy level definitions}
+\par
+Initially, the copy level was defined as follows:
+\begin{XMP}
+     0       original
+     1       copy of an original
+     2       copy of a copy
+     ...
+\end{XMP}
+\par
+In fact, this has been of limited use and it is now more
+commonly used to indicate the data representation. The
+following definitions are used by OPAL and correspond to
+those used by the FPACK package developed at DESY.
+\begin{XMP}
+     1       IEEE floating point format (used on Unix workstations and 
+                                         for Zebra exchange data format) 
+     2       IBM  floating point format
+     3       VAX  floating point format
+     4       IEEE floating point format, but byte-swapped
+     5       Cray floating point format
+     4       IEEE floating point format, but byte-swapped
+\end{XMP}
+\Filename{H2Fatmentutorial-using-the-catalogue}
+\section{Using the FATMEN catalogue - a simple example}
+\par
+The FATMEN catalogue can be used as a general purpose
+catalogue, for example, to store information about
+the records, cassettes and CDs that someone owns.
+\par
+To create a catalogue, we just type
+\index{mkfatnew}
+\index{FATNEW}
+\index{Creating a new catalogue}
+\begin{XMP}
+mkfatnew
+\end{XMP}
+We then give the name \Lit{MUSIC} as the name of 
+the FATMEN system, and \Lit{CLASSICAL} as the
+name of the experiment. This will create a file
+called \Lit{MUSIC.FATRZ} and all generic names will
+start \Lit{//MUSIC/CLASSICAL}.
+\par
+We can then catalogue our collection by composer,
+making directories such as \Lit{BACH}, \Lit{BEETHOVEN}, 
+\Lit{CHOPIN} etc.
+\begin{XMP}
+fm
+FM>mkdir BACH
+FM>mkdir BEETHOVEN
+FM>mkdir CHOPIN
+\end{XMP}
+\par
+We may well group the music under the type of work, such
+as \Lit{CONCERTOS}, \Lit{SONATOS}, \Lit{SYMPHONIES}.
+We then have very readable generic-names,
+e.g. \Lit{//MUSIC/CLASSICAL/BEETHOVEN/SYMPHONIES/NUMBER9},
+could correspond to Beethoven's 9th Symphony.
+Note that, using the FATMEN shell, 
+we would never need to type the \Lit{//MUSIC/CLASSICAL}
+as this would be our 'home' directory. We can even
+return to it by typing \Lit{cd \$HOME}.
+\par
+We can now type commands such as:
+\begin{XMP}
+FM>ls beethoven/symphonies/(7:9) | List works 7-9 inclusive
+FM>ls b*/c*/*                   | All works by composers
+                                  with names beginning B
+                                  and categories beginning C.
+FM>ls */* -gc | Display the full name and comment field of 
+                every entry
+\end{XMP}
+\par
+We can, of course, use other fields of the catalogue, such
+as the media type. Here we will use 1 to mean CD, 2 for 
+cassette and 3 for LP. Thus, by default, FATMEN will preferentially
+find a CD before a cassette before an LP. 
+We could also define the location code, such as
+\begin{XMP}
+1 : home
+2 : car
+3 : boat
+4 : pad in St. Tropez
+\end{XMP}
+\par
+Then, we can limit our searching to a subset of the catalogue.
+\begin{XMP}
+FM>set/location 3
+FM>ls */* -gc | Now we just see what we have on our boat
+\end{XMP}
+\par
+If we get a new DAT player, we may want to add this,
+say as media type 4. We can then redefine the search
+order with:
+\begin{XMP}
+FM>set/media 1,4,2,3 | Access DAT after CD but before everything else
+\end{XMP}
+\par
+There are also other fields that could be of interest,
+such as the performance date, for which we could use
+the creation date field, the performers, e.g.
+Berlin Philharmonic, and the conducter. 
+We could then use the search command to list all entries
+performed by the London Sympony Orchestra (for example).
+\par
+Thus, we can make selections according to 
+\begin{UL}
+\item
+The generic-name, e.g. BACH\_*/*, to list all works
+by the BACH family.
+\item
+The FATMEN keys, such as the location-code, media-type
+or copy-level (which could be important for convential
+cassettes!)
+\item
+The catalogue entry itself, such as performance date,
+composer, record company etc.
+\end{UL}
+\par
+We will see later how to use the same features to 
+manage physics data, which is of course our main concern.
+\Filename{H2Fatmentutorial-starting to work-with-fatmen}
+\section{Starting to work with the FATMEN system}
+\par
+Before you can start to work with the FATMEN system, your group must
+have been entered into the FATMEN system as detailed in the installation
+guide section of this manual. This involves
+\begin{UL}
+\item
+Creating a set of ORACLE or SQL/DS tables for your experiment
+{\bf N.B.This is only necessary if you wish to have the
+FATMEN catalogued backed up into a relational database.
+This option is typically only used at CERN.}
+\item
+Creating a service machine to manage the FATMEN database
+\item
+Registering this machine with the FATMEN master service machine
+\end{UL}
+\par
+To get this done, just send a mail to JAMIE@CERNVM.
+\Filename{H2Fatmentutorial-adding-information}
+\section{Adding information to the file catalogue}
+\par
+Once the above steps have been taken, one can procede to catalogue
+data in the database.
+This can be done through either the FORTRAN callable interface
+or the FATMEN shell. We will demonstrate the use of both and show
+how the FATMEN system can then be used to access the data referenced
+by these catalogue entries.
+\subsection{Adding existing data to the FATMEN catalogue}
+\par
+The following examples show how existing data may be catalogued
+within FATMEN. The examples are taken from the Fermilab CDF 
+experiment.
+\par
+Information on existing data is kept in flat files, as shown below.
+\begin{XMP}
+R015881E.TOP04   |CED984|FNALH   |MUA21|04-SEP-1989:06:53:19.60|GOOD|
+R015882B.TOP04   |CED984|FNALH   |MUA21|04-SEP-1989:08:59:03.96|GOOD|
+R015882C.TOP04   |CED984|FNALH   |MUA21|04-SEP-1989:10:25:58.47|GOOD|
+R015882D.TOP04   |CED984|FNALH   |MUA21|04-SEP-1989:11:50:21.63|GOOD|
+R015898A.TOP04   |CED984|FNALH   |MUA21|04-SEP-1989:13:26:08.62|GOOD|
+R015910A.TOP04   |CED984|FNALH   |MUA21|04-SEP-1989:14:13:17.86|GOOD|
+R015911A.TOP04   |CED984|FNALH   |MUA21|04-SEP-1989:15:43:56.84|GOOD|
+\end{XMP}
+where the fields are dataset name (filename), tape number (vsn),
+nodename, device name on which the tape was written, date and time
+and status.
+\par
+The easiest way to add this information is to write a small command
+file that converts the file into a KUMAC file. This can be done
+as follows.
+\begin{XMP}
+$       open/read in top04.tape
+$       open/write out addfat.kumac
+$loop:
+$       read/end=eof in line
+$       line=f$edit(line,"TRIM,COMPRESS,COLLAPSE")
+$       dsn =f$element(0,"|",line)
+$       vsn =f$element(1,"|",line)
+$       node=f$element(2,"|",line)
+$       comm=f$element(5,"|",line)
+$       fname=f$element(0,".",dsn)
+$       temp =dsn - fname - "."
+$       gname="//fnal/cdf/dst/" + temp + "/" + fname
+$       write out "ADD/TAPE ''vsn' ''vsn' 1 ''gname' ''dsn' _"
+$       write out "YBB 0 ''node' ''comm' F 0 0 200 3"
+$       goto loop
+$eof:   close in
+$       close out
+\end{XMP}
+This generates the following KUMAC file.
+\begin{XMP}
+ADD/TAPE CED984 CED984 1 //fnal/cdf/dst/TOP04/R015880A R015880A.TOP04 _
+UN 0 FNALH GOOD F 0 0 200 3
+ADD/TAPE CEH060 CEH060 1 //fnal/cdf/dst/TOP04/R015881B R015881B.TOP04 _
+UN 0 FNALH GOOD F 0 0 200 3
+ADD/TAPE CED984 CED984 1 //fnal/cdf/dst/TOP04/R015881C R015881C.TOP04 _
+UN 0 FNALH GOOD F 0 0 200 3
+ADD/TAPE CED984 CED984 1 //fnal/cdf/dst/TOP04/R015881D R015881D.TOP04 _
+UN 0 FNALH GOOD F 0 0 200 3
+ADD/TAPE CED984 CED984 1 //fnal/cdf/dst/TOP04/R015881E R015881E.TOP04 _
+UN 0 FNALH GOOD F 0 0 200 3
+ADD/TAPE CED984 CED984 1 //fnal/cdf/dst/TOP04/R015882B R015882B.TOP04 _
+UN 0 FNALH GOOD F 0 0 200 3
+ADD/TAPE CED984 CED984 1 //fnal/cdf/dst/TOP04/R015882C R015882C.TOP04 _
+UN 0 FNALH GOOD F 0 0 200 3
+ADD/TAPE CED984 CED984 1 //fnal/cdf/dst/TOP04/R015882D R015882D.TOP04 _
+UN 0 FNALH GOOD F 0 0 200 3
+ADD/TAPE CED984 CED984 1 //fnal/cdf/dst/TOP04/R015898A R015898A.TOP04 _
+UN 0 FNALH GOOD F 0 0 200 3
+ADD/TAPE CED984 CED984 1 //fnal/cdf/dst/TOP04/R015910A R015910A.TOP04 _
+UN 0 FNALH GOOD F 0 0 200 3
+ADD/TAPE CED984 CED984 1 //fnal/cdf/dst/TOP04/R015911A R015911A.TOP04 _
+UN 0 FNALH GOOD F 0 0 200 3
+\end{XMP}
+To add this to FATMEN we now type
+\begin{XMP}
+\Ucom{EXEC ADDFAT}
+\end{XMP}
+from within the FATMEN shell.
+\par
+We could also do the same thing using the FORTRAN interface.
+This would have the advantage that we could also convert
+the date and time of creation from VAX format and add that
+to the catalogue, as is shown in the following FORTRAN
+program.
+\begin{XMPt}{The ADDTEST fortran program}
+      PROGRAM ADDTEST
+*
+*     Add stuff to FATMEN catalogue, using CDF tape log files
+*     A similar function can be performed by using ADDFAT.COM,
+*     followed by ADDFAT.KUMAC in the FM shell.
+*
+      CHARACTER*256 GENAME,DSN,CHLINE
+      CHARACTER*80  COMM
+      CHARACTER*8   HOST
+      CHARACTER*23  VAXDAT
+      CHARACTER*6   VSN
+      CHARACTER*4   FFORM,RECFM,CHOPT
+      CHARACTER*3   MONTHS(12),CHMON
+      DATA          MONTHS( 1)/'JAN'/,MONTHS( 2)/'FEB'/,
+     +              MONTHS( 3)/'MAR'/,MONTHS( 4)/'APR'/,
+     +              MONTHS( 5)/'MAY'/,MONTHS( 6)/'JUN'/,
+     +              MONTHS( 7)/'JUL'/,MONTHS( 8)/'AUG'/,
+     +              MONTHS( 9)/'SEP'/,MONTHS(10)/'OCT'/,
+     +              MONTHS(11)/'NOV'/,MONTHS(12)/'DEC'/
+*
+* Start of FATMEN sequence FATPARA
+*
+** ***     Data set bank mnemonics
+*
+*
+*          Keys
+      PARAMETER ( MKSRFA= 1, MKFNFA= 2, MKCLFA=7, MKMTFA=8
+     1           ,MKLCFA= 9, MKNBFA=10, NKDSFA=10 )
+*
+** ***     Bank offsets
+*
+      PARAMETER ( MFQNFA=  1, MHSNFA= 65, MCPLFA= 67, MMTPFA= 68
+     1           ,MLOCFA= 69, MHSTFA= 70, MHOSFA= 74
+     2           ,MVSNFA= 77, MVIDFA= 79, MVIPFA= 81, MDENFA= 82
+     3           ,MVSQFA= 83, MFSQFA= 84, MSRDFA= 85, MERDFA= 86
+     4           ,MSBLFA= 87, MEBLFA= 88, MRFMFA= 89, MRLNFA= 90
+     5           ,MBLNFA= 91, MFLFFA= 92, MFUTFA= 93, MCRTFA= 94
+     6           ,MCTTFA= 95, MLATFA= 96, MCURFA= 97, MCIDFA= 99
+     7           ,MCNIFA=101, MCJIFA=103, MFPRFA=105, MSYWFA=106
+     8           ,MUSWFA=116, MUCMFA=126, NWDSFA=145
+     9           ,MFSZFA=MSYWFA,MUSCFA=MSYWFA+1)
+*
+* End of FATMEN sequence FATPARA
+*
+      COMMON /USRLNK/LUSRK1,LUSRBK,LADDBK,LUSRLS
+
+      DIMENSION     NFAT(NWDSFA)
+
+*
+*     Initialise FATMEN & Zebra...
+*
+      CALL FMSTRT(1,2,'//FNAL/CDF',IRC)
+      CALL FMLOGL(0)
+*
+*     Open the data file...
+*
+      OPEN(3,FORM='FORMATTED',STATUS='OLD')
+*
+*     Now process the data...
+*
+10    CONTINUE
+      READ(3,'(A)',END=99) CHLINE
+*     PRINT *,'Processing ',CHLINE(1:LENOCC(CHLINE))
+
+*123456789_123456789_123456789_123456789_123456789_123456789_123456789_
+*R015880A.TOP04   |CED984|FNALH   |MUA21|04-SEP-1989:01:31:48.11|GOOD
+
+*
+*     Convert date and time...
+*
+      VAXDAT = CHLINE(41:60)
+      READ(VAXDAT,'(I2,1X,A3,1X,I4,1X,I2,1X,I2)') 
+     +     IDAY,CHMON,IYEA,IHOU,IMIN
+      IMON   = ICNTH(CHMON,MONTHS,12)
+
+      IYEA   = MOD(IYEA,1900)
+
+      ID     = IYEA*10000 + IMON*100 + IDAY
+      IT     = IHOU*100   + IMIN
+*
+*     and pack for insertion into FATMEN bank...
+*
+      CALL FMPKTM(ID,IT,IP,IRC)
+      
+      GENAME = '//FNAL/CDF/DST/'//CHLINE(10:14)//'/'//CHLINE(1:8)
+
+      VSN    = CHLINE(19:24)
+
+      DSN    = CHLINE(1:14)
+
+      HOST   = CHLINE(26:31)
+
+      IFILE  = 1
+
+      CHOPT  = 'N'
+*
+*     Change later to YBB...
+*
+      FFORM  = 'UN'
+
+      ICOPY  = 0
+
+      RECFM  = 'V'
+
+      COMM   = CHLINE(65:68) // ' ' // CHLINE(35:39)
+ 
+      CALL FMADDT(GENAME,VSN,VSN,IFILE,
+     +            DSN,FFORM,ICOPY,HOST,RECFM,0,0,0,0,COMM,
+     +            IVECT,CHOPT,IRC)
+
+*
+*     Now get back the bank into a vector and modify the fields
+*     that we could not via FMADDT
+*
+      CALL FMPEEK(GENAME,NFAT,' ',IRC)
+*
+*     Media type 3 = 3420
+*
+      NFAT(MMTPFA) = 3
+*
+*     these should be zero anyway...
+*
+      CALL VZERO(NFAT(MUSWFA),10)
+*
+*     Creation date...
+*
+      NFAT(MCRTFA) = IP
+
+      CALL FMPOKE(GENAME,NFAT,'P',IRC)
+
+      GOTO 10
+
+99    CLOSE(3)
+*
+      CALL FMEND(IRC)
+      PRINT *,'Return code ',IRC,' from FMEND'
+*
+      END
+\end{XMPt}
+
+\subsection{Adding and referencing data using the FATMEN shell}
+
+Let us assume that the tapes have volume serial numbers (VSN - the
+magnetically recorded label) JS1001 to JS1010 inclusive. The visual
+identifiers (VID) are different - CIN136 to CIN145 inclusive.
+As this type of VID implies, these are actually IBM 3480 cartridges,
+rather than the older open reel tape.
+The file identifier of all the datasets is the same - RAWDATA.
+In order to catalogue these files we must first establish a table
+linking each file or tape with a generic-name.
+Let us assume that the generic-name starts with
+\Lit{//CERN/OPAL/LEPD/RAWD/P51989}. 
+This implies that
+the data are real LEP data (as opposed to simulated data), in
+raw data format, i.e. no filtering or reconstruction. The data
+were recorded in period 5 in 1989.
+
+The FATMEN shell does not allow all fields of the file catalogue
+to be entered. We are able to specify the following fields:
+\begin{OL}
+\item
+Volume sequence number (VSN)
+\item
+Visual identifier (VID)
+\item
+File sequence number (FSEQ)
+\item
+File identifier or dataset name (DSN)
+\item
+File format (FX, FZ etc.)
+\item
+Copy level (is this a copy or an original?)
+\item
+Host name
+\item
+Comment
+\end{OL}
+\par
+Suppose we now enter this information into a disk file, each line
+representing a different tape. The resultant file might look
+like the following:
+\begin{XMP}
+JS1001 CIN136 1 RAWDATA FX 0 VXOPON 'Early physics run - some dectectors out'
+JS1002 CIN137 1 RAWDATA FX 0 VXOPON 'Early physics run - some dectectors out'
+JS1003 CIN138 1 RAWDATA FX 0 VXOPON 'Early physics run - some dectectors out'
+JS1004 CIN139 1 RAWDATA FX 0 VXOPON 'Early physics run - some dectectors out'
+JS1005 CIN140 1 RAWDATA FX 0 VXOPON 'Early physics run - some dectectors out'
+JS1006 CIN141 1 RAWDATA FX 0 VXOPON 'Early physics run - some dectectors out'
+JS1007 CIN142 1 RAWDATA FX 0 VXOPON 'Early physics run - some dectectors out'
+JS1008 CIN143 1 RAWDATA FX 0 VXOPON 'Early physics run - some dectectors out'
+JS1009 CIN144 1 RAWDATA FX 0 VXOPON 'Early physics run - some dectectors out'
+JS1010 CIN145 1 RAWDATA FX 0 VXOPON 'Early physics run - some dectectors out'
+\end{XMP}
+\par
+As we first wish to add this data using the FATMEN shell,
+we must edit the file to include the generic-name of each dataset.
+To do this, we will create a file with filetype KUMAC, so that
+we can then execute it directly from within the FATMEN shell.
+First, we include a command to change the current directory
+to \Lit{//CERN/OPAL/LEPD/RAWD/P51989}. 
+This is done using the command \Ucom{cd}.
+ Note that there is no need to type the
+\Lit{//CERN/OPAL} as we enter at this level by default.
+Then, between the file sequence number and dataset name, we insert
+the generic-name. For simplity, we will refer to these files
+as FILE1 to FILE10. 
+We also add the command \Ucom{ADD/TAPE} at
+the beginning of each line to instruct the FATMEN shell to add this
+information to the database.
+\begin{XMPt}{Resultant file \Lit{TESTFAT KUMAC} (or \Lit{testfat.kumac})}
+cd lepd/rawd/p51989
+
+ADD/TAPE JS1001 CIN136 1 TAPE1 RAWDATA FX 0 VXOPON 'Early physics run - some detectors out'
+ADD/TAPE JS1002 CIN137 1 TAPE2 RAWDATA FX 0 VXOPON 'Early physics run - some detectors out'
+ADD/TAPE JS1003 CIN138 1 TAPE3 RAWDATA FX 0 VXOPON 'Early physics run - some detectors out'
+ADD/TAPE JS1004 CIN139 1 TAPE4 RAWDATA FX 0 VXOPON 'Early physics run - some detectors out'
+ADD/TAPE JS1005 CIN140 1 TAPE5 RAWDATA FX 0 VXOPON 'Early physics run - some detectors out'
+ADD/TAPE JS1006 CIN141 1 TAPE6 RAWDATA FX 0 VXOPON 'Early physics run - some detectors out'
+ADD/TAPE JS1007 CIN142 1 TAPE7 RAWDATA FX 0 VXOPON 'Early physics run - some detectors out'
+ADD/TAPE JS1008 CIN143 1 TAPE8 RAWDATA FX 0 VXOPON 'Early physics run - some detectors out'
+ADD/TAPE JS1009 CIN144 1 TAPE9 RAWDATA FX 0 VXOPON 'Early physics run - some detectors out'
+ADD/TAPE JS1010 CIN145 1 TAPE10 RAWDATA FX 0 VXOPON 'Early physics run -some dectectors out'
+\end{XMPt}
+We can now procede to run this macro, by typing the following commands:
+\begin{XMP}
+\Ucom{FM}
+\Ucom{EXEC TESTFAT}
+\Ucom{END}
+\end{XMP}
+Now that these files have been catalogued, we can look at the catalogue
+information using the {\tt\underline{ls}} command.
+This command allows
+us to list the various files and there attributes. For example, the
+command {\tt\underline{ls tape\% -a}}
+would list all details (option a)
+for the files tape1-tape9. Tape10 would not be listed as the \% character
+only matches against a single character. We must use the syntax
+{\tt\underline{ls tape* -a}} to see also this file.
+\par
+Of perhaps more interest is the ability to be able to access the data
+itself by using the generic name. This is performed by using the
+{\tt find} command. Thus, we could type the commands
+\begin{XMP}
+{\bf\it
+fm
+cd lepd/rawd/p51989
+find tape7 iofile13
+end
+}
+\end{XMP}
+\par
+This would initiate an input tape stage of the volume matching the 
+generic name
+\begin{XMP}
+//CERN/OPAL/LEPD/RAWD/P51989/TAPE7
+\end{XMP}
+\par
+Once the stage has completed, a FORTRAN
+program can read the data on {\ttsc IOFILE13}.
+\subsection{Adding data using the FORTRAN callable interface}
+\par
+The following example shows how data may be added to the
+catalogue using the FORTRAN interface.
+The \Rind{FMADDD} and \Rind{FMADDT} routines provide the same functionality
+as the shell ADD/DISK and ADD/TAPE commands. 
+\begin{XMPt}{Adding information to the catalogue}
+      PROGRAM ADDTEST
+      CHARACTER*256 GENAME,DSN
+      CHARACTER*80  COMM
+      CHARACTER*8   HOST,CHUSER
+      CHARACTER*4   FFORM,RECFM,CHOPT
+*
+*     Sequence FATPARA from PATCH FATCDES on FATMEN pam
+*
++CDE,FATPARA.
+
+      CALL FMSTRT(1,2,'//CERN/CNDIV',IRC)
+      CALL FMLOGL(3)
+ 
+      GENAME = '//CERN/CNDIV/JAMIE/ULF'
+      DSN    = '<JAMIE.192>BOX.SET'
+      FFORM  = 'AS'
+      HOST   = 'CERNVM'
+      RECFM  = 'V'
+      COMM   = 'ADDED VIA NEW ADDTEST FORTRAN'
+      CHOPT  = 'N'
+*
+*     CHOPT = N : do not add this entry to the catalogue
+*     this allows us to modify other fields before sending
+*     the update to the server.
+* 
+      CALL FMADDD(GENAME,DSN,FFORM,0,HOST,RECFM,80,11,483,2,COMM,
+     +            IVECT,CHOPT,IRC)
+*
+*     Update user file format - this field is not accessible
+*     directly via FMADDD
+*
+*     Two ways of doing this are shown. 
+*     
++SELF,IF=PEEK.
+*
+*     Get contents of bank into vector IVECT
+*
+      CALL FMPEEK(GENAME,IVECT,' ',IRC)
+*
+*     Update user file format
+*
+      CALL UCTOH('NFF',IVECT(MFUTFA),4,3)
+*
+*     Copy vector back and update catalogue
+*
+      CALL FMPOKE(GENAME,IVECT,'P',IRC)
++SELF,IF=-PEEK.
+      CALL FMPUTC(-1,'NFF',MFUTFA,3,IRC)
+*
+*     Now update the catalogue
+*         Options: N - ignore IVECT
+*                  P - add entry via FMPUT
+*
+      CALL FMPOKE(GENAME,IVECT,'NP',IRC)
++SELF.
+      CALL FMEND(IRC)
+      PRINT *,'Return code ',IRC,' from FMEND'
+*
+      END
+\end{XMPt}
+\Filename{H2Fatmentutorial-data-access-using-fortran}
+\section{Access to data using the FORTRAN callable interface}
+\par
+The following example shows how a dataset may be accessed
+through the FORTRAN interface.
+\begin{XMPt}{Access to data}
+      CHARACTER*80 GENAME
+      COMMON /QUEST/IQUEST(100)
+*
+*     FATMEN keys. These will be returned by the call to FMOPEN
+*
+      PARAMETER (LKEYFA=10)
+      DIMENSION KEY(LKEYFA)
+*
+*     Units for reading the FATMEN catalogue and for
+*     sending updates to the server
+*
+      LUNRZ = 1
+      LUNFZ = 2
+*    
+*     Initialise FATMEN novice interface
+*
+      CALL FMSTRT(LUNRZ,LUNFZ,'//CERN/OPAL',IRC)
+*
+      GENAME = '//CERN/OPAL/DDST/PASS3/FYZ1/P18R1929/C01'
+      LG = LENOCC(GENAME)
+*
+*     Access and open the file. R indicates Read mode
+*     and F instructs FMFILE to issue the appropriate
+*     call to FZFILE for this dataset.
+* 
+      LBANK = 0
+      CALL FMFILE(11,GENAME(1:LG),'RF',IRC)
+      IF(IRC.NE.0) THEN
+         PRINT *,'Return code ',IRC,' from FMFILE'
+         GOTO 10
+      ELSE
+*
+*     Now process the file, reading just the FZ headers
+*
+         CALL READRZ(11)
+      ENDIF
+*
+*     Now close this file, issuing FZENDI (option E),
+*     drop staging disk (option D)
+*
+      CALL FMFEND(11,GENAME(1:LG),'ED',IRC)
+      IF(IRC.NE.0) PRINT *,'Return code ',IRC,' from FMFEND'
+1     CONTINUE
+10    CONTINUE
+*
+      END
+ 
+      SUBROUTINE READFZ(LUN)
+      COMMON/QUEST/IQUEST(100)
+      CHARACTER*8  DELTIM
+      DIMENSION    IUHEAD(400)
+      DIMENSION    IOCR(100)
+      PARAMETER (JBIAS=2)
+ 
+      NREC = 0
+      CALL FMRTIM(DELTIM)
+      CALL TIMED(T)
+   1  CONTINUE
+      NHEAD = 400
+      IXDIV = 0
+      CALL FZIN(LUN,IXDIV,LSUP,JBIAS,'S',NHEAD,IUHEAD)
+      IF(IQUEST(1).LT.4) THEN
+         NREC = NREC + 1
+         GOTO 1
+      ENDIF
+ 
+      PRINT *,'READFZ. end after ',NREC,' records, IQUEST(1) = ',
+     +        IQUEST(1)
+      CALL FMRTIM(DELTIM)
+      CALL TIMED(T)
+      PRINT *,'FMFZLP. Elapsed time = ',DELTIM,
+     +        ' CP time = ',T,' sec.'
+      END
+ 
+ 
+\end{XMPt}
+\Filename{H2Fatmentutorial-step-by-step-data-access}
+\section{Access to data step by step}
+\par
+The following examples go through some of the various
+options available when accessing a dataset.
+The simplest example as already been given, and
+is access to a dataset using the FATMEN shell.
+\par
+We just type
+\begin{XMP}
+
+FM> find generic-name unit
+
+\end{XMP}
+\par
+If unit is numeric, it will be interpreted as a FORTRAN
+unit number. Thus, after typing
+\begin{XMP}
+
+find //cern/cndiv/jamie/test 11
+
+\end{XMP}
+we would have the following.
+\begin{UL}
+\item
+On VM systems, a FILEDEF on unit FT11F001 pointing to the
+dataset referenced by //cern/cndiv/jamie. Any mini-disk
+links and accesses or stage operations would have been
+performed automatically, so that a subsequent FORTRAN
+program could just open unit 11 and read.
+\item
+On VMS systems, a logical name FOR011. Once again,
+our FORTRAN program can just open unit 11 and read.
+\item
+On Unix systems, a soft link fort.11.
+\end{UL}
+\par
+One could also specify a unit such as VM11F001, if
+the file were to be read by VMIO, or any character
+string that would be used as a logical name or
+symbolic link, e.g.
+\begin{XMP}
+find //cern/cndiv/jamie/test mydat
+\end{XMP}
+\par
+Our FORTRAN program could then open the named file MYDAT.  
+(On VM or MVS systems, this corresponds to the DDNAME, 
+rather than the file name.) 
+\par
+Normally, we will wish to issue the FIND command from
+FORTRAN, as this is more powerful. Although a routine
+\Rind{FMFIND} exists, we will describe the \Rind{FMOPEN} routine,
+which includes all of the functionality of \Rind{FMFIND} and
+more.
+\par
+Our call to \Rind{FMOPEN} looks like
+\begin{XMP}
+      CALL FMOPEN('//CERN/CNDIV/JAMIE/TEST',CHLUN,LBANK,CHOPT,IRC)
+\end{XMP}
+\par
+Here, the generic name and unit are specified exactly as in the
+shell, and are both of type character. This permits
+the use of units such as VM11F001, MYDAT and so on. Again,
+if we call \Rind{FMOPEN} with
+\begin{XMP}
+      CALL FMOPEN('//CERN/CNDIV/JAMIE/TEST','11',LBANK,CHOPT,IRC)
+\end{XMP}
+the correct FORTRAN name on the system in question would be used.
+The exception to this is when the generic name in question points
+to a file which should not be processed by FORTRAN. In this case,
+\Rind{FMOPEN} will automatically perform the correct operation.
+For example, EPIO files on the IBM should be read with IOPACK,
+hence \Rind{FMOPEN} will build a DDNAME of IOFILE11. (This was also
+true for Zebra exchange format files on the IBM prior to
+version 3.67, when FORTRAN I/O became the default).
+\par
+Unlike the shell, \Rind{FMOPEN} will not only perform operations such
+as staging the file as required, but will also issue
+the correct OPEN. This may be overridden by the character
+option parameter CHOPT.
+\subsection{FMOPEN options}
+\par
+In the case of files to be processed by the Zebra FZ or RZ package,
+we can ask \Rind{FMOPEN} to perform the FZFILE or RZFILE call.
+For example,
+\begin{XMP}
+      CALL FMOPEN('//CERN/CNDIV/JAMIE/TEST','11',LBANK,'F',IRC)
+\end{XMP}
+\par
+where F indicates that a call to FZFILE is to be issued. FATMEN obtains
+the correct parameters for the call to FZFILE from the catalogue.
+\par
+Another interesting option is the S option. This will instruct FATMEN
+to update the catalogue with the file size. This is useful for tape
+files, as future accesses will request a staging disk of the correct
+size, and hence use the system more efficiently. 
+\par
+We can also request that an automatic duplicate of the file is made
+into the robot at CERN (SMCF), via the D option. This option requires
+a pool of tapes gg\_FAT1, e.g. XX\_FAT1, in the TMS. Naturally, if a robot
+copy already exists a new one will not be made.
+\subsection{Access to tape data}
+\index{tape data}
+\index{configuration files}
+\index{SETUP names file}
+\index{names file}
+\index{SETUP logical names}
+\index{VAXTAP}
+\index{SHIFT}
+\par
+For a dataset on a tape volume to be accessible, a device capable
+of reading or writing the volume must exist on the local node,
+or on a server node, in the case of remote access to data or VAXcluster systems.
+\par
+Suppose we wished to read the dataset with generic name 
+{\tt //CERN/CNDIV/JAMIE/TEST}. A copy of this dataset might
+exist on tape volume {\tt 123456}. If this volume required a device
+of tape {\tt CT1}, the FATMEN software will attempt to determine
+if such a device exists on the local node. Where remote tape access
+is available, it will check if such a device exists on one of the
+server nodes. This is done as follows.
+\subsubsection{VM/CMS systems running HEPVM software}
+A entry must exist in the file {\tt SETUP~NAMES}
+for the device {\tt CT1} (in this example). {\bf (Not yet implemented)}
+\subsubsection{VAX/VMS systems running VAXTAP software}
+A logical name in the system table {\tt SETUP\_CT1S} (in this example)
+must exist for locally attached tapes. Served tapes must be defined
+in the file {\tt SETUP\_EXE:TPSERV.CONF}
+\subsubsection{Cray Unicos systems}
+An entry for the corresponding device must exist
+in the file {\tt /etc/shift.conf}.
+\subsubsection{Unix systems running the SHIFT tape software}
+An entry for the corresponding
+device must exist in the file {\tt /etc/shift.conf} or in the file {\tt /etc/TPCONFIG}.
+\subsection{Access to remote data}
+\index{remote data}
+\index{remote access}
+\index{L3 Stage}
+\index{SHIFT}
+\par
+The above examples will work on both local and remote data, without
+any change. Note that a call to \Rind{FMOPEN} on an Apollo in Helsinki will
+not result in a cartridge being mounted in the robot at CERN.
+Remote access to tape data must be explicitly enabled. It is currently
+enabled in the SHIFT facility, where the data is staged via the CRAY,
+and on the L3 Apollos, where the data is staged through LEPICS.
+\par
+Access to remote disk data requires explicit selection of a copy of 
+a dataset. This may be done as shown below.
+\begin{XMPt}{Example of using the \protect\Rind{FMSELK} routine}
+*     Argument declarations
+      PARAMETER (LKEYFA=10)
+      PARAMETER (MAXKEY=999)
+      DIMENSION INKEYS(LKEYFA),OUKEYS(LKEYFA,MAXKEY)
+*     The following statements will select all datasets
+*     with copy level (MKCLFA) of 1 (i.e. a copy of an original file),
+*     media type of 1 (i.e. disk) and location code of 1 (i.e. CERN)
+      INKEYS(MKCLFA) = 1
+      INKEYS(MKMTFA) = 1
+      INKEYS(MKLCFA) = 1
+      CALL FMSELK('//CERN/CNDIV/JAMIE/TEST',INKEYS,OUKEYS,NFOUND,MAXKEY,IRC)
+      IF(NFOUND.GT.0) THEN
+*     Just take the first one found which matches
+         CALL FMGETK('//CERN/CNDIV/JAMIE/TEST',LBANK,OUKEYS(1,1),IRC)
+*     Now pass the bank to FMOPEN.
+         CALL FMOPEN('//CERN/CNDIV/JAMIE/TEST','11',LBANK,'F',IRC)
+      ENDIF
+\end{XMPt}
+\par
+In the current version this dataset would only be accessible if mounted
+via NFS.
+\Filename{H2Fatmentutorial-relationships}
+\section{The relationship between generic names, keys vectors and Zebra banks}
+\par
+As explained above, there can be multiple copies of a file with the same 
+generic name. Typically, these copies will reside on different media,
+in different locations or have different data representations.
+\par
+An entry exists in the FATMEN catalogue for each copy of a file.
+This entry consists of a Zebra bank and an associated vector
+known as the KEYS vector. One can use the keys vector, explicitly
+or implicitly, to select a particular copy of a file. More details
+on how this is done are given below.
+\par
+Many of the FATMEN callable routines have the generic name, Zebra
+bank address and keys vector as arguments. If the bank address
+is zero, the FATMEN software retrieves the bank corresponding to
+the specified generic name from the FATMEN catalogue. In the case of
+multiple entries for the same generic name, the entry which is returned
+is determined by the rules described below. The exception to this
+rule is the routine \Rind{FMGETK}, which returns the entry corresponding
+to the key vector specified.
+\subsection{The FATMEN selection rules}
+\par
+By default, the FATMEN selection is as follows:
+\begin{OL}
+\item
+The catalogue is scanned for entries matching a given generic
+name. No check is made on location code, or copy level,
+but the different media types are processed in numerical order
+1 - 4. (Media types 1 - 4 are disk, 3480 cartridge, 3420 tape
+and Exabyte 8200 cassette respectively).
+\item
+If a entry is found for a given media type that is accessible,
+that entry is taken and the search stops.
+\item
+For disk files, the host name in the catalogue must match
+the current host name for the file to be deemed accessible.
+\item
+In the case of VAXclusters, the node name in the catalogue
+may be the VAXcluster alias or the name of any member of 
+the cluster.
+\item
+In the case of tape files, an entry on a robotically mounted 
+volume is taken in preference over one on a manually mounted
+volume.
+\item
+If the interface to the Tape Management System (TMS) is enabled,
+the volume must exist and be in an active vault.
+\end{OL}
+\par
+Note that for systems such as Apollo, SHIFT etc. the node name
+that the FATMEN software uses can be set using an environmental
+variable. Thus on the various SHIFT nodes at CERN (shift1, shd01 etc.)
+the node name is set to SHIFT.
+\par
+One can set ranges of valid location codes and copy levels using
+the routines \Rind{FMSETL} and \Rind{FMSETC} respectively. (The corresponding
+shell commands are \Lit{SET/LOCATION} and \Lit{SET/COPYLEVEL}). If ranges
+for either of these keys are set, then only entries with
+keys that match will be considered for selection. 
+Note that setting a range of location codes can result in
+significantly faster selection time in the case of multiple
+entries, particurly if multiple TMS queries are avoided.
+\par
+For example, if one makes 30 copies of every DST tape for
+export to outside laboratories, one can avoid up to 29 
+TMS queries by using different location codes at these
+sites.
+\par
+In addition to ranges of location codes and copy levels,
+one may also set ranges of media types with \Rind{FMSETM} or
+\Lit{SET/MEDIATYPE}. Here, the order is also significant,
+thus \Lit{SET/MEDIATYPE 2,4,1} will look first on 3480 cartridge,
+then Exabyte 8200 cassette and finally disk.
+\par
+In some cases, a more powerful selection technique is needed.
+For example, one may want to set the search order to
+\begin{OL}
+\item
+Local disk, native data format
+\item
+Robotically mounted tape, native data format
+\item
+Local disk, exchange data format
+\item
+Robotically mounted tape, exchange data format
+\end{OL}
+to avoid the overhead of conversion between data representation
+types. This can be achieved using the FORTRAN routine \Rind{FMSETK}.
+This routine is described further in the user guide section of
+this manual.
+\Filename{H2Fatmentutorial-dataset-copies}
+\section{Using FATMEN to make copies of datasets}
+\par
+FATMEN can make copies of a dataset with automatic update of the catalogue.
+This is available both through the shell and the FORTRAN interface.
+The shell version provides an interface to the file transfer
+routines of CSPACK (the same as those used by ZFTP) and hence
+permits the network transfer of files. The files are transferred
+from disk to disk. If the local file resides on tape, it is first
+staged to disk. For reasons of program size this facility
+is not yet enabled on VM or MVS machines, but just for VMS and Unix
+systems. An interface to remote tapes is not yet provided.
+
+Both the shell COPY command and the FORTRAN routine \Rind{FMCOPY} permit
+conversion of data representation and record format during
+copy. That is, one may copy an input Zebra FZ binary exchange
+file to an output Zebra FZ native file, or an input file
+with VBS format to an output file with record format U.
+
+\newpage
+
+The following example shows the use of \Rind{FMCOPY}. This example
+was written for DELPHI, but similar programs are in use by
+CPLEAR, L3 and OPAL.
+
+\begin{XMPt}{Example of copy data with \protect\Rind{FMCOPY}}
+***********************************************************************
+* PROGRAM DELRCOPY                                                    *
+* ================                                                    *
+* Make copies of all files corresponding to generic names on unit 10  *
+* into the robot (SMCF) allocating volumes from pool XX_RAWD          *
+***********************************************************************
+      PARAMETER (LURCOR=100000)
+      COMMON/CRZT/IXSTOR,IXDIV,IFENCE(2),LEV,LEVIN,BLVECT(LURCOR)
+      DIMENSION    LQ(999),IQ(999),Q(999)
+      EQUIVALENCE (IQ(1),Q(1),LQ(9)),(LQ(1),LEV)
+      COMMON /USRLNK/LUSRK1,LUSRBK,LUSRLS
+      COMMON /QUEST/IQUEST(100)
+*
+* Start of FATMEN sequence FATPARA
+*
+** ***     Data set bank mnemonics
+*
+*          Keys
+      PARAMETER ( MKSRFA= 1, MKFNFA= 2, MKCLFA=7, MKMTFA=8
+     1           ,MKLCFA= 9, MKNBFA=10, NKDSFA=10 )
+*
+** ***     Bank offsets
+*
+      PARAMETER ( MFQNFA=  1, MHSNFA= 65, MCPLFA= 67, MMTPFA= 68
+     1           ,MLOCFA= 69, MHSTFA= 70, MHOSFA= 74
+     2           ,MVSNFA= 77, MVIDFA= 79, MVIPFA= 81, MDENFA= 82
+     3           ,MVSQFA= 83, MFSQFA= 84, MSRDFA= 85, MERDFA= 86
+     4           ,MSBLFA= 87, MEBLFA= 88, MRFMFA= 89, MRLNFA= 90
+     5           ,MBLNFA= 91, MFLFFA= 92, MFUTFA= 93, MCRTFA= 94
+     6           ,MCTTFA= 95, MLATFA= 96, MCURFA= 97, MCIDFA= 99
+     7           ,MCNIFA=101, MCJIFA=103, MFPRFA=105, MSYWFA=106
+     8           ,MUSWFA=116, MUCMFA=126, NWDSFA=145
+     9           ,MFSZFA=MSYWFA,MUSCFA=MSYWFA+1)
+ 
+* End of FATMEN sequence FATPARA
+      CHARACTER*6  DENS
+      CHARACTER*8  LIB
+      CHARACTER*4  LABTYP
+      CHARACTER*1  MNTTYP
+      CHARACTER*8  MODEL
+      CHARACTER*7  ROBMAN(2)
+      DATA         ROBMAN(1)/'-Robot '/,ROBMAN(2)/'-Manual'/
+      PARAMETER (LKEYFA=10)
+      PARAMETER (MAXFIL=1000)
+      DIMENSION KEYS(LKEYFA,MAXFIL)
+      DIMENSION JSORT(MAXFIL)
+      DIMENSION KEYSIN(LKEYFA),KEYSOU(LKEYFA,MAXFIL)
+      CHARACTER*255 FILES(MAXFIL)
+      CHARACTER     THRONG*8, DSN*8, VSN*6, VID*6
+      CHARACTER*80  TOPDIR,GENAME
+      CHARACTER*26  CHOPT
+*
+*     Initialise ZEBRA
+*
+      CALL MZEBRA(-3)
+      CALL MZSTOR(IXSTOR,'/CRZT/','Q',IFENCE,LEV,BLVECT(1),BLVECT(1),
+     +            BLVECT(5000),BLVECT(LURCOR))
+      CALL MZLOGL(IXSTOR,-3)
+*
+* *** Define user division and link area like:
+*
+      CALL MZDIV  (IXSTOR, IXDIV, 'USERS', 50000, LURCOR, 'L')
+      CALL MZLINK (IXSTOR, '/USRLNK/', LUSRK1, LUSRLS, LUSRK1)
+*
+*     Units for FATMEN RZ/FZ files
+*
+      LUNRZ = 1
+      LUNFZ = 2
+*
+*     Initialise FATMEN
+*
+      CALL FMINIT(IXSTOR,LUNRZ,LUNFZ,'//CERN/DELPHI',IRC)
+      CALL FMLOGL(1)
+      IDEBFA = 2
+      NPROC  = 0
+ 
+10    CONTINUE
+      CALL TIMEL(T)
+      IF(T.LT.100) THEN
+         PRINT *,'Stopping due to time limit'
+         GOTO 99
+      ENDIF
+      READ(10,9001,END=99) GENAME
+9001  FORMAT(A80)
+*     GENAME = FILES(JSORT(I))
+      LGN = LENOCC(GENAME)
+      PRINT *,'Processing ',GENAME(1:LGN)
+      IROBOT = 0
+*
+*     First, check that a robot copy does not already exist
+*
+      CALL VBLANK(KEYSIN(2),5)
+      LFN = INDEXB(GENAME(1:LGN),'/') + 1
+*
+*     Don't compare copy level or location code
+*
+      KEYSIN(MKCLFA) = -1
+      KEYSIN(MKLCFA) = -1
+*
+*     Restrict search to 3480s
+*
+      KEYSIN(MKMTFA) = 2
+      CALL FMSELK(GENAME(1:LGN),KEYSIN,KEYSOU,NMATCH,MAXFIL,IRC)
+      IF(IRC.NE.0) THEN
+         PRINT *,'Return code ',IRC,' from FMSELK'
+         PRINT *,'Skipping ',GENAME(1:LGN)
+         GOTO 10
+      ENDIF
+      IF(IDEBFA.GE.2)
+     +PRINT *,'Found ',nmatch,' matches for media type 2'
+      DO 30 J=1,NMATCH
+      CALL FMQVOL(GENAME(1:LGN),LBANKR,KEYSOU(1,J),
+     +            LIB,MODEL,DENS,MNTTYP,LABTYP,IC)
+ 
+      IF(INDEX(LIB,'*Unknown') .NE.0) THEN
+         IF(IDEBFA.GE.0) PRINT *,'Cannot determine mount type'
+      ENDIF
+ 
+      IF(MNTTYP.EQ.'R') THEN
+         IF(IDEBFA.GE.0) PRINT *,'Robot copy already exists'
+         IROBOT = 1
+      ENDIF
+ 
+30    CONTINUE
+      IF(IROBOT.EQ.0) THEN
+         PRINT *,'Robot copy does not exist for ',GENAME(1:LGN)
+*
+*     Now make a robot copy
+*     First, allocate a new tape
+*
+         CALL FMALLO('3480','38K',' ','SMCF_1','XX_RAWD',
+     +               LBANKR,' ',VSN,VID,IRC)
+         IF(IRC.NE.0) THEN
+            PRINT *,'Cannot allocate new tape - STOP!'
+            GOTO 99
+         ENDIF
+*
+*     Display the bank
+*
+         CALL FMSHOW(GENAME(1:LGN),LBANKR,KEYSOU(1,J),'A',IRC)
+         LZERO = 0
+         CALL VZERO(KEYSIN,10)
+*
+*     and make the copy
+*
+         CALL FMLOGL(3)
+         CALL FMCOPY(GENAME(1:LGN),LZERO,KEYSIN,
+     +               GENAME(1:LGN),LBANKR,KEYSOU(1,J),' ',IRC)
+         IF(IRC.NE.0) THEN
+            PRINT *,'Error from FMCOPY - STOP!'
+            GOTO 99
+         ENDIF
+         CALL MZDROP(IXSTOR,LBANKR,' ')
+         CALL MZDROP(IXSTOR,LZERO,' ')
+         NPROC = NPROC + 1
+      ENDIF
+      GOTO 10
+99    CONTINUE
+      PRINT *,'Made ',NPROC,' copies, ',T,' seconds left'
+*
+*     Terminate cleanly
+*
+      CALL FMEND(IRC)
+      END
+\end{XMPt}
+\newpage
+\Filename{H2Fatmentutorial-using-tms-tag-info}
+\section{Using the TMS tag information}
+\par
+When FATMEN is installed with the TMS option, access to the TMS
+tag information is possible. The TMS keeps two tags for each volume.
+As FATMEN already contains a fair amount of user information in the
+catalogue, it is not recommended that these tags be used to store
+further such information. Firstly, the TMS tags are only available
+for data on tape and secondly, access to the TMS tags is slower
+and less efficient than to information in the FATMEN catalogue.
+It can be useful to set the text tag to the generic name.
+If, for example, the generic name 
+\begin{XMP}
+//cern/l3/prod/data/sdsutt/cc00ftgu
+\end{XMP}
+points to the volume XP3088 one could set the text tag on
+this volume to be 
+\begin{XMP}
+//cern/l3/prod/data/sdsutt/cc00ftgu
+\end{XMP}
+This means that if we find the tape XP3088 somewhere and want to
+know what is on it, we can query the TMS and have a pointer
+to the entry in the FATMEN catalogue.
+Alternatively, one could use the command
+\begin{XMP}
+SEARCH */* VID=XP3088
+\end{XMP}
+\par
+The TMS text tag can be set to the generic name with the shell command
+\begin{XMP}
+tag //cern/l3/prod/data/sdsutt/cc00ftgu -s
+\end{XMP}
+\Filename{H2Fatmentutorial-using-tape-pools-in-tms}
+\section{Using tape pools within the TMS}
+\par
+The following is the recommended method of using tape pools
+within the TMS.
+\begin{UL}
+\item
+When a new tape is required, it is first allocated out of the
+specified pool using the subroutine \Rind{FMALLO}.
+\item
+The job that allocates this volume should then write the data and,
+if successful, move the volume to another named pool, optionally
+write-locking it.
+\item
+If the job fails, it should return the volume to the pool from which
+it came.
+\item
+When the data is no longer required, the entry can be deleted from
+the catalogue with the tape volume automatically write-enabled
+and freed using the shell rm command.
+\end{UL} 
+\par
+Thus, a FORTRAN program might look like the following.
+\begin{XMPt}{Example of using TMS tape pools}
+*
+*     Allocate a new 3480 from the pool XX_FREE
+*
+      CALL FMALLO('3480','38K',' ','SMCF_1','XX_FREE',
+     +LBANK,' ',VSN,VID,IRC)
+*
+*     Now write the data ...
+*
+...
+...      
+*
+*     OK - write-lock the tape and move to XX_DSTS
+*     set TMS tag to generic name
+*
+10    CONTINUE
+      CALL FMPOOL(GENAM,LBANK,KEYS,'XX_DSTS','LS',IRC)
+      RETURN
+*
+*     Error - free tape
+*     delete TMS tag 
+*
+20    CONTINUE
+      CALL FMPOOL(GENAM,LBANK,KEYS,'XX_FREE','D',IRC)
+      RETURN
+      END
+\end{XMPt}
+\Filename{H2Fatmentutorial-protecting-banks-with-link-areas}
+\section{Using a Zebra link area to protect the addresses of FATMEN banks}
+\index{Link area}
+\label{LAREA}
+\par
+The addresses of FATMEN banks obtained from the FATMEN RZ file, e.g.
+using the routines \Rind{FMGET}, \Rind{FMGETK} are stored in a link area by the
+FATMEN software. However, only the most recent bank address is saved -
+these routines will DROP any previous bank upon entry.
+Should you wish to retain the addresses of multiple banks, the
+following method may be used.
+\begin{XMPt}{Example of using a link area}
+      COMMON /USRLNK/LUSRK1,LBANKS,LUSRLS
+      DIMENSION LBANKS(NBANKS)
+      CHARACTER*255 GENAM(NBANKS)
+      PARAMETER (LKEYFA=10)
+      DIMENSION KEYS(LKEYFA)
++CDE,FATBANK.
+*
+      CALL MZLINK (IXSTOR, '/USRLNK/', LUSRK1, LUSRLS, LUSRK1)
+*
+      DO 10 I=1,NBANKS
+      CALL FMGET(GENAM(I)(1:LENOCC(GENAM(I))),LBANK,KEYS,IRC)
+      CALL ZSHUNT(IXSTOR,LBANK,LBANKS(I),1,0)
+*
+*     FMGET will DROP any bank at LTDSFA - including the one
+*     we just got!
+*
+      LTDSFA = 0
+ 
+10    CONTINUE
+\end{XMPt}
+\Filename{H2Fatmentutorial-using-fmallo}
+\section{Using the routine FMALLO to allocate a tape}
+
+The following example is taken from the CERN specific routine \Rind{FMSMCF}.
+This routine is called from \Rind{FMOPEN} if the option D is specified.
+It performs the following functions:
+\begin{OL}
+\item
+Checks to see if a copy of the specified dataset already exists in the
+robot (SMCF)
+\item
+If not, a tape is allocated from the special pool {\tt gg\_FAT1}, e.g. 
+{\tt WS\_FAT1.}
+\item
+The \Rind{FMCOPY} routine is then invoked to copy the data and update the catalogue.
+\end{OL}
+\par
+As soon as the catalogue has been updated, subsequent accesses will by
+default take the copy in the robot.
+\begin{XMPt}{Using \protect\Rind{FMALLO} to allocate a tape}
+      SUBROUTINE FMSMCF(GENAME,LBANK,IRC)
+*
+*     Routine to make a copy of the dataset STAGEd in into the robot
+*     using FMCOPY option 'S' (STAGE CHANGE)
+*
++CDE,FATBANK.
++CDE,FATPARA.
++CDE,TMSDEF.
+      CHARACTER*(*) GENAME
+      CHARACTER*6   VSN,VID,CHACC
+      PARAMETER (LKEYFA=10)
+      DIMENSION KEYS(LKEYFA),KEYSR(LKEYFA)
+      PARAMETER       (MAXKEY=1000)
+      DIMENSION KEYSOU(LKEYFA,MAXKEY),KEYSIN(LKEYFA)
+      INTEGER   FMACNT
+*
+      LGN = LENOCC(GENAME)
+*
+*     Save old bank address
+*
+      LOLDFA = LBANK
+      LTDSFA = 0
+*
+*     First, check that a robot copy does not already exist
+*
+      CALL UCOPY(KEYS,KEYSIN,10)
+*
+*     Don't compare copy level or location code
+*
+      KEYSIN(MKCLFA) = -1
+      KEYSIN(MKLCFA) = -1
+      CALL FMSELK(GENAME(1:LGN),KEYSIN,KEYSOU,NMATCH,MAXKEY,IRC)
+      IF(IDEBFA.GE.2)
+     +PRINT *,'FMSMCF. found ',nmatch,' matches for media type 2'
+      DO 10 I=1,NMATCH
+      CALL FMGETK(GENAME(1:LGN),LBANKR,KEYSOU(1,I),IRC)
+      CALL UHTOC(IQ(L+KOFUFA+MVIDFA),4,VID,6)
+      LVID = LENOCC(VID)
+      CALL FMQTMS(VID(1:LVID),LIB,MODEL,DENS,MNTTYP,LABTYP,IC)
+      IF(MNTTYP.EQ.'R') THEN
+         IF(IDEBFA.GE.0) PRINT *,'FMSMCF. robot copy already exists'
+         RETURN
+      ENDIF
+10    CONTINUE
+*
+*     Lift new bank for the robot copy
+*
+      CALL FMLIFT(GENAME(1:LGN),KEYSR,'DISK',' ',IRC)
+      CALL FMLINK(GENAME(1:LGN),LBANKR,' ',IRC)
+*
+*     Blindly copy old bank into new...
+*
+      CALL UCOPY(IQ(LBANK+KOFUFA+MFQNFA),IQ(LBANKR+KOFUFA+MFQNFA),
+     +           NWDSFA)
+*
+*     and the keys...
+*
+      CALL UCOPY(KEYS,KEYSR,10)
+*
+*     Set last access date, date of cataloging and use count
+*
+      CALL DATIME(IDATE,ITIME)
+      CALL FMPKTM(IDATE,ITIME,IPACK,IRC)
+      IQ(LBANKR+KOFUFA+MCTTFA) = IPACK
+      IQ(LBANKR+KOFUFA+MLATFA) = IPACK
+      IQ(LBANKR+KOFUFA+MUSCFA) = 1
+*
+*     Now, allocate new tape
+*
+      IC = FMACNT(CHACC)
+      CALL FMALLO('3480','38K',' ','SMCF_1',CHACC(5:6)//'_FAT1',
+     +LBANKR,' ',VSN,VID,IRC)
+      IF(IRC.NE.0) THEN
+         IF(IDEBFA.GE.0) PRINT *,'FMSMCF. Cannot allocate robot tape'
+         RETURN
+         ELSE
+         IF(IDEBFA.GE.0) PRINT *,'FMSMCF. allocated ',VSN,' ',VID,
+     +                           ' (VSN/VID)'
+      ENDIF
+*
+*     Do the copy
+*
+      CALL FMCOPY(GENAME,LOLDFA,KEYS,GENAME,LBANKR,KEYSR,'S',IRC)
+      IF(IRC.NE.0) PRINT *,'FMSMCF. return code ',IRC,' from FMCOPY'
+*
+*     Restore bank address
+*
+      LBANK = LOLDFA
+      END
+ 
+\end{XMPt}
+
+\Filename{H2Fatmentutorial-processing-multiple-entries}
+\section{Processing multiple entries}
+
+One may frequently wish to perform the same operation on
+multiple datasets, or on multiple catalogue entries.
+For example, we may wish to reset the user words
+for all entries corresponding to Monte Carlo data.
+This can be done in a simple way by
+
+\begin{UL}
+\item Using the \Rind{FMLFIL} routine to generate a list of entries.
+\item Loop over all entries found
+\item Read each entry from the catalogue
+\item Replace the user vector
+\item Update the catalogue
+\end{UL}
+
+The following example shows how this can be done using
+the novice interface.
+
+\begin{XMPt}{Modifying the user words}
+      PARAMETER     (MAXFIL=100)
+      PARAMETER     (LKEYFA=10)
+      CHARACTER*255 CHFILES(MAXFIL),GENAME
+      DIMENSION     KEYS(LKEYFA,MAXFIL)
+*
+** ***     Data set bank mnemonics
+*
+*          Keys
+      PARAMETER ( MKSRFA= 1, MKFNFA= 2, MKCLFA=7, MKMTFA=8
+     1           ,MKLCFA= 9, MKNBFA=10, NKDSFA=10 )
+*
+** ***     Bank offsets
+*
+      PARAMETER ( MFQNFA=  1, MHSNFA= 65, MCPLFA= 67, MMTPFA= 68
+     1           ,MLOCFA= 69, MHSTFA= 70, MHOSFA= 74
+     2           ,MVSNFA= 77, MVIDFA= 79, MVIPFA= 81, MDENFA= 82
+     3           ,MVSQFA= 83, MFSQFA= 84, MSRDFA= 85, MERDFA= 86
+     4           ,MSBLFA= 87, MEBLFA= 88, MRFMFA= 89, MRLNFA= 90
+     5           ,MBLNFA= 91, MFLFFA= 92, MFUTFA= 93, MCRTFA= 94
+     6           ,MCTTFA= 95, MLATFA= 96, MCURFA= 97, MCIDFA= 99
+     7           ,MCNIFA=101, MCJIFA=103, MFPRFA=105, MSYWFA=106
+     8           ,MUSWFA=116, MUCMFA=126, NWDSFA=145
+     9           ,MFSZFA=MSYWFA,MUSCFA=MSYWFA+1)
+
+      PARAMETER (LURCOR=200000)
+      COMMON/FAT/IXSTOR,IXDIV,IFENCE(2),LEV,LEVIN,BLVECT(LURCOR)
+      DIMENSION    LQ(999),IQ(999),Q(999)
+      EQUIVALENCE (IQ(1),Q(1),LQ(9)),(LQ(1),LEV)
+*
+      COMMON /QUEST/IQUEST(100)
+      DIMENSION     IVECT(10)
+*
+*     Initialise FATMEN and Zebra
+*
+      LUNRZ = 1
+      LUNFZ = 2
+      CALL FMSTRT(LUNRZ,LUNFZ,'//CERN/OPAL',IRC)
+ 
+      GENAME = '//CERN/OPAL/SIMD/DDST/PASS3/*/*'
+      LG = LENOCC(GENAME)
+*
+*     Find all entries that match 
+*
+      ICONT = 0
+      IFLAG = 1
+10    CONTINUE
+      CALL FMLFIL(GENAME(1:LG),CHFILES,KEYS,NFOUND,MAXFIL,ICONT,IRC)
+*
+      DO 20 J=1,NFOUND
+      LF = LENOCC(CHFILES(J))
+      LBANK = 0
+      PRINT *,'Processing ',CHFILES(J)(1:LF)
+*
+*     Read entry from catalogue
+*
+      CALL FMGETK(CHFILES(J)(1:LF),LBANK,KEYS(1,J),IRC) 
+*
+*     here we could add checks on the bank contents
+*
+*     Store vector IVECT at offset MUSWFA, length 10
+*
+      CALL FMPUTV(LBANK,IVECT,MUSWFA,10,IRC)
+*
+*     and write back to the catalogue
+*
+      CALL FMMOD(CHFILES(J)(1:LF),LBANK,IFLAG,IRC)
+*
+*     drop bank
+*
+      CALL MZDROP(IXSTOR,LBANK,' ')
+20    CONTINUE
+
+      IF(ICONT.NE.0) GOTO 10
+
+      CALL FMEND(IRC)
+      END
+\end{XMPt}
+
+The following example finds all generic-names that match
+a pattern containing wild cards, and then deletes all 
+entries corresponding to tapes that are mounted robotically.
+The tape volumes are write-enabled and moved to a TMS pool
+so that they can be allocated for future use.
+
+\begin{XMPt}{Example of processing multiple entries in FORTRAN}
+      PARAMETER (LURCOR=200000)                                         
+      COMMON/CRZT/IXSTOR,IXDIV,IFENCE(2),LEV,LEVIN,BLVECT(LURCOR)       
+      DIMENSION    LQ(999),IQ(999),Q(999)                               
+      EQUIVALENCE (IQ(1),Q(1),LQ(9)),(LQ(1),LEV)                        
+*                                                                       
+      COMMON /USRLNK/LUSRK1,LUSRBK,LUSRLS                               
+*                                                                       
+      COMMON /QUEST/IQUEST(100)                                         
+*                                                                       
+* Start of FATMEN sequence FATPARA                                      
+*                                                                       
+** ***     Data set bank mnemonics                                      
+*                                                                       
+*          Keys                                                         
+      PARAMETER ( MKSRFA= 1, MKFNFA= 2, MKCLFA=7, MKMTFA=8              
+     1           ,MKLCFA= 9, MKNBFA=10, NKDSFA=10 )                     
+*                                                                       
+** ***     Bank offsets                                                 
+*                                                                       
+      PARAMETER ( MFQNFA=  1, MHSNFA= 65, MCPLFA= 67, MMTPFA= 68        
+     1           ,MLOCFA= 69, MHSTFA= 70, MHOSFA= 74                    
+     2           ,MVSNFA= 77, MVIDFA= 79, MVIPFA= 81, MDENFA= 82        
+     3           ,MVSQFA= 83, MFSQFA= 84, MSRDFA= 85, MERDFA= 86        
+     4           ,MSBLFA= 87, MEBLFA= 88, MRFMFA= 89, MRLNFA= 90        
+     5           ,MBLNFA= 91, MFLFFA= 92, MFUTFA= 93, MCRTFA= 94        
+     6           ,MCTTFA= 95, MLATFA= 96, MCURFA= 97, MCIDFA= 99        
+     7           ,MCNIFA=101, MCJIFA=103, MFPRFA=105, MSYWFA=106        
+     8           ,MUSWFA=116, MUCMFA=126, NWDSFA=145                    
+     9           ,MFSZFA=MSYWFA,MUSCFA=MSYWFA+1)                        
+                                                                        
+* End of FATMEN sequence FATPARA                                        
+      CHARACTER*6  DENS                                                 
+      CHARACTER*8  LIB                                                  
+      CHARACTER*4  LABTYP                                               
+      CHARACTER*1  MNTTYP                                               
+      CHARACTER*8  MODEL                                                
+      CHARACTER*7  ROBMAN(2)                                            
+      DATA         ROBMAN(1)/'-Robot '/,ROBMAN(2)/'-Manual'/            
+      PARAMETER (LKEYFA=10)                                             
+      PARAMETER (MAXFIL=3000)                                           
+      DIMENSION KEYS(LKEYFA,MAXFIL)                                     
+      CHARACTER*255 FILES(MAXFIL)                                       
+      CHARACTER*8   THRONG                                              
+      CHARACTER*255 TOPDIR                                              
+      CHARACTER*26  CHOPT                                               
+      CHARACTER*8   DSN                                                 
+*                                                                       
+*                                                                       
+*     Initialise ZEBRA                                                  
+*                                                                       
+      CALL MZEBRA(-3)                                                   
+      CALL MZSTOR(IXSTOR,'/CRZT/','Q',IFENCE,LEV,BLVECT(1),BLVECT(1),   
+     +            BLVECT(5000),BLVECT(LURCOR))                          
+      CALL MZLOGL(IXSTOR,-3)                                            
+                                                                        
+*                                                                       
+* *** Define user division and link area like:                          
+*                                                                       
+      CALL MZDIV  (IXSTOR, IXDIV, 'USERS', 50000, LURCOR, 'L')          
+      CALL MZLINK (IXSTOR, '/USRLNK/', LUSRK1, LUSRLS, LUSRK1)          
+*                                                                       
+*     Units for FATMEN RZ/FZ files                                      
+*                                                                       
+      LUNRZ = 1                                                         
+      LUNFZ = 2                                                         
+*                                                                       
+*     Initialise FATMEN                                                 
+*                                                                       
+      CALL FMINIT(IXSTOR,LUNRZ,LUNFZ,'//CERN/delphi',IRC)               
+      CALL FMLOGL(1)                                                    
+*                                                                       
+*     Get list of file names                                            
+*                                                                       
+      JCONT = 0                                                         
+1     CONTINUE                                                          
+      CALL FMLFIL('//CERN/DELPHI/P01_*/RAWD/NONE/Y90V00/E*/L*/*',       
+     +FILES,KEYS,NFOUND,MAXFIL,JCONT,IRC)                               
+*
+*     IRC = -1 indicates that there are more files found than
+*     fit in FILES(MAXFIL). Calling FMLFIL again with JCONT^=0 will
+*     return the next MAXFIL matches
+*
+      IF(IRC.EQ.-1) THEN                                                
+        JCONT = 1                                                       
+      ELSE                                                              
+        JCONT = 0                                                       
+      ENDIF                                                             
+                                                                        
+      PRINT *,NFOUND,' files found'                                     
+                                                                        
+      DO 10 I=1,NFOUND                                            
+      LENF = LENOCC(FILES(I))                                           
+      PRINT *,'Processing ',FILES(I)(1:LENF)                            
+      LBANK = 0                                                         
+      CALL FMQMED(FILES(I)(1:LENF),LBANK,KEYS(1,I),IMEDIA,IROBOT,IRC)   
+      IF(IROBOT.NE.1) GOTO 10                                           
+*
+*     Display media information and the full generic-name for this entry
+*
+      CALL FMSHOW(FILES(I)(1:LENF),LBANK,KEYS(1,I),'MG',IRC)            
+*
+*     Unlock (write-enable) corresponding tape volume
+*
+      CALL FMULOK(FILES(I)(1:LENF),LBANK,KEYS(1,I),' ',IRC)             
+      IF(IRC.NE.0) THEN                                                 
+         PRINT *,'Return code ',IRC,' from FMULOK for ',                
+     +   FILES(I)(1:LENF)                                               
+         GOTO 10                                                        
+      ENDIF                                                             
+*
+*     Move to pool XX_DSTS. 
+*
+      CALL FMPOOL(FILES(I)(1:LENF),LBANK,KEYS(1,I),                     
+     +            'XX_RAWD',' ',IRC)                                    
+      IF(IRC.NE.0) THEN                                                 
+         PRINT *,'Return code ',IRC,' from FMPOOL for ',                
+     +   FILES(I)(1:LENF)                                               
+         GOTO 10                                                        
+      ENDIF                                                             
+*
+*     and remove the entry from the FATMEN catalogue
+*
+      CALL FMRM(FILES(I)(1:LENF),LBANK,KEYS(1,I),IRC)                   
+      IF(IRC.NE.0) THEN                                                 
+         PRINT *,'Return code ',IRC,' from FMRM for ',                  
+     +   FILES(I)(1:LENF)                                               
+         GOTO 10                                                        
+      ENDIF                                                             
+10    CONTINUE                                                          
+*
+*     any more files?
+*
+      IF(JCONT.NE.0) GOTO 1                                             
+*                                                                       
+*     Terminate cleanly                                                 
+*                                                                       
+      CALL FMEND(IRC)                                                   
+                                                                        
+      END                                                               
+                                                                        
+\end{XMPt}
+\Filename{H2Fatmentutorial-deleting-multiple-files}
+\section{Deleting multiple files using the FATMEN shell}
+\par
+Neither the FORTRAN routine \Rind{FMRM} nor the shell commmand \Ucom{rm}
+accept wild-cards in the generic-name. This is deliberate
+and protects against mis-use such as
+\begin{XMP}
+   \Ucom{rm *}
+
+or worse
+
+   \Ucom{rm */*}
+\end{XMP}
+which would remove all files in all directories,
+subject to the normal protection rules,  and generate
+a lot of work for the servers.
+
+Multiple files can be deleted as shown in the previous FORTRAN
+example, or via a 2-stage operation in the shell.
+If, for example, one wished to delete all files belonging to
+JAMIE, one could type
+\begin{XMPt}{Using the SEARCH command to prepare a macro}
+FM>SEARCH */* USER=JAMIE -D OUTPUT=DELETE.KUMAC
+FM>EXEC DELETE
+\end{XMPt}
+\par
+To approximate to the previous FORTRAN example, one could use
+\begin{XMPt}{Using the SEARCH command to delete robot tapes}
+FM>SEARCH //CERN/DELPHI/P01_*/RAWD/NONE/Y90V00/E*/L*/* VID=I* -D _
+   OUTPUT=DELROB.KUMAC
+FM>EDIT DELROB | Now add -FU to each line
+FM>EXEC DELROB
+\end{XMPt}
+\par
+Note that the removal of entries from the catalogue should
+always be done with extreme care.
+ 
+\Filename{H2Fatmentutorial-access-tms-tag-info}
+\section{Access to TMS tag information}
+\par
+The following program shows how the TMS tags associated
+with a tape volume may be accessed. As usual in the FATMEN
+system, all access is based on the generic-name.
+\begin{XMPt}{Access to TMS tag information from FORTRAN}
+      PARAMETER (LURCOR=200000)
+      COMMON/CRZT/IXSTOR,IXDIV,IFENCE(2),LEV,LEVIN,BLVECT(LURCOR)
+      DIMENSION    LQ(999),IQ(999),Q(999)
+      EQUIVALENCE (IQ(1),Q(1),LQ(9)),(LQ(1),LEV)
+*
+      COMMON /USRLNK/LUSRK1,LUSRBK,LUSRLS
+*
+      COMMON /QUEST/IQUEST(100)
+*
+* Start of FATMEN sequence FATPARA
+*
+** ***     Data set bank mnemonics
+*
+*          Keys
+      PARAMETER ( MKSRFA= 1, MKFNFA= 2, MKCLFA=7, MKMTFA=8
+     1           ,MKLCFA= 9, MKNBFA=10, NKDSFA=10 )
+*
+** ***     Bank offsets
+*
+      PARAMETER ( MFQNFA=  1, MHSNFA= 65, MCPLFA= 67, MMTPFA= 68
+     1           ,MLOCFA= 69, MHSTFA= 70, MHOSFA= 74
+     2           ,MVSNFA= 77, MVIDFA= 79, MVIPFA= 81, MDENFA= 82
+     3           ,MVSQFA= 83, MFSQFA= 84, MSRDFA= 85, MERDFA= 86
+     4           ,MSBLFA= 87, MEBLFA= 88, MRFMFA= 89, MRLNFA= 90
+     5           ,MBLNFA= 91, MFLFFA= 92, MFUTFA= 93, MCRTFA= 94
+     6           ,MCTTFA= 95, MLATFA= 96, MCURFA= 97, MCIDFA= 99
+     7           ,MCNIFA=101, MCJIFA=103, MFPRFA=105, MSYWFA=106
+     8           ,MUSWFA=116, MUCMFA=126, NWDSFA=145
+     9           ,MFSZFA=MSYWFA,MUSCFA=MSYWFA+1)
+ 
+* End of FATMEN sequence FATPARA
+      PARAMETER (LKEYFA=10)
+      DIMENSION KEYS(LKEYFA)
+      CHARACTER*80  GENAM
+      CHARACTER*255 CHTAGS
+*
+*
+*     Initialise ZEBRA
+*
+      CALL MZEBRA(-3)
+      CALL MZSTOR(IXSTOR,'/CRZT/','Q',IFENCE,LEV,BLVECT(1),BLVECT(1),
+     +            BLVECT(5000),BLVECT(LURCOR))
+      CALL MZLOGL(IXSTOR,-3)
+ 
+*
+* *** Define user division and link area like:
+*
+      CALL MZDIV  (IXSTOR, IXDIV, 'USERS', 50000, LURCOR, 'L')
+      CALL MZLINK (IXSTOR, '/USRLNK/', LUSRK1, LUSRLS, LUSRK1)
+*
+*     Units for FATMEN RZ/FZ files
+*
+      LUNRZ = 1
+      LUNFZ = 2
+*
+*     Initialise FATMEN
+*
+      CALL FMINIT(IXSTOR,LUNRZ,LUNFZ,'//CERN/CNDIV',IRC)
+      CALL FMLOGL(0)
+*
+*     Get list of file names
+*
+      GENAM = '//CERN/CNDIV/JAMIE/OUT'
+      LG    = LENOCC(GENAM)
+      CHTAGS = 'Archive tape for FATMEN source'
+*
+*     Set tag - default is Text tag
+*
+      CALL FMTAGS(GENAM(1:LG),LBANK,KEYS,CHTAGS,'S',IRC)
+*
+*     Read back and print tag
+*
+      CALL FMTAGS(GENAM(1:LG),LBANK,KEYS,CHTAGS,'G',IRC)
+      PRINT *,IRC,CHTAGS(1:LENOCC(CHTAGS))
+*
+*     Terminate cleanly
+*
+      CALL FMEND(IRC)
+ 
+      END
+ 
+\end{XMPt}
+
+\Filename{H2Fatmentutorial-runtime-tailoring}
+\section{Run time tailoring of the FATMEN system}
+
+Certain features of the FATMEN system may be reconfigured at run-time,
+both via the FORTRAN callable interface or interactive shell.
+A description of what can be tailored is given below.
+\subsection{Host name and account fields}
+
+The FATMEN software attempts to determine various information, such as the
+current host name and account, by calling system routines. In some cases, 
+it may be desirable to override the values returned. This can be done by
+setting variables (environmental variables in Unix, global symbols in VAX/VMS). 
+
+For example, the SHIFT facility at CERN is composed of a number of systems
+(shift1, shd01 etc.). By default, a file created on a given system
+would not be accessible on another as the node name check would fail. 
+To override this, the variable \Rind{FMHOST} is set, 
+as below.
+\begin{XMP}
+\Ucom{setenv FMHOST shift}
+\end{XMP}
+
+The account field can be set in a similar way, e.g.
+\begin{XMP}
+FMACNT:==JDSCT
+\end{XMP}
+for a VAX/VMS system.
+\subsection{Media attributes}
+\par
+If FATMEN has been installed using the TMS flag, media attributes are obtained
+from the TMS (Tape Management System). (A preliminary interface to the VMTAPE
+package also exists and is selected via the flag VMTAPE).
+\par
+On other systems, the defaults can be overridden globally, or on a per volume basis.
+Ideally, the media attributes for a given site should be automatically selected
+via installation flags. However, the \Rind{FMEDIA} callable routine and MEDIA shell command
+permit the default values to be overridden at any time.
+\par
+For example, to change the generic device name of media type 2, which defaults
+at CERN to CT1, the following command could be used.
+\begin{XMP}
+MEDIA 2 3480 TA90
+\end{XMP}
+\subsection{Tailoring the FATMEN selection}
+\index{selection}
+\index{KEYS selection}
+\par
+By default, all entries in the FATMEN catalogue are visible and may
+be examined using the shell command ls. One may limit the range
+of entries that can be seen by defining a list of location codes,
+copy levels and media types. These lists also affect those files
+that may be accessed, and the selection procedure itself.
+\par
+For example, an experiment which computes at several laboratories will
+probably have copies of the tapes containing the DST information at
+each site. The shell command
+\begin{XMP}
+set/location 1-3
+\end{XMP}
+would prevent any catalogue entries with a location code outside the range
+1-3 from being visible. This is particularly useful for large collaborations
+that typically have many copies of each dataset.
+\par
+It is also important to set the correct range for efficiency in data access.
+In the case where an experiment has multiple copies of a file on different tapes,
+each at a different laboratory, FATMEN will normally issue a TMS query
+for each volume to see if it is accessible. Setting the location code
+correctly reduces the number of TMS queries and hence improves data access time.
+\par
+In the case of the location code or copy level, only those entries with
+a value in the defined range will be visible or accessible.
+In the case of the medium type, the order of the values is also important.
+By default, FATMEN first looks for a disk file, then a copy on a 3480 cartridge and so
+on. The shell command
+\begin{XMP}
+set/media 5,1,2
+\end{XMP}
+would cause FATMEN to first look for a copy on an Exabyte 8500 cartridge,
+then disk and finally a 3480 cassette, assuming the default medium attributes.
+
+\Filename{H2Fatmentutorial-plotting-onfo}
+\section{Plotting information from the FATMEN catalogue}
+
+The following program shows how certain information, such as the
+file size, number of days since last access, etc. can be histogrammed
+using HBOOK and saved in a file for further processing with PAW.
+
+Before running, the variable THRONG should be set to the FATMEN
+group that is to be processed, as shown below.
+\begin{XMPt}{Setting the \Lit{THRONG} variable on various systems}
+Unix systems:        THRONG=OPAL;export THRONG {\rm (Bourne and Korn shells)}
+-------------        setenv THRONG OPAL        {\rm (C shell)}
+
+VMS systems:         throng==opal
+------------
+
+VM/CMS systems:      SETENV THRONG OPAL
+---------------
+\end{XMPt}
+\begin{XMPt}{Plotting FATMEN information with HBOOK}
+      PARAMETER (LURCOR=200000)                                         
+      COMMON/CRZT/IXSTOR,IXDIV,IFENCE(2),LEV,LEVIN,BLVECT(LURCOR)       
+      DIMENSION    LQ(999),IQ(999),Q(999)                               
+      EQUIVALENCE (IQ(1),Q(1),LQ(9)),(LQ(1),LEV)                        
+*                                                                       
+      COMMON /USRLNK/LUSRK1,LUSRBK,LUSRLS                               
+*                                                                       
+      COMMON /QUEST/IQUEST(100)                                         
+      CHARACTER*8   THRONG
+*                                                                       
+* Start of FATMEN sequence FATPARA                                      
+*                                                                       
+** ***     Data set bank mnemonics                                      
+*                                                                       
+*          Keys                                                         
+      PARAMETER ( MKSRFA= 1, MKFNFA= 2, MKCLFA=7, MKMTFA=8              
+     1           ,MKLCFA= 9, MKNBFA=10, NKDSFA=10 )                     
+*                                                                       
+** ***     Bank offsets                                                 
+*                                                                       
+      PARAMETER ( MFQNFA=  1, MHSNFA= 65, MCPLFA= 67, MMTPFA= 68        
+     1           ,MLOCFA= 69, MHSTFA= 70, MHOSFA= 74                    
+     2           ,MVSNFA= 77, MVIDFA= 79, MVIPFA= 81, MDENFA= 82        
+     3           ,MVSQFA= 83, MFSQFA= 84, MSRDFA= 85, MERDFA= 86        
+     4           ,MSBLFA= 87, MEBLFA= 88, MRFMFA= 89, MRLNFA= 90        
+     5           ,MBLNFA= 91, MFLFFA= 92, MFUTFA= 93, MCRTFA= 94        
+     6           ,MCTTFA= 95, MLATFA= 96, MCURFA= 97, MCIDFA= 99        
+     7           ,MCNIFA=101, MCJIFA=103, MFPRFA=105, MSYWFA=106        
+     8           ,MUSWFA=116, MUCMFA=126, NWDSFA=145                    
+     9           ,MFSZFA=MSYWFA,MUSCFA=MSYWFA+1)                        
+                                                                        
+* End of FATMEN sequence FATPARA                                        
+*KEEP,FATBUG.
+      COMMON /FATUSE/ IDEBFA, IDIVFA, IKDRFA, KOFSFA, KOFUFA, LBFXFA
+     +              , LSAVFA, LTOPFA, LBBKFA, LBGNFA, LTDSFA, LBDSFA
+     +              , LPRTFA, NTOPFA, LUFZFA, IOUPFA, IOBKFA, IODSFA
+     +              , LLNLFA, LLNHFA
+*KEND.
+      CHARACTER*8   DSN                                                 
+      EXTERNAL      UROUT
+*                                                                       
+*                                                                       
+*     Initialise ZEBRA                                                  
+*                                                                       
+      CALL MZEBRA(-3)                                                   
+      CALL MZSTOR(IXSTOR,'/CRZT/','Q',IFENCE,LEV,BLVECT(1),BLVECT(1),   
+     +            BLVECT(5000),BLVECT(LURCOR))                          
+      CALL MZLOGL(IXSTOR,-3)                                            
+                                                                        
+*                                                                       
+* *** Define user division and link area like:                          
+*                                                                       
+      CALL MZDIV  (IXSTOR, IXDIV, 'USERS', 50000, LURCOR, 'L')          
+      CALL MZLINK (IXSTOR, '/USRLNK/', LUSRK1, LUSRLS, LUSRK1)          
+*                                                                       
+*     Units for FATMEN RZ/FZ files                                      
+*                                                                       
+      LUNRZ = 1                                                         
+      LUNFZ = 2                                                         
+      CALL GETENVF('THRONG',THRONG)
+      LTH = LENOCC(THRONG)
+*                                                                       
+*     Initialise FATMEN                                                 
+*                                                                       
+      CALL FMINIT(IXSTOR,LUNRZ,LUNFZ,'//CERN/'//THRONG(1:LTH),IRC)
+      CALL FMLOGL(0)
+*
+*     Initialise HBOOK
+*
+      CALL HLIMIT(-20000)
+*
+*     Book histograms
+*
+      CALL HBOOK1(1,'File Size (MB)',50,0.,200.,0.)
+      CALL HBOOK1(2,'Number of accesses',50,0.,50.,0.)
+      CALL HBOOK1(3,'Number days since last access',50,0.,300.,0.)
+      CALL HBOOK1(4,'Number days since catalogued',50,0.,300.,0.)
+      CALL HBOOK1(5,'Number days since created',50,0.,300.,0.)
+      CALL HBOOK1(6,'Medium',5,0.,5.,0.)
+      CALL HIDOPT(0,'BLAC')
+*
+*     Loop over all files
+*
+      CALL FMLOOP('//CERN/*/*',-1,UROUT,IRC)
+*
+*     Print and store the histograms
+*
+      CALL HPRINT(0)
+      CALL HRPUT(0,'FATTUPLE.'//THRONG(1:LTH),'N')
+*
+*     Terminate cleanly
+*
+      CALL FMEND(IRC)
+      END
+
+      SUBROUTINE UROUT(PATH,KEYS,IRC)
+*                                                                       
+* Start of FATMEN sequence FATPARA                                      
+*                                                                       
+** ***     Data set bank mnemonics                                      
+*                                                                       
+*          Keys                                                         
+      PARAMETER ( MKSRFA= 1, MKFNFA= 2, MKCLFA=7, MKMTFA=8              
+     1           ,MKLCFA= 9, MKNBFA=10, NKDSFA=10 )                     
+*                                                                       
+** ***     Bank offsets                                                 
+*                                                                       
+      PARAMETER ( MFQNFA=  1, MHSNFA= 65, MCPLFA= 67, MMTPFA= 68        
+     1           ,MLOCFA= 69, MHSTFA= 70, MHOSFA= 74                    
+     2           ,MVSNFA= 77, MVIDFA= 79, MVIPFA= 81, MDENFA= 82        
+     3           ,MVSQFA= 83, MFSQFA= 84, MSRDFA= 85, MERDFA= 86        
+     4           ,MSBLFA= 87, MEBLFA= 88, MRFMFA= 89, MRLNFA= 90        
+     5           ,MBLNFA= 91, MFLFFA= 92, MFUTFA= 93, MCRTFA= 94        
+     6           ,MCTTFA= 95, MLATFA= 96, MCURFA= 97, MCIDFA= 99        
+     7           ,MCNIFA=101, MCJIFA=103, MFPRFA=105, MSYWFA=106        
+     8           ,MUSWFA=116, MUCMFA=126, NWDSFA=145                    
+     9           ,MFSZFA=MSYWFA,MUSCFA=MSYWFA+1)                        
+                                                                        
+* End of FATMEN sequence FATPARA                                        
+      PARAMETER (LURCOR=200000)                                         
+      COMMON/CRZT/IXSTOR,IXDIV,IFENCE(2),LEV,LEVIN,BLVECT(LURCOR)       
+      DIMENSION    LQ(999),IQ(999),Q(999)                               
+      EQUIVALENCE (IQ(1),Q(1),LQ(9)),(LQ(1),LEV)                        
+      CHARACTER*(*) PATH
+      PARAMETER     (LKEYFA=10)
+      DIMENSION     KEYS(LKEYFA)
+      DIMENSION     NDAYS(3)
+      COMMON/QUEST/IQUEST(100)
+      IRC   = 0
+      LBANK = 0
+      LP    = LENOCC(PATH)
+      CALL FMGETK(PATH(1:LP),LBANK,KEYS,IRC)
+*
+*     Fill histograms
+*
+      IF(IQ(LBANK+MFSZFA).NE.0)
+     +CALL HFILL(1,FLOAT(IQ(LBANK+MFSZFA)),0.,1.)
+      IF(IQ(LBANK+MUSCFA).NE.0)
+     +CALL HFILL(2,FLOAT(IQ(LBANK+MUSCFA)),0.,1.)
+      CALL FMDAYS(PATH(1:LP),LBANK,KEYS,NDAYS,' ',IRC)
+      CALL HFILL(3,FLOAT(NDAYS(3)),0.,1.)
+      CALL HFILL(4,FLOAT(NDAYS(2)),0.,1.)
+      CALL HFILL(5,FLOAT(NDAYS(1)),0.,1.)
+      CALL HFILL(6,FLOAT(IQ(LBANK+MMTPFA)),0.,1.)
+      CALL MZDROP(IXSTOR,LBANK,' ')
+      END
+\end{XMPt}

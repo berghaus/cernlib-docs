@@ -1,0 +1,274 @@
+<PRE>
+
+
+
+
+<H2>Geant  3.16  Routine  PHYS221</H2>
+
+
+<PRE>
+
+
+Origin:  G.N.Patrick,  L.Urban   Submitted:  26.09.83
+Revision:                                                            Revised:  16.12.93
+Documentation:
+
+
+</PRE>  <HR>  <H2>Simulation  of  Compton
+scattering</H2>
+
+
+<PRE>
+
+
+</PRE>
+
+
+<H2>Subroutines</H2>
+
+
+<PRE>
+
+
+
+       CALL  GCOMP
+
+
+
+GCOMP  generates  the  Compton  scattering  of  a
+photon  on  an  atomic  electron.  It  uses  the  random
+number  techniques  of  Butcher  and  Messell    to
+sample  the  scattered  photon  energy  according  to
+the  Klein-Nishina  formula  .
+
+
+The  interaction  produces  one  electron,  which  is
+put  in  the  /GCKING/  common  block  for  further
+tracking.  Tracking  of  the  scattered  photon  will
+continue,  with  direction  and  energy  changed  by
+the  interaction.  All  input/output  information  is
+through  GEANT  common  blocks.
+
+
+
+    Input:                     via  COMMON  /GCTRACK/
+
+
+
+    Output:                    via  COMMONs  /GCTRAK/  and  /GCKING/
+
+
+
+Compton  scattering  is  selected  in  GEANT  by  the
+input  data  record  COMP.  When  Compton  scattering
+is  selected,  GCOMP  is  called  automatically  from
+the  GEANT  photon  tracking  routine  GTGAMA.
+
+
+</PRE>
+
+
+<H2>Method</H2>
+
+
+<PRE>
+
+
+For  a  complete  account  of  the  Monte  Carlo  methods
+used  the  interested  user  is  referred  to  the
+
+
+
+publications  of  Butcher  and  Messel  ,  Messel  and
+Crawford    and  Ford  and  Nelson  .  Only  the  basic
+formalism  is  outlined  here.
+
+
+The  quantum  mechanical  Klein-Nishina
+differential  cross-section  is:
+
+                                 2           2                                                                                     *
+ *      2              @
+Phi      (E, E') = ((X   npi    r   m   )/ (E   ))[((1)/ (epsilon             ))+epsilon             ][1- ((epsilon             sin*
+ *         theta       @
+                      0              e
+                                 0
+
+where,
+
+
+
+    E                   =       energy  of  the  incident  photon
+
+
+
+    E'                =         energy  of  the  scattered  photon
+
+
+
+    epsilon              =      E'/ E
+
+
+
+    m                   =       electron  mass
+     e
+
+
+    n                   =       electron  density
+
+
+
+    r                   =       classical  electron  radius
+     0
+
+
+    X                   =       radiation  length
+     0
+
+
+Assuming  an  elastic  collision,  the  scattering
+angle  theta           is  defined  by  the  Compton  formula:
+
+
+
+                       E' = E((m   )/ (m    + E(1- cos      theta         )))
+                                e       e
+
+
+
+Using  the  combined  ``composition  and  rejection''
+Monte  Carlo  methods  described  in  chapter  PHYS211,
+we  may  set:
+
+
+
+                                                                                                                 2
+    f(epsilon             )               =         [((1)/ (epsilon             )) + epsilon             ] = sum        alpha      *
+ *      f   (E)        @
+                                                                                                              i=1                  *
+ *   i   i             @
+
+
+                                                                                       2                                           *
+ * 2
+    g(epsilon             )               =         [1- ((epsilon             sin         theta         )/ (1 + epsilon            *
+ *    ))]              @
+
+                                                                                                                                   *
+ *                     @
+    alpha                                 =         ((1)/ (ln    (1/ epsilon               )))                                     *
+ *                     @
+                  1                                                                     0                                          *
+ *                     @
+                                                                                                                                   *
+ *                     @
+                                                                                                                                   *
+ *                     @
+    f   (epsilon             )            =         ((1)/ (epsilon             ln    (1/ epsilon               )))                 *
+ *                     @
+     1                                                                                                      0                      *
+ *                     @
+
+
+
+ The  value  of  epsilon              corresponding  to  the  minimum
+ photon  energy  (backward  scattering)  is  given  by:
+
+
+                         epsilon                       =         ((1)/ (1 + 2E/ m   ))
+                                             0                                   e
+
+
+
+ Given  a  set  of  random  numbers  r     uniformly
+                                      i
+
+ distributed  in  [0,1],  the  sampling  procedure  for
+ epsilon               is  the  following:
+
+
+1.      decide  which  element  of  the  f(epsilon             )
+        distribution  to  sample  from.  Let
+        alpha             = (alpha             + alpha            )r   .  If  alpha            > =    alpha
+                      T                    1                   2    0                       1                       T
+
+        select  f   (epsilon             ),  otherwise  select
+                 1
+
+        f   (epsilon             );
+         2
+
+2.      sample  epsilon              from  the  distributions
+        corresponding  to  f     or  f   .  For  f     this  is
+                            1         2           1
+
+        simply  achieved  by:
+
+
+                                                                                  alpha
+                                    epsilon             = epsilon                e               r
+                                                                              0                   1
+                                                                                  1
+
+
+        For  f   ,  we  change  variables  and  use:
+              2
+
+
+
+                                     max     (r   , r   )                for              E/ m> =    (E/ m + 1)r
+
+        epsilon             ' = -              2     3                                                          4                  *
+ *      .
+
+                                     r                                   for  all  other  cases
+                                      5
+
+
+        Then,
+        epsilon              = epsilon                + (1- epsilon               )epsilon             ';
+                                                   0                           0
+
+                           2
+3.      calculate  sin         theta          = max     (0, t(2- t))  where
+        t = m   (1- epsilon            )/ E'
+             e
+
+4.      test  the  rejection  function,  if
+        r   < =    g(epsilon             )  accept  epsilon             ,  otherwise
+         6
+
+        return  to  step  1.
+
+
+ After  the  successful  sampling  of  epsilon             ,  GCOMP
+ generates  the  polar  angles  of  the  scattered
+ photon  with  respect  to  the  direction  of  the
+
+
+
+parent  photon.  The  azimuthal  angle,  phi     ,  is
+generated  isotropically  and  theta           is  as  defined
+above.  The  momentum  vector  of  the  scattered
+photon  is  then  calculated  according  to  kinematic
+considerations.  Both  vectors  are  then
+transformed  into  the  GEANT  coordinate  system.
+
+
+</PRE>
+
+
+<H2>Restriction</H2>
+
+
+<PRE>
+
+
+The  differential  cross-section  is  only  valid  for
+those  collisions  in  which  the  energy  of  the
+recoil  electron  is  large  compared  with  its
+binding  energy  (which  is  ignored).  However,  as
+pointed  out  by  Rossi  ,  this  has  a  negligible
+effect  because  of  the  small  number  of  recoil
+electrons  produced  at  very  low  energies.
+</PRE>

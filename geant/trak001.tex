@@ -1,0 +1,233 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%  GEANT manual in LaTeX form                              %
+%                                                                 %
+%  Michel Goossens (for translation into LaTeX)                   %
+%  Version 1.00                                                   %
+%  Last Mod. Jan 24 1991  1300   MG + IB                          %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\Documentation{F.Bruyant}
+\Submitted{15.08.84}      \Revised{16.12.93}
+\Version{Geant 3.16}       \Routid{TRAK001}
+\Makehead{The tracking package}
+\section{Introduction}
+ 
+In {\tt GEANT} {\it tracking} a particle through a geometry of
+objects consists in calculating a set of points in a seven-dimensional
+space ($x$, $y$, $z$, $t$, $p_x$, $p_y$, $p_z$) which is called the
+trajectory of the particle. This is achieved by integrating the equations 
+of motion over successive {\it steps} from one trajectory point to the
+next and applying corrections to account for the presence of matter. 
+
+To have a detailed description of the kinematic of the particle it would
+be necessary to calculate a trajectory point every time the component
+of the momentum change. This is not possible because it would mean 
+calculating an enormously large number of points. Processes like the
+deviation of a charged particle in a magnetic field, the loss of energy
+due to bremsstrahlung and ionisation or the deviation due to elastic
+electromagnetic scatterings are essentially continuous. An arbitrary
+distinction is thus made between discrete and continuous processes,
+controlled by a set of thresholds which can be set by the user.
+A particle trajectory is thus a set of points at which a discrete process
+has happened. 
+
+The tracking package contains a subprogram
+which performs the tracking for
+all particles in the current event and for the secondary
+products which they generate, plus some tools
+for storing the space point coordinates
+computed along the corresponding trajectories.
+
+\section{The step size}
+ 
+
+When tracking particles through a complex structure one of the
+critical tasks is the estimation {\it a priori} of the step size. 
+This is performed automatically by the program.
+For a particle with a given energy the step size depends
+primarily on the intrinsic properties of the particle (mass,
+charge, lifetime, etc.) and on the characteristics of the current
+medium. The dependence may be due either to the (quasi)continuous
+processes which usually impose a limit to the interval
+of integration (energy loss, multiple scattering ...)
+or to the occurrence of a discrete process which introduces
+a discontinuity in the trajectory (decay, electromagnetic or hadronic
+interaction). 
+The modification of the kinematic parameters (position
+and energy) due to continuous processes between two discrete ones is
+taken into account and the necessary modifications are applied at the end
+of the step. 
+
+In addition to the physical effects
+there are constraints of a geometrical nature, the step being limited by
+the path length to the medium boundary.
+In practice, the step size depends ultimately on a set of tolerances and cuts,
+which the program will set automatically, but which may be also
+optimised by the user, such as:
+
+\begin{itemize}
+\item the maximum turning angle due to magnetic field permitted in one step;
+\item the maximum fractional energy loss in one step;
+\item the maximum geometrical step allowed;
+\item the accuracy for crossing medium boundaries;
+\item the minimum step size due to either energy loss or multiple scattering.
+\end{itemize}
+
+These quantities are part of the so-called tracking medium parameters. They
+can either be calculated by the program or 
+provided by the user and are stored in the
+data structure {\tt JTMED}, through the routine \Rind{GSTMED} (see {\tt [CONS]}). 
+Usually, this is done together with the initialisation of the geometrical setup.
+The optimisation is by no means trivial as the economy of computing time
+should not lead to an unacceptable loss of accuracy.
+
+Other information required for the computation
+of the step size is found in the data
+structures {\tt JPART} and {\tt JMATE}, for the
+properties of the particles and of the materials, and in the
+data structure {\tt JVOLUM}, for the current medium and its geometrical
+boundaries.
+The communication between the tracking package and the
+structure {\tt JVOLUM} is achieved through the basic subroutines of the
+geometry package \Rind{GMEDIA}, \Rind{GTMEDI},
+\Rind{GTNEXT} and \Rind{GINVOL} (see {\tt [GEOM]}).
+Some information is computed at tracking time
+such as the probability of occurrence of an interaction. 
+
+For convenience
+every particle is assigned a tracking type:
+\begin{enumerate}
+\item $\gamma$ (\Rind{GTGAMA});
+\item e$^{\pm}$ (\Rind{GTELEC});
+\item neutral hadrons and neutrinos (\Rind{GTNEUT});
+\item charged hadrons (\Rind{GTHADR});
+\item muons (\Rind{GTMUON});
+\item geantinos, particles only sensitive to geometry
+used for debugging (\Rind{GTNINO});
+\item \v{C}erenkov photons (\Rind{GTCKOV});
+\item heavy ions (\Rind{GTHION}).
+\end{enumerate}
+
+Which processes have
+to be considered for a given particle depends on its tracking type.
+For the hadrons it depends also, through the subroutine \Rind{GUPHAD}, on
+which hadronic processes from {\tt GHEISHA, FLUKA} have been selected
+(see {\tt [PHYS001]}).
+
+\section{Transport subroutines}
+ 
+At the event level the tracking is  controlled by the subroutine \Rind{GTREVE}
+called by the subroutine \Rind{GUTREV} where the user can perform additional
+actions.
+\Rind{GTREVE} loops over all vertices and for every vertex in turn
+stores all tracks
+in the stack {\tt JSTAK}. Then tracking begins: particles are fetched
+from {\tt JSTAK} by \Rind{GLTRAC} which prepares the commons for tracking.
+\Rind{GUTRAK} is then called, which calls \Rind{GTRACK}.
+The subroutine  \Rind{GTRACK}  transports  the  particle up to the its end:
+stop, decay, interaction or escape. During this phase it may
+happen that  secondary products have  been generated and  stored by
+the user, as explained below, in the {\tt JSTAK} stack, and possibly in the
+permanent structure {\tt JKINE}.
+
+The subroutine \Rind{GTRACK} transports the track through the geometrical 
+volumes
+identifying, through the subroutine
+\Rind{GTMEDI}, every new volume which the particle has reached, and storing
+the corresponding  material and  tracking medium  constants in  the
+common blocks \FCind{/GCMATE/} and \FCind{/GCTMED/}. The actual transport
+is performed by a different routine for each tracking type, as indicated in
+the previous section.
+These compute the physical step size according to the activated
+physics processes, and compute the geometrical limit for the step,
+only when necessary, through \Rind{GTNEXT}, and propagate the particle
+over the computed step.
+
+\section{Magnetic field transport routines}
+Once the step size has been decided, transport proceeds along a straight
+lines for all neutral particles and for charged particle in absence of
+magnetic field. When magnetic field is present, the direction of charged
+particles will change along the step. The routine \Rind{GUSWIM} calculates
+the deviation in magnetic field over a given step. 
+Depending on 
+the tracking medium parameter {\tt IFIELD} the \Rind{GUSWIM} routine
+calls:
+\begin{itemize}
+\item \Rind{GRKUTA} for inhomogeneous fields, {\tt IFIELD=1};
+\item \Rind{GHELIX} for quasi-homogeneous fields, {\tt IFIELD=2};
+\item \Rind{GHELX3} for uniform fields along the $z$ axis, {\tt IFIELD=3}).
+\end{itemize}
+\Rind{GRKUTA} and \Rind{GHELIX} call the user subroutine
+\Rind{GUFLD} to obtain the components of the field in a given point.
+\Rind{GHELX3} takes the value of the field from the tracking medium parameter
+{\tt FIELDM}.
+
+\section{The subroutine {\tt GUSTEP}}
+ 
+The current track parameters are available in the common
+\FCind{/GCTRAK/} together with all variables necessary to 
+the tracking routines for the control of the step size. In addition, a few
+flags and variables are
+stored in the common block \FCind{/GCTRAK/} to record the history of the
+current step:
+
+\begin{itemize}
+\item The flag {\tt INWVOL} informs on the boundary crossing:
+\begin{DLtt}{MMMM}
+\item[0] transport inside a volume;
+\item[1] entering a new volume or beginning of new track;
+\item[2] exiting a volume;
+\item[3] exiting the first mother;
+\end{DLtt}
+\item  The flag {\tt ISTOP} informs on the particle status:
+\begin{DLtt}{MMMM}
+\item[0] normal transport;
+\item[1] particle has disappeared (decay, interaction...);
+\item[2] particle has crossed a threshold (time, energy...).
+\end{DLtt}
+\item The array {\tt LMEC} informs on the {\it mechanisms} active in the
+current step. The mechanism names are stored in ASCII equivalent in 
+{\tt LMEC(1...NMEC)}.
+\item The total energy loss in the current step is
+stored in the variable {\tt DESTEP}.
+\end{itemize}
+
+This information is necessary for the user to take
+the proper actions in the subroutine
+\Rind{GUSTEP} which is called by \Rind{GTRACK} at the end of every step
+and when entering a new volume.
+
+The variable {\tt NGKINE} in common \FCind{/GCKING/} contains the number of
+secondary particles generated at every step, and which are stored in the
+same common.
+Depending on the application and on the particle type the user may then
+take the appropriate action in \Rind{GUSTEP}:
+\begin{itemize}
+\item ignore the particle;
+\item store the secondary produced in the {\tt JSTAK} stack for further
+tracking;
+\item store the secondary also in the {\tt JKINE/JVERTX} structure where
+it will be kept till the end of the event.
+\end{itemize}
+
+\section{Connection with the detector response package}
+The detector response package ({\tt [HITS]}) allows to establish a 
+correspondence between the volumes seen by the particle and
+the active components of the detectors. When entering a new volume in
+\Rind{GTRACK} the subroutine
+\Rind{GFINDS} is called. If the volume has been declared by the user as a
+sensitive detector through appropriate calls to \Rind{GSDET} and if the
+corresponding tracking medium constant {\tt ISVOL} is non zero,
+\Rind{GFINDS} fills the common block \FCind{/GCSETS/} with the information to
+identify uniquely the detector component. This enables the user, in
+\Rind{GUSTEP}, to record the
+hits in the proper {\tt JHITS} substructure {\tt[HITS]}.
+
+\section{Connection with the drawing package}
+The coordinates of the space points generated during the tracking are
+available at each step in the common block\FCind{/GCTRAK/}. In
+\Rind{GUSTEP} the user can store them in the structure {\tt JXYZ} with the
+help of the subroutine \Rind{GSXYZ}. This information can be used later
+for debugging (subroutine \Rind{GPJXYZ}) or for the graphical representation
+of the particle trajectories {\tt[DRAW]}.

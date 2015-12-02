@@ -1,0 +1,131 @@
+% 27 May 1992 mg
+\Version {RFACT}                               \Routid{F011}
+\Keywords{LINEAR EQUATION MATRIX INVERSION SOLUTION DETERMINANT}
+\Author{G.A. Erskine, H. Lipps}                 \Library{KERNLIB}
+\Submitter{}                                    \Submitted{18.12.1979}
+\Language{Fortran or Assembler or COMPASS}   \Revised{27.11.1984}
+\Cernhead {Repeated Solution of Linear Equations, Matrix Inversion,
+Determinant}
+These subroutines provide a two-step procedure for solving sets of
+linear equations
+$$\mathbf{AX=B} \mbox{\hspace{2cm}(*)}$$
+which is faster than the library programs {\tt RINV} (F010) when (*)
+must be solved repeatedly for the same matrix {\bf A} with different
+sets of right-hand sides. The inverse matrix $\mathbf{A^{-1}}$ and the
+determinant det({\bf A}) may also be calculated.
+\Structure
+{\tt SUBROUTINE} subprograms\\
+User Entry Names: \Rdef{RFACT}, \Rdef{RFEQN}, \Rdef{RFINV},
+\Rdef{DFACT}, \Rdef{DFEQN}, \Rdef{DFINV},
+\Rdef{CFACT}, \Rdef{CFEQN}, \Rdef{CFINV} \\
+Internal Entry Names:  {\tt TMPRNT}\\
+Files Referenced: Printer\\
+External References: \Rind{KERMTR}{N001}, \Rind{ABEND}{Z035}
+\Usage
+For $\mathtt{t=R}$ (type {\tt REAL}), $\mathtt{t=D}$ (type
+{\tt DOUBLE PRECISION}), $\mathtt{t=C}$ (type {\tt COMPLEX}):
+\begin{verbatim}
+    CALL tFACT(N,A,IDIM,IR,IFAIL,DET,JFAIL)
+    CALL tFEQN(N,A,IDIM,IR,K,B)
+    CALL tFINV(N,A,IDIM,IR)
+\end{verbatim}
+\begin{DLtt}{123456}
+\item [N] ({\tt INTEGER}) Order of the square matrix {\bf A}.
+\item [A] (Type according to {\tt t}) Two-dimensional array
+whose first dimension has the value {\tt IDIM}.
+\item [IDIM] ({\tt INTEGER}) First dimension of array {\tt A}
+(and of array {\tt B} if $\mathtt{K > 1}$).
+\item [IR] ({\tt INTEGER}) Array of at least {\tt N}
+elements, required as working space.
+\item [IFAIL] ({\tt INTEGER}) On exit, {\tt IFAIL} will be set to
+$\mathtt{-1}$ if {\bf A} is found to be singular, and to {\tt 0}
+otherwise.
+(Singularity will often go undetected because of rounding errors during
+factorization even if the elements of {\bf A} have integral values.)
+\item [DET] (Type according to {\tt t}) On exit, {\tt DET} will be set
+to the value det({\bf A}) unless {\tt JFAIL} returns a non-zero value.
+\item [JFAIL] ({\tt INTEGER}) On exit, {\tt JFAIL} will be set to zero if
+det({\bf A}) can be safely evaluated. Otherwise {\tt JFAIL} is set as
+follows: \\
+$\mathtt{= -1}$ if det({\bf A}) is probably too small, \\
+$\mathtt{= +1}$ if det({\bf A}) is probably too large.
+\item [K] ({\tt INTEGER}) Number of columns of the matrices {\bf B}
+and {\bf X}.
+\item [B] (Type according to {\tt t}) In general, a two-dimensional
+array whose first dimension has the value {\tt IDIM}.
+{\tt B} may be one-dimensional if $\mathtt{K = 1}$.
+\end{DLtt}
+\newpage
+Subroutine {\tt tFACT} must be called with matrix {\bf A} in array
+{\tt A} prior to any calls to {\tt tFEQN} and {\tt tFINV}. On return the
+situation is as follows:
+\begin{enumerate}
+\item Provided {\bf A} is non-singular, {\tt IFAIL} will be set
+to {\tt 0}, and {\tt A} and {\tt R} will be set in preparation for calls
+to {\tt tFEQN} and {\tt tFINV}.
+\par
+If {\bf A} is singular, {\tt IFAIL} will be set to $\mathtt{-1}$,
+in which case any subsequent call to {\tt tFEQN} or {\tt tFINV} will give
+unpredictable results.
+\item Provided det({\bf A}) can be safely evaluated within the range
+of the computer, {\tt JFAIL} will be set to {\tt 0} and and {\tt DET}
+will be set to det({\bf A}). In particular, if {\bf A} is singular,
+both {\tt JFAIL} and {\tt DET} will be set to zero.
+\par
+If the evaluation of det({\bf A}) would probably cause underflow,
+{\tt JFAIL} will be set to $\mathtt{-1}$ and {\tt DET} will be set to
+zero.
+\par
+If the evaluation of det({\bf A}) would probably cause overflow,
+{\tt JFAIL} will be set to $\mathtt{+1}$ and {\tt DET} will be incorrect.
+\par
+Execution continues, and subsequent calls to {\tt tFEQN} and {\tt tFINV}
+will give correct results.
+\end{enumerate}
+Subroutine {\tt tFEQN} may be called only after {\tt tFACT} has been
+called, with the contents of {\tt A} and {\tt R} unchanged, and with
+matrix {\bf B} in array {\tt B}. On return, {\tt B} will contain
+the solution {\bf X}, with {\tt A} and {\tt R} unchanged. Therefore a
+single call to {\tt tFACT} may be followed by several calls to
+{\tt tFEQN} with differing {\bf B}.
+\par
+Subroutine {\tt tFINV} may be called only after {\tt tFACT} has been
+called, with the contents of {\tt A} and {\tt R} unchanged. On return,
+{\tt A} will contain the inverse $\mathbf{A^{-1}}$ of {\bf A}. Therefore,
+once {\tt tFINV} has been called, it is no longer meaningful to call
+{\tt tFEQN} with {\tt A} as parameter.
+\Method
+Triangular factorization with row interchanges. The inverse
+matrix $\mathbf{A^{-1}}$ is the product, in reverse order, of the
+in-place inverses of the triangular factors. The array {\tt R} holds
+information specifying the row interchanges.
+\Accuracy
+On computers with IBM 370 architecture, inner products are accumulated
+using double-precision arithmetic internally for arrays of type
+{\tt REAL} and {\tt COMPLEX}.
+\Errorh
+If $\mathtt{N < 1}$ or $\mathtt{IDIM < N}$ or $\mathtt{K < 1}$,
+a message is printed and program execution is terminated by
+calling {\tt ABEND} (Z035).
+\Examples
+Assume that the $10 \times 10$ matrix {\bf A}, the $10 \times 3$ matrix
+{\bf B}, and the 10-element vector {\bf z} are stored according to
+the Fortran convention in arrays {\tt A}, {\tt B} and {\tt Z}
+respectively of a program containing the declarations
+\begin{verbatim}
+    DIMENSION IR(25)
+    COMPLEX A(25,30),B(25,10),Z(25),DET
+\end{verbatim}
+Then, unless {\bf A} is singular (which is to cause a jump to
+statement {\tt 100}), the following statements will set
+$\mathtt{DET}=\det(\mathbf{A})$, replace {\bf B} by $\mathbf{A^{-1}B}$,
+replace
+{\bf z} by $\mathbf{A^{-1}z}$, and replace {\bf A} by  $\mathbf{A^{-1}}$:
+\begin{verbatim}
+    CALL CFACT (10,A,25,IR,IFAIL,DET,JFAIL)
+    IF(IFAIL .NE. 0) GO TO 100
+    CALL CFEQN(10,A,25,IR,3,B)
+    CALL CFEQN(10,A,25,IR,1,Z)
+    CALL CFINV(10,A,25,IR)
+\end{verbatim}
+$\bullet$

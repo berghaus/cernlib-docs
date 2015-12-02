@@ -1,0 +1,15 @@
+      PROGRAM KMAIN
+      PARAMETER (NWPAW=20000)
+      PARAMETER (NWKUIP=5000)
+      COMMON/PAWC/PAW(NWPAW)
+      CALL MZEBRA(-3)
+      CALL MZPAW(NWPAW,' ')
+      CALL KUINIT(NWKUIP)
+
+      CALL MYDEF
+
+
+      CALL KUIDFM
+      CALL KUWHAM('Kuip++')
+
+      END

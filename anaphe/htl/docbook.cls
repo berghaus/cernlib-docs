@@ -1,0 +1,198 @@
+%% This is file `docbook.cls' (inspired by cernman.cls)
+%% Copyright (C) 2000 Michel Goossens. All rights reserved. 
+%% You can use this style for what you like, 
+%% but no permission is granted to distribute a 
+%% modified version of this file under its original name. 
+%% 
+\def\fileversion{1}
+\def\filedate{2000/04/13}
+\def\docdate{2000/04/11}
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesClass{docbook}[\filedate]
+\DeclareOption*{\PassOptionsToClass{\CurrentOption}{report}}
+\PassOptionsToClass{11pt,a4paper,twoside}{report}
+\ProcessOptions
+\LoadClass{report}
+\RequirePackage{array,tabularx}
+\RequirePackage{makeidx}
+\RequirePackage[]{graphicx}
+\RequirePackage{url}
+%\RequirePackage[bookmarks=false]{hyperref}
+%\RequirePackage{pifont}
+%\RequirePackage{color}
+%\RequirePackage{verbatim}
+%\RequirePackage{varioref}
+%\RequirePackage{multicol}
+%\RequirePackage{here}
+%\RequirePackage{xspace}
+%\RequirePackage{calc}
+
+
+\renewcommand{\rmdefault}{ptm}
+
+\@mparswitchtrue
+
+\extrarowheight2pt
+\arrayrulewidth.6pt
+
+\let\Theindex\theindex
+\renewcommand{\theindex}{\Theindex\raggedright}
+\setcounter{topnumber}{4}
+\setcounter{totalnumber}{4}
+\renewcommand{\topfraction}{.98}
+\renewcommand{\textfraction}{.02}
+\setlength{\floatsep}{6pt plus 2pt minus 3pt}
+\setlength{\textfloatsep}{6pt plus 2pt minus 3pt}
+
+\usepackage{rotating}
+\pagestyle{headings}
+\def\ps@headings{%
+   \let\@mkboth\markboth
+   \def\@oddfoot{}%
+   \def\@evenfoot{}%
+   \def\@evenhead{\rmfamily\thepage\hfil \textit{\leftmark}}%
+   \def\@oddhead{\hbox{}\textit{\rightmark}\hfil\rmfamily\thepage}%
+   \def\chaptermark##1{\markboth{%
+       \ifnum \c@secnumdepth>\m@ne
+          \@chapapp\ \thechapter. \
+       \fi
+       ##1}{}%
+   }%
+   \def\sectionmark##1{%
+      \markright{%
+       \ifnum \c@secnumdepth >\z@
+         \thesection. \
+       \fi
+       ##1}
+   }%
+}
+\setlength{\hoffset}{-1in}
+\setlength{\voffset}{-2cm}
+\setlength{\textwidth}{160mm}
+\setlength{\evensidemargin}{25mm}
+\setlength{\oddsidemargin}{25mm}
+\setlength{\marginparwidth}{25mm}
+\setlength{\marginparsep}{25mm}
+\setlength{\marginparpush}{25mm}
+\setlength{\topmargin}{2cm}
+\setlength{\headheight}{5mm}
+\setlength{\headsep}{8mm}
+\setlength{\footskip}{9mm}
+\ifcase \@ptsize\relax % 10 pt
+ \setlength{\baselineskip}{13pt}
+ \setlength{\textheight}{48\baselineskip}
+\or                    % 11 pt
+ \setlength{\baselineskip}{14pt}
+ \setlength{\textheight}{45\baselineskip}
+\or                    % 12 pt
+ \setlength{\baselineskip}{15pt}
+ \setlength{\textheight}{41\baselineskip}
+\fi
+
+\long\def\MMM{\message{@ptsize=\@ptsize\space baselineskip=\the\baselineskip\space
+         textheight=\the\textheight}}
+
+\def\@makechapterhead#1{             % Heading for \chapter command
+  { \parindent 0pt \raggedright
+    \ifnum \c@secnumdepth >\m@ne     % IF secnumdepth > -1 THEN
+      \Large\bfseries \@chapapp{}
+      \thechapter:\ \fi              % Print 'Chapter' and number.
+    #1\par
+    \nobreak                         % TeX penalty to prevent page break.
+    \vskip 10pt                      % Space between title and text.
+  } }
+\def\@makeschapterhead#1{             % Heading for \chapter* command
+  { \parindent 0pt \raggedright
+    \Large \bfseries                  % Title.
+    #1\par
+    \nobreak                          % TeX penalty to prevent page break.
+    \vskip 10pt                       % Space between title and text.
+  } }
+\def\section{\@startsection {section}%
+  {1}{\z@}{-2.ex plus -1ex minus -.2ex}{2ex plus .2ex}{\large\bfseries}}
+\def\subsection{\@startsection{subsection}%
+  {2}{\z@}{-2ex plus -1ex minus -.2ex}{1.5ex plus .2ex}{\large\bfseries}}
+\def\subsubsection{\@startsection{subsubsection}%
+  {3}{\z@}{-2ex plus-1ex minus -.2ex}{1.5ex plus .2ex}{\normalsize\bfseries}}
+\def\paragraph{\@startsection{paragraph}%
+  {4}{\z@}{2ex plus 1ex minus .2ex}{-1em}{\normalsize\bfseries}}
+\def\subparagraph{\@startsection{subparagraph}%
+  {5}{\parindent}{2ex plus 1ex minus .2ex}{-1em}{\normalsize\bfseries}}
+
+\long\def\@makecaption#1#2{\vskip10pt
+   \setbox\@tempboxa\hbox{#1: #2}
+   \ifdim \wd\@tempboxa >\hsize   % IF longer than one line:
+       #1: #2\par                 %   THEN set as ordinary paragraph.
+     \else                        %   ELSE  center.
+       \hbox to\hsize{\hfil\box\@tempboxa\hfil}
+   \fi\par\vspace*{10pt}}
+
+\def\tableofcontents{\section*{Table of Contents}\@starttoc{toc}}
+\def\listoffigures{\section*{List of Figures}\@starttoc{lof}}
+\def\listoftables{\section*{List of Tables}\@starttoc{lot}}
+\def\l@figure{\@dottedtocline{1}{1.5em}{2.3em}}% Align with section titles
+\let\l@table\l@figure
+
+\parindent=0pt
+\parskip.2\baselineskip plus1pt minus1pt
+
+\def\fnum@figure{\figurename\ \thefigure}
+\def\fnum@table{\tablename\ \thetable}
+
+\def\Nospacing{\itemsep=0pt\topsep=0pt\partopsep=0pt\parskip=0pt\parsep=0pt}
+\newcommand{\Ucom}[1]{\mbox{{\ttfamily\underline{#1}}}}
+
+\makeindex
+
+%%%%%%%%%%%
+
+%%% Special commands for Docbook %%%%%
+
+%%%%%%%%%%%
+
+\newcommand{\QuotedString}[1]{« #1 »}
+
+    %  ==================== Front material ============================
+
+\input \jobname.front 
+
+\setlength{\baselineskip}{13.6pt}
+\setlength{\textheight}{241mm}
+
+\let\FOinputIfFileExists\InputIfFileExists
+\def\InputIfFileExists#1#2#3{%
+ {\def\@tempa{#1}\ifx\@tempa\supppdf\else
+   \FOinputIfFileExists{#1}{#2}{#3}\fi}}
+
+\def\DoTable#1\\{%
+ \begin{tabular}{#1@{}c@{}}
+}
+
+{\catcode`\%=13
+\gdef\percenttest#1%#2#3\@{\ifx#2\relax\def\percentval{#1}\expandafter\@firstoftwo
+  \else
+    \expandafter\@secondoftwo
+  \fi}
+\gdef\PercentToDimen#1{\expandafter\percenttest#1\relax%.\@
+  {\@tempdimb\percentval pt\relax\divide\@tempdimb by 100
+   \edef\SCALE{\strip@pt\@tempdimb}\global\@tempdima=\SCALE\TableWidth
+   \global\advance\@tempdima by -\tabcolsep\global\advance\@tempdima by -\tabcolsep}{\global\@tempdima#1}
+}
+\gdef\SetGWidth{\expandafter\percenttest\figwidth\relax%.\@
+  {\@tempdima\percentval pt\relax\divide\@tempdima by 100
+  \edef\WSCALE{\strip@pt\@tempdima}\setkeys{Gin}{width=\WSCALE\linewidth}}{\setkeys{Gin}{width=\figwidth}}}
+}
+  \def\T@ref#1{%
+    \expandafter\@setref\csname r@#1\endcsname\@firstoftwo{#1}%
+  }%
+\long\def\@fourthoffive#1#2#3#4#5{#4}
+\long\def\@fifthoffive#1#2#3#4#5{#5}
+
+\let\XREFbib\cite
+\let\XREFnormal\ref
+\let\XREFpage\pageref
+
+\endinput
+
+
+

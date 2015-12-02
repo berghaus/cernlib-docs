@@ -1,0 +1,1502 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                 %
+%   HEPDB    - Tutorial         -- LaTeX Source                   %
+%                                                                 %
+%   Original: Lawrence Williams                                   %
+%                                                                 %
+%   Last Mod.: 12 Feb  1993      Rev.2                            %
+%                                                                 %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+\Filename{H1hdbtutr-A-tutorial-guide-to-HEPDB}
+\chapter{A tutorial guide to HEPDB}
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                            %
+% The following 3 sections are based on the article HEPDB - A DBMS for HEP   %
+% appearing in the CERN computer news letter 209 (November 1992).            %
+% ORIGINAL:J.Shiers CN/AS                                                    %
+%                                                                            %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%
+%
+\Filename{H2hdbtutr-What-is-HEPDB}
+\section{What is HEPDB ?}
+{\tt HEPDB} is a database management system tuned to the specific requirements
+of High Energy Physics experiments. In particular it is well suited to the storage
+and retrieval of detector geometry and calibration information. However it may
+also be applied to other experimental areas such as book-keeping.
+%
+%
+%
+\Filename{H2hdbtutr-How-does-HEPDB-help}
+\section{How does HEPDB help ?}
+{\tt HEPDB} helps solve problems in the above areas by providing the user with
+a selection of {\tt FORTRAN} callable subroutines for the storage and retrieval
+of {\tt ZEBRA} data structures, {\tt FORTRAN} vectors and text files. Additionally there are
+facilities for help manipulation, aliases for directory names and mnemonic names
+for individual elements of the stored data.
+\par
+Where appropriate these facilities are also provided through a {\tt KUIP}
+based interactive interface.
+%
+%
+%
+\Filename{H2hdbtutr-Explanation-of-terms}
+\section{Explanation of terms}
+{\tt HEPDB} is based upon the {\tt ZEBRA RZ} package. Thus data is accessed
+or stored using a {\tt UNIX}-like pathname, plus one or more identifiers
+known as keys.
+\par
+For example in the use of {\tt HEPDB} to store and retrieve calibration
+constants for some experimental sub-detector the aforementioned pathname
+would be the name of the sub-detector and the keys would provide the selection of
+a particular calibration.
+%
+%
+%
+\Filename{H2hdbtutr-Using-HEPDB---an-example-scenario}
+\section{Using HEPDB - an example scenario}
+Suppose some high energy physics institute has an experiment
+involving the use of some large detector within which the
+knowledge of geometrical and calibration parameters is of
+great importance in order to aid the understanding of
+systematical errors.
+\par
+The database to contain these parameters giving a full description
+of our apparatus should therefore try to satisfy the following
+criteria:
+\begin{OL}
+\item  Allow fast and simple access to large amounts of stored data
+\item  Provide portability between different platforms
+\item  Offer the capability to handle frequent updates
+\item  Provide an interactive interface for issuing commands
+to the database as well as FORTRAN library routines
+\item  Provide files which can easily be accessed from users own
+applications
+\end{OL}
+
+%
+%
+%
+\subsection{Further problem definition}
+We shall now examine generally the type of procedures that must be followed
+to allow the
+implementation of a set of databases under {\tt HEPDB} bearing in mind
+that the new databases must be built from scratch and that we want to cause
+the minimum possible disruption to the existing software that an experiment may already
+be using.
+\par
+Suppose now that some experimental group who currently use the {\tt RZ} file
+system for keeping data regarding the geometric, calibration and
+auxiliary data of a detector decide that a change to the {\tt HEPDB} database
+management system would give them more flexibility with their data.
+\par
+The following pages of this tutorial aim to give a general overview in the steps
+involved with such a conversion , stopping also to describe some other interesting
+features of the package.
+\par
+The general plan for the conversion would be as follows:
+\begin{OL}
+\item  Set up a server for {\tt HEPDB}
+\item  Create the new destination databases
+\item  Convert existing databases to the {\tt HEPDB} format including any
+changes to the existing structure (keys, directories etc.).
+\item  Construct a compatibility mode interface to existing experimental software.
+\end{OL}
+%
+%
+%
+\Filename{H2hdbtutr-The-database-servers}
+\section{The database servers}
+Fundamental to the operation of {\tt HEPDB} is the concept of
+the database server. Although other modes of operation exist,
+the normal way of updating a {\tt HEPDB} database is via a dedicated
+database server. The client, or user, requests changes to the database
+using the {\tt HEPDB} Fortran or KUIP interface. These changes are
+not applied directly. Instead they are written into a queue, which
+might simply be a directory or the VM spool. Thus although the database
+files may be read by an unlimited number of simulatenous users, they
+are only ever written by a single process - the database server.
+%
+%
+%
+\Filename{H2hdbtutr-Placement-of-servers}
+\section{Placement of servers}
+The first step in setting up a new {\tt HEPDB} server is that of making a home for
+it to reside in. In the case of {\tt UNIX} and {\tt VMS} platforms this merely
+involves the creation of a directory with some arbitrary name. In the following
+paragraphs we shall assume the server has been placed in the directory
+{\tt hepdb/expdb}.~\footnote{The exact server setup at CERN is described on page \pageref{CERN-servers}.}
+Within this directory one should now create the subdirectories
+which are used to hold various data essential to the server. The first of
+these should be named {\tt logs} (this is where the server logs are written), the
+second {\tt queue} (this directory holds new updates from {\tt HEPDB} clients)
+\footnote{The above names are in fact arbitrary and are driven by a configuration
+file. In addition, the server input queue and client output queue are not necessarily
+the same, depending on whether the server is a master or slave.}, and
+the third {\tt save} (the place the server saves updates after processing).
+In addition, a further directory named {\tt bad} is used to store files that
+cannot be successfully processed.
+\par
+In the case of {\tt VM} platforms the following procedure should be adopted. There
+should be one account per experiment set aside for the server, this should be given
+a name consisting of the prefix {\tt CD} followed by the experiment name. For example
+the {\tt CPLEAR} collaborations server is named {\tt CDCPLEAR}.
+(Note that in the following examples when refering to a {\tt VM} implementation
+our example account will be {\tt CDEXPDB})
+\par
+Within this account your {\tt 191} addressed disk (this will hold the actual
+database files) should be allocated some 20 cylinders of space, your {\tt 192} addressed disk
+(the link disk to the {\tt HEPDB 191} code) should be given 2 cylinders and finally
+your {\tt 193} mode disk (the journal disk for transactions) should be given 5 cylinders of space.
+\par
+The final step in placing the server is the setting of an environmental
+variable \footnote{e.g. using the {\tt SETENV} command on VM/CMS systems,
+setting a global symbol on VAX/VMS systems, or setting a shell variable
+on Unix systems}
+ {\tt CDSERV} \index{CDSERV} which tells {\tt HEPDB} where your server resides.
+(It is recommended that this assignment be part of your standard setup procedure)
+The way in which the variable is set varies from platform to platform, a
+list of possible commands follows:
+\par
+\begin{UL}
+\item {\tt UNIX}
+\subitem Bourne Shell {\tt CDSERV=/hepdb/expdb;export CDSERV}
+\subitem C Shell {\tt setenv CDSERV /hepdb/expdb}
+\subitem Korn Shell {\tt export CDSERV=/hepdb/expdb}
+\item {\tt VMS}
+\subitem {\tt CDSERV:==HEPDB:[EXPDB]}
+\item {\tt VM}
+\subitem {\tt setenv CDSERV CDEXPDB 191}
+\end{UL}
+\Filename{H2hdbtutr-Server-management}
+\section{Server management}
+\subsection{Server configuration}
+Once storage space has been created a {\tt names} file is then constructed for the server.
+Below is an example names file for a server.
+This particular names files contains entries for two databases
+one for calibration and one for a geometric database.
+(The next section of the tutorial will demonstrate the creation of these database files.)
+\par
+\begin{XMPt}{An example names file for calib and geom dbs files}
+
+:nick.config
+            :list.ge ca
+            :log./hepdb/expdb/logs
+            :bad./hepdb/expdb/bad
+            :todo./hepdb/expdb/queue
+            :queue./hepdb/expdb/queue
+            :save./hepdb/expdb/save
+            :logl.3
+            :wakeup.60
+
+:nick.ge
+            :file.<CDEXPDB>.GEO.dbs
+            :desc.Geometric database (residing on VM)
+            :servers.caliblist1
+
+:nick.ca
+            :file./hepdb/expdb/CAL.dbs
+            :desc.Calibration Database
+            :servers.caliblist2
+
+:nick.caliblist1
+            :list.ecal1 ecal2
+
+:nick.caliblist2
+            :list.ecal2
+
+:nick.ecal1
+            :userid.cdl3
+            :node.hepdb
+            :localq./hepdb/l3/todo
+
+:nick.ecal2
+            :userid.cdl3
+            :node.vxl3on
+            :queue.disk$db:[cdl3.todo]
+            :transport.tcpip
+            :localq./hepdb/l3/tovxl3on
+
+\end{XMPt}
+\par
+To understand the way the server uses the information in the {\tt names}
+file one needs to examine the individual tags within it.
+A brief description of these tags starting with those in the configuration block
+follows however a more detailed account of this file can be found elsewhere in
+this text.
+Note that additional tags exist for use with the program {\bf CDMOVE}.
+This tags are only required if you wish to distribute database updates
+between multiple nodes. See page \pageref{sect-CDMOVE} for more details.
+\par
+\begin{DLtt}{1234567890}
+\item[CONFIG]Indicates the start of the server configuration details.
+\begin{DLtt}{1234567890}
+\item[LIST]A list of two character database prefixes. These prefixes
+act as a pointer within the names file giving specific details
+about each database file.
+\item[LOG]The directory where the server logs are written
+\item[BAD]The directory where the server places bad updates
+\item[QUEUE]The directory where new updates are placed by HEPDB clients
+\item[TODO]The directory which the server scans for new updates. If this
+is the same as the {\tt QUEUE} directory then the server operates
+as the database master. In other cases it will operate in slave mode.
+\item[SAVE]The directory where the server saves updates after processing
+\item[LOGL]The log level for the server
+\item[WAKEUP]The wakeup interval in seconds for the server
+\item[SERVERS]The list of remote servers. Each database
+may have a different list of remote servers. The information
+on this tag should include all of the remote nodes listed
+for any of the individual databases, as described below.
+This tag is processed only by the {\bf CDMOVE} server.
+\end{DLtt}
+\end{DLtt}
+\par
+%
+The next type of block in the names file are the database files
+blocks, identified by the string {\tt :nick.xx}
+where {\tt xx} is the two character database prefix discussed above.
+%
+\par
+\begin{DLtt}{1234567890}
+\item[:nick.xx]The two character database prefix, e.g. {\tt ca}.
+\begin{DLtt}{1234567890}
+\item[FILE]The full path name of the database file. For VM/CMS systems,
+the syntax is {\tt <user.address>filename.filetype}
+\item[DESC]Gives a brief description of the database contents. It provides a way
+of documenting the {\tt names} file.
+\item[SERVERS]The name specified in this tag is a pointer to a
+list of remote servers. In our example file above the description
+of our {\tt calib.dbs} file refers to a serverlist {\tt caliblist1}
+which itself then points to details of the two remote servers {\tt ecal1}
+and {\tt ecal2}. As described above, there may be a different list
+of remote servers for each database. 
+\end{DLtt}
+\end{DLtt}
+\par
+%
+The remaining entries in our example {\tt names} file are server
+descriptions. These are identified by an entry {\tt :nick.servername} and
+store details of remote servers.
+\par
+%
+\begin{DLtt}{1234567890}
+\item[server]The nickname of the servers, e.g. {\tt ecal1}.
+\begin{DLtt}{1234567890}
+\item[USERID]Userid under which the server runs on the remote node
+\item[NODE]Node on which the server runs
+\item[QUEUE]Input queue on the remote node
+\item[TRANSPORT]Method by which updates are transmitted
+\item[LOCALQ]The local directory where updates are written pending
+transmission to the remote node. This may, in fact, be the same
+as {\tt QUEUE}, e.g. when the directory is accessible via {\tt NFS}
+or {\tt AFS}.
+\end{DLtt}
+\end{DLtt}
+\subsection {Starting the server}
+%
+%
+%
+Finally we must start the server up. According to the platform you are using
+the command to do this will vary slightly
+. The main forms of the command follow:
+\par
+\begin{UL}
+\item UNIX and VMS
+\subitem The server can be run in the background or in batch mode.
+\item VM
+\subitem On {\tt VM} the server can be started in one of two ways.
+You could autolog the machine {\tt CDexperiment} (eg: {\tt CDEXPDB}), or
+alternatively you could log on as for example {\tt CDEXPDB}, type {\tt HDBSTART}
+and then exit the session via the command {\tt \#CP DISC}.
+\end{UL}
+%
+%
+%
+
+\Filename{H2hdbtutr-Database-Creation}
+\section{Database Creation}
+Having setup and configured a {\tt HEPDB} server, we now procede to create
+a new database file.
+This is a fairly trivial operation and code for doing this is given below.
+The main routine to take note of is \Rind{CDNEW}, which is described in
+detail in the next section of this manual.
+%
+\begin{XMPt}{Creating a new database file}
+      PROGRAM CREATE
+*     ==============
+*
+*     Create a new, empty database
+*
+      PARAMETER   (NWPAW=100000)
+      COMMON/PAWC/PAW(NWPAW)
+*
+*     Initialise Zebra, HBOOK and HEPDB
+*
+      CALL CDPAW(NWPAW,NHBOOK,IDIV,'USR-DIV',5000,50000,'ZPHU',IRC)
+*
+*     Unit for database access
+*
+      LUNCD  = 1
+*
+*     Database parameters
+*
+      NPAIR  = 1
+      NREC   = 20000
+      NPRE   = 200
+      NTOP   = 1
+*
+*     Accept default record length (1024 words)
+*
+      LRECL  = 0
+      CALL CDNEW(LUNCD,'geome','GEO.dbs',IDIV,NPAIR,NREC,NPRE,NTOP,
+     +           LRECL,'F',IRC)
+*
+*     Set the log level
+*
+      CALL CDLOGL(' ',3,'A',IRC)
+*
+*     Terminate
+*
+      CALL CDEND(' ','A',IRC)
+
+      END
+\end{XMPt}
+%
+For the sake of our example lets assume we create three databases, one for the
+geometric data, one for calibration and finally one for the auxiliary data. We will
+name these {\tt GEO.dbs}, {\tt CAL.dbs} and {\tt AUX.dbs} respectively.
+%
+\Filename{H2hdbtutr-Opening-a-database}
+\section{Opening a database}
+Now we can check that a database exists via the {\tt HEPDB} interactive interface.
+(Later we show how to open a database
+via a {\tt HEPDB}-calling {\tt FORTRAN} program).
+\par
+The following section gives a little detail upon the invocation of the interactive
+interface.
+%
+%
+%
+\subsection {Invoking the HEPDB interactive interface}
+The interactive interface is invoked by typing {\tt hepdb}. Note that
+the variable {\tt CDSERV} must be set, specifying the directory where the
+appropriate {\tt HEPDB} configuration file is stored.
+
+When you log on to the system you may notice messages saying that macros
+{\tt xxxSYS, xxxGRP, xxxUSR}, and {\tt xxxLOGON} are not present. This is a normal response
+and refers to a {\tt HEPDB} facility which allows you to execute a standard set of
+macros on entry to the interactive interface. The following section explains
+how the use of these macros is envisaged.
+%
+%
+%
+\subsection{Using start up macros}
+The use of a subroutine {\tt KULOGN} is as follows:
+\begin{XMPt}{Description of subroutine KULOGN}
+
+      SUBROUTINE KULOGN (CHPACK,CHOPT)
+*
+*    Execute logon kumacs for package `CHPACK' with options `CHOPT'
+*    KUMACs are xxxSYS, xxxGRP, xxxUSR and xxxLOGON
+*
+
+\end{XMPt}
+Depending on the platform you are running different ways of tailoring
+where the macros reside are available. The search methods used by the
+various platforms are as follows:
+\begin{UL}
+\item {\tt VAX/VMS}
+\subitem Look in directories defined in searchlist {\tt xxxPATH}
+,if {\tt xxxPATH} not defined, use {\tt SYS\$LOGIN,
+SYS\$DISK:[]}
+(i.e. current and home directories).
+\item {\tt Unix}
+\subitem Look in path {\tt xxx PATH} (If not defined, use
+current and home directories).
+\item {\tt VM/CMS}
+\subitem Check disks in {\tt xxxPATH}. If this is not defined
+default to using the {\tt A} disk.
+\end{UL}
+\par
+The standard set of macros currently supported by {\tt HEPDB}
+are intended for the following use:
+\begin{UL}
+\item {\tt xxxSYS}
+\subitem This macro may contain a call to a monitoring program
+\item {\tt xxxGRP}
+\subitem This macro would contain commands specific to a particular group.
+\item {\tt xxxUSR} and {\tt xxxLOGON}
+\subitem These two macros are intended to hold user specific information.
+As the default search order is the current and then home directory,
+one may use one macro, e.g. {\tt HDBUSR} for general commands, e.g.
+creation of standard aliases etc. and the other, e.g. {\tt HDBLOGON}
+for directory specific commands.
+\end{UL}
+%
+%
+%
+\subsection {Opening a database interactively}
+{\tt HEPDB} allows a database file to be opened via the {\tt OPEN} command. The
+{\tt OPEN} command must be given with the two character prefix of the database followed
+(optionally) by the databases' physical file name. The example below shows
+how to open a file interactively and the terminal output you can
+expect.
+\par
+\begin{XMPt}{Opening a database interactively}
+\index{Interactive OPEN}
+
+HEPDB> \underline{open ge geo.dbs}
+HEPDB  1.02/14 921029 16:46 CERN PROGRAM LIBRARY HEPDB=Q180
+ This version created on 921029 at 1756
+CDOPNC. opened file GEO.DBS on unit  2 with top directory CDGE and record length 1024
+HEPDB>
+
+\end{XMPt}
+%
+To demonstrate that the file has now been opened
+you can issue another {\tt HEPDB} interactive command {\tt FILES}, which shows a list
+of all files currently open to {\tt HEPDB}.
+\par
+\begin{XMPt}{Checking a file is open with FILES.}
+
+HEPDB>\underline{files}
+ File #   1, unit:  2, top directory:             CDGE
+ CDFILC.           1  file(s) are attached
+HEPDB>
+
+\end{XMPt}
+%
+Finally the database should now be closed. This can be done in two ways, explicitly
+via the {\tt CLOSE} command if you wish to do more work with {\tt HEPDB} during the
+current session or implicitly via the {\tt QUIT} command if you wish to terminate the current
+{\tt HEPDB} session. An example of the first of these cases follows:
+\par
+\begin{XMPt}{Closing a HEPDB file interactively}
+\index{Interactive CLOSE}
+
+HEPDB>\underline{close ge}
+CDCLSH. closing GEO on unit         2
+CDCLSH. closed            1  file(s)
+HEPDB>
+
+\end{XMPt}
+%
+%
+%
+\subsection {Opening a database from FORTRAN}
+Below is an example section of {\tt FORTRAN} code showing how {\tt HEPDB}'s
+user callable routines can be used to open a database file. Notice how the
+two character id code of the database is used in the call to \Rind{CDPREF}
+to obtain the full file name and top directory name of the required database.
+This information is then used by the call to \Rind{CDOPEN} which then opens
+the file. Finally note the use of \Rind{CDEND} this is the method of closing
+the database file. (The character option `A' signifies that all files should be closed.)
+%
+\begin{XMPt}{Opening a database from FORTRAN}
+
+      PROGRAM EGOPEN
+*     ==============
+*
+*     Modify an existing database
+*
+      PARAMETER    (NWPAW=100000)
+      COMMON/PAWC/ PAW(NWPAW)
+      PARAMETER    (NKEYS=10)
+      PARAMETER    (MAXOBJ=1000)
+      CHARACTER*8  CHTAG(NKEYS)
+      CHARACTER*10 CHFOR
+      CHARACTER*4  CHTOP
+      CHARACTER*80 CHFILE
+*
+*     Initialise Zebra, HBOOK and HEPDB
+*
+      CALL CDPAW(NWPAW,NHBOOK,IDIV,'USR-DIV',5000,50000,'ZPHU',IRC)
+*
+*     Unit for database access
+*
+      LUNCD  = 1
+*
+*     Unit for database update (via journal files)
+*
+      LUNFZ  = 2
+*
+*     Find the database file and construct the top directory name
+*     Pass in 'GE' (two-char id code for database) as 2nd parameter
+*
+      CALL CDPREF(10,'GE',CHTOP,CHFILE,IRC)
+      IF(IRC.GT.4) THEN
+         PRINT *,'EGOPEN. STOPPING DUE TO FATAL ERROR FROM CDPREF'
+         STOP 16
+      ENDIF
+*
+*     Open the database file
+*
+      LRECL  = 0
+      CALL CDOPEN(LUNCD,LUNFZ,CHTOP,CHFILE,LRECL,IDIV,' ',IRC)
+*
+*     Do Nothing and Terminate
+*
+      CALL CDEND(' ','A',IRC)
+
+      END
+
+\end{XMPt}
+%
+%
+%
+\Filename{H2hdbtutr-Database-Structure}
+\section{Database Structure}
+The {\tt HEPDB} database management system organises databases in files
+as a collection of directories and sub-directories (Similar to the
+{\tt UNIX} file system structure). Residing at the end of any path-name
+there maybe zero, one or many actual data objects. These objects are further identified
+beyond their pathname by keys, which may be a single word of information
+(integer , hollerith, string etc.) or a vector of such words.
+%
+%
+%
+\subsection{An example structure}
+Supposing as stated earlier that an experiment currently stores its data under
+the {\tt RZ} file system and that therefore the required directory structure is
+already known and the essential keys for the database are also already known
+we have a firm basis on which to start to build our {\tt HEPDB} database structure.
+\par
+Below is a description of an existing {\tt RZ} file structure for a geometric database
+including the directory tree (corresponding to different parts of a detector) and its
+associated keys.
+%
+%  Tree diagram of required structure
+%
+\begin{XMPt}{The required directory structure}
+
+GEOMETRY                  TYPE |  KEYS
+  |                       -----+------------------------------------------
+  |                       (I)  |  VAL_STAR  start validity range of object
+  |----->PC               (I)  |  VAL_STOP  end   validity range of object
+  |----->DC               (H)  |  DETECTOR  detector name
+  |----->ST               (H)  |  POINTER   some MZ bank pointer name
+  |----->PID
+  |----->CAL_WIRE
+  |----->CAL_STRI
+
+\end{XMPt}
+We can now asses the directory structure and the keys to see if any modifications
+are required as this is the best time to start the implementation of any new keys etc.
+\par
+For the sake of this example lets assume that the directory structure requires no real
+modification but we do however think it may be useful to add an extra key to signify
+the source from which a data object came, this can have one of two values (on-line or
+off-line data).
+\par
+After the next short section which explains the use of keys under {\tt HEPDB} we shall
+decide on how we are to implement the extra key.
+%
+%
+%
+\subsection{Use of keys under HEPDB}
+\index{KEYS}
+The HEPDB package assumes that all key vectors consist of at
+least 10 keys. These keys are defined as shown in table
+\ref{table-keys} on page~\pageref{table-keys} of this manual.
+\par
+The system keys (the first 5 keys) should not (normally) be touched by the user or application program.
+The special user (keys 6 to 10) keys may contain any information decided on by the experiment.
+(However it has been suggested that keys 6 and 7 may contain a unique source identifier and
+a software reference number respectively.)
+For instance these keys could be used to hold a key which is common to all databases regardless
+of their contents.
+\par
+After the standard keys come a number of key pairs. The number of pairs
+is a database constant. For example, the CPLEAR collaboration use only
+one key pair, the start and end times for which a database object is
+valid. The OPAL collaboration use 3 key pairs - the start and end
+experiment, run and event number for which a database object is valid.
+\par
+Additional keys, the so-called user keys, can be declared by the user
+(within an overall limit of 100 keys).
+%
+%
+%
+\subsection{Example use of keys}
+From our previous description of the existing {\tt RZ} file we can see that we
+have 1 validity range pair {\tt VAL\_STAR} , {\tt VAL\_STOP}. These will be held
+in keys 11 and 12 and therefore imply a database constant {\tt NPAIR} (number of
+pairs) equals the value 1.
+\par
+The other keys from our geometry {\tt RZ} files will take the form of normal user
+keys occupying keys {\tt 11+NPAIR*2} and {\tt 12+NPAIR*2} or in other words
+keys 13 and 14.
+\par
+As discussed before in our example of the geometric database we have decided
+that an extra key to define the source (on-line, off-line) of a data object
+would be useful. As this will be common to all our databases (geometric,
+calibration and auxilliary) we can in this instance allocate a special user
+key for this job. We shall use key 10 (although we could have used any normal
+user key instead.).
+%
+\Filename{H2hdbtutr-Special-HEPDB-directories}
+\section{Special HEPDB directories}
+
+Each {\tt HEPDB} database file contains two special directories,
+which are created automatically.
+Thu our initial database file structure is as shown below.
+\begin{XMPt}{Initial directory structure}
+\index{Initial directory structure}
+CDGE
+  |
+  |----->HELP
+  |----->DICTIONARY
+
+\end{XMPt}
+Note that the top (root) directory name not actually part of the
+database itself. However, files accessed though {\tt HEPDB}
+always have a top directory name formed by concatenating
+the letters {\tt CD} with the two character database prefix.
+%
+%
+%
+\Filename{H2hdbtutr-Creating-a-directory-structure}
+\section{Creating a directory structure}
+Currently, directories can only be made using the Fortran interface.
+This is to retain full flexibility in the specification of the
+various directory parameters such as the key types and tags.
+\par
+The following code adds to the initial directory structure to create
+a directory {\tt CALIBRATION} containing the required directories for our
+example case.
+%
+\begin{XMPt}{FORTRAN code to create directories}
+
+      PROGRAM GEDIRS
+c|    ================
+c|
+c|    To Create a directory structure in a database
+c|
+      PARAMETER    (NWPAW=100000)
+      COMMON/PAWC/ PAW(NWPAW)
+      PARAMETER    (NKEYS=2)
+      PARAMETER    (MAXOBJ=1000)
+      PARAMETER    (NODIRS=6)
+      CHARACTER*40 DITAG(NODIRS)
+      CHARACTER*8  CHTAG(NKEYS)
+      CHARACTER*10 CHFOR
+      CHARACTER*4  CHTOP
+      CHARACTER*80 CHFILE
+      CHARACTER*40 DNAME
+c|
+c|    Initialise directory names
+c|
+      DATA DITAG/'PC','DC','ST','PID','CAL_WIRE','CAL_STRI'/
+      CALL CDPAW(NWPAW,NHBOOK,IDIV,'USR-DIV',5000,50000,'ZPHU',IRC)
+      LUNCD  = 1
+      LUNFZ  = 2
+      CALL CDPREF(10,'GE',CHTOP,CHFILE,IRC)
+      IF(IRC.GT.4) THEN
+         PRINT *,'EGOPEN. STOPPING DUE TO FATAL ERROR FROM CDPREF'
+         STOP 16
+      ENDIF
+      LRECL  = 0
+      CALL CDOPEN(LUNCD,LUNFZ,CHTOP,CHFILE,LRECL,IDIV,' ',IRC)
+c|
+c|    Define key types and tags
+c|
+      CHFOR = 'HH'
+      CHTAG(1) = 'DETECTOR'
+      CHTAG(2) = 'POINTER '
+      IPREC=0
+      DELTA=0.0
+c|
+c|    Loop to create directories
+c|
+      DO 99 IDX=1,NODIRS
+         DNAME='//CDGE/GEOMETRY/'//DITAG(IDX)
+         PRINT *,'CREATING DIRECTORY ',DNAME,' ...'
+         CALL CDMDIR(DNAME,NKEYS,CHFOR,CHTAG,MAXOBJ,IPREC,DELTA
+     +               ,'CP',IRC)
+         PRINT *,'IRC AFTER CDMDIR =',IRC
+99    CONTINUE
+c|
+c|    Terminate
+c|
+      CALL CDEND(' ','A',IRC)
+      END
+c|
+\end{XMPt}
+This simple program simply loops over the directory names required which are
+held in the character array {\tt DITAG} and performs a call to routine
+\Rind{CDMDIR} which creates the directory. Note that the keys that each directory
+will contain are also set at this point via the {\tt CHTAG} array which holds
+the keys {\tt HOLLERITH} tags and the {\tt CHFOR} character array which defines the
+keys type (in this case the two user keys are {\tt HOLLERITH}s so we use {\tt HH}).
+\par
+We can now examine the directory structure via the interactive interfaces'
+{\tt TREE} command. An example transcript follows:
+%
+\begin{XMPt}{Examining directory structure with TREE}
+
+ HEPDB>\underline{tree}
+ CDTREK. directory tree structure below //CDGE down          99  levels
+ //CDGE
+       /HELP
+       /DICTIONARY
+       /GEOMETRY
+                /PC
+                    /1
+                /DC
+                    /1
+                /ST
+                    /1
+                /PID
+                    /1
+                /CAL_WIRE
+                         /1
+                /CAL_STRI
+                         /1
+          16  subdirectories found
+HEPDB>
+
+\end{XMPt}
+%
+%
+%
+\Filename{H2hdbtutr-Deleting-a-directory-Structure}
+\section{Deleting a directory Structure}
+The following section for reasons of completeness describes how a directory structure may
+be modified.
+%
+%
+%
+\subsection{Deleting a directory via FORTRAN}
+To remove a directory via a {\tt FORTRAN} program we make a call
+to the routine \Rind{CDDDIR}. An outline of a program
+that would delete our {\tt DC} directory is shown below.
+%
+\begin{XMPt}{FORTRAN deletion of a directory}
+
+      PROGRAM DELDIR
+*     ==============
+*
+*     To delete a directory in a database structure
+*     First do usual open database code.
+*
+      PARAMETER    (NWPAW=100000)
+      COMMON/PAWC/ PAW(NWPAW)
+      PARAMETER    (MAXOBJ=1000)
+      CHARACTER*4  CHTOP
+      CHARACTER*80 CHFILE
+      CHARACTER*40 DNAME
+
+      CALL CDPAW(NWPAW,NHBOOK,IDIV,'USR-DIV',5000,50000,'ZPHU',IRC)
+      LUNCD  = 1
+      LUNFZ  = 2
+      CALL CDPREF(10,'GE',CHTOP,CHFILE,IRC)
+      IF(IRC.GT.4) THEN
+         PRINT *,'EGOPEN. STOPPING DUE TO FATAL ERROR FROM CDPREF'
+         STOP 16
+      ENDIF
+      LRECL  = 0
+      CALL CDOPEN(LUNCD,LUNFZ,CHTOP,CHFILE,LRECL,IDIV,' ',IRC)
+*
+*     Construct directory name to be removed
+*
+      DNAME='//CDGE/GEOMETRY/DC'
+*
+*     Delete the directory
+*
+      CALL CDDDIR (DNAME,' ',IRC)
+*
+*     Terminate
+*
+      CALL CDEND(' ','A',IRC)
+      END
+
+\end{XMPt}
+If we were now to issue another interactive {\tt TREE} command we would
+notice that the directory is no longer part of our database structure.
+%
+%
+%
+\subsection{Multiple directory deletion}
+As well as allowing individual directories to be deleted {\tt HEPDB} also
+allows the deletion of multiple directories via the \Rind{CDKEEP} routine.
+As the name suggests, all subdirectories that are not specified are deleted.
+
+The call to \Rind{CDKEEP} is envisaged as follows:
+%
+\begin{XMPt}{Multiple directory deletion via CDKEEP}
+
+      PROGRAM MDELDIR
+*     ================
+*
+*     To delete many directories in a database structure
+*     First do usual open database code.
+*
+      PARAMETER    (NWPAW=100000)
+      COMMON/PAWC/ PAW(NWPAW)
+      PARAMETER    (MAXOBJ=1000)
+      CHARACTER*4  CHTOP
+      CHARACTER*80 CHFILE
+      CHARACTER*40 DNAME(10)
+      CALL CDPAW(NWPAW,NHBOOK,IDIV,'USR-DIV',5000,50000,'ZPHU',IRC)
+      LUNCD  = 1
+      LUNFZ  = 2
+      CALL CDPREF(10,'GE',CHTOP,CHFILE,IRC)
+      IF(IRC.GT.4) THEN
+         PRINT *,'EGOPEN. STOPPING DUE TO FATAL ERROR FROM CDPREF'
+         STOP 16
+      ENDIF
+      LRECL  = 0
+      CALL CDOPEN(LUNCD,LUNFZ,CHTOP,CHFILE,LRECL,IDIV,' ',IRC)
+*
+*     Construct List of directory paths to be kept
+*
+      DNAME(1)='//CDGE/GEOMETRY/PC'
+      DNAME(2)='//CDGE/GEOMETRY/DC'
+*
+*     Delete the directory
+*
+      CALL CDKEEP (DNAME,2,' ',IRC)
+*
+*     Terminate
+*
+      CALL CDEND(' ','A',IRC)
+      END
+
+\end{XMPt}
+%
+%
+%
+\subsection{Other directory related operations}
+As well as the commands given above for the creation and deletion of
+directories there are also commands to allow manipulation of directory
+partitions. (See elsewhere in this manual for description of directory
+partitioning.) However such commands are outside the scope of this tutorial
+and shall therefore only  be mentioned in passing below.
+
+Subroutines exist to allow the conversion of a non-partitioned directory
+to a partitioned one (routine \Rind{CDPART}) and to allow the deletion of
+specific directory partitions (routine \Rind{CDPURP}).
+%
+%
+%
+\Filename{H2hdbtutr-Conversion-of-existing-databases}
+\section{Conversion of existing databases}
+
+Having created a database and the required directory structure, we now procede
+to add the data.
+
+As we already know in our example the data is held in {\tt RZ} files in the form of
+{\tt ZEBRA} banks. As the object type used by {\tt HEPDB} is the {\tt ZEBRA} bank
+the conversion of the old {\tt CPLEAR} database is fairly simple.
+The only modification to the
+original data will be the addition of the new special user key 10 as discussed
+above.
+
+The code below shows the conversion of the original {\tt RZ} geometric database to
+{\tt HEPDB} format. After the code follows a brief explanation although the comments
+within the code tell of its operation.
+%
+\begin{XMPt}{Conversion of GEOMETRY database}
+
+      PROGRAM GEOCONV
+c     ===============
+c+---------------------------------------------------------+
+c|    Program to convert    RZ  geo database -> HEPDB      |
+c|------------------------------+--------------------------|
+c|    RZGEO keys: VAL_STAR (I)  |  For all directories     |
+c|                VAL_STOP (I)  +--------------------------|
+c|                DETECTOR (H)                             |
+c|                POINTER  (H)                             |
+c|    insertion time = RZ date/time                        |
+c|----------------------------------------+----------------|
+c|    HEPDB keys: NPAIR    = 1            |                |
+c|                VAL_STAR = KEYS(11) (I) | For all        |
+c|                VAL_STOP = KEYS(12) (I) | geometry       |
+c|                NUSER    = 2            | directories    |
+c|                DETECTOR = KEYS(13) (H) |                |
+c|                POINTER  = KEYS(14) (H) |                |
+c|    insertion time = KEYS(IDHINS)                        |
+c|---------------------------------------------------------|
+c|    Output pathnames:                                    |
+c|    //CDGE/GEOMETRY                                      |
+c|    //CDGE/GEOMETRY/PC                                   |
+c|    //CDGE/GEOMETRY/DC                                   |
+c|    //CDGE/GEOMETRY/ST                                   |
+c|    //CDGE/GEOMETRY/PID                                  |
+c|    //CDGE/GEOMETRY/CAL_WIRE                             |
+c|    //CDGE/GEOMETRY/CAL_STRI                             |
+c+---------------------------------------------------------+
+c
+      PARAMETER     (NWPAW=200000)
+      COMMON/PAWC/   PAW(NWPAW)
+      COMMON/USRLNK/ IDIV,LADDR
+      CHARACTER*4    CHTOP
+      CHARACTER*80   CHFILE
+      EXTERNAL       CPGEOC
+c|
+c|    Initialise Zebra, HBOOK and HEPDB
+c|
+      CALL CDPAW(NWPAW,NHBOOK,IDIV,'USR-DIV',10000,150000,'ZPU',IRC)
+      CALL MZLINK(IDIV,'/USRLNK/',LADDR,LADDR,LADDR)
+      LUNCD  = 1
+      LUNFZ  = 2
+      LUNRZ  = 3
+c|
+c|    Open RZ geometry database (RZGEO.DATA)
+c|
+      LRECL  = 0
+      CALL RZOPEN(LUNRZ,'RZGEO','rzgeo.data',' ',LRECL,IRC)
+      CALL RZFILE(LUNRZ,'RZGEO',' ')
+c|
+c|    Find the database file and construct the top directory name
+c|    Open the database file
+c|
+      CALL CDPREF(10,'GE',CHTOP,CHFILE,IRC)
+      LRECL  = 0
+      CALL CDOPEN(LUNCD,LUNFZ,CHTOP,CHFILE,LRECL,IDIV,' ',IRC)
+c|
+c|    Loop over all sub-directories in RZGEO.DATA
+c|
+      CALL RZSCAN('//RZGEO',CPGEOC)
+c|
+c|    Terminate
+c|
+      CALL CDEND(' ','A',IRC)
+      CALL RZCLOS(' ','A')
+      END
+
+      SUBROUTINE CPGEOC(CHDIR)
+c
+c+---------------------------------------------------------+
+c|    Routine to retrieve,convert and store old RZ objects |
+c|    under HEPDB                                          |
+c+---------------------------------------------------------+
+c
+      COMMON /USRLNK/   IDIV,LADDR
+      COMMON /QUEST/    IQUEST(100)
+      PARAMETER         (NRZKS=5)
+      PARAMETER         (MAXKEY=1000)
+      PARAMETER         (IOBJECTS=18)
+      INTEGER            HDBKEYS(15),RZKYTOGET(NRZKS)
+      INTEGER            NKEYRET,KEYSARR(NRZKS,MAXKEY)
+      CHARACTER*(*)      CHDIR
+      CHARACTER*255      CHSAVE,DEST
+      CHARACTER*(NRZKS)  CHFORM
+      CHARACTER*8        CHTAG(NRZKS)
+      CHARACTER*4        CTEMP(3)
+      DATA               NENTRY/0/
+      SAVE               NENTRY
+c|
+c|    Check for exit from RZSCAN loop
+c|
+      LADDR=0
+      IF (NENTRY.EQ.0) THEN
+         NENTRY=1
+         RETURN
+      ENDIF
+c|
+c|    Set Current RZ directory
+c|
+      LDIR    = LENOCC(CHDIR)
+      CHSAVE  = CHDIR(1:LDIR)
+      CALL RZCDIR(CHSAVE(1:LDIR),' ')
+      PRINT *,'-- RZ Directory Change -----------------------'
+      PRINT *,' ', CHSAVE(1:30)
+      PRINT *,'----------------------------------------------'
+c|
+c|    Get CWD key definitions
+c|
+      CALL RZKEYS(NRZKS,MAXKEY,KEYSARR,NKEYRET)
+      PRINT *,' No of objects in CWD          :',NKEYRET
+      CALL RZKEYD (NWKEY,CHFORM,CHTAG)
+      PRINT *,' Key Format for this directory :',CHFORM
+c|
+c|    Now loop over all objects in CWD, display and convert
+c|
+      DO I=1,NKEYRET
+           PRINT*,' - OBJECT No. ',I,' ------------------'
+           PRINT*,' ',CHTAG(1),':',KEYSARR(1,I),'  '
+     +           ,' ',CHTAG(2),':',KEYSARR(2,I),'  '
+           CALL UHTOC(KEYSARR(3,I),4,CTEMP(1),4)
+           CALL UHTOC(KEYSARR(4,I),4,CTEMP(2),4)
+           CALL UHTOC(KEYSARR(5,I),4,CTEMP(3),4)
+           PRINT*,' ',CHTAG(3),':',CTEMP(1),'  '
+     +           ,' ',CHTAG(4),':',CTEMP(2),'  '
+           PRINT*,' ',CHTAG(5),':',CTEMP(3),'  '
+c|
+c|         Load object ,I, into zebra store
+c|
+           ICYCLE=9999
+           JBIAS=2
+           DO J=1,NRZKS
+                RZKYTOGET(J)=KEYSARR(J,I)
+           ENDDO
+           CALL RZIN(IDIV,LADDR,JBIAS,RZKYTOGET,ICYCLE,' ')
+c|
+c|         Now set HEPDB keys, and pack time stamp
+c|
+           CALL RZDATE(IQUEST(14),IDATE,ITIME,1)
+           CALL CDPKTM(IDATE,ITIME,IPACK,IRC)
+           HDBKEYS(4)=IPACK
+c|
+           DO J=1,5
+                HDBKEYS(10+J)=RZKYTOGET(J)
+           ENDDO
+c|
+c|         Set key 10 to 0 (Our new key!)
+c|
+           HDBKEYS(10)=0
+c|
+c|         Now store object at LADDR under HEPDB
+c|
+           DEST='//CDGE/GEOMETRY/'//CHDIR(9:LDIR)
+           PRINT*,' Destination path        :',DEST
+           CALL CDSTOR(DEST,LADDR,LKYBK,IDIV,HDBKEYS,'H',IRC)
+           IF (IRC.NE.0) THEN
+               PRINT*,' Error! CDSTOR IRC=',IRC
+               STOP
+           ENDIF
+           CALL RZCDIR(CHSAVE(1:LDIR),' ')
+           CALL MZDROP(IDIV,LADDR,' ')
+           LADDR=0
+           PRINT*,' Object ',I,' Stored under HDB'
+           PRINT *,' '
+      ENDDO
+      CALL CDSTSV(' ',0,IRC)
+      CALL RZCDIR(CHSAVE(1:LDIR),' ')
+      PRINT *,' '
+      END
+
+\end{XMPt}
+The flow of the above program starts by opening both the source {\tt RZ} file
+and the destination {\tt HEPDB} database file. It then makes a call to the {\tt RZ}
+routine \Rind{RZSCAN} which visits each directory of the {\tt RZ} file in turn
+passing execution to subroutine {\tt CPGEOC}.
+\par
+Once inside this routine the current {\tt RZ} directory is set by the
+routine \Rind{RZCDIR}. The {\tt RZ} key definitions  and their values
+are retrieved via calls to \Rind{RZKEYD} and \Rind{RZKEYS} respectively.
+The objects within the directory are then looped over one at a time , each being
+brought into {\tt ZEBRA} store and then output to {\tt HEPDB} via the
+\Rind{CDSTOR} routine. Note that the special user key 10 we now wish to add
+is simply given a 0 value in this case as we assume all current data to be
+from the off-line source. (This is for our example although other code could
+be introduced to set this key accordingly) Once all objects in the {\tt RZ}
+directory have been processed the update file is sent to the {\tt HEPDB} database
+server.  This procedure is then repeated for each subdirectory of the
+{\tt RZ} file.
+
+An important point to be noted at this time is the manipulation of a system key.
+This is key 4 {\tt insertion time} ({\tt IDHINS}). As we would like to keep the
+information regarding the original insertion time of the {\tt RZ} objects
+we suppress {\tt HEPDB} from re-writing this key and force it to honor the
+original {\tt RZ} insertion time by the option {\tt `H'} in our call to \Rind{CDSTOR}.
+This is the only legitimate way in which a system key should be altered.
+%
+%
+%
+\Filename{H2hdbtutr-Data-storage}
+\section{Data storage}
+This section explains how information can be entered into database
+and how to retrieve or delete information.
+
+Under {\tt HEPDB} the user can store data structures created under the
+{\tt ZEBRA} system in the database. These {\tt ZEBRA} data structures can
+range from a single {\tt ZEBRA} bank through to a complex {\tt ZEBRA}
+data structure. When data is submitted for inclusion to the database
+the pathname of the directory where the data is to reside and the
+key vector must also be supplied.
+
+{\tt HEPDB} also provides facilities for the storage of other data types.
+Note that the data is always converting into {\tt ZEBRA} banks,
+but that this conversion is automatic and transparent to the user.
+These facilities include the
+routines \Rind{CDTEXT}, \Rind{CDCHAR} and \Rind{CDVECT} which allow
+the storage of text files , character data and vectors respectively.
+%
+%
+%
+\subsection{Storing a ZEBRA data structure}
+Providing the directory in which the data is to reside in has already been
+created and the data structure is already in memory the user can
+store the data in memory to disk by use of the routine \Rind{CDSTOR}.
+A demonstration of this routine is shown in the above program to convert
+an existing {\tt RZ} database.
+%
+%
+%
+%
+\subsection{The storage of text file data}
+Whilst discussing {\tt HEPDB}'s storage facilities we shall examine briefly
+how the routine \Rind{CDTEXT} allows us to store text files under {\tt HEPDB}.
+It achieves this by converting a text file to or from a {\tt ZEBRA} structure
+suitable for storage under {\tt HEPDB}.
+\par
+Suppose we had a file (for this examples sake residing on {\tt VM}) that we
+wished to store under {\tt HEPDB}. Assuming the name of the file was
+{\tt TEST TEXT A1} we could use a call similar to the following
+to retrieve the file from disk and to return the address of the {\tt ZEBRA}
+bank now containing it ready for insertion to the database.
+%
+\begin{XMPt}{Example of storing a text file}
+
+*
+*     LUN for textfile access
+*
+      TXLUN=10
+*
+      CALL CDTEXT(TXLUN,'TEST.TEXT.A1',PATH,LBANK,'R',IRC)
+
+\end{XMPt}
+The character option {\tt 'R'} intructs the \Rind{CDTEXT} routine to read
+the file from disk. In this case the bank address will be returned in {\tt LBANK}.
+%
+%
+%
+\subsection{Storage of character based data}
+The storage of character based data is performed by the routine \Rind{CDCHAR}
+which has similar functionality to the previously described \Rind{CDTEXT}
+routine, except that the data is moved from and to character
+arrays rather than text files.
+%
+%
+%
+\subsection{Storage of vector based data}
+Once again the storage of vector data is allowed by converting vectors to
+the {\tt ZEBRA} bank format before committing that bank to the database.
+The routine available for this operation is \Rind{CDVECT}.
+\par
+To demonstrate this imagine that one of the example databases we wish to convert
+from the {\tt RZ} format  currently consists not of {\tt ZEBRA} banks
+but of {\tt FORTRAN} integer vectors.
+\par
+The conversion program must now read in the vectors and convert them to
+a {\tt HEPDB} format before they can be stored in the database.
+The code shown below offers a suggestion of how the previous conversion program
+could be modified to handle this storage of vectors.
+%
+\begin{XMPt}{Example of data conversion using CDVECT}
+                  .
+                  . other code
+                  .
+c|
+c|       Zero temporary vector, then fill with next object
+c|
+         CALL VZERO(ITEMPVECT,80000)
+         CALL RZVIN(ITEMPVECT,80000,NFILE,RZKYTOGET,ICYCLE,' ')
+         IF(IQUEST(1).NE.0) THEN
+              PRINT *,' Error! RZVIN gives ',IQUEST(1)
+              STOP
+         ENDIF
+         PRINT *,' No. of elements in RZ vector :',NFILE
+                  .
+                  . other code
+                  .
+c|
+c|       Convert the array to a ZEBRA data structure
+c|
+         CALL CDVECT(' ',ITEMPVECT,NFILE,LADDR,'PI',IRC)
+         IF(IRC.NE.0) THEN
+              PRINT *,' Error! CDVECT IRC=',IRC
+              STOP
+         ENDIF
+c|
+c|       Now store bank at LADDR under HEPDB
+c|
+         DEST='//CDAU/AUX/'//CHDIR(9:LDIR)
+         PRINT*,' Destination path : ',DEST
+         CALL CDSTOR(DEST,LADDR,LKYBK,IDIV,HDBKEYS,'H',IRC)
+         IF (IRC.NE.0) THEN
+              PRINT *,' Error! CDSTOR IRC=',IRC
+              STOP
+         ENDIF
+                  .
+                  . other code
+                  .
+      CALL CDSTSV(' ',0,IRC)
+      CALL RZCDIR(CHSAVE(1:LDIR),' ')
+      PRINT *,' '
+      END
+\end{XMPt}
+%
+%
+%-------------------------------------------------------------------------
+\Filename{H2hdbtutr-Data-retrieval}
+\section{Data retrieval}
+Routines are available to allow the simple retrieval of data from the database.
+The following section addresses the general issue of data retrieval
+with a brief description of the available routines and examines the problems
+of retrieving data into already existing software.
+%
+\subsection{Retrieving ZEBRA data structures based on a key vector}
+Now that we have created and filled our database with data we have to generate code
+which allows us to read the data into our programs. Taking the
+{\tt CPLEAR auxiliary}
+database (integer vectors stored under {\tt HEPDB}) as an example and supposing
+we want to simply load the auxiliary data for a given run into
+our program's arrays we could approach the problem as follows.
+\par
+The general loop of tasks would be to set keys for the object (and consequently vector)
+that is required, retrieve the object into {\tt ZEBRA} store and finally convert the
+object back to a vector the software can use.
+\par
+We could write a subroutine called say {\tt HDBFET} to fetch the database object with
+parameters as follows:
+%
+\begin{XMPt}{Example calling parameters of HDBFET}
+
+      SUBROUTINE HDBFET(PATH,NUMRUN,KY1,KY2,LBANK)
+*
+*     Where: PATH   is the absolute path to where the data resides in the database (string)
+*            NUMRUN is the instant of validity for the object we require (integer)
+*            KY1    user key 1 say the detector name (4 Character hollerith)
+*            KY2    user key 2 say the name of the destination array (4 char hollerith)
+*            LBANK  the address of the retrieved bank.
+
+\end{XMPt}
+This subroutine could be implemented as follows.
+\begin{XMPt}{Possible implementation of HDBFET}
+
+      SUBROUTINE HDBFET(PATH,IVALID,UKY1,UKY2,LBANK)
+c|
+c+-------------------------------------------------------------------+
+c|    HDBFET    : Routine to retrieve HEPDB object into a bank       |
+c|                valid at NUMRUN with keys UKY1/2                   |
+c+-------------------------------------------------------------------+
+c|
++SEQ,CPPOIN.
++SEQ,CPBANK.
+      COMMON/QUEST/IQUEST(100)
+      PARAMETER       (IONLINE=0)
+      PARAMETER       (IOFFLINE=1)
+      PARAMETER       (NHDBKEYS=14)
+      INTEGER          LBANK
+      INTEGER          IMASK(NHDBKEYS)
+      INTEGER          HDBKEYS(NHDBKEYS)
+      CHARACTER*255    PATH
+      CHARACTER*4      UKY1,UKY2
+      CHARACTER*8      MESS
+      INTEGER          IVALID
+c|
+c|    Convert CHARACTER --> HOLLERITH for user keys
+c|
+      CALL UCTOH(UKY1,HDBKEYS(13),4,4)
+      CALL UCTOH(UKY2,HDBKEYS(14),4,4)
+c|
+c|  Set up IMASK for relevant keys
+c|
+      CALL VZERO (IMASK,NHDBKEYS)
+      IMASK(10)=1
+      IMASK(13)=1
+      IMASK(14)=1
+c|
+c|    Make the search for an off-line object first
+c|
+      HDBKEYS(10)=IOFFLINE
+c|
+c|    Get Bank from Database
+c|
+      CALL CDUSEM(PATH,LBANK,IVALID,IMASK,HDBKEYS,' ',IRC)
+      IF (IRC.EQ.33) THEN
+         HDBKEYS(10)=IONLINE
+         CALL CDUSEM(PATH,LBANK,IVALID,IMASK,HDBKEYS,' ',IRC)
+      ENDIF
+      IF (IRC.NE.0) THEN
+         PRINT *,'Error. CDUSEM IRC=',IRC
+         PRINT *,'For user keys :',UKY1,' ',UKY2
+         PRINT *,'With path :',PATH
+         STOP
+      ENDIF
+      IF (IB(LBANK+10).EQ.IOFFLINE) THEN
+         MESS='OFF-LINE'
+      ELSE
+         MESS='ON-LINE '
+      ENDIF
+      IF (IQUEST(2).NE.0) THEN
+        PRINT *,
+     + '[Source-->',MESS,'] [Keys-->',UKY1,' ',UKY2,' Data from DISK ]'
+      ELSE
+        PRINT *,
+     + '[Source-->',MESS,'] [Keys-->',UKY1,' ',UKY2,' Data from CACHE]'
+      ENDIF
+      RETURN
+      END
+
+\end{XMPt}
+The comments within the code describe the basic flow of the code, however there
+are a couple of points to note. Firstly notice how the new key (key 10) we introduced
+is used to check for off-line versions of data objects before resorting to taking an
+on-line version of the data.
+\par
+Finally notice how {\tt IQUEST(2)} is checked at the end of the routine to see if
+data was refreshed from disk or from the cache of objects already in memory. This is
+a powerful feature of {\tt HEPDB} as it saves the need for repeated access to the
+same object each time the current run-number changes as it will not always follow that the
+required object will need to be changed. Later in this section we discuss how the command
+\Rind{CDFREE} is used to declare that an object is to be cached.
+\par
+Now let's imagine a typical call to such a routine. Suppose we want to retrieve an integer array
+stored under {\tt HEPDB} with user keys {\tt CALO} and {\tt CNEX} (which represent the integer
+array of {\tt CALO}rimeter {\tt NEX}t wires) for run number {\tt NUMRUN}. We also assume that the
+object resides in directory {\tt //CDAU/AUX/CALPA}. A section of code to retrieve and convert
+the object to an array in memory would have the form shown below.
+
+%
+\begin{XMPt}{Example calling sequence to HDBFET}
+
+c+-------------------------------------------------------------------+
+c|  Input CANEXT data from //CDAU/AUX/CALPA                          |
+c|  For keys CALO , CNEX ---> to vector ICANEX (size 68850)          |
+c+-------------------------------------------------------------------+
+c|  Get object from HEPDB according to run number/user keys
+c|
+      PATH='//CDAU/AUX/CALPA'
+      CALL HDBFET(PATH,NUMRUN,'CALO','CNEX',LBANK)
+c|
+c|     Unpack bank into a vector
+c|
+      CALL CDVECT(' ',ICANEX,68850,LB(LBANK-1),'GI',IRC)
+      IF (IRC.NE.0) THEN
+         WRITE(LUPRNT,*) 'Error. CDVECT IRC=',IRC
+         STOP
+      ENDIF
+
+\end{XMPt}
+The main points to note here are that the call to \Rind{CDVECT} must be
+supplied with the type of the vector (in this case {\tt INTEGER})
+via the character options {\tt 'GI'}
+( {\tt G}et {\tt I}nteger) and the expected size of the vector in elements.
+
+Also note that the data part of the object resides at {\tt LB(LBANK-1)} of the keys bank and
+this is the address that must be passed to \Rind{CDVECT} via its fourth parameter.
+
+As mentioned before, {\tt HEPDB} has a facility for the caching of objects in memory.
+Objects are only retrieved from disk when no matching object exists in the cache
+or when explicitly requested by the user.
+This is performed as follows. After an object has been used, it is marked by
+the user as a candidate for deleted from the cache using the routine \Rind{CDFREE}.
+
+We therefore add an additional subroutine called say {\tt AUCAS} to declare an
+object to be a candidate for deletion from database memory with parameters defined
+as follows:
+
+\Shubr{AUCAS}{(SUBROUTINE AUCAS(PATH,KY1,KY2,LBANK)}
+\begin{DLtt}{1234567}
+\item[PATH]Character variable specifying the directory in which the object resides
+\item[KY1]user key 1 of the object to be dropped
+\item[KY2]user key 2 of the object to be dropped
+\item[LBANK]the address of the keys bank.
+\end{DLtt}
+
+This subroutine could be implemented as follows.
+%
+\begin{XMPt}{Possible implementation of AUCAS}
+
+      SUBROUTINE AUCAS(PATH,KY1,KY2,LBANK)
+c|
+c+-------------------------------------------------------------------+
+c|   AUCAS      : Routine to declare  HEPDB object in a bank         |
+c|                at LBANK available for deletion.                   |
+c+-------------------------------------------------------------------+
+c|
++SEQ,CPPOIN.
++SEQ,CPBANK.
+      CHARACTER*4       KY1,KY2
+      COMMON/QUEST/     IQUEST(100)
+      INTEGER           LBANK,IKV(14),IMASK(14)
+      CHARACTER*255     PATH
+c|
+c|    Zero, then set the user key mask
+c|
+      CALL VZERO(IMASK,14)
+      IMASK(13)=1
+      IMASK(14)=1
+      CALL UCTOH(KY1,IKV(13),4,4)
+      CALL UCTOH(KY2,IKV(14),4,4)
+      CALL CDFREE (PATH,LBANK,IMASK,IKV,' ',IRC)
+      IF (IRC.NE.0) THEN
+          PRINT *,'Error: CDFREE IRC=',IRC
+          STOP
+      ENDIF
+      RETURN
+      END
+
+\end{XMPt}
+So given our previous example call to {\tt HDBFET} with keys {\tt CALO} and {\tt CNEX}
+the appropriate call to {\tt AUCAS} would be:
+%
+\begin{XMPt}{Possible implementation of AUCAS}
+
+      CALL AUCAS(PATH,'CALO','CNEX',LBANK)
+
+\end{XMPt}
+%
+%
+%
+\Filename{H2hdbtutr-Retrieval-of-data-into-existing-software}
+\section{Retrieval of data into existing software}
+When existing software has to be modified to accept data from {\tt HEPDB}
+it would appear that there could be a problem in loading objects into predefined
+positions in {\tt ZEBRA} store. To overcome this problem {\tt HEPDB} provides a
+routine \Rind{CDGET} which can be used to retrieve a data structure to a user
+specified location.
+\par
+However it must be noted that the caching facilities offered to routines such
+as \Rind{CDUSEM} are not available with \Rind{CDGET}. Full details of the use
+of this routine are give elsewhere in this manual.
+\par
+As well as the routine \Rind{CDGET} the user may get objects in the usual way
+( using \Rind{CDUSE}, \Rind{CDUSEM}) and then use the {\tt ZEBRA} routine
+\Rind{ZSHUNT} to move the required databank to a specified location in memory.
+An example of such a `shunt' is given below , note the code uses the routines
+{\tt HDBFET} and {\tt AUCAS} as defined above.
+%
+\begin{XMPt}{Example use of ZSHUNT}
+
+               .
+               .some code
+               .
+c+-------------------------------------------------------------------+
+c|    Input universal geometry (LIGDX0)                              |
+c+-------------------------------------------------------------------+
+         CALL HDBFET(PATH,NUMRUN,DETNAM(IDET),'GDX0',LBANK)
+         CALL ZSHUNT(IDVGDX,LB(LBANK-1),LMIGDX,0,0)
+         LIGDX0(IDET)=LB(LMIGDX)
+         CALL UCTOH('IGDX',IB(LIGDX0(IDET)-4),4,4)
+         IB(LIGDX0(IDET)-5)=IDET
+         CALL RDBGDX(IDET)
+         CALL AUCAS(PATH,DETNAM(IDET),'GDX0',LBANK)
+               .
+               .some code
+               .
+
+\end{XMPt}
+%
+%
+%
+%------------------------------------------------------------------------------
+\Filename{H2hdbtutr-Data-removal}
+\section{Data removal}
+\subsection{Deletion based on a key vector}
+To allow deletion of object from the database based upon a user specified
+key vector {\tt HEPDB} provides the user callable routine \Rind{CDPURK}.
+Once again as in the call to \Rind{CDSTOR} discussed earlier the user
+sets up a key vector of size enough to hold all system, special user,
+validity and normal user keys and fills in the required elements for the
+envisaged deletion. The user then creates another vector (in our example
+to follow it is called {\tt IMASK} ) which acts as a mask specifying
+which elements of our key vector are to be considered in the deletion
+operation (this is set by the element taking a non-zero value).
+\par
+Note also that the routine \Rind{CDPURK} can be used to `undelete' previously
+deleted objects. The specification of the object to be restored is the same as that
+of deleting an object. To perform the undelete operation the user simply specifies
+character option {\tt 'U'}.
+%
+%------------------------------------------------------------------------------
+%
+%  END OF TUTORIAL LATEX SOURCE
+%

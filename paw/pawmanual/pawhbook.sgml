@@ -1,0 +1,1935 @@
+<?.*****************************************************************>
+<?.* PAW   HBOOK/NTUPLES - Part 2                                  *>
+<?.*  Last Mod.  15 Nov 1989  15.45    mg                          *>
+<?.*****************************************************************>
+<H1 ID=HBOOKH1>HBOOK
+<H2 ID=HBINTRO SUBJECT='Introduction'>Introduction
+<I1>HBOOK
+<P>Many of the ideas and functionality in the area of data
+presentation, manipulation and management in PAW find their origin
+in the <HP2>HBOOK</HP2> subroutine package <BIBREF REFID=HBOOK>, which
+handles statistical distributions (histograms and Ntuples).
+HBOOK is normally run in a batch environment, and it produces
+generally graphics output on the line printer or, optionally, via
+<I1>HPLOT
+the <HP2>HPLOT</HP2> <BIBREF REFID=HPLOT> package
+on a high resolution graphic output device.
+<P>The HBOOK system consists of a few hundred FORTRAN
+subroutines which enable the user to symbolically define, fill and output
+one- and two-dimensional density estimators, under the form
+of <HP2>histograms, scatter-plots</HP2> and <HP2>tables</HP2>.
+<I1>histogram
+<I1>scatter-plot
+<I2>table
+<I1>Ntuple
+<P>Furthermore the analysis of large data samples is eased by the use
+of <HP2>Ntuples</HP2>, which
+are two-dimensional arrays, characterised by a
+<HP2>fixed</HP2> number N, specifying the number of entries per element,
+and by a <HP2>length</HP2>, giving the
+total number of elements. An element of a Ntuple can be thought of
+<I1>DST
+as a physics <Q>event</Q> on e.g. a Data Summary Tape (micro-DST).
+<HP2>Selection criteria</HP2>
+can be applied to each <Q>event</Q> or element and
+a complete Ntuple can be statistically analysed in a fast, efficient
+and interactive way.
+<H3>HBOOK functionality:
+<P>
+<DL TSIZE=27>
+<DT>Booking
+<DD>Declare a one- or two-dimensional histogram or a Ntuple
+<DT>Projections
+<DD>Project two-dimensional distributions onto both axes
+<DT>Ntuples
+<DD>Way of writing micro data-summary-files for further
+processing. This allows to make later projections of
+individual variables or correlation plots. Selection mechanisms
+may be defined
+<DT>Function representation
+<DD>Associates a real function of 1 or 2 variables to a histogram
+<DT>Filling
+<DD>Enter a data value into a given histogram, table or Ntuple
+<DT>Access to information
+<DD>Transfer of numerical values from HBOOK-managed memory to FORTRAN
+variables and back
+<DT>Arithmetic operations
+<DD>On histograms and Ntuples
+<DT>Fitting
+<DD>Least squares and maximum likelihood fits of
+parametric functions to histogramed data
+<DT>Smoothing
+<DD>Splines or other algorithms
+<DT>Random number generation
+<DD>Based on experimental distributions
+<DT>Archiving
+<DD>Information is stored
+on mass storage for further reference in subsequent programs
+<DT>Editing
+<DD>Choice of the form of presentation of the histogramed data
+</DL>
+<?.PA>
+<H2 SUBJECT='Basic ideas'>Basic ideas
+<P>
+The basic data elements of HBOOK are the <HP2>histogram</HP2> (one-
+and two-dimensional) and the <HP2>Ntuple</HP2>. The user identifies
+his data elements using a <HP2>single integer</HP2>. Each of the
+elements has a number of <HP2>attributes</HP2> associated with it.
+<P>The HBOOK system uses the <HP2>ZEBRA</HP2> data manager
+<BIBREF REFID=ZEBRA> to store its data elements in a COMMON
+block <XPH><HP2>/PAWC/</HP2></XPH>, shared
+<I1>PAWC common
+<I1>HIGZ
+<I1>KUIP
+<I1>ZEBRA
+<I1>data structure
+with the <HP2>KUIP</HP2> <BIBREF REFID=KUIP> and
+<HP2>HIGZ</HP2> <BIBREF REFID=HIGZ> packages, when the latter are
+also used (as is the case in PAW). In fact the first task of a
+HBOOK user is to declare the length of this common to
+ZEBRA by a call to <XPH>HLIMIT</XPH>, as is seen in
+<I1>HLIMIT
+figures <FIGREF REFID=HBEX1IN> and <FIGREF REFID=HBEX2IN>
+<FN CALLOUT='*'>This is of course not necessary in PAW, which is already
+precompiled when it is run. However when treating very large data
+samples or in other special applications, it might
+be necessary to specify a different value for the length
+of the dynamic store, which is defined by a call to <XPH>PAWINT</XPH>
+<I1>PAWINT
+from the main initialisation routine <XPH>PAMAIN</XPH>.
+<I1>PAMAIN
+The <Q>default</Q> value for the length of <XPH>PAWC</XPH> is
+500000 (Apollo), 200000 (IBM) or 300000 (other systems),
+with respectively 10000 and 68000 words initially reserved for
+HIGZ and KUIP.</FN>.
+<P>
+In the <XPH>/PAWC/</XPH> data store, the HBOOK,
+HIGZ and KUIP packages have all their own
+<HP2>division</HP2> (see <BIBREF REFID=ZEBRA> for
+more details on the notion of divisions) as is shown in
+<FIGREF REFID=PAWSTOR>.
+<FIG ID=PAWSTOR PLACE=INLINE FRAME=NONE WIDTH=170MM>
+<FIGCAP>The layout of the /PAWC/ dynamic store
+<ARTWORK name=PAWSTOR ALIGN=CENTER>
+</FIG>
+<H3>The use of ZEBRA
+<P>
+Inside the HBOOK division the various data elements are
+stored as a ZEBRA data structure, one for each <Q>identifier</Q>.
+In fact all identifiers (histogram or Ntuple numbers)
+are stored in an ordered array in a ZEBRA
+bank and access to the information associated with the HBOOK data
+is via the <HP2>reference link</HP2> at the same offset as the
+identifier in the data part of the bank. The data structure for
+a given element depends on its characteristics.
+In any case the top bank for a given element contains the
+title and other constants, while the data themselves are
+stored in another bank hanging from the previous one. Sometimes
+other banks are created, e.g. for automatic binning,
+for storing the limits of the elements of a Ntuple and,
+when a Ntuple is kept in memory, for containing the overflow
+<I1>projection
+of the data, for <HP2>projections</HP2>, <HP2>slices</HP2> and
+<I1>band
+<HP2>bands</HP2> in the 2-dim case of for containing the <HP2>errors</HP2>
+<I1>error
+associated to a bin. This means that each HBOOK identifier
+has a whole set of <HP2>attributes</HP2> associated with its
+<I1>attribute
+existence, and when a histogram or Ntuple is written to backup
+store and later reread, the <HP2>complete data structure</HP2>, containing
+all characteristics and attributes are retrieved.
+<FIGREF REFID=HBZEBRA> shows
+the ZEBRA data structure for a two-dimensional histogram.
+The precise layout of this bank should be of no concern to the
+user. It is only shown here as an example of the underlying ZEBRA structure
+of HBOOK. Note the use of the <Hp2>data</HP2> part of the bank for
+storing attributes (e.g. title, number of bins, number of entries) as
+well as of the <HP2>link</HP2> part for storing the addresses to access the
+associated data points (scatter plot contents, X and Y projections,
+slices and bands and their associated errors).
+<FIG ID=HBZEBRA PLACE=INLINE FRAME=NONE>
+<FIGCAP>The ZEBRA data structure used for two-dimensional histograms
+<ARTWORK name=HBZEBRA WIDTH=170mm ALIGN=CENTER>
+</FIG>
+<?.PA>
+<H3>RZ directories and HBOOK files
+<P>
+<I1>change directory
+<I1>current directory
+<I1>directory
+<I2>change
+<I2>current
+Another advantage of the use of ZEBRA in HBOOK is that ZEBRA's direct
+access <HP2>RZ package</HP2> is available.
+The latter allows data structures to
+be uniquely addressed via <HP2>pathnames</HP2>, carrying a mnemonic meaning and
+showing the relations between data structures. Related data structures are
+addressed from a <HP2>directory</HP2>. Each time a RZ file is opened via a
+call to <XPH>HRFILE</XPH> a supplementary top directory is created with
+a name specified in the calling sequence. This
+means that the user can more easily keep track of his data
+and also the <HP2>same</HP2> histogram identifiers can be used
+in various files, what makes life easier if one wants to study various
+data samples with the same program,
+since they can be addressed by changing
+to the relevant file by a call to <XPH>HCDIR</XPH> first.
+<XMP>
+     CALL HRFILE(1,'HISTO1',' ')    ! Open first  HBOOK RZ file (read only)
+     CALL HRFILE(2,'HISTO2','U')    ! Open second HBOOK RZ file (update)
+     CALL HCDIR('//HISTO1',' ')     ! Make HISTO1 current directory
+     CALL HRIN(20,9999,0)           ! Read ID 20 on file 1
+       ....
+     CALL HCDIR('//HISTO2',' ')     ! Make HISTO2 current directory
+     CALL HRIN(10,9999,0)           ! Read ID 10 on file 2
+       ....
+     CALL HROUT(20,ICYCLE,' ')      ! Write ID 20 to file 2
+     CALL HREND('HISTO1')           ! Close file 1
+     CALL HREND('HISTO2')           ! Close file 2
+</XMP>
+<P>
+In the previous example (and also in figures <FIGREF REFID=HBEX1IN FORM=NUMONLY>
+and <FIGREF REFID=HBEX2IN FORM=NUMONLY>) it is shown how an external file
+is available via a directory name inside HBOOK (and PAW), and that one
+can change from one to the other file by merely
+<HP2>changing directory</HP2>,
+via the PAW command <XPH><HP3>CDIR</HP3></XPH>, which calls the
+HBOOK routine <XPH><HP2>HCDIR</HP2></XPH>.
+<H3>Changing directories
+<P>
+One must pay attention to the fact that
+<HP2>newly</HP2> created histograms go to <HP2>memory</HP2> in
+the <XPH>//PAWC</XPH> directory (i.e. the <XPH>/PAWC/</XPH> common).
+<I1>//PAWC
+<I1>//LUN1
+As an example suppose that the current directory is <XPH>//LUN1</XPH>,
+and an operation is performed on two histograms. These histograms are
+first copied to memory <XPH>//PAWC</XPH>, the operation is performed
+and the result is <HP2>only</HP2> available in <XPH>//PAWC</XPH>,
+<XMP>
+ PAW > <HP3>CDIR //LUN1</HP3>           | Set current directory to //LUN1
+ PAW > <HP3>ADD 10 20 30</HP3>          | Add histograms 10 and 20 into 30
+                             | Histogram 30 is created in //PAWC
+ PAW > <HP3>Histo/Plot //PAWC/30</HP3>  | Show the result of the sum
+ PAW > <HP3>CD //PAWC</HP3>             | Set the current directory to memory
+ PAW > <HP3>Histo/plot 30</HP3>         | Show the result once more
+</XMP>
+Similarly when histograms or Ntuples are plotted
+(e.g. by the <XPH>HISTO/PLOT</XPH> command), they are copied to memory
+possibly replacing an old copy of the same ID.
+As long as the copy in memory is not changed, each time the ID is read
+from the <HP2>external</HP2> file. This is because in a <HP2>real time</HP2>
+environment, e.g. using <HP2>global sections</HP2> on VMS or
+<HP2>modules</HP2> with OS9, the data base on the external medium can be
+<I1>real time
+<I1>global section
+<I1>OS9 module
+changed by concurrent processes.
+However if the HBOOK data structure, associated with the
+histogram or Ntuple in memory is <HP2>altered</HP2>
+(e.g. by a <XPH>MAX, IDOPT, FIT</XPH> command), then it becomes
+the <HP2>default</HP2> for subsequent operations.
+If one wants the <HP2>original copy</HP2> one first must delete the
+copy from memory or <HP2>explicitly</HP2> use the pathname for the
+external file.
+<XMP>
+ PAW > <HP3>Histo/file 1 his.dat</HP3>  | The file contains ID=10
+ PAW > <HP3>Histo/Plot 10</HP3>         | ID=10 read from file and plotted
+ PAW > <HP3>H/plot 10</HP3>             | ID=10 read again from file and plotted
+ PAW > <HP3>H/fit 10 ! G</HP3>          | Read from file, make a Gaussian fit on //PAWC/10
+ PAW > <HP3>H/plot 10</HP3>             | ID=10 read from memory since it changed
+ PAW > <HP3>H/del 10</HP3>              | Delete histogram 10 from memory
+ PAW > <HP3>H/plot 10</HP3>             | ID=10 read again from file and plotted
+</XMP>
+<?.CC 50>
+<H2 SUBJECT='HBOOK batch as the first step of the analysis'>HBOOK batch as the first step of the analysis
+<P>
+Although it is possible to define histograms interactively in a PAW
+session, and then read the (many thousands of) events, in general
+for large data samples the relevant variables are extracted from
+the <HP2>Data Summary Files <HP0>or</HP0> DST</HP2>s
+and stored in <HP2>histograms</HP2>
+<I1>DST
+or an <HP2>Ntuple</HP2>.
+The histogram needs already that a certain choice has to be made
+as to the range of values for the plotted parameter, because the
+<HP2>binning</Hp2>, or the coarseness, of the distribution has to
+be specified when the histogram is defined (<Hp2>booked</HP2>).
+Also only one- and two-dimensional histograms are possible, hence the
+correlations between various parameters can be difficult to study.
+Hence it seems in many cases more appropriate to store the value of
+the important parameters for each event in an <HP2>Ntuple</HP2>.
+This approach preserves the correlation between the parameters
+and allows selection criteria to be applied on the (reduced)
+data sample at a later stage.
+<P>In general, the time consuming job of
+analysing all events available on tape is run on a mainframe, and
+the important event parameters are stored in a Ntuple
+to allow further detailed study. For convenience the Ntuple
+can be output to disk for each run, and then at a later stage the
+Ntuples can be <HP2>merged</HP2> in order to allow a global
+interactive analysis of the complete data sample.
+<FIG ID=HBBATCH PLACE=INLINE WIDTH=COLUMN FRAME=NONE>
+<FIGCAP>Schematic presentation of the various steps in the data analysis chain
+<ARTWORK name=HBBATCH WIDTH=145MM ALIGN=LEFT>
+</FIG>
+<P>A typical batch job in which data are analysed offline and
+some characteristics are stored in HBOOK is given in <FIGREF REFID=HBEX1IN>
+After opening the RZ HBOOK file, HBOOK is initialised by a call to&nbsp;
+<XPH>HLIMIT</XPH>, which declares a length of 80000 words for the
+length of the <XPH>/PAWC/</XPH> dynamic store. Then the one- and two-
+dimensional histograms 110 and 210 are filled respectively
+according to the functions <XPH>HTFUN1</XPH> and <XPH>HTFUN2</XPH>.
+The output generated by the program is shown in <FIGREF REFID=HBEX1OU>.
+<?:GRID FRAME='BOX' RULES='NONE'.>
+<?:GRIDSEG.>
+<?:GRIDAREA.>
+<FIG ID=HBEX1IN PLACE=INLINE FRAME=NONE>
+<FIGCAP>Writing data to HBOOK with the creation of a HBOOK RZ file
+<XMP SCALE=0.75>
+      PROGRAM HTEST
+      COMMON/PAWC/H(80000)
+      EXTERNAL HTFUN1,HTFUN2
+*.------------------------------------------------------------
+      CALL HLIMIT(80000)
+*             Book histograms and declare functions
+      CALL HBFUN1(100,'Test of HRNDM1',100,0.,1.,HTFUN1)
+      CALL HBOOK1(110,'Filled according to HTFUN1',100,0.,1.,1000.)
+      CALL HBFUN2(200,'Test of HRNDM2',100,0.,1.,40,0.,1.,HTFUN2)
+      CALL HSCALE(200,0.)
+      CALL HBOOK2(210,'Fill according to HTFUN2',100,0.,1.,40,0.,1.,30.)
+*             Fill histograms
+      DO 10 I=1,10000
+         X=HRNDM1(100)
+         CALL HFILL(110,X,0.,1.)
+         CALL HRNDM2(200,X,Y)
+         CALL HFILL(210,X,Y,1.)
+  10  CONTINUE
+*             Save all histograms on file HTEST.DAT
+      CALL HRPUT(0,'HTEST.DAT','N')
+      CALL HDELET(100)
+      CALL HDELET(200)
+      CALL HPRINT(0)
+      END
+<?:GRIDAREA.>
+      FUNCTION HTFUN2(X,Y)
+ 
+      HTFUN2=HTFUN1(X)*HTFUN1(Y)
+ 
+      RETURN
+      END
+ 
+      FUNCTION HTFUN1(X)
+      DATA C1,C2/1.,0.5/,XM1,XM2/0.3,0.7/,XS1,XS2/0.07,0.12/
+ 
+      A1=-0.5*((X-XM1)/XS1)**2
+      A2=-0.5*((X-XM2)/XS2)**2
+      X1=C1
+      X2=C2
+      IF(ABS(A1).GT.0.0001)X1=C1*EXP(A1)
+      IF(ABS(A2).GT.0.0001)X2=C2*EXP(A2)
+ 
+      HTFUN1=X1+X2
+ 
+      RETURN
+      END
+</XMP>
+</FIG>
+<?:EGRID.>
+<?:GRID FRAME='BOX' RULES='NONE'.>
+<?:GRIDSEG.>
+<?:GRIDAREA.>
+<FIG ID=HBEX1OU FRAME=NONE>
+<FIGCAP>Output generated by job HTEST
+<XMP SCALE=0.48>
+Filled according to HTFUN1
+ 
+HBOOK     ID =       110                                        DATE  02/09/89               NO =  2
+ 
+     340                                    -
+     330                                    I -
+     320                                    I I
+     310                                    I I
+     300                                    I-I-
+     290                                  --I  I
+     280                                 -I    I-
+     270                                 I      I
+     260                                 I      I
+     250                                -I      I-
+     240                                I        I
+     230                               -I        I
+     220                               I         I-
+     210                              -I          I
+     200                              I           I -
+     190                              I           I-I
+     180                             -I             I
+     170                             I              I                                -
+     160                             I              I                          -    -I-   -
+     150                             I              I-                         I  --I I- -I -
+     140                             I               I-                       -I--I    I-II-I-
+     130                           --I                I-                     -I              I
+     120                           I                   I                  - -I               I
+     110                           I                   I                  I-I                I--
+     100                           I                   I-                -I                    I
+      90                          -I                    I-              -I                     I----
+      80                         -I                      I            --I                          I-
+      70                         I                       I           -I                             I
+      60                        -I                       I--       - I                              I- -
+      50                       -I                          I-- ----I-I                               I-I-
+      40                       I                             I-I                                        I---
+      30                     --I                                                                           I--
+      20                   --I                                                                               I --
+      10            -------I                                                                                 I-II--
+ 
+CHANNELS 100   0                                                                                                  1
+          10   0        1         2         3         4         5         6         7         8         9         0
+           1   1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890
+ 
+CONTENTS 100                       111222222323222211111                  1111111111111111111111
+          10             1 12224578227034888392975189442985544344445467789101235335456543453430088887545443322111
+           1.       22345055038484428230601947383077660674994445157562761227948358021717653142735611669210337304276
+ 
+LOW-EDGE   1.            111111111122222222223333333333444444444455555555556666666666777777777788888888889999999999
+*10**  1   0   0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789
+ 
+* ENTRIES =      10000      * ALL CHANNELS = 0.1000E+05      * UNDERFLOW = 0.0000E+00      * OVERFLOW = 0.0000E+00
+* BIN WID = 0.1000E-01      * MEAN VALUE   = 0.4846E+00      * R . M . S = 0.2199E+00
+</XMP>
+<?:GRIDAREA.>
+<XMP SCALE=0.48>
+Fill according to HTFUN2
+ 
+HBOOK     ID =       210                                        DATE  02/09/89               NO =  4
+ 
+CHANNELS 100 0                                                                                                  1
+          10 0        1         2         3         4         5         6         7         8         9         0
+           1 1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890
+           ********************************************************************************************************
+  OVE      *                                                                                                      * OVE
+     .975  *                                                                                                      *  40
+     .95   *                  ++   2   2 2++  +3 +   ++     +  +     2+         3 2  + 2++++       + 2    +       *  39
+     .925  *           +   +    2  ++ 32+++ +22  22+    +++    +       + +    +  22+2+++ +2++   + + +             *  38
+     .9    *                   223 +3+ +3 3++333223  +2  2     +  +    ++2+ +    232+322 2+++  +24+      +        *  37
+     .875  *           +   ++ +2++++ 342533 443224++2 2  +   +  ++23  +  +42+3222233+++3+++2 22+ ++   + + +       *  36
+     .85   *               ++  + 5+35+3333483475 65+2+ + ++  +    +33+3 +2 +2335222+235 522 24+   ++    2         *  35
+     .825  *                ++  2+2 558335876736583+ 2 +2+ + +   3   224+533623+35252+54 32+452++3 332 +++++      *  34
+     .8    *            ++   + 532 656562546C8A88936324332+ +2+23 +332+2236433657234455556+4635+222 +23 +3  +     *  33
+     .775  *               +2  33 375B7274C6A66A782+323++2+23  +5++3+5222256768365258276374+86334+ 32    +++ +    *  32
+     .75   *            + 2+ 2 45523786A79FB98B6AD4855224+  + ++23323+5755552468283746644543 443324 5223++  2     *  31
+     .725  *            + ++4+22+637A785B8BBBA6B4656922++ 2 23 24 2+5464+435552843286C6246623636+3+ 2 3 2  3+2    *  30
+     .7    *       +      22 +2 735ABCA89G8C8A6DA5765+3+322  2+2++52234445475+355864768724+B74632+23 +3   3+   +  *  29
+     .675  *              23 +4+3364HBBAFCFCBB98945C7933++ 2 5+3 +4225243752 75787896C367+475443+32242422 2 +     *  28
+     .65   *           + + ++5+3795498GAC96CB9A79E6645 34 3+3  ++24537234424532777657445+4746235+2+3++  4+2 2     *  27
+     .625  *           +     3 647774A9CE67G99BAB6B233233 4+ 2 322 42 44364+657735+735736733+4+23234 +++++2  +    *  26
+     .6    *            + ++3+342233874B8C966896565+5242+5 +2+++++2+5225+42544535456A265357253+2222+ 2+2++ +  +2  *  25
+     .575  *           ++  +  +5 74535525677984573453422 +2   ++ 2  +++4+2 3526525235+4243342+32+  23 2+          *  24
+     .55   *               ++ +226+584568349865+433 +2222 +      ++ +4444352326542332823+444332 +2 2 + +          *  23
+     .525  *                 ++++2+65436+3A753535+22+++2+++  ++ + ++2  +2 ++4++2+ 224224+32 2+ ++++ 2      +      *  22
+     .5    *                 22  4+23+6425 84543+++42 +2     +++2  2 + 2+2+ 3+ 24++2334223+ 223  +2   +       +   *  21
+     .475  *         +             +5334+7333+22  ++2+ +  3+      2 +4 +32  2 222+2 + 33++ 222 +  +3++     +      *  20
+     .45   *                  +  433244397 2++23232+ 24 +2        ++  ++2+ 2+ +2+33  ++4 +3 ++2+3    +  +         *  19
+     .425  *           +  ++ 2+ 22+24636432646+5+322 4 +++ + 2++  ++ +22+533+3++3+  +432 +322++2+     2+  ++ +    *  18
+     .4    *                +++3237549588A9725H724545++33+33 + + 2 24  4 +A4633 39 25636343322+82++ ++ + +2+  +   *  17
+     .375  *              +++3+374879CCCADLD48996CE54365232 +2+2342347+563264636547B47925542444434+2+322 2+  +2   *  16
+     .35   *            +++ +4637549EC87D8IHDICI9B754655432++23233+2554368886H68B9667889677A635C+4+223333+22  +   *  15
+     .325  *        +  ++++ 2445949CHHDFNHJRHIHKLDD5DC3545422233 24564875549A8E7899B4F4BC3CA7E597842+67242+++++   *  14
+     .3    *          ++++++2667889EDFEHULQHI*IKFIFA878666336+6+48526B79777BCCEBBAEEED58E96997A4674763463++++ 2+  *  13
+     .275  *        +  ++++ 3546898BEMPNIURPH*NOECDC8958E442+3542+68554B37466AAGCEEACAC7A476599962365 343++2 +2   *  12
+     .25   *        +     2344658A9DAJPLDENQGDHJEEBAA93 +3225322+4259A576784DA9B98B56A85CD859797A5843523223+ 22   *  11
+     .225  *               3 256778BA6CEJGIEAICGCHA4A242+43+++52427545466927A78866BB66795655763454656  2 3 +++    *  10
+     .2    *                +2++4357A69BC88AAFAA5665432+434 +++ ++++343233668554584442CA7664745+4++34+++2 + +++   *   9
+     .175  *                 + 3  3436344766755264526++3 2+ + ++ +42  22 2+32345++353562 34 33+++4 +3 +++  +      *   8
+     .15   *                  2+ + +3+44+262542+4225 232 ++++   222 + 2+  +23+242 32+222 2++342 22    22+ 2  +    *   7
+     .125  *              +   +2  +++22+32+ 3+++2                    +  +42 +  2+ +   +  2+       + + ++          *   6
+     .1    *                           +  +   + +2+     ++             +    +2+    +        ++    +++ +           *   5
+     .075  *                       + 2  +     +                          +                               +        *   4
+     .05   *                                      +                                                               *   3
+     .025  *                                                                         +                            *   2
+           *                                                                                                      *   1
+  UND      *                                                                                                      * UND
+           ********************************************************************************************************
+LOW-EDGE   0 0000000000111111111122222222223333333333444444444455555555556666666666777777777788888888889999999999
+           0 0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789
+ 
+ *                                                          I         I
+ * ENTRIES =    10000                   PLOT       ---------I---------I---------
+ * SATURATION  AT=           31                             I 9991    I
+ * SCALE  .,+,2,3,.,., A,B,           STATISTICS   ---------I---------I---------
+ * STEP =    1     * MINIMUM=0                              I         I
+</XMP>
+</FIG>
+<?:EGRID.>
+<?.PA>
+<H3>Adding some data to the RZ file
+<P>
+The second run using program <XPH>HTEST1</XPH> shows
+how to add some data to the HBOOK&nbsp;RZ&nbsp;file
+created in the job <XPH>HTEST</XPH>. After opening the file
+in question in update mode (<HP2>'U'</HP2> option) with the
+name <XPH>EXAM2</XPH>, a new directory <XPH>NTUPLE</XPH> is created,
+known as <XPH>//EXAM2/NTUPLE</XPH> as seen in the output of
+<XPH>HLDIR</XPH> command at the end of the output.
+A one- and a two-dimensional
+histogram and a Ntuple with identifiers of respectively 10, 20 and 30
+are booked.
+Each Ntuple element or <Q>event</Q>
+is characterised by three <HP2>variables</HP2>
+(labelled <HP2>'X', 'Y'</HP2> and <HP2>'Z'</HP2>).
+The Ntuple data, when the initial size of <XPH>1000</XPH>
+words is exhausted, will be written to the directory specified in the
+call to <XPH>HBOOKN</XPH>, i.e. <XPH>//EXAM2/NTUPLE</XPH>,
+and the data in memory are replaced with those newly read.
+A one- and a two-dimensional projection
+of <XPH>X</XPH> and <XPH>X versus Y</XPH> are then made onto histograms
+10 and 20 respectively, before they are printed and written on the
+HBOOK RZ file. At the end the <HP2>current</HP2> and <HP2>parent</HP2>
+directories are listed.
+The contents of the latter shows that the data written in
+the first job (<XPH>HTEST</XPH>) are indeed still present in the file
+under the top directory <XPH>//EXAM2</XPH>.
+The call to <XPH>RZSTAT</XPH> shows usage statistics about the RZ file.
+<?:GRID FRAME='BOX' RULES='NONE'.>
+<?:GRIDSEG.>
+<?:GRIDAREA.>
+<FIG ID=HBEX2IN PLACE=INLINE FRAME=NONE>
+<FIGCAP>Adding data to a HBOOK RZ file
+<XMP SCALE=0.65>
+      PROGRAM HTEST1
+      COMMON/PAWC/H(80000)
+      DIMENSION X(3)
+      CHARACTER*8 CHTAGS(3)
+      DATA CHTAGS/'   X   ','   Y   ','   Z   '/
+*.------------------------------------------------------------
+      CALL HLIMIT(80000)
+*             Reopen data base
+      CALL HROPEN(1,'EXAM2','HTEST.DAT',0,'U')
+      CALL HMDIR('NTUPLE','S')
+      CALL HBOOK1(10,'TEST1',100,-3.,3.,0.)
+      CALL HBOOK2(20,'TEST2',30,-3.,3.,30,-3.,3.,250.)
+      CALL HBOOKN(30,'N-TUPLE',3,'//EXAM2/NTUPLE',1000,CHTAGS)
+*
+      DO 10 I=1,10000
+         CALL RANNOR(A,B)
+         X(1)=A
+         X(2)=B
+         X(3)=A*A+B*B
+         CALL HFN(30,X)
+  10  CONTINUE
+*
+      CALL HPROJ1(10,30,0,0,1,999999,1)
+      CALL HPROJ2(20,30,0,0,1,999999,1,2)
+      CALL HPRINT(0)
+      CALL HROUT(0,ICYCLE,' ')
+      CALL HLDIR(' ',' ')
+      CALL HCDIR('\',' ')
+      CALL HLDIR(' ',' ')
+      CALL RZSTAT(' ',999,' ')
+      CALL HREND('EXAM2')
+      END
+</XMP>
+<?:GRIDAREA.>
+<XMP SCALE=0.4>
+TEST1
+ 
+HBOOK     ID =        10                                        DATE  02/09/89               NO =  1
+ 
+     280
+     270                                                      - -
+     260                                                      I I  -
+     250                                                   -  I I  I
+     240                                                 - I  I-I- I -
+     230                                                 I-I--I  I I-I-
+     220                                                -I       I I  I-
+     210                                                I        I I   I-
+     200                                                I        I-I    I-
+     190                                          - - --I                I --
+     180                                          I-I-I                  I-II--
+     170                                          I                           I
+     160                                          I                           I--
+     150                                       - -I                             I --
+     140                                      -I-I                              I II
+     130                                     -I                                 I-II-
+     120                                    -I                                      I-
+     110                                  --I                                        I--
+     100                                --I                                            I
+      90                                I                                              I
+      80                                I                                              I----
+      70                              --I                                                  I-
+      60                             -I                                                     I--
+      50                          ---I                                                        I--
+      40                     -----I                                                             I--
+      30                     I                                                                    I-----
+      20               - ----I                                                                         I---
+      10       --------I-I                                                                                I--------
+ 
+CHANNELS 100   0                                                                                                  1
+          10   0        1         2         3         4         5         6         7         8         9         0
+           1   1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890
+ 
+CONTENTS 100                             11111111111111122222222221222222111111111111111
+          10           1 1111333334446669000123434878888132522637496233109788775524421007777655443322222111
+           1.  1266487877127932587516069303434644322909949809367004036056844525243975324963516782565365312194856211
+ 
+LOW-EDGE       --------------------------------------------------
+           1.  3222222222222222211111111111111111                                 111111111111111112222222222222222
+           0   0988776554432211099887665543322100998776654433211000112334456677899001223345566788990112234455677889
+           0   0482604826048260482604826048260482604826048260482606284062840628406284062840628406284062840628406284
+ 
+* ENTRIES =      10000      * ALL CHANNELS = 0.9969E+04      * UNDERFLOW = 0.1200E+02      * OVERFLOW = 0.1900E+02
+* BIN WID = 0.6000E-01      * MEAN VALUE   =-0.3907E-02      * R . M . S = 0.9857E+00
+</XMP>
+<?:GRIDSEG.>
+<?:GRIDAREA.>
+<XMP SCALE=0.50>
+TEST2
+ 
+HBOOK     ID =        20                                        DATE  02/09/89               NO =  2
+ 
+CHANNELS  10 U 0        1         2         3 O
+           1 N 123456789012345678901234567890 V
+           **************************************
+  OVE      *        + ++ +232++2+ +++           * OVE
+    2.8    *      ++ 2    +2 + 2  +             *  30
+    2.6    *           2 2+  +34+++ ++   +      *  29
+    2.4    *          2+ 3322343+ 3++ +         *  28
+    2.2    *    + 2    247236663524+23++   +    *  27
+    2      *    +    2+23769597A75 6+2+ 2       *  26
+    1.8    *       + 5598576EBCDAA53357  2+ +   *  25
+    1.6    *      ++3278CC9JFO8F98C86643+2+     *  24
+    1.4    *      344686AAGJJMEMIDFG964232+   + *  23
+    1.2    *    ++++44BBJGMQOPWNICCGI97322++  + *  22
+    1      *     2+545BGOMTSX*VYTJMCFA755++2    *  21
+     .8    *    2+4799DHSRUX****VXRQJC57635+    *  20
+     .6    *   + +25CBEKLZ********MXGGCI4322  3 *  19
+     .4    * 2   4+779BN*U*********YOIFB862     *  18
+     .2    * 2 ++266CCLR************OIHA464+2 4 *  17
+           * +  3238ECX*T***********YKPC772   + *  16
+-    .2    * + +423D6LDS**X********ZUMGC543+  2 *  15
+-    .4    * +  2347CAHSSX*********UMK75D2 3  + *  14
+-    .6    *   2334AAKML*V**********IIH9773++ + *  13
+-    .8    *   +22565CLJL*X******Z*TL9H948+ +   *  12
+-   1      * 2 2 32666EMLN****Q*ULLQMABB342+  2 *  11
+-   1.2    *   + 22377BDIUS*P***TTUNBDA545+2    *  10
+-   1.4    * + + 2 +689E7KKNWUNRIHJCEA472+++  + *   9
+-   1.6    *     2+3+74BCMJIGOIKEIAAD6643++   2 *   8
+-   1.8    * + + +2222856AA8HGJACB6786+2+2++    *   7
+-   2      *   +   2 +273598EDC5977634++        *   6
+-   2.2    * +   + ++2+274977548883+++2 +++     *   5
+-   2.4    *         +  +3367558445+442+   +    *   4
+-   2.6    *       +2 +  2224+6++7234 +    +    *   3
+-   2.8    *          +  33+3+322++ +           *   2
+-   3      *       ++ ++ 22 2 +4+2 2            *   1
+  UND      *          + +  23 +2+++      +      * UND
+           **************************************
+LOW-EDGE       ---------------
+           1.  32222211111         1111122222
+           0   086420864208642024680246802468
+ 
+ *                                                          I   19    I
+ * ENTRIES =    10000                   PLOT       ---------I---------I---------
+ * SATURATION  AT=          255                       12    I 9936    I   19
+ * SCALE  .,+,2,3,.,., A,B,           STATISTICS   ---------I---------I---------
+ * STEP =    1     * MINIMUM=0                              I   14    I
+</XMP>
+<?:GRIDAREA.>
+<XMP SCALE=0.80>
+********************************************************
+* NTUPLE ID=   30  ENTRIES=  10000   N-TUPLE           *
+********************************************************
+*  Var numb  *   Name    *    Lower     *    Upper     *
+********************************************************
+*      1     *    X      * -.422027E+01 * 0.386411E+01 *
+*      2     *    Y      * -.411076E+01 * 0.378366E+01 *
+*      3     *    Z      * 0.485187E-04 * 0.179518E+02 *
+********************************************************
+ 
+ 
+===> Directory : //EXAM2/NTUPLE
+        30 (N)   N-TUPLE
+        10 (1)   TEST1
+        20 (2)   TEST2
+ 
+===> Directory : //EXAM2
+       100 (1)   Test of HRNDM1
+       110 (1)   Filled according to HTFUN1
+       200 (2)   Test of HRNDM2
+       210 (2)   Fill according to HTFUN2
+ 
+ 
+     NREC    NWORDS    QUOTA(%)  FILE(%)   DIR. NAME
+      34      34064      0.85     0.85   //EXAM2/NTUPLE
+      41      40431      1.02     1.02   //EXAM2
+ 
+</XMP>
+</FIG>
+<?:EGRID.>
+<?.PA>
+<H2 SUBJECT='Using PAW to analyse data'>Using PAW to analyse data
+<P>
+After transferring the HBOOK RZ file, which was created in the batch
+job as explained in the previous section, we start a PAW session
+to analyse the data which were generated
+<FN CALLOUT='*'>In fact it is
+possible to leave the data on the disk of the
+machine where they were written in the batch job, and connect with
+<XPH>NETWORK/RLOGIN host</XPH> to the
+machine in question, getting access to the file via <XPH>TCP/IP</XPH>.
+<I1>RLOGIN
+<I1>TCP/IP
+<I1>remote access
+See <HDREF REFID=H1DIST> for more details.</FN>. The PAW session below
+shows that the file <XPH>HTEST.DAT</XPH>
+is first opened via a call to <XPH>HISTO/FILE</XPH>.
+The data on the file are now accessible as the top directory
+<XPH>//LUN1</XPH>. When listing with the <XPH>ldir</XPH> command the
+contents of the top directory <XPH>//LUN1</XPH> and its <XPH>NTUPLE</XPH>
+subdirectory, the same information (histograms and Ntuples) is found
+as in the batch job (<FIGREF REFID=HBEX2IN>)
+<FIG PLACE=INLINE WIDTH=COLUMN ID=HFILE FRAME=BOX SCALE=0.9>
+<FIGCAP>Reading a HBOOK direct access file
+<XMP>
+ 
+ PAW > <HP3>histo/file 1 htest.dat</HP3>    | open the HBOOK RZ file
+ PAW > <HP3>ldir</HP3>                      | list current directory
+ 
+ ************** Directory ===> //LUN1 <===
+ 
+                  Created 890902/1955  Modified 890902/1958
+ 
+ ===> List of subdirectories
+ NTUPLE           Created 890902/1958 at record     9
+ 
+ ===> List of objects
+     HBOOK-ID  CYCLE   DATE/TIME   NDATA   OFFSET    REC1    REC2
+        100       1   890902/1955    153       1       3
+        110       1   890902/1955     88     154       3
+        200       1   890902/1955   4335     242       3       4 ==>     7
+        210       1   890902/1955    767     481       7       8
+ 
+  NUMBER OF RECORDS =    7  NUMBER OF MEGAWORDS =  0 +  6367 WORDS
+  PER CENT OF DIRECTORY QUOTA USED =   0.175
+  PER CENT OF FILE USED            =   0.175
+  BLOCKING FACTOR                  =  74.540
+ PAW > <HP3>ldir ntuple</HP3>               | list directory in NTUPLE
+ 
+ ************** Directory ===> //LUN1/NTUPLE <===
+ 
+                  Created 890902/1958  Modified 890902/1958
+ 
+ ===> List of objects
+     HBOOK-ID  CYCLE   DATE/TIME   NDATA   OFFSET    REC1    REC2
+         30       2   890902/1958   1082     215      41      42
+                  1   890902/1958   1082     725      39      40
+         10       1   890902/1958    151     783      40
+         20       1   890902/1958    305     934      40      41
+ 
+  NUMBER OF RECORDS =   34  NUMBER OF MEGAWORDS =  0 + 34064 WORDS
+  PER CENT OF DIRECTORY QUOTA USED =   0.851
+  PER CENT OF FILE USED            =   0.850
+  BLOCKING FACTOR                  =  94.899
+</XMP>
+</FIG>
+<?.PA>
+<H3>Plot histogram data
+<P>
+The analysis of the data can now start and we begin by looking at the
+histograms in the top directory.
+<FIGREF REFID=FHTEST1> shows the commands entered and the corresponding
+output plot. They should be compared
+with the lineprinter output in <FIGREF REFID=HBEX1OU>.
+<FIG ID=FHTEST1 PLACE=INLINE FRAME=BOX>
+<FIGCAP>Plot of one- and two-dimensional histograms
+<XMP>
+      PAW > <HP3>zon 1 2</HP3>         | Divide picture into 2 vertically
+      PAW > <HP3>set htyp -3</HP3>     | Set hatch style for histogram
+      PAW > <HP3>hi/pl 110</HP3>       | Plot 1-dimensional histogram 110
+      PAW > <HP3>hi/pl 210</HP3>       | Plot 2-dimensional histogram 210
+</XMP>
+<ARTWORK name=FHTEST1 ALIGN=CENTER WIDTH=17.cm TOPMAR=5MM>
+</FIG>
+<?.PA>
+<H2 ID=NTUPLH2 SUBJECT='Ntuples: A closer look'>Ntuples: A closer look
+<P>
+<I1>Ntuple
+We now turn our attention to the <XPH>NTUPLE</XPH>&nbsp;directory to
+show the functionality and use of Ntuples.
+After making <XPH>NTUPLE</XPH> the <HP2>current</HP2> directory
+the available HBOOK objects are listed. The structure of the
+Ntuple with identifier <HP2>30</HP2> is <XPH>PRINTed</XPH>.
+The contents of the various Ntuple elements (<Q>events</Q>)
+can be viewed by the <XPH>NTUPLE/SCAN</XPH> command.
+As with most Ntuple commands a <HP2>selection criterion</HP2>
+can be given to treat only given <Q>selected</Q> subsamples
+of the Ntuple (two examples are seen with the further
+<XPH>NTUPLE/SCAN</XPH> commands (see <FIGREF REFID=NTPRINT>)
+<FIG ID=NTPRINT PLACE=INLINE FRAME=BOX SCALE=0.8>
+<FIGCAP>Print and scan Ntuple elements
+<XMP SCALE=1.05>
+ 
+ PAW > <HP3>cd ntuple</HP3>                                | move to NTUPLE directory
+ PAW > <HP3>hi/li</HP3>                                    | list HBOOK objects
+ 
+ ===> Directory : //LUN1/NTUPLE
+         30 (N)   N-TUPLE
+         10 (1)   TEST1
+         20 (2)   TEST2
+ 
+ PAW > <HP3>nt/print 30</HP3>                              | print summary for Ntuple 30
+ 
+ ********************************************************
+ * NTUPLE ID=   30  ENTRIES=  10000   N-TUPLE           *
+ ********************************************************
+ *  Var numb  *   Name    *    Lower     *    Upper     *
+ ********************************************************
+ *      1     *    X      * -.422027E+01 * 0.386411E+01 *
+ *      2     *    Y      * -.411077E+01 * 0.378365E+01 *
+ *      3     *    Z      * 0.485188E-04 * 0.179518E+02 *
+ ********************************************************
+ 
+ PAW > <HP3>nt/scan 30</HP3>                               | scan the first elements
+ ***************************************************
+ * ENTRY *      X      *      Y      *      Z      *
+ ***************************************************
+ !     1 !  -1.0765    !   1.4405    !   3.2337    !
+ !     2 !  -1.2429    !  -1.6043    !   4.1185    !
+ !     3 !  0.54489    !   1.7043    !   3.2017    !
+ !     4 ! -0.81803    !  0.66588    !   1.1126    !
+ !     5 !  -1.8752    !  0.38176    !   3.6621    !
+ !     6 !  0.37968    !  -1.0601    !   1.2680    !
+ !     7 ! -0.52406    ! -0.68243E-01!  0.27930    !
+ !     8 !   1.2175    !  0.91701    !   2.3231    !
+ !     9 ! -0.21487    ! -0.26670    !  0.11730    !
+ !    10 !  0.70368    !  0.82514    !   1.1760    !
+ !    11 !  0.93648E-01!  -2.0311    !   4.1343    !
+ !    12 ! -0.48216    !  -2.5980    !   6.9820    !
+ !    13 ! -0.45801    !  0.71523    !  0.72132    !
+ !    14 ! -0.60272    !  0.98909E-01!  0.37306    !
+ !    15 !  0.70454    ! -0.25562    !  0.56172    !
+More...? ( &lt;CR&gt;/N ): <HP3>N</HP3>
+ ==>     15 events have been scanned
+ PAW > <HP3>nt/sc 30 z>16</HP3>                            | example of a condition on the Z variable
+ ***************************************************
+ * ENTRY *      X      *      Y      *      Z      *
+ ***************************************************
+ !    43 !   3.8641    !  -1.5822    !   17.435    !
+ !  1964 !  -4.2203    ! -0.37562    !   17.952    !
+ !  7480 !  0.94503    !  -4.1108    !   17.791    !
+ !  9213 !  0.71434    !  -4.0068    !   16.565    !
+ ==>      4 events have been scanned
+ 
+ PAW > <HP3>nt/sc 30 abs(x)>4.or.abs(y)>4</HP3>            | example of a more complex selection criterium
+ ***************************************************
+ * ENTRY *      X      *      Y      *      Z      *
+ ***************************************************
+ !  1964 !  -4.2203    ! -0.37562    !   17.952    !
+ !  7480 !  0.94503    !  -4.1108    !   17.791    !
+ !  9213 !  0.71434    !  -4.0068    !   16.565    !
+ ==>      3 events have been scanned
+</XMP>
+</FIG>
+<?.PA>
+<H3>Ntuple plotting
+<P>
+<I1>selection function
+<I1>cut
+<I1>mask
+<I1>weight
+<I1>Ntuple cut
+<I1>Ntuple mask
+<I1>Ntuple weight
+The general format of the command <XPH>NTUPLE/PLOT</XPH> to
+project and plot a Ntuple as a (1-Dim or 2-Dim) histogram
+with automatic binning, possibly using a selection algorithm is:
+<?.sk>
+<HP2>NTUPLE/PLOT idn &lsqb; uwfunc nevent ifirst nupd chopt &rsqb;</hp2>
+<?.SK>
+<I1>ntuple
+<I1>plot
+<I1>NTUPLE/PLOT
+<DL TSIZE=10 COMPACT>
+<DT>IDN
+<DD>Ntuple Identifier and variable(s) (see <TREF REFID=NTUPID>)
+<DT>UWFUNC
+<DD>Selection function (see <TREF REFID=NTUPSEL>) - Default no function
+<DT>NEVENT
+<DD>Number of events to be processed (default is 999999)
+<DT>IFIRST
+<DD>First event to be procesed (default is 1)
+<DT>NUPD
+<DD>Frequency with which to update histogram (default is 1000000)
+<DT>CHOPT
+<DD>HPLOT options (C,S,+,B,L,P,*,U,E,A)
+</DL>
+<H3>Ntuple variable and selection function specification
+<TABLE ID=NTUPID RULES='BOTH' COLS='3cm * 4cm' mindepth=p5 align='l l' FRAME=BOX HP='2 0' WIDTH=PAGE>
+<TCAP>Syntax for specifying Ntuple variables
+<THD>
+<C>Format
+<C>Explanation
+<C>Example
+</THD>
+<ROW>
+<C>IDN.CHNAME
+<C>The variable <HP2>named</HP2> <Q>CHNAME</Q>
+<C><XPH>30.x</XPH>         variable x
+<ROW>
+<C>IDN.n
+<C>The Ntuple variable at <HP2>position</HP2> <XPH>n</XPH>
+<C><XPH>30.3</XPH>         variable 3
+<ROW>
+<C>IDN.expression
+<C><XPH>Expression</XPH> is any numerical expression of the Ntuple variables.
+It may include a call to a COMIS function.
+<C><XPH>30.X**2+Y**2</XPH>
+<XPH>30.X*COMIS.FOR</XPH>
+<ROW>
+<C>IDN.B%A
+<C>Scatter-plot of variable "B" versus "A" for each event
+<C><XPH>30.Y%X</XPH>       Y versus X
+<ROW>
+<C>IDN.2%1
+<C>Scatter-plot of variable nb. 2 versus variable nb. 1
+<C><XPH>30.1%3</XPH>       1 versus 3
+<ROW>
+<C>IDN.expr1%expr2
+<C>
+<XPH>expr1</XPH> and <XPH>expr2</XPH> can be
+any numerical expression of the Ntuple variables.
+They can be COMIS functions.
+<C><XPH>30.SQRT(X**2+Y**2)%SIN(Z)</XPH>
+<XPH>30.COMIS1.FTN%COS(Z)</XPH>
+<ROW><C>&nbsp;<C>Any combination of the above
+<C><XPH>30.3%COMIS2.FTN*SIN(X)</XPH>
+</TABLE>
+<TABLE ID=NTUPSEL RULES='BOTH' COLS='2.5cm * *' mindepth=p5 align='l l' FRAME=BOX HP='2 0' WIDTH=PAGE>
+<TCAP>Syntax of a selection function used with a Ntuple
+<THD>
+<C>Format
+<C>Explanation
+<C>Example
+</THD>
+<ROW>
+<C><Q>0</Q> or missing
+<C>No selection is applied (weight is 1).
+<C><XPH>NT/PLOT 30.X </XPH>
+<ROW>
+<C>Combination of cuts
+<C>A CUT or combination of CUTs, each created by the
+command NTUPLE/CUTS
+<C><XPH>NT/PLOT 30.X 1</XPH> (use cut number 1)
+<?.BR>
+<XPH>NT/PLOT 30.X 1.AND.2</XPH>
+<?.BR>
+<XPH>NT/PLOT 30.X .NOT.(1.AND.3).OR.2</XPH>
+<ROW>
+<C>Combination of masks
+<C>A MASK or combination of MASKs, each created by the
+command NTUPLE/MASK
+<C>Assuming there exists a mask vector <XPH>MSK</XPH>
+<?.BR>
+<XPH>NT/PLOT 30.X MSK(4)</XPH>     (bit 4)
+<?.BR>
+<XPH>NT/PLOT 30.X MSK(1).OR.MSK(6)</XPH>
+<ROW>
+<C>Logical expression
+<C>Any <HP2>logical</HP2> combination of conditions between Ntuple
+variables, cuts and masks.
+<C><XPH>NT/PLOT 30.X X&gt;3.14.AND.(Y&lt;Z+5.)</XPH>
+<?.BR>
+<XPH>NT/PLOT 30.X 1.AND.MASK(3).OR.Z&lt;10</XPH>
+<ROW>
+<C>Numerical expression
+<C>Any <HP2>numerical</HP2>
+combination of constants and Ntuple variables.
+In this case the value of the expression will be applied
+as a <HP2>weight</HP2>
+to the element being plotted.
+<C><XPH>NT/PLOT 30.X Y     </XPH> weight X by Y
+<?.BR>
+<XPH>NT/PLOT 30.X X**2+Y**2</XPH>
+<?.BR>
+<XPH>                   </XPH> weight X by <F>X sup 2 + Y SUP 2</F>
+<ROW>
+<C>Selection function
+<C>Name of a selection function in a text file
+of the form
+<XPH>FUN.FTN, FUN&nbsp;FORTRAN, FUN.FOR</XPH> (Apollo, IBM, VAX).
+The function value is applied as a <HP2>weight</HP2>
+<C><XPH>NTUPLE/PLOT 30.X SELECT.FOR</XPH>
+<?.BR>
+For each event the plotted value of <XPH>X</XPH> will be
+multiplied by the value of the selection
+function <XPH>SELECT</XPH> calculated for that event.
+<ROW><C>&nbsp;<C>Any combination of the above
+<C><XPH>NT/PL 30.3%F1.FTN*SIN(X) 1.OR.F2.FTN</XPH>
+</TABLE>
+<?.PA>
+<H3>Ntuple selection mechanisms
+<P>
+With most Ntuple operations a selection
+<Q>function</Q> <XPH>UWFUNC</XPH> of a form described in
+<TREF REFID=NTUPSEL> can be used, i.e. it can take the
+form of a simple or composed <HP2>expression</HP2> or an
+<HP2>external FORTRAN function</HP2>,
+executed by COMIS<BIBREF REFID=COMIS>, a <HP2>cut</HP2>
+or a <HP2>mask</HP2>.
+When used together with the <XPH>NTUPLE/PLOT</XPH> command
+the selection function also acts as a
+<I1>selection function
+<I1>weighting factor
+<HP2>weighting</HP2> factor.
+<H3>Masks
+<I1>mask
+<I1>NTUPLE/MASK
+<P>The mask facility allows the user to specify up to <HP2>32</HP2>
+selection criteria associated with a Ntuple. These criteria are
+defined like cuts, but their value for each event are written to
+an external direct access file, from which the information can be
+readily retrieved at a later stage, without recalculating the
+condition value in question.
+In the example session below first a <HP2>new</HP2> mask file
+<XPH>MNAME.MASK</XPH> is defined, which can contain information
+for up to 10000 Ntuple elements.
+Next we define event election criteria and store their result
+at various bit positions in the mask vector <XPH>MNAME</XPH>.
+<XMP>
+ PAW > <HP3>NT/CUT 4 Z>X**2</HP3>                    | Define cut 4
+ PAW > <HP3>NT/MASK MNAME N 10000</HP3>
+ PAW > <HP3>NT/PLOT 30.X X**2+Y**2&gt;2&gt;&gt;MNAME(1)</HP3>
+ PAW > <HP3>NT/PLOT 30.X 4.AND.Y&gt;1&gt;&gt;MNAME(2)</HP3>
+ PAW > <HP3>NT/PLOT 30.Y SIN(Z).GT.SIN(Y)&gt;&gt;MNAME(3)</HP3>
+ PAW > <HP3>NT/MASK MNAME P</HP3>                    | Print mask definitions
+ 
+   =====> Current active selections in mask MNAME
+ 
+   Bit  Nevents    Selection
+     1    3723     X**2+Y**2>2
+     2    1558     4.AND.Y>1
+     3    7051     SIN(Z)>SIN(Y)
+ PAW > <HP3>NT/MASK MNAME C</HP3>                    | close MNAME.MASK file
+</XMP>
+Of course doing this kind of gymnastics makes sense only if a
+<HP2>time consuming</HP2> selection mechanism is used and only a
+few events are selected.
+In a subsequent run the mask file can then be read to display
+the information much more quickly.
+<XMP>
+ PAW > <HP3>NT/MASK MNAME</HP3>                     | open the mask file for read
+ PAW > <HP3>NT/PLOT 30.X MNAME(1)</HP3>             | plot using bit 1
+ PAW > <HP3>NT/PLOT 30.X MNAME(2)</HP3>             | plot using bit 2
+ PAW > <HP3>NT/PLOT 30.Y MNAME(3)</HP3>             | plot using bit 3
+ PAW > <HP3>NT/MASK MNAME C</HP3>                   | close MNAME.MASK file
+</XMP>
+<H4>Cuts
+<P>
+<I1>cut
+<I1>NTUPLE/CUT
+A <HP2>cut</HP2> is identified by an integer (between 0 and 100) and
+is a <HP2>logical</HP2> expression of Ntuple
+elements, other cuts, masks or functions. Examples are:
+<XMP>
+ PAW > <HP3>NT/CUT 1 4&lt;X</HP3>                      | variable
+ PAW > <HP3>NT/CUT 2 0.4&lt;X<0.8.AND.Y&lt;SQRT(Z)</HP3>  | ditto
+ PAW > <HP3>NT/CUT 3 FUN.FOR</HP3>                  | external function
+ PAW > <HP3>NT/CUT 4 FUN.FOR.AND.Z&gt;X**2</HP3>       | ditto plus variable
+ PAW > <HP3>NT/CUT 5 (1.AND.2).OR.4</HP3>           | combination of cuts
+ PAW > <HP3>NT/CUT 6 1.AND.Z&lt;0</HP3>                | cut and variable
+ PAW > <HP3>NT/CUT 7 X</HP3>                        | event weight
+ PAW > <HP3>NT/CUT 8 SQRT(Y)</HP3>                  | ditto
+ PAW > <HP3>NT/CUT 9 MASK(23).AND.8</HP3>           | mask and cut
+</XMP>
+<P>Cut definitions can be written to a file and later re-read.
+<XMP>
+ PAW > <HP3>NT/CUT 0 W cuts.dat</HP3>               | write all cuts to file
+ PAW > <HP3>NT/CUT 4 R cuts.dat</HP3>               | read cut 4 from file
+ PAW > <HP3>NT/CUT 4 P</HP3>                        | print cut 4
+ 
+    CUT number=  4 Points= 1  Variable=  1
+             FUN.FOR.AND.Z&gt;X**2
+</XMP>
+<?.PA>
+<H4>Graphical cut
+<P>
+<I1>graphical cut
+<I1>cut graphical
+One can also define a cut on the screen in a <HP2>graphical</HP2>
+way, by pointing out the upper and lower limits (1-dimensional
+case) or an area defined by up to 20 points (2-dimensional
+case) by using the mouse or arrow keys (see <FIGREF REFID=NTGRCUT>).
+<P>Note that graphical cuts are only valid for the <HP2>original</HP2>
+Ntuple variables and not for combinations of the latter.
+<FIG ID=NTGRCUT FRAME=BOX PLACE=INLINE>
+<FIGCAP>Graphical definition of cuts
+<XMP SCALE=0.8>
+   PAW > <HP3>nt/pl 30.x%y </HP3>                                    | plot y versus x
+   PAW > <HP3>CUT 1 G</HP3>                                          | define graphical cut 1 for current plot
+   PAW > <HP3>zon 1 2</HP3>                                          | define picture layout
+   PAW > <HP3>title 'Graphical cuts'</HP3>                           | title for picture
+   PAW > <HP3>2d 211 'X versus Y' 50 -2.5 2.5 50 -2.5 2.5 0.</HP3>   | user binning
+   PAW > <HP3>1d 212 'X - Before and after cut' 60 -3. 3. 0.</HP3>   |    ditto
+   PAW > <HP3>1d 213 'Y - Before and after cut' 60 -3. 3. 0.</HP3>   |    ditto
+   PAW > <HP3>nt/pl 30.x%y ! -211</HP3>                              | plot y versus x into histogram 211
+   PAW > <HP3>cut 1 d</HP3>                                          | draw graphical cut 1 defined previously
+   PAW > <HP3>zon 2 2 3 s</HP3>                                      | redefine the picture layout
+   PAW > <HP3>nt/pl 30.x ! -212</HP3>                                | plot x BEFORE cut into histogram 212
+   PAW > <HP3>set htyp -3</HP3>                                      | use hatch for plot after cut
+   PAW > <HP3>nt/pl 30.x 1 -212 ! !  S</HP3>                         | plot x AFTER cut on same plot
+   PAW > <HP3>set htyp 0</HP3>                                       | no hatch for plot without cut
+   PAW > <HP3>nt/pl 30.y ! -213</HP3>                                | plot y BEFORE cut into histogram 213
+   PAW > <HP3>set htyp -3</HP3>                                      | use hatch for plot after cut
+   PAW > <HP3>nt/pl 30.y 1 -213 ! !  S</HP3>                         | plot y AFTER cut on same plot
+</XMP>
+<ARTWORK name=FGCUTS ALIGN=CENTER DEPTH=15CM>
+</FIG>
+<H4>COMIS selection function
+<P>
+<I1>COMIS
+<I1>selection function
+In the definition of a selection criterion an external function
+(in the sense that it has not been compiled and linked together
+with PAW) can be used. This function is interpreted by the
+COMIS<BIBREF REFID=COMIS> package. The functions which are callable
+from within such a function are given below.
+<TABLE ID=COMFUN RULES='BOTH' COLS='3cm *' mindepth=p5 align='l l' FRAME=BOX HP='2 0' WIDTH=PAGE>
+<TCAP>Functions callable from an external function with PAW
+<THD>
+<C>Type of function
+<C>List of callable routines
+</THD>
+<ROW>
+<C>FORTRAN library
+<C><XPH>SQRT LOG LOG10 EXP SIN COS TAN ASIN ACOS ATAN2
+ABS MOD MIN MAX INT REAL DBLE LEN INDEX</XPH>
+<ROW>
+<C>HBOOK package
+<C><XPH>HBOOK1 HBOOK2 HBOOKN HFILL  HF1    HPRINT HDELET HRESET
+HFITGA HFITPO HFITEX HPROJ1 HPROJ2 HFN    HGNPAR
+HROPEN PAOPEN PACLOS PAREAD PAWRIT
+HPAK   HPAKE  HUNPAK
+HGIVE  HGN    HGNF   HF2    HFF1   HFF2   HBFUN1 HBFUN2
+HRIN   HROUT  HI     HIE    HIX    HIJ    HIDALL HNOENT
+HX     HXY    HCOPY  HSTATI HBPROF HOPERA HIDOPT HDERIV
+HRNDM1 HRNDM2 HBARX  HBARY</XPH>
+<ROW>
+<C>ZEBRA package
+<C><XPH>FZIN FZOUT FZENDI FZENDO
+RZCDIR RZLDIR RZFILE RZEND RZIN RZOUT RZVIN RZVOUT</XPH>
+<ROW>
+<C>HPLOT package
+<C><XPH>HPLOT  HPLSYM HPLERR HPLEGO HPLNT  HPLSUR HPLSOF
+HPLSET HPLGIV HPLOC  HPLSET HPLGIV HPLOC</XPH>
+<ROW>
+<C>KUIP package
+<C><XPH>KUGETV KUDPAR KUVECT KILEXP KUTIME</XPH>
+<ROW>
+<C>HIGZ package
+<C><XPH>IPL    IPM    IFA    IGTEXT IGBOX  IGAXIS IGPIE  IGRAPH IGHIST
+IGARC  IGLBL  IGRNG  IGMETA IGSA   IGSET  IRQLC  IRQST  ISELNT
+ISFAIS ISFASI ISLN   ISMK     ISVP   ISWN   ITX    ICLRWK</XPH>
+<ROW>
+<C>KERNLIB library
+<C><XPH>JBIT JBYT LENNOC RANNOR RNDM SBYT UCOPY VZERO</XPH>
+</TABLE>
+<P>
+The command <XPH>NTUPLE/UWFUNC</XPH>
+allows a selection function for a Ntuple to be prepared more easily.
+It generates a function with a name specified by the user and with
+code making available the variables corresponding to
+the given Ntuple identifier via a COMMON block.
+As an example consider the Ntuple number 30 used previously.
+<I1>UWFUNC
+<XMP>
+ PAW > <HP3>NTUPLE/UWFUNC 30 SELECT.FOR PT</HP3>   | Generate SELECT.FOR
+ PAW > <HP3>EDIT SELECT.FOR</HP3>            | Look at file SELECT.FOR
+      REAL FUNCTION SELECT(XDUMMY)
+      REAL X    ,   Y    ,   Z
+      COMMON/PAWIDN/IDNEVT,VIDN1,VIDN2,VIDN3,
+     +    X    ,   Y    ,   Z
+      DIMENSION XDUMMY(  3)
+      CHARACTER*8 CHTAGS(  3)
+      DATA CHTAGS/'   X    ','   Y    ','   Z    '/
+*
+      SELECT=1.
+      PRINT 1000,IDNEVT
+      DO 10 I=1,  3
+         PRINT 2000,I,CHTAGS(I),XDUMMY(I)
+  10  CONTINUE
+*
+ 1000 FORMAT(8H IDNEVT=,I5)
+ 2000 FORMAT(5X,I3,5X,A,1H=,G14.7)
+      END
+</XMP>
+<P>
+The user can add further FORTRAN code with the command EDIT.
+Remember that the value of the function can be used for weighting each event.
+<?.PA>
+<H3>Examples
+<P>To put into practice the syntax explained above let us consider
+<FIGREF REFID=FHTEST2>.
+We first plot variable <HP2>Z</HP2> with the binning automatically
+calculated by HBOOK.
+Then we define a histogram with identifier <HP2>300</HP2> into
+which we want HBOOK to plot the squared sums of the elements <HP2>X</HP2>
+and <HP2>Y</HP2>. This corresponds
+to the definition of the <HP2>Z</HP2> variable
+as can be seen in the FORTRAN listing in <FIGREF REFID=HBEX2IN>. As the <XPH>MEAN</XPH>
+and <XPH>RMS</XPH> are only calculated on the events within the histogram boundaries,
+they differ slightly between the top and bottom plot in figure
+<FIGREF REFID=FHTEST2 FORM=NUMONLY>.
+<FIG ID=FHTEST2 FRAME=BOX PLACE=INLINE>
+<FIGCAP>Read and plot Ntuple elements
+<XMP>
+ 
+   PAW > <HP3>zon 1 2</HP3>                      | 2 histograms one above the other
+   PAW > <HP3>opt STAT</HP3>                     | Write statistics on plot
+   PAW > <HP3>NT/PL 30.Z</HP3>                   | plot variable Z of Ntuple 30
+   PAW > <HP3>1d 300 'Z recalculated and user binning' 100 0. 10.</HP3>
+   PAW > <HP3>NT/PL 30.X**2+Y**2 ! -300</HP3>    | Recalculate variable Z + plot with user binning
+ 
+</XMP>
+<ARTWORK name=FHTEST2 ALIGN=CENTER DEPTH=16CM TOPMAR=5MM>
+</FIG>
+<FIG ID=FHTEST3 FRAME=BOX>
+<FIGCAP>Selection functions and different data presentations
+<XMP>
+ PAW > <HP3>zon 2 2</HP3>                                    | Divide plot in 4 zones
+ PAW > <HP3>opt STAT</HP3>                                   | Select option to write statistics on plot
+ PAW > <HP3>set HTYP -3</HP3>                                | Define histogram hatch type
+ PAW > <HP3>1d 401 'NT/PL - X' 100. -2.5 2.5</HP3>           | Book 1 dim histogram
+ PAW > <HP3>nt/pl 30.1 ! -401</HP3>                          | Plot variable 1 (x) using histogram 401
+ PAW > <HP3>1d 402 'NT/PL E option - Y' 100. -2.5 2.5</HP3>  | 1 dim histogram (different title)
+ PAW > <HP3>igset mtyp 21</HP3>                              | Select market type for points on plot
+ PAW > <HP3>nt/pl 30.y ! -402 ! ! E</HP3>                    | Plot y variable with Error bar option
+ PAW > <HP3>1d 403 'NT/PL B option - X' 40. -2.5 2.5</HP3>   | 1 dim histogram (different title + binning)
+ PAW > <HP3>set barw 0.4</HP3>                               | Define bar width for bar chart
+ PAW > <HP3>set baro 0.3</HP3>                               | Define bar origin for bar chart
+ PAW > <HP3>csel NB 0.33</HP3>                               | Print selection criterion on plot
+ PAW > <HP3>set hcol 1001</HP3>                              | Histogram colour black
+ PAW > <HP3>nt/pl 30.x y>0 -403 ! ! b</HP3>                  | Plot x variable as bar chart
+ PAW > <HP3>1d 404 'NT/PL PL option - Y' 100. -2.5 2.5</HP3> | 1 dim histogram (different title)
+ PAW > <HP3>max 404 160</HP3>                                | Fix maximum for plotting hist 404
+ PAW > <HP3>nt/pl 30.y sqrt(z)>1 -404 ! ! pl</HP3>           | Plot y variable with PL option
+</XMP>
+<ARTWORK name=FHTEST3 ALIGN=CENTER DEPTH=16.5cm TOPMAR=9MM>
+</FIG>
+<?.PA>
+<H2 SUBJECT='Fitting with PAW/HBOOK/MINUIT'>Fitting with PAW/HBOOK/MINUIT
+<P>MINUIT<BIBREF REFID=MINUIT><FN CALLOUT='*'>The following information
+about MINUIT has been extracted from the MINUIT documentation</FN>
+is conceived as a tool to find the minimum value of a
+<I1>MINUIT
+<I1>minimisation
+<I1>fit
+multi-parameter function and analyze the shape of the function
+around the minimum. The principal application is foreseen for
+statistical analysis, working on chisquare or
+log-likelihood functions,
+to compute the best-fit parameter values and uncertainties,
+including correlations between the parameters.
+It is especially suited to handle difficult problems, including those
+which may require guidance in order to find the correct solution.
+<H3>Basic concepts - The organization of MINUIT.
+<P>
+The MINUIT package acts on a multiparameter FORTRAN function to which we
+give the generic name <HP2>FCN</HP2>.
+In the PAW/HBOOK implementation, the function FCN is called
+<I1>HFCNF
+<XPH><HP2>HFCNH</HP2></XPH>
+when the command <XPH><HP3>Histo/Fit</HP3></XPH>
+or the routine <XPH><HP2>HFITH</HP2></XPH> are invoked. It is called
+<XPH><HP2>HFCNV</HP2></XPH>
+when the command <XPH><HP3>Vector/Fit</HP3></XPH>
+or the routine <XPH><HP2>HFITV</HP2></XPH> are invoked.
+<I1>HFCNV
+The value of FCN will in general depend on one or more variable parameters.
+<P>
+To take a simple example, suppose the problem is to fit a polynomial through
+a set of data points with the command Vector/Fit.
+The routine <XPH><HP2>HFCNV</HP2></XPH>
+called by <XPH><HP2>HFITV</HP2></XPH> calculates the chisquare between a
+polynomial and the data; the variable parameters of
+<XPH><HP2>HFCNV</HP2></XPH> would be the
+coefficients of the polynomials. The routine <XPH><HP2>HFITV</HP2></XPH>
+will request MINUIT to minimize <XPH><HP2>HFCNV</HP2></XPH>
+with respect to the parameters, that is, find those
+values of the coefficients which give the lowest value of chisquare.
+<H3>Basic concepts - The transformation for parameters with limits.
+<P>
+For variable parameters with limits, MINUIT uses the following transformation:
+<DF>
+P sub int % = % arc sin lparen 2 % < P sub ext - a > over < b - a > %
+     - 1 rparen
+%%%%%%%%%%%%%%%%%%%%%%%%%%%
+P sub ext % = % a + < b - a > over < 2 > lparen sin P sub int + 1 rparen
+</DF>
+so that the internal value <F> P sub int </F> can take on any value, while
+the external value <F> P sub ext </F> can take on values only between the lower
+limit <F> a </F> and the upper limit <F> b </F>.
+Since the transformation is necessarily non-linear, it would transform a
+nice linear problem into a nasty non-linear one, which is the reason why
+limits should be avoided if not necessary. In addition, the transformation
+does require some computer time, so it slows down the computation a little
+bit, and more importantly, it introduces additional numerical inaccuracy into
+the problem in addition to what is introduced in the numerical calculation
+of the FCN value.  The effects of non-linearity and numerical roundoff both
+become more important as the external value gets closer to one of the limits
+(expressed as the distance to nearest limit divided by distance between limits).
+The user must therefore be aware of the fact that, for example,
+if he puts limits of (<F>0,%10 sup 10</F>) on a parameter, then the values 0.0 and 1.0
+will be indistinguishable to the accuracy of most machines.
+<P>The transformation also affects the parameter error matrix, of course,
+so MINUIT does a transformation of the error matrix (and the "parabolic"
+parameter errors) when there are parameter limits.
+Users should however realize that the transformation is only a linear
+approximation, and that it cannot give a meaningful result if one or more
+parameters is very close to a limit, where
+<F> partial P sub ext % / % partial P sub int % approx % 0 </F>.
+Therefore, it is recommended that:
+<UL COMPACT>
+<LI>Limits on variable parameters should be used only when needed in order
+to prevent the parameter from taking on unphysical values.
+<LI>When a satisfactory minimum has been found using limits, the limits
+should then be removed if possible, in order to perform or re-perform the
+error analysis without limits.
+</UL>
+<H3>How to get the right answer from MINUIT.
+<P>
+MINUIT offers the user a choice of several minimization algorithms.
+The <XPH><HP2>MIGRAD</HP2></XPH><FN CALLOUT='*'>Other algorithms
+are available with Interactive MINUIT, as described in
+<HDREF REFID=H2MWMIN></FN>
+algorithm is in general
+the best minimizer for nearly all functions. It is a
+variable-metric method with inexact line search, a stable
+metric updating scheme, and checks for positive-definiteness.
+Its main weakness is that it depends heavily on knowledge of the
+first derivatives, and fails miserably if they are very inaccurate.
+If first derivatives are a problem, they can be
+calculated analytically inside the user function and communicated
+to PAW via the routine <XPH><HP2>HDERIV</HP2></XPH>.
+<P>
+If parameter limits are needed, in spite of the side effects,
+then the user should be aware of the following
+techniques to alleviate problems caused by limits:
+<H4>Getting the right minimum with limits.
+<P>
+If MIGRAD converges normally to a point where no parameter is
+near one of its limits, then the existence of limits has
+probably not prevented MINUIT from finding the right minimum.
+On the other hand, if one or more parameters is near its limit
+at the minimum, this may be because the true minimum is indeed
+at a limit, or it may be because the minimizer has become "blocked"
+at a limit.  This may normally happen only if the parameter
+is so close to a limit (internal value at an odd multiple
+of <F>pm pi over 2</F>) that MINUIT prints a warning to this effect
+when it prints the parameter values.
+<P>
+The minimizer can become blocked at a limit, because at a limit
+the derivative seen by the minimizer <F> partial F / partial P sub int </F>
+is zero no matter what the real derivative
+<F> partial F / partial P sub ext </F> is.
+<DF>
+  < partial F > over < partial P sub int > % = %
+< < partial F > over < partial P sub ext > >
+< < partial P sub ext > over < partial P sub int > > % = %
+< < partial F > over < partial P sub ext > > %  = % 0
+</DF>
+<H4>Getting the right parameter errors with limits.
+<P>
+<I1>parameter errors (fit)
+<I1>errors on fitted parameters
+<I1>limits on fitted parameters
+In the best case, where the minimum is far from any limits,
+MINUIT will correctly transform the error matrix, and the
+parameter errors it reports should be accurate and very
+close to those you would have got without limits.
+In other cases (which should be more common, since
+otherwise you wouldn't need limits), the very meaning of
+parameter errors becomes problematic.  Mathematically, since
+the limit is an absolute constraint on the parameter, a parameter
+at its limit has no error, at least in one direction.
+The error matrix, which can assign only symmetric errors, then
+becomes essentially meaningless.
+<H3>Interpretation of Parameter Errors
+<P>
+There are two kinds of problems that can arise:
+the <HP2>reliability</HP2> of MINUIT's error estimates, and their
+<HP2>statistical interpretation</HP2>, assuming they are accurate.
+<H4>Statistical interpretation.
+<P>
+For discussuion of basic concepts, such as the meaning of the elements
+of the error matrix, or setting of exact
+confidence levels, see <BIBREF REFID='MINERR MIN80 EADIE'>.
+<H4>The reliability of MINUIT error estimates.
+<P>
+MINUIT always carries around its own current estimates of the
+parameter errors, which it will print out on request, no matter how
+accurate they are at any given point in the execution.
+For example, at initialization, these estimates are just the starting
+step sizes as specified by the user.  After a <XPH><HP2>MIGRAD</HP2></XPH>
+<I1>HESSE
+<I1>MIGRAD
+or <XPH><HP2>HESSE</HP2></XPH>  step,
+the errors are usually quite accurate, unless there has been a problem.
+MINUIT, when it prints out error values,
+also gives some indication of how reliable it thinks they are.
+For example, those marked <XPH><HP2>CURRENT GUESS ERROR</HP2></XPH>  are only working values
+not to be believed, and <XPH><HP2>APPROXIMATE ERROR</HP2></XPH>  means that they have been
+calculated but there is reason to believe that they may not be accurate.
+<?.CC 20>
+<P>
+If no mitigating adjective is given, then at least MINUIT believes
+the errors are accurate, although there is always a small chance
+that MINUIT has been fooled.
+Some visible signs that MINUIT may have been fooled are:
+<UL COMPACT>
+<LI>
+Warning messages produced during the minimization or error analysis.
+<LI>
+Failure to find new minimum.
+<LI>
+Value of EDM too big (estimated Distance to Minimum).
+<LI>
+Correlation coefficients exactly equal to zero, unless some parameters
+are known to be uncorrelated with the others.
+<LI>
+Correlation coefficients very close to one (greater than 0.99).
+This indicates both an exceptionally difficult problem, and one
+which has been badly parameterized so that individual errors are not
+very meaningful because they are so highly correlated.
+<LI>
+Parameter at limit. This condition, signalled by a MINUIT warning
+message, may make both the function minimum and parameter errors
+unreliable. See the discussion above
+<HP1>Getting the right parameter errors with limits.</HP1>
+</UL>
+The best way to be absolutely sure of the errors, is to use
+"independent" calculations and compare them, or compare the calculated
+errors with a picture of the function.
+Theoretically, the covariance matrix for a "physical" function must be
+positive-definite at the minimum, although it may not be so
+for all points far away from the minimum, even for a well-determined
+physical problem. Therefore, if MIGRAD reports that it has found a
+non-positive-definite covariance matrix, this may be
+a sign of one or more of the following:
+<H5>A non-physical region
+<P>
+On its way to the minimum, MIGRAD may have traversed a region which has
+unphysical behaviour, which is of course not a serious problem as long
+as it recovers and leaves such a region.
+<H5>An underdetermined problem
+<P>
+If the matrix is not positive-definite even at the minimum,
+this may mean that the solution is not well-defined, for example
+that there are more unknowns than there are data points, or that the
+parameterization of the fit contains a linear dependence.
+If this is the case, then MINUIT (or any other program) cannot solve
+your problem uniquely, and the error matrix will necessarily be
+largely meaningless, so the user must remove the underdeterminedness
+by reformulating the parameterization. MINUIT cannot do this itself.
+<H5>Numerical inaccuracies
+<P>
+It is possible that the apparent lack of positive-definiteness
+is in fact only due to excessive roundoff errors in numerical
+calculations in the user function or not enough precision.
+This is unlikely in general, but becomes more likely if the number of
+free parameters is very large, or if the parameters are badly scaled
+(not all of the same order of magnitude), and correlations are
+also large.
+In any case, whether the non-positive-definiteness is
+real or only numerical is largely irrelevant, since in both cases the
+error matrix will be unreliable and the minimum suspicious.
+<H5>An ill-posed problem
+<P>
+For questions of parameter dependence, see the discussion above
+on positive-definiteness.
+<H4>Possible other mathematical problems:
+<H5>Excessive numerical roundoff
+<P>
+Be especially careful of exponential and factorial functions
+which get big very quickly and lose accuracy.
+<H5>Starting too far from the solution
+<P>The function may have unphysical local minima, especially
+at infinity in some variables.
+<?.PA>
+<H3>Fitting histograms
+<P>
+The general syntax of the command to fit histograms is:
+<?.SK>
+<HP2>HISTOGRAM/FIT  id func &lsqb; chopt np par step pmin pmax errpar &rsqb;</hp2>
+<?.SK>
+Only the parameters, which are of more general use, are described in detail.
+The full description can be found in part 3 of this manual.
+<DL COMPACT TSIZE=9>
+<DT>ID
+<DD>A histogram identifier (1-dim or 2-dim)
+<?.BR>
+A bin range may be specified, e.g. <XPH>Histo/Fit 10(25:56) ...</XPH>
+<DT>FUNC
+<DD>Name of a function to be fitted to the histogram.
+<?.BR>
+This function can be of various forms:
+<OL COMPACT>
+<LI>The name of a file which contains the user defined
+function to be minimized. Function name and file name
+must be the same. For example file <XPH>FUNC.FOR</XPH> is:
+<XMP>
+     FUNCTION FUNC(X)   or FUNC(X,Y) for a 2-Dim histogram
+     COMMON/PAWPAR/PAR(2)
+     FUNC=PAR(1)*X +PAR(2)*EXP(-X)
+     END
+</XMP>
+<LI>One of the keywords below <HP2>(1-dim histograms only)</HP2>,
+which will use the parameterization described at the right for the fit.
+<DL COMPACT TSIZE=4>
+<DT>G
+<DD><XPH>Func=par(1)*exp(-0.5*((x-par(2))/par(3))**2)</XPH>
+<DT>E
+<DD><XPH>Func=exp(par(1)+par(2)*x)</XPH>
+<DT>Pn
+<DD><XPH>Func=par(1)+par(2)*x+par(3)*x**2...+par(n+1)*x**n, 0&lt;n&lt;20</XPH>
+</DL>
+<LI>A combination of the keywords above with the 2 operators <XPH>+</XPH>
+or <XPH>*</XPH>.
+<P>
+Note that in this case, the order of parameters in PAR must
+correspond to the order of the basic functions.
+Blanks are not allowed in the expression.
+</OL>
+<DT>CHOPT
+<DD>All options of the <XPH>HISTO/PLOT</XPH> command plus the following
+additional ones:
+<DL TSIZE=3 COMPACT>
+<DT>0
+<DD>Do not plot the result of the fit. By default the fitted
+function is drawn unless the option <Q>N</Q> below is specified.
+<DT>B
+<DD>Some or all parameters are bounded.
+In this case vectors <XPH>STEP,PMIN,PMAX</XPH> must be specified.
+Default is: All parameters vary freely.
+<DT>D
+<DD>The user is assumed to compute derivatives analytically using
+routine <XPH>HDERIV</XPH>. By default, derivatives are computed numerically.
+<DT>L
+<DD>Use Log Likelihood method. Default is <F>chi sup 2</F> method.
+<DT>M
+<DD>Invokes interactive MINUIT (See <HDREF REFID=H2MWMIN>)
+<DT>N
+<DD>Do not store the result of the fit bin by bin with the histogram.
+By default the function is calculated at the centre of each bin
+and the fit results stored with the histogram data structure.
+<DT>Q
+<DD>Quiet mode. No output printed about the fit.
+<DT>V
+<DD>Verbose mode. Results are printed after each iteration.
+By default only final results are printed.
+<DT>W
+<DD>Sets weights equal to 1.
+</DL>
+<DT>NP
+<DD>Number of parameters in fit (0&le;NP&le;34)
+<DT>PAR
+<DD>Vector containing the fit parameters.
+<?.BR>
+<HP2>Before the fit:</HP2> Vector containing the initial values
+<P>
+<HP2>After the fit:</HP2> Vector containing the fitted values.
+<DT>STEP
+<DD>Vector with step size for fit parameters
+<DT>PMIN
+<DD>Vector with lower bounds for fit parameters
+<DT>PMAX
+<DD>Vector with upper bounds for fit parameters
+<DT>ERRPAR
+<DD>Vector with errors on the fitted parameters
+</DL>
+<P>When using predefined functions
+(case 2 for the <XPH>FUNC</XPH> parameter)
+initial values need not be specified when <XPH>NP=0</XPH>.
+In this case the parameter vector <XPH>PAR</XPH>, if specified,
+is only filled
+with the fitted parameters on <HP2>output</HP2>.
+<?.PA>
+<H3>A simple fit with a gaussian
+<P>
+<FIG ID=FHTEST4 FRAME=BOX PLACE=INLINE>
+<FIGCAP>Example of a simple fit of a one-dimensional distribution
+<XMP SCALE=0.95>
+      PAW > <HP3>opt stat</HP3>                           | Select option to show histogram statsitics on plot
+      PAW > <HP3>opt fit</HP3>                            | Select option to show fitted parameters on plot
+      PAW > <HP3>hi/fit 10 G</HP3>                        | Fit histogram 10 with a single gaussian
+ 
+          **********************************************
+          *                                            *
+          * Function minimization by SUBROUTINE HFITGA *
+          * Variable-metric method                     *
+          * ID =         10  CHOPT = T                 *
+          *                                            *
+          **********************************************
+      Convergence when estimated distance to minimum (EDM) .LT.  0.10E-03
+ 
+      FCN=   96.97320     FROM MIGRAD    STATUS=CONVERGED  CALLS=  549 EDM=  0.26E-03
+                          STRATEGY= 1    ERROR DEF=    1.0000
+ 
+      INT EXT  PARAMETER                                   STEP         FIRST
+      NO. NO.    NAME        VALUE          ERROR          SIZE      DERIVATIVE
+        1  1  Constant      239.83        2.8178       0.00000       0.57627E-02
+        2  2  Mean        -0.53038E-02   0.77729E-04   0.00000        22.025
+        3  3  Sigma        0.98766       0.70224E-02   0.00000      -0.88534
+ 
+      CHISQUARE = 0.1021E+01  NPFIT =   98
+</XMP>
+<ARTWORK name=FHTEST4 ALIGN=CENTER DEPTH=13.5cm TOPMAR=7MM>
+</FIG>
+<?.PA>
+<H3>Fit parts of an histogram separately
+<P>
+<FIG ID=FHTEST5 FRAME=BOX PLACE=INLINE>
+<FIGCAP>Example of a fit using sub-ranges bins
+<FIGSEG>
+<XMP>
+    PAW > <HP3>opt NSTA</HP3>                                     | Turn off option showing statistics on plot
+    PAW > <HP3>ve/cr par(6)</HP3>                                 | Create a vector with 6 elements
+    PAW > <HP3>set fit 111</HP3>                                  | Show fitted parameters + errors on plot
+    PAW > <HP3>hi/fit 110(1:50) G ! 0 par</HP3>                   | Fit first half with a gaussian and plot
+ 
+        **********************************************
+        *                                            *
+        * Function minimization by SUBROUTINE HFITGA *
+        * Variable-metric method                     *
+        * ID =        110  CHOPT = TR                *
+        *                                            *
+        **********************************************
+    Convergence when estimated distance to minimum (EDM) .LT.  0.10E-03
+ 
+    FCN=   90.66560     FROM MIGRAD    STATUS=CONVERGED  CALLS=  152 EDM=  0.68E-05
+                        STRATEGY= 1    ERROR DEF=    1.0000
+ 
+    INT EXT  PARAMETER                                   STEP         FIRST
+    NO. NO.    NAME        VALUE          ERROR          SIZE      DERIVATIVE
+      1  1  Constant      300.28        5.0681       0.13342       0.97075E-04
+      2  2  Mean         0.30698       0.10511E-02  -0.13885E-04  -0.57797
+      3  3  Sigma        0.73832E-01   0.67896E-03  -0.57602E-04   -4.6407
+ 
+    CHISQUARE = 0.2159E+01  NPFIT =   45
+ 
+    PAW > <HP3>hi/fit 110(50:99) G 0 0 par(4)</HP3>                | Fit second half with gaussian, do not plot
+ 
+        **********************************************
+        *                                            *
+        * Function minimization by SUBROUTINE HFITGA *
+        * Variable-metric method                     *
+        * ID =        110  CHOPT = TR                *
+        *                                            *
+        **********************************************
+    Convergence when estimated distance to minimum (EDM) .LT.  0.10E-03
+ 
+    FCN=   30.16534     FROM MIGRAD    STATUS=CONVERGED  CALLS=  221 EDM=  0.87E-04
+                        STRATEGY= 1    ERROR DEF=    1.0000
+ 
+    INT EXT  PARAMETER                                   STEP         FIRST
+    NO. NO.    NAME        VALUE          ERROR          SIZE      DERIVATIVE
+      1  1  Constant      153.27        3.0227       0.65005E-01   0.36877E-02
+      2  2  Mean         0.70186       0.19599E-02   0.40388E-03    4.8103
+      3  3  Sigma        0.11965       0.18242E-02  -0.25292E-03    6.9011
+ 
+    CHISQUARE = 0.6418E+00  NPFIT =   50
+ 
+    PAW > <HP3>hi/plot 110 SFUNC</HP3>                             | Plot result of fit on Same plot
+    PAW > <HP3>ve/pr par(1:6)</HP3>                                | Print the fitted parameters in PAR
+    PAR (    1 ) =   300.2846
+    PAR (    2 ) =  0.3069752
+    PAR (    3 ) =  0.7383241E-01
+    PAR (    4 ) =   153.2716
+    PAR (    5 ) =  0.7018576
+    PAR (    6 ) =  0.1196475
+</XMP>
+<FIGSEG>
+<ARTWORK name=FHTEST5 ALIGN=CENTER WIDTH=16cm DEPTH=16cm TOPMAR=7MM>
+</FIG>
+<P>In <TREF REFID=FITRES> the results for the fitted parameters are compared with
+the initial values with which the gaussian distributions were
+generated in the <Q>batch</Q> job in <FIGREF REFID=HBEX1IN>. The table also includes
+the result of the double gaussian fit in the next section (<FIGREF REFID=FHTEST6>).
+<TABLE ID=FITRES RULES='BOTH' COLS='* * * *' mindepth=p5 align='l l l l' FRAME=BOX HP='2 0 0 0' WIDTH=PAGE CONCAT=NO>
+<TCAP>Comparison of the results of the fit for the double gaussian distribution
+<THD>
+<C>Parameter
+<C>Input value
+<C>Result of Figure <FIGREF REFID=FHTEST5 FORM=NUMONLY>
+<C>Result of Figure <FIGREF REFID=FHTEST6 FORM=NUMONLY>
+</THD>
+<ROW>
+<C><HP7>First Gaussian:</HP7>
+Height
+Mean value
+Width (sigma)
+<C>&nbsp;
+<XPH>1.</XPH>  (normalised)
+<XPH>0.3</XPH>
+<XPH>0.07</XPH>
+<C>&nbsp;
+<XPH>300.  &plusmn;5.</XPH>
+<XPH>0.307 &plusmn;0.001</XPH>
+<XPH>0.074 &plusmn;0.001</XPH>
+<C>&nbsp;
+<XPH>308.  &plusmn;5.</XPH>
+<XPH>0.303 &plusmn;0.001</XPH>
+<XPH>0.070 &plusmn;0.001</XPH>
+<ROW>
+<C><HP7>Second Gaussian</HP7>
+Height
+Mean value
+Width (sigma)
+<C>&nbsp;
+<XPH>0.5</XPH>  (normalised)
+<XPH>0.7</XPH>
+<XPH>0.12</XPH>
+<C>&nbsp;
+<XPH>153.  &plusmn;3</XPH>
+<XPH>0.702 &plusmn;0.002</XPH>
+<XPH>0.120 &plusmn;0.002</XPH>
+<C>&nbsp;
+<XPH>154.  &plusmn;4</XPH>
+<XPH>0.703 &plusmn;0.002</XPH>
+<XPH>0.119 &plusmn;0.002</XPH>
+</TABLE>
+<?.PA>
+<H3>A more complex fit
+<P>
+<FIG ID=FHTEST6 FRAME=BOX PLACE=INLINE>
+<FIGCAP>Example of a fit using a global double gaussian fit
+<!--FIGSEG-->
+<XMP SCALE=0.9>
+    PAW > * Create a vector of 6 elements and provide initial values for combined fit of two gaussians
+    PAW > <HP3>ve/cr par2(6) r 200 0.3 0.1 100 0.7 0.1</HP3>     | initial values for the 6 fit parameters
+    PAW > <HP3>set fit 111</HP3>                                 | display fitted parameters plus errors
+    PAW > <HP3>hi/fit  110(2:99) G+G  ! 6 par2</HP3>             | perform the fit (sum of 2 gaussians)
+ 
+        **********************************************
+        *                                            *
+        * Function minimization by SUBROUTINE HFITH  *
+        * Variable-metric method                     *
+        * ID =        110  CHOPT = R                 *
+        *                                            *
+        **********************************************
+      Convergence when estimated distance to minimum (EDM) .LT.  0.10E-03
+ 
+      FCN=   57.41251     FROM MIGRAD    STATUS=CONVERGED  CALLS=  597 EDM=  0.10E-03
+                          STRATEGY= 1    ERROR DEF=    1.0000
+ 
+      INT EXT  PARAMETER                                   STEP         FIRST
+      NO. NO.    NAME        VALUE          ERROR          SIZE      DERIVATIVE
+        1  1  P1            307.86        5.3896        1.3393      -0.51814E-03
+        2  2  P2           0.30265       0.10750E-02   0.18577E-03    3.5622
+        3  3  P3           0.70029E-01   0.86285E-03   0.19967E-03    11.689
+        4  4  P4            153.62        3.0170       0.73111       0.30406E-02
+        5  5  P5           0.70303       0.20652E-02   0.43051E-03   -1.2694
+        6  6  P6           0.11865       0.18645E-02   0.39360E-03    3.2237
+ 
+      CHISQUARE = 0.6524E+00  NPFIT =   94
+</XMP>
+<ARTWORK name=FHTEST6 ALIGN=CENTER DEPTH=13cm TOPMAR=7MM>
+</FIG>
+<?.PA>
+<H2 ID=H2MWMIN SUBJECT='Doing more with MINUIT'>Doing more with MINUIT
+<P>
+When the <XPH>Histo/Fit</XPH> or <XPH>Vector/Fit</XPH> command is
+invoked, PAW/HBOOK
+will set a default environment for MINUIT. Control may be given to MINUIT
+if the option <Q>M</Q> is specified in the command.
+In this case, the user
+may enter MINUIT control statements.
+<H3>Overview of available MINUIT commands
+<H4>CLEar
+<P>
+Resets all parameter names and values to undefined. Must normally be
+followed by a PARAMETER command or equivalent, in order to define
+parameter values.
+<H4>CONtour  par1  par2  &lsqb;devs&rsqb;  &lsqb;ngrid&rsqb;
+<P>
+Instructs MINUIT to trace contour lines of the user function with
+respect to the two parameters whose external numbers are <HP2>par1</HP2>
+and <HP2>par2</HP2>.
+Other variable parameters of the function, if any, will have their
+values fixed at the current values during the contour tracing.
+The optional parameter <HP2>&lsqb;devs&rsqb;</HP2> (default value 2.)
+gives the number of
+standard deviations in each parameter which should lie entirely within
+the plotting area. Optional parameter <HP2>&lsqb;ngrid&rsqb;</HP2>
+(default value 25 unless
+page size is too small) determines the resolution of the plot, i.e.
+the number of rows and columns of the grid at which the function
+will be evaluated.
+<H4>EXIT
+<P>
+End of Interactive MINUIT. Control is returned to PAW.
+<H4>FIX  parno
+<P>
+Causes parameter <HP2>parno</HP2> to be removed from the list of variable
+parameters, and its value will remain constant (at the current value)
+during subsequent minimizations, etc., until another command changes
+its value or its status.
+<H4>HELP &lsqb;SET&rsqb; &lsqb;SHOw&rsqb;
+<P>
+Causes MINUIT to list the available commands. The list of
+SET and SHOw commands must be requested separately.
+<H4>HESse  &lsqb;maxcalls&rsqb;
+<P>
+Instructs MINUIT to calculate, by finite differences, the Hessian or
+error matrix. That is, it calculates the full matrix of second
+derivatives of the function with respect to the currently variable
+parameters, and inverts it, printing out the resulting error matrix.
+The optional argument <HP2>&lsqb;maxcalls&rsqb;</HP2> specifies the (approximate) maximum
+number of function calls after which the calculation will be stopped.
+<H4>IMProve  &lsqb;maxcalls&rsqb;
+<P>
+If a previous minimization has converged, and the current values
+of the parameters therefore correspond to a local minimum of the function,
+this command requests a search for additional distinct local minima.
+The optional argument <HP2>&lsqb;maxcalls&rsqb;</HP2> specifies the (approximate) maximum
+number of function calls after which the calculation will be stopped.
+<H4>MIGrad  &lsqb;maxcalls&rsqb;  &lsqb;tolerance&rsqb;
+<P>
+Causes minimization of the function by the method of Migrad, the most
+efficient and complete single method, recommended for general functions
+(see also MINImize).
+The minimization produces as a by-product the error matrix
+of the parameters, which is usually reliable unless warning messages
+are produced.
+The optional argument <HP2>&lsqb;maxcalls&rsqb;</HP2> specifies the (approximate) maximum
+number of function calls after which the calculation will be stopped
+even if it has not yet converged.
+The optional argument <HP2>&lsqb;tolerance&rsqb;</HP2> specifies required tolerance on the
+function value at the minimum.  The default tolerance is <XPH>0.1</XPH>.
+Minimization will stop when the estimated vertical distance to
+the minimum (<XPH>EDM</XPH>) is less than <XPH>0.001*&lsqb;tolerance&rsqb;*UP</XPH> (see SET ERR).
+<H4>MINImize  &lsqb;maxcalls&rsqb; &lsqb;tolerance&rsqb;
+<P>
+Causes minimization of the function by the method of Migrad,
+as does the MIGrad command, but switches to the SIMplex method
+if Migrad fails to converge. Arguments are as for MIGrad.
+<H4>MINOs   &lsqb;maxcalls&rsqb;  &lsqb;parno&rsqb; &lsqb;parno&rsqb; ...
+<P>
+Causes a Minos error analysis to be performed on the parameters whose
+numbers <HP2>&lsqb;parno&rsqb;</HP2> are specified.
+If none are specified, Minos errors
+are calculated for all variable parameters.
+Minos errors may be expensive to calculate, but are very reliable since
+they take account of non-linearities in the problem as well as
+parameter correlations, and are in general asymmetric.
+The optional argument <HP2>&lsqb;maxcalls&rsqb;</HP2> specifies the (approximate) maximum
+number of function calls <HP1>per parameter requested,</HP1>
+after which the calculation will be stopped for that parameter.
+<H4>RELease  parno
+<P>
+If <HP2>parno</HP2> is the number of a previously variable parameter which has
+been fixed by a command:
+<HP2>FIX&nbsp;parno</HP2>, then that parameter will
+return to variable status.  Otherwise a warning message is printed
+and the command is ignored.
+Note that this command operates only on parameters which were at one time
+variable and have been FIXed.
+It cannot make constant parameters variable;
+that must be done by redefining the parameter with a PARAMETER command.
+<H4>REStore  &lsqb;code&rsqb;
+<P>
+If no <HP2>&lsqb;code&rsqb;</HP2> is specified, this command restores all previously FIXed
+parameters to variable status. If <HP2>&lsqb;code&rsqb;=1</HP2>,
+then only the last parameter FIXed is restored to variable status.
+<H4>SCAn &lsqb;parno&rsqb;  &lsqb;numpts&rsqb; &lsqb;from&rsqb;  &lsqb;to&rsqb;
+<P>
+Scans the value of the user function by varying parameter number
+<HP2>&lsqb;parno&rsqb;</HP2>, leaving all other parameters fixed at the current value.
+If <HP2>&lsqb;parno&rsqb;</HP2> is not specified, all variable parameters are scanned in
+sequence. The number of points <HP2>&lsqb;numpts&rsqb;</HP2> in the scan is 40 by default,
+and cannot exceed 100.
+The range of the scan is by default 2 standard deviations on each side
+of the current best value, but can be specified as from
+<HP2>&lsqb;from&rsqb;</HP2> to <HP2>&lsqb;to&rsqb;</HP2>.
+After each scan, if a new minimum is found, the best parameter values
+are retained as start values for future scans or minimizations.
+The curve resulting from each scan is plotted on the output unit
+in order to show the approximate behaviour of the function.
+This command is not intended for minimization, but is sometimes useful
+for debugging the user function or finding a reasonable starting point.
+<H4>SEEk  &lsqb;maxcalls&rsqb;  &lsqb;devs&rsqb;
+<P>
+Causes a Monte Carlo minimization of the function, by choosing
+random values of the variable parameters, chosen uniformly over a
+hypercube centered at the current best value.  The region size is by
+default 3 standard deviations on each side, but can be changed by
+specifying the value of <HP2>&lsqb;devs&rsqb;</HP2>.
+<H4>SET ERRordef  up
+<P>
+Sets the value of <HP2>up</HP2> (default value= 1.), defining parameter errors.
+MINUIT defines parameter errors as the change in parameter value
+required to change the function value by <HP2>up</HP2>.
+Normally, for chisquared fits <HP2>up=1</HP2>,
+and for negative log likelihood, <HP2>up=0.5</HP2>.
+<H4>SET LIMits  &lsqb;parno&rsqb;  &lsqb;lolim&rsqb;  &lsqb;uplim&rsqb;
+<P>
+Allows the user to change the limits on one or all parameters.
+If no arguments are specified, all limits are removed from all parameters.
+If <HP2>&lsqb;parno&rsqb;</HP2> alone is specified,
+limits are removed from parameter <HP2>&lsqb;parno&rsqb;</HP2>.
+If all arguments are specified, then parameter
+<HP2>&lsqb;parno&rsqb;</HP2> will be bounded
+between <HP2>&lsqb;lolim&rsqb;</HP2> and <HP2>&lsqb;uplim&rsqb;</HP2>.
+Limits can be specified in either order,
+MINUIT will take the smaller as <HP2>&lsqb;lolim&rsqb;</HP2>
+and the larger as <HP2>&lsqb;uplim&rsqb;</HP2>.
+However, if <HP2>&lsqb;lolim&rsqb;</HP2> is equal to
+<HP2>&lsqb;uplim&rsqb;</HP2>, an error condition results.
+<H4>SET PARameter  parno  value
+<P>
+Sets the value of parameter <HP2>parno</HP2> to <HP2>value</HP2>.
+The parameter
+in question may be variable, fixed, or constant, but must be defined.
+<H4>SET PRIntout level
+<P>
+Sets the print level, determining how much output
+MINUIT will produce.
+The allowed values and their meanings are displayed
+after a <HP2>SHOw&nbsp;PRInt</HP2> command.
+Possible values for <HP2>level</HP2> are:
+<DL COMPACT TSIZE=4>
+<DT>-1
+<DD>No output except from SHOW commands
+<DT>0
+<DD>Minimum output (no starting values or intermediate results)
+<DT>1
+<DD>Default value, normal output
+<DT>2
+<DD>Additional output giving intermediate results.
+<DT>3
+<DD>Maximum output, showing progress of minimizations.
+</DL>
+<H4>SET STRategy level
+<P>
+Sets the strategy to be used in calculating first and second derivatives
+and in certain minimization methods. In general, low values of <HP2>level</HP2>
+mean fewer function calls and high values mean more reliable minimization.
+Currently allowed values are 0, 1 (default), and 2.
+<H4>SHOw   XXXX
+<P>
+All <HP2>SET&nbsp;XXXX</HP2> commands have a corresponding
+<HP2>SHOw&nbsp;XXXX</HP2> command.
+In addition, the SHOw commands listed starting here have no corresponding
+SET command for obvious reasons.  The full list of SHOw commands
+is printed in response to the command <HP2>HELP&nbsp;SHOw</HP2>.
+<H4>SHOw CORrelations
+<P>
+Calculates and prints the parameter correlations from the error matrix.
+<H4>SHOw COVariance
+<P>
+Prints the (external) covariance (error) matrix.
+<H4>SIMplex  &lsqb;maxcalls&rsqb;  &lsqb;tolerance&rsqb;
+<P>
+Performs a function minimization using the simplex method of Nelder and
+Mead. Minimization terminates either when the function has been called
+(approximately) <HP2>&lsqb;maxcalls&rsqb;</HP2> times,
+or when the estimated vertical
+distance to minimum (EDM) is less than <HP2>&lsqb;tolerance&rsqb;</HP2>.
+The default value of <HP2>&lsqb;tolerance&rsqb;</HP2> is
+<XPH>0.1*UP</XPH> (see <HP2>SET ERR</HP2>).
