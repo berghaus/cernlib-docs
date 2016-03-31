@@ -1,0 +1,228 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html xmlns:date="http://www.jclark.com/xt/java/java.util.Date">
+<head>
+<title>LHC++ Object Model</title>
+<STYLE TYPE="text/css">body       { background: white; color: black}
+ P.CENTERP  { text-align: center}
+ TD.LISTING { background: #88FFFF; color: black; white-space: pre}
+ tt         { color: red }
+</STYLE>
+</head>
+<body>
+<H1>
+<A NAME="H1LHCPPObjectModel">2. LHC++ Object Model</A>
+</H1>
+
+
+<H2>2.1. A historical digression: Ntuples and PAW</H2>
+
+<P>
+During the past decade, many HEP experiments  have based their
+interactive data analysis on the following steps
+(see the top half of Figure <a href="H1LHCPPObjectModel.html#NTUPLETAGDB">[NTUPLETAGDB]</a>).
+</P>
+
+<OL>
+<LI>
+<EM>Raw and reconstructed</EM> data are stored in <EM>banks</EM> in an
+experiment-specific hierarchical format.  Most of the time one uses
+many different files on several distinct hosts.
+</LI>
+<LI>
+These data are <EM>distilled</EM> and <EM>reclustered</EM> to obtain a
+more compact and thus more efficient representation. This permits a
+significant speed-up for the down-stream analysis compared to using
+the data in their raw form as described in point 1.  This format
+corresponds to the so-called HBOOK Ntuples.  One drawback of this
+method is that the direct relation to the raw <EM>event data</EM> is
+lost.
+
+
+</LI>
+<LI>
+Ntuple files are analysed <EM>interactively</EM> with programs
+like PAW. Plots of physics variables are produced by extracting
+information contained in one or more of the Ntuple rows or columns,
+binning them in HBOOK histograms and then operating on these histograms
+to obtain the best representation. 
+
+</LI>
+</OL>
+
+<P>
+The advantage of Ntuples is that their format is known and simple enough, 
+so that a general purpose analysis tool, such as PAW can cope with data
+coming from any experiment. On the other hand, since no link to the
+original data exists, Ntuples impose a limitation on the structure of
+the data physicists can use for their analysis. On top of that, since
+the data were copied from the original files into a dedicated Ntuple
+file, each time original dataset changed most Ntuple files had to be
+regenerated.
+
+
+</P>
+<P>
+Two kinds of Ntuples exists. <EM>Row-Wise Ntuples</EM> transform a
+complex data structure into a simple tabular form.  <EM>Column-Wise
+Ntuples</EM> on the other hand improve the flexibility of the Ntuple data
+model by allowing the definition of variable-length items, but they
+still are difficult to use to describe complex data structures, like
+those of the reconstructed data.  Moreover, the Ntuple Query language
+is rather non-intuitive and complex to master.
+</P>
+
+
+
+<H2>
+<A NAME="SNEWDATAMODEL">2.2. The new Data Model</A>
+</H2>
+
+<P>
+Most new HEP experiments assume that it will be possible to make both
+raw data and reconstructed data available <EM>on-line</EM> thanks to
+the integration between Objectivity/DB and HPSS. Each experiment will
+have its own data model and physicists should be able to
+<EM>navigate</EM> through it. This is a major problem for a
+general-purpose Interactive Analysis environment, since, unlike the
+Ntuple case, there no longer exists a common and pre-defined data
+model shared amongst all experiments. This problem can be solved but there
+is no easy way out: the general-purpose tool should be able to access
+the arbitrary experiment data model using some kind of run time type
+information or the initial data model definition.
+
+
+</P>
+
+<P>
+Since all data is supposed to be <EM>on-line</EM>, the role of the Ntuple
+replacement could be quite different. While reasonably small
+<EM>personal</EM> data collections will still exist, the main concern
+will probably be how to index large event stores to speed up the
+analysis. 
+</P>
+
+<P>
+The RD45 Project suggested one approach to deal with both problems.
+The idea it to speed up queries by defining for each event a <EM>Tag</EM>, 
+i.e., a small collection of its most important physics attributes plus
+an association with the event where the Tag data come from. Such
+<EM>Concrete</EM> Tags contain copies of data members of a 
+persistent data class. A collection of tag objects 
+is saved together in a Tag Database, something 
+intermediate between an Event Directory and an Ntuple.
+Since they are globally defined for the whole experiment, concrete
+tags can be optimized so that they offer a very efficient way to make
+initial cuts on attributes, thus achieving a high degree of
+selectivity.  On top of that, at any moment you are able to cross the
+association to the event if you want to retrieve any other details
+about the full event, which are not contained in the Tag (see bottom
+part of Figure <a href="H1LHCPPObjectModel.html#NTUPLETAGDB">[NTUPLETAGDB]</a>).
+
+
+
+
+
+
+
+
+
+</P>
+
+<P CLASS="CENTERP">
+<A NAME="NTUPLETAGDB"><IMG SRC="ntuple_tagdb.gif"></A>
+</P>
+<P>
+<B>The Ntuple and TagDB models</B>
+</P>
+
+
+
+
+
+
+
+
+
+
+<P>
+In general the selection of <EM>key</EM> attributes characterising 
+events will be made by the experiment or group, so that concrete tags
+are mostly defined for experiment-wide or
+workgroup-wide data sets. However, individual physicists have
+the possibility to define their own simpler data collection by using
+the <EM>Generic Tag</EM> mechanism. This second light-weight procedure
+allows you to define a tag <EM>on the fly</EM>, without creating a
+persistent class. Compared to the concrete tag, there is, of course, a
+small performance penalty, but this is most of the time balanced by
+an increased flexibility, since at any time new fields can be added to
+the tag and the association to the complete event data remains
+available. Presently, both the concrete tag
+and the generic tag are defined in a C++ program before being
+used in the Interactive Analysis framework.
+
+
+
+
+
+
+</P>
+
+
+
+<H2>2.3. Implementing the Data Model: explorable collections</H2>
+
+<P>
+When creating a tag (either generic or concrete) a description of its
+fields (name and type) must be provided. This information is used
+later to access the data. The set of individual
+tags is called an <EM>Explorable Collection</EM>,
+i.e., a collection of objects implementing an IRIS Explorer access
+interface.
+
+
+
+</P>
+
+<P>
+Explorable collections are data that you can analyse using
+The principle of operation in described in 
+Figure <a href="H1LHCPPObjectModel.html#FIAM">[FIAM]</a>.
+HEPExplorer Interactive Analysis modules.
+
+</P>
+
+<P CLASS="CENTERP">
+<A NAME="FIAM"><IMG SRC="interactive-analysis-map.gif"></A>
+</P>
+<P>
+<B>Principle of operation of Interactive Analysis Map</B>
+</P>
+
+
+
+
+
+<P>
+To plot an histogram, you start by picking your explorable collection
+using the Browser, and then define your cuts and histogram variables
+using the Selector, before filling your Histogram.  Apart from
+accessing the data in the tag, you are able to invoke C++ methods that
+implement, e.g., common physics or access the experiment specific
+event object (by traversing the association between a tag and its
+related event). User-defined functions can be used whenever a C++
+expression is allowed.
+All these possibilities are explained in much more detail
+
+in Section <a href="H1HEPExplorerModules.html#HEPExplorerexplorable">[HEPExplorerexplorable]</a>.
+
+
+
+
+</P>
+
+<hr>
+<address>
+ Last updated: mg Mon Sep 06 12:05:57 GMT+03:30 1999<br>
+</address>
+</body>
+</html>

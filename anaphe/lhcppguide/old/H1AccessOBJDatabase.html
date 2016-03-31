@@ -1,0 +1,547 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html xmlns:date="http://www.jclark.com/xt/java/java.util.Date">
+<head>
+<title>Accessing the Objectivity/DB database</title>
+<STYLE TYPE="text/css">body       { background: white; color: black}
+ P.CENTERP  { text-align: center}
+ TD.LISTING { background: #88FFFF; color: black; white-space: pre}
+ tt         { color: red }
+</STYLE>
+</head>
+<body>
+<H1>
+<A NAME="H1AccessOBJDatabase">4. Accessing the Objectivity/DB database</A>
+</H1>
+
+
+<H2>4.1. What does the user have to know about the database?</H2>
+
+<P>
+Ideally, the hierarchical structure of the data storage should be
+completely transparent to the average user. Therefore, the LHC++ Team
+has done its best to hide the impact of the database on the C++
+user code to a minimum. However, it is best that the users of the
+modules are aware of some basic principles, and how they relate to the
+experimental data model used by the various analysis programs.
+</P>
+
+<P>
+Let we have a look at Figure <a href="H1AccessOBJDatabase.html#STORAGEUSER">[STORAGEUSER]</a>.
+It shows the storage hierarchy used to store event data at the
+left, together with the user's view of these data at the right.
+</P>
+
+<P CLASS="CENTERP">
+<A NAME="STORAGEUSER"><IMG SRC="storage_user.gif"></A>
+</P>
+<P>
+<B>The storage hierarchy and the user view</B>
+</P>
+
+
+<P>
+We start with the user's view (right hand side of the picture).
+The user likes to think in terms of events (the octagons), and wants
+to deal with, for instance reconstructed tracks (the triangles), hits in
+the forward calorimeter (the diamonds), or the calibration for the TPC
+(the pentagons), etc. Users should not be directly concerned (apart
+perhaps for efficiency considerations) how these various data elements
+are actually stored in files and distributed over a network. They
+prefer to have a <EM>logical</EM> view of their event and navigate
+between its various componenents in a transparent way. It is up to the
+data administrator to make sure that the data are stored in a way
+optimising performance and throughput for the end user.
+</P>
+
+<P>
+This is possible using an object oriented database system, such as
+Objectivity/DB (left hand side of the picture). All data are kept in one
+<EM>federated database</EM>, which is basically just a file containing
+the catalog of the database files and the hostnames where they
+reside. It also contains the <EM>schema</EM> (object model) used by
+the data in the various databases.
+
+
+
+</P>
+
+<P>
+The <EM>databases</EM> themselves are also separate files, which can
+reside on different nodes and they can consist of multiple
+<EM>containers</EM>, that can be thought of a contiguous areas on a
+file.
+</P>
+
+
+
+<P>
+Finally, each container consists of one or more <EM>persistent</EM>
+objects (e.g., histograms, reconstructed tracks, fits). As seen in the
+picture, the mapping of the event to its components is very flexible,
+allowing different parts of an event to reside in different
+containers, and/or databases (even on remote nodes). Moreover, since
+the end users only access the full data through the logical structure,
+they are never affected by changes in the physical layout of the
+database.
+</P>
+
+
+
+
+<H2>4.2. Getting access to an Objectivity/DB database</H2>
+
+<P>
+In 1999 a central service will be run for the various experiments using Objectivity/DB
+to provide access to their databases
+from various platforms using AMS. However, at present, it is necessary to
+associate a federated database with a given machine, so that you must
+always connect to that same machine if you want to access that
+database.
+
+
+
+
+
+</P>
+
+<P>
+In particular, when working on a cluster (such as hpplus) you must
+remember the real node name (e.g., <TT>hpplus16</TT>, as in the
+example in the previous chapter) of the machine which you used to
+create the database.  When you want to use the database in a later
+session, you must always connect to that node, otherwise you will not
+be able to access your data (unless your experiment is running Objectivity/DB's
+AMS, a facility to share databases
+across the network).</P>
+
+
+<P>
+The first step (after creating the database) is to tell Objectivity/DB
+where it can be found. This is done with the environment variable
+<TT>OO_FD_BOOT</TT>, which should be set to the full path name
+of the boot file of the database that you want to access.  This boot
+file is actually a small ASCII file, which contains valuable
+information about your federated database.
+
+
+
+
+
+</P>
+<TABLE>
+<TR>
+<TD CLASS="PRE">
+<PRE>
+&gt; more $OO_FD_BOOT 
+ooFDNumber=30500
+ooLFDNumber=65535
+ooPageSize=8192
+ooLockServerName=hpplus16
+ooFDDBHost=hpplus16
+ooFDDBFileName=/afs/cern.ch/user/g/goossens/HP-UX/explorer/HEPEXP.FDDB
+ooJNLHost=hpplus16
+ooJNLPath=/afs/cern.ch/user/g/goossens/HP-UX/explorer
+</PRE>
+</TD>
+</TR>
+</TABLE>
+<P>You should <EM>NEVER</EM> change its contents!</P>
+<P>
+In particular, changing the path of the federated database in this
+file after you moved it will <EM>not</EM> work.
+
+
+
+</P>
+
+<P>
+Once the <TT>OO_FD_BOOT</TT> variable is set correctly, you can
+run the Objectivity/DB management tools. For instance the program
+<TT>oodumpcatalog</TT> displays the catalog, showing the different
+databases associated to the current federated database.
+
+
+
+
+</P>
+<TABLE>
+<TR>
+<TD CLASS="PRE">
+<PRE>
+&gt; oodumpcatalog
+
+Objectivity/DB (TM) List Database Files Utility, Version 4.0.2
+Copyright (c) Objectivity, Inc 1990, 1996. All rights reserved.
+
+FD Name   = HEPEXP
+FD ID     = 30500
+FD File   = hpplus16::/afs/cern.ch/user/g/goossens/HP-UX/explorer/HEPEXP.FDDB
+Boot File = hpplus16::/afs/cern.ch/user/g/goossens/HP-UX/explorer/HEPEXP
+Jnl Dir   = hpplus16::/afs/cern.ch/user/g/goossens/HP-UX/explorer
+Lock Host = hpplus16
+
+DB Name   = SimpleTestDatabase
+DB ID     = 3
+DB Image  = hpplus16::/afs/cern.ch/user/g/goossens/HP-UX/explorer/SimpleTestDatabase.HEPEXP.DB
+</PRE>
+</TD>
+</TR>
+</TABLE>
+
+<P>
+Thus, in the example above, we see that we need to connect to the node
+<TT>hpplus16</TT> (the so-called <EM>Lock Host</EM>).  It should also
+be noted that each federated database should have a different
+federated database number to enforce proper locking management when
+the same lockserver is used by more than one federation (e.g., when
+the lockserver is running on a central service, such as hpplus).  A
+series of federated database numbers have been allocated to
+experiments and user groups (a proposed list can be found at the URL 
+<A HREF="http://wwwinfo.cern.ch/asd/cernlib/rd45/recommendations/dba.html">here</A>
+). As explained above, when registering as
+a database user with your experiment's or group's Objectivity/DB's coordinator,
+you get a unique number assigned to ensure the uniqueness of the
+federated database number.
+
+
+
+</P>
+
+
+
+
+<H2>
+<A NAME="H2AccesssOBJ">4.3. Accessing the Objectivity/DB from inside a C++ program</A>
+</H2>
+
+<P>After the initial installation, you have a federated database,
+which has no associated databases yet. This can
+be seen by using the Objectivity/DB tool <TT>ootoolmgr</TT> (<TT>oobrowse</TT>
+on Windows/NT), which allows you to browse the contents of all
+databases (down to the object level) in a federated database.  If you
+want to run <TT>ootoolmgr</TT> just type
+<TABLE>
+<TR>
+<TD CLASS="PRE">
+<PRE>
+&gt; ootoolmgr
+</PRE>
+</TD>
+</TR>
+</TABLE>
+on the command line. You will then get an Objectivity/DB panel, as shown
+in Figure <a href="H1AccessOBJDatabase.html#OOTOOLMGRPANEL">[OOTOOLMGRPANEL]</a>.
+
+
+
+
+</P>
+
+<P CLASS="CENTERP">
+<A NAME="OOTOOLMGRPANEL"><IMG SRC="ootoolmgrpanel.gif"></A>
+</P>
+<P>
+<B>The <TT>ootoolmgr</TT> initial panel</B>
+</P>
+
+<P>Then in the <TT>File</TT> pull-down menu you choose the
+database (most of the time it is enough to click the default setting
+at the bottom, which corresponds to the database selected with the
+<TT>OO_FD_BOOT</TT> environment variable). Then you can go to
+the <TT>Tools</TT> pull-down menu and choose <TT>Browse
+FD</TT> at the top. Then you will see the <TT>Objectivity/DB - Browse
+FD</TT> appear, with four main windows, namely the names of the
+<EM>Databases</EM>, <EM>Containers</EM>, <EM>Basic
+Objects</EM>, and finally, at the bottom, the contents of the
+selected object. Just after initialisation, there are no databases
+yet, as seen in Figure <a href="H1AccessOBJDatabase.html#OOTOOLMGREMPTY">[OOTOOLMGREMPTY]</a>.
+</P>
+
+<P CLASS="CENTERP">
+<A NAME="OOTOOLMGREMPTY"><IMG SRC="ootoolmgrempty.gif"></A>
+</P>
+<P>
+<B>Using the tool <TT>ootoolmgr</TT></B>
+</P>
+
+
+
+<P>
+Before writing our first C++ program to use the database, let us
+first establish three basic rules.
+</P>
+<OL>
+<LI>
+One must first establish a connection to the database with the
+<TT>Init</TT> method.
+
+
+</LI>
+<LI>
+<EM>Transactions</EM> are used to retrieve or store persistent
+objects.
+
+<UL>
+<LI>
+A transaction is set up using the <TT>startUpdate</TT>
+or <TT>startRead</TT> methods.
+
+
+
+
+</LI>
+<LI>
+A transaction is terminated using the <TT>commit</TT>
+or <TT>abort</TT> methods. The <TT>commit</TT> method
+will save all changed objects in the database, whereas  <TT>abort</TT>
+will revert the database to the state before the transaction was
+initiated.
+
+
+
+
+
+</LI>
+</UL>
+</LI>
+<LI>
+To access persistent objects <EM>smart</EM> pointers are provided.
+They are indistinguishable from normal C++ pointers, they are merely
+declared with a different syntax using <TT>HepRef</TT>, e.g.,
+for a 1D histogram we would declare
+
+<TABLE>
+<TR>
+<TD CLASS="PRE">
+<PRE>
+HepRefP(Histo1D) myHisto (...);
+</PRE>
+</TD>
+</TR>
+</TABLE>
+while for a pointer to a non-persistent C++ object you would write
+<TABLE>
+<TR>
+<TD CLASS="PRE">
+<PRE>
+Histo1D *myHisto ...
+</PRE>
+</TD>
+</TR>
+</TABLE>
+Once you have declared your smart pointers to your persistent object,
+all navigation between objects is completely like in the case of
+normal pointers; whenever a reference is made to a smart pointer, a
+callback to the database will automatically fetch the required
+data. Moreover at the end of the transaction all modified objects will
+automatically be stored in the database at commit time.
+
+</LI>
+</OL>
+<P>If, while reading through the examples, you want to know more
+details about the HepODBMS classes, you can have a look at the
+<EM>Class Reference Guide</EM> at the URL
+<A HREF="http://wwwinfo.cern.ch/asd/lhc++/HepODBMS/reference-manual/HepODBMS.html">here</A>.
+</P>
+
+
+
+
+<H2>4.4. Manipulating the Objectivity/DB database and its containers in a C++ program</H2>
+
+<P>
+To show a few more of the class methods available to manipulate an
+Objectivity/DB database, we can look at the following code.
+</P>
+<TABLE>
+<TR>
+<TD CLASS="LISTING">
+<PRE>
+/* dbAccess.cpp */
+#include "HepODBMS/tagdb/HepTagDbApplication.h"
+#include "HepODBMS/tagdb/HepEvent.h"
+
+class dbAccessApp : public HepTagDbApplication {
+  // Application inherits session control from HepDbApplication
+public:
+  // this application implements just one method: run the 
+  dbAccessApp(const char *name) : HepTagDbApplication(name)
+  {};
+  
+  int run()
+  {
+    // print an 
+    message("about to initialise the db connection");
+    Init();        // initialise the db session
+    message("starting an update transaction");
+    startUpdate(); // start an update transaction
+
+    // create a new database (file)
+    HepDatabaseRef  myDb = db("MyDatabase");
+
+    // if the database ref is not valid:
+    // - print a message
+    // - exit the application with an error code 
+    if (myDb == 0)
+      fatal("could not find or create MyDatabase");
+    
+    // create a new container in this database
+    HepContainerRef cont = container("MyContainer"); 
+    if (cont == 0 )
+      fatal("could not find or create MyDatabase");
+
+    // work with the container and database
+    // (e.g. create histograms, tags or other persistent objects)
+      
+    for (short i=0; i&lt;1000; i++)
+    {
+      // create a new event in my container
+      HepRef(HepEvent) event = new(cont) HepEvent;
+      if (event == 0) 
+        fatal("could not create a new event");
+    }
+    message("created 1000 events");
+
+    printContainerMap( ) ;
+
+    // delete the container from the database
+    // including all events
+    HepDelete(cont);
+    warning("deleted the container");
+
+    // delete the database from the federation
+    HepDelete(myDb);
+    warning("deleted the database");
+
+    // commit all changes made during this transaction
+    commit();
+    return 0;
+  }
+  
+};
+
+int main(int argc, const char *argv[])
+{
+  dbAccessApp myApp(argv[0]);  // create an application object
+  return myApp.run();    // call it's run method
+}
+</PRE>
+</TD>
+</TR>
+</TABLE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<P>
+The <TT>HepDbApplication</TT> class defines the transaction methods 
+<TT>abort</TT>, <TT>commit</TT>, <TT>startRead</TT>, 
+<TT>startUpdate</TT> (described already in Section
+<a href="H1AccessOBJDatabase.html#H2AccesssOBJ">[H2AccesssOBJ]</a>),
+as well as four methods for sending an informative string to the
+user console: <TT>fatal</TT> (prints a fatal error message and
+aborts), <TT>error</TT> and <TT>warning</TT>,  (prints an 
+error and warning message and continue), and
+<TT>message</TT> (just prints a message).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</P>
+<P>
+The <TT>HepDatabaseRef</TT> declaration sets up a database handle
+<TT>myDb</TT> using the <TT>db</TT> method from the <TT>ooSession</TT>
+class. Once we have opened a database, we declare a container with
+<TT>HepContainerRef</TT>, which returns us a handle <TT>cont</TT>
+using the <TT>container</TT> method from the <TT>ooSession</TT>
+class. The container handle is then used to store one thousand events
+of type <TT>HepEvent</TT> inside the <TT>for</TT> loop. Just before we
+delete our database we print a map of the containers with the
+<TT>printContainerMap</TT> method, which shows the containers together
+with their object identifiers (the <TT>HepSystem</TT> and
+<TT>ExplorableDescr</TT> containers are created when HEPODBMS is set
+up in the <TT>System</TT> database).  Finally, we delete the container
+and database by specifying their respective handles to the
+<TT>HepDelete</TT> method. Below, the output generated by the above
+C++ code is shown.
+</P>
+<TABLE>
+<TR>
+<TD CLASS="PRE">
+<PRE>
+dbAccess: about to initialise the db connection
+dbAccess: starting an update transaction
+dbAccess: created 1000 events
+HepSystem --- #3-4-3-1
+ExplorableDescr --- #3-5-3-1
+MyContainer --- #12-3-1-1
+WARNING: dbAccess: deleted the container
+WARNING: dbAccess: deleted the database
+</PRE>
+</TD>
+</TR>
+</TABLE>
+
+
+
+
+<H2>4.5. Objectivity/DB administration tools</H2>
+
+<P>
+Objectivity/DB provides a whole set of administration tools to manage a
+federated database. These tools are described in detail in the
+<EM>Objectivity/DB Administration</EM> manual. In this section we briefly
+describe the more useful from the physicists' point of view.
+</P>
+<UL>
+<LI>
+<TT>oodumpcatalog</TT> provides summary information about a
+    federated database;
+
+
+</LI> 
+<LI>
+<TT>ootoolmgr</TT> (<TT>oobrowse</TT>
+    on Windows/NT) allows you to browse federated database schema and
+    data;</LI>
+<LI>
+<TT>oocleanup</TT> resets pending locks;</LI>
+<LI>
+<TT>oodeletedb</TT> deletes a <EM>physical</EM> database.</LI>
+</UL>
+
+<hr>
+<address>
+ Last updated: mg Mon Sep 06 12:06:01 GMT+03:30 1999<br>
+</address>
+</body>
+</html>
